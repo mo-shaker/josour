@@ -1,0 +1,48 @@
+<ui:FluentWindow x:Class="RouteBridge.App.MainWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 xmlns:app="clr-namespace:RouteBridge.App"
+                 xmlns:vm="clr-namespace:RouteBridge.App.ViewModels"
+                 xmlns:views="clr-namespace:RouteBridge.App.Views"
+                 mc:Ignorable="d"
+                 d:DataContext="{d:DesignInstance Type=vm:MainViewModel, IsDesignTimeCreatable=False}"
+                 Title="{x:Static app:Strings.AppName}"
+                 Icon="pack://application:,,,/Assets/routebridge.ico"
+                 Width="460" Height="560" MinWidth="420" MinHeight="480"
+                 WindowStartupLocation="CenterScreen"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="Mica"
+                 WindowCornerPreference="Round">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="{x:Static app:Strings.AppName}" ShowMaximize="False" />
+
+        <TabControl Grid.Row="1" Margin="12,4,12,0">
+            <TabItem Header="{x:Static app:Strings.HostTab}">
+                <views:HostPage DataContext="{Binding Host}" />
+            </TabItem>
+            <TabItem Header="{x:Static app:Strings.GuestTab}">
+                <views:GuestPage DataContext="{Binding Guest}" />
+            </TabItem>
+        </TabControl>
+
+        <Grid Grid.Row="2" Margin="16,8,16,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ui:TextBlock Grid.Column="0" FontTypography="Caption" Appearance="Secondary"
+                          Text="{Binding StatusText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            <ui:TextBlock Grid.Column="1" FontTypography="Caption" Appearance="Tertiary"
+                          Text="{Binding VersionText}" VerticalAlignment="Center" Margin="12,0,0,0" />
+        </Grid>
+    </Grid>
+</ui:FluentWindow>

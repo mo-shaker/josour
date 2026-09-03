@@ -1,0 +1,18 @@
+<Application x:Class="RouteBridge.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:conv="clr-namespace:RouteBridge.App.Converters"
+             ShutdownMode="OnExplicitShutdown">
+    <!-- No StartupUri: App.OnStartup builds the Generic Host and shows MainWindow itself (or stays in the tray with -\-minimized). -->
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ui:ThemesDictionary Theme="Light" />
+                <ui:ControlsDictionary />
+            </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter x:Key="BoolToVis" />
+            <conv:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

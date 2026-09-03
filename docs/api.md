@@ -1,0 +1,65 @@
+# عقد REST: `/api/v1`
+
+الإصدار: 1 (مجمّد نهاية الأسبوع 1). المصدر التنفيذي هو OpenAPI المولّد على `/docs` (مقيّد للمسؤولين في الإنتاج). هذا الملف يثبّت الأشكال التي يعتمد عليها المسار C.
+
+## قواعد عامة
+
+- JSON في الطلب والرد. الأوقات ISO-8601 UTC بلاحقة `Z`. المعرّفات UUID.
+- المصادقة: `Authorization: Bearer <access>`. access JWT صالح 15 دقيقة، refresh صالح 30 يومًا ويُستبدل عند كل تجديد (rotation؛ إعادة استخدام refresh قديم تلغي السلسلة كلها).
+- الأخطاء: `{ "error": { "code": "…", "message": "…" } }` مع رمز HTTP مناسب. أكواد شائعة: `invalid_credentials`, `account_locked`, `account_disabled`, `device_revoked`, `unauthorized`, `forbidden`, `not_found`, `validation_error`, `rate_limited`, `conflict`.
+- Rate limit على `/auth/login`: 5 طلبات/دقيقة/IP → `429`.
+- قفل الحساب 15 دقيقة بعد 10 محاولات فاشلة → `423 account_locked`.
+
+## المصادقة
+
+### `POST /auth/login`
+```json
+{ "email": "a@b.c", "password": "…",
+  "device": { "id": "uuid|null", "secret": "…|null", "name": "LAPTOP-01", "os_version": "Windows 11 Pro", "os_build": "22631" } }
+```
+- `device.id` و`device.secret` فارغان عند أول دخول من الجهاز → الخادم ينشئ الجهاز ويعيد `device_secret` **مرة واحدة**؛ العميل يحفظه بـ DPAPI.
+- جهاز موجود بسر خاطئ → `401 unauthorized`. جهاز ملغى → `403 device_revoked`.
+
+الرد `200`:
+```json
+{ "access_token": "…", "refresh_token": "…", "expires_in": 900,
+  "user": { "id": "…", "email": "…", "display_name": "…", "role": "user" },
+  "device": { "id": "…", "name": "…", "secret": "…|null" } }
+```
+
+### `POST /auth/refresh`  `{ "refresh_token": "…" }` → نفس شكل الرد أعلاه بلا `device.secret`.
+### `POST /auth/logout`  `{ "refresh_token": "…" }` → `204`.
+
+## المستخدم الحالي
+
+- `GET /me` → `{ id, email, display_name, role }`
+- `GET /me/devices` → `[{ id, name, os_version, status, last_seen_at, created_at }]`
+- `DELETE /me/devices/{id}` → `204` (إلغاء تسجيل؛ يلغي refresh tokens الجهاز)
+- `GET /hosts` → `[{ device_id, user_display_name, device_name, reachable }]` (نفس شكل `hosts.snapshot`)
+- `GET /sessions/me?limit=50` → `[{ id, role, peer_display_name, peer_device_name, status, created_at, started_at, ended_at, end_reason, bytes_up, bytes_down }]`
+- `GET /domains` → `{ "version": 3, "entries": ["example.com", "=exact.com", "portal.corp:8443"] }` مع `ETag: "3"`؛ يدعم `If-None-Match` → `304`، و`?version=N` يعيد إصدارًا محددًا أو `404`.
+
+## النموذج التقني
+
+- `POST /probe`  `{ "ip": "…", "port": 12345 }` → `{ "reachable": true, "latency_ms": 42 }` (عند الفشل: `{ "reachable": false, "latency_ms": null }`). يتطلب مصادقة. العناوين الخاصة وloopback تُرفض بـ `400 validation_error`. الخادم يجرب اتصال TCP بمهلة 3 ثوانٍ ويغلقه فورًا. يُستخدم في نموذج الأسبوع 1 وفي فحص قابلية الوصول.
+
+## الإدارة (role = admin)
+
+- `POST /admin/users` `{ email, password, display_name, role }` → `201` المستخدم.
+- `GET /admin/users` → قائمة. `PATCH /admin/users/{id}` `{ is_active?, password?, display_name?, unlock?: true }`.
+- `GET /admin/devices?user_id=` ، `POST /admin/devices/{id}/revoke` → `204`.
+- `GET /admin/domains` → `{ version, entries, updated_at }`.
+- `PUT /admin/domains` `{ "entries": [...] }` → إصدار جديد؛ يتحقق من صحة كل مدخل؛ يبث `allowlist.updated`.
+- `GET /admin/sessions?status=&limit=` ، `POST /admin/sessions/{id}/terminate` → `204`.
+- `GET /admin/security-events?limit=` ، `GET /admin/diagnostics` → ملخص: عدد الجلسات، نسبة `connect_result=ok`، توزيع `winner_type`، توزيع `tls_version`.
+- `GET /admin/settings` ، `PATCH /admin/settings` `{ max_session_minutes?, request_timeout_seconds?, log_domains?, allowed_ports? }`.
+
+## القيم الافتراضية للإعدادات
+
+| المفتاح | الافتراضي |
+|---|---|
+| `max_session_minutes` | 120 |
+| `request_timeout_seconds` | 60 |
+| `connect_timeout_seconds` | 30 |
+| `log_domains` | false |
+| `allowed_ports` | `[80, 443]` |

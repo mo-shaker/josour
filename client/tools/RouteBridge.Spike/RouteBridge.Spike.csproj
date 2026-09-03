@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>RouteBridge.Spike</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/RouteBridge.Core/RouteBridge.Core.csproj" />
+    <ProjectReference Include="../../src/RouteBridge.Tunnel/RouteBridge.Tunnel.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,50 @@
+name: ci-client
+
+on:
+  push:
+    branches: [main]
+    paths: ["client/**", ".github/workflows/ci-client.yml"]
+  pull_request:
+    paths: ["client/**", ".github/workflows/ci-client.yml"]
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Restore
+        run: dotnet restore RouteBridge.sln
+      - name: Build
+        run: dotnet build RouteBridge.sln --no-restore -c Release -warnaserror:nullable
+      - name: Test
+        run: dotnet test RouteBridge.sln --no-build -c Release --logger "trx;LogFileName=results.trx"
+      - name: Publish app (unsigned, artifact for QA)
+        run: dotnet publish src/RouteBridge.App -c Release -r win-x64 --self-contained false -o publish/app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: routebridge-app-unsigned
+          path: client/publish/app
+          retention-days: 7
+
+  build-linux:
+    # يثبت أن المكتبات (بلا WPF) تُبنى وتُختبر خارج Windows أيضًا
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Test libraries
+        run: |
+          for p in Core Tunnel Proxy Egress Browser; do
+            dotnet test tests/RouteBridge.$p.Tests -c Release
+          done

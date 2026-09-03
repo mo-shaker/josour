@@ -1,0 +1,95 @@
+using System.Net;
+using System.Net.Sockets;
+
+namespace RouteBridge.Tunnel.Tests;
+
+public class TunnelListenerTests
+{
+    [Fact]
+    public async Task Port_IsAssigned_AndStopClosesTheSocket()
+    {
+        var listener = new TunnelListener(0, IPAddress.Loopback);
+        Assert.InRange(listener.Port, 1, 65535);
+        await listener.StartAsync(async (socket, ct) => { socket.Dispose(); await Task.CompletedTask; }, CancellationToken.None);
+        Assert.True(listener.IsRunning);
+
+        using (var probe = new TcpClient())
+        {
+            await probe.ConnectAsync(IPAddress.Loopback, listener.Port);
+        }
+
+        await listener.StopAsync();
+        Assert.False(listener.IsRunning);
+        using var after = new TcpClient();
+        await Assert.ThrowsAnyAsync<SocketException>(() => after.ConnectAsync(IPAddress.Loopback, listener.Port).WaitAsync(TimeSpan.FromSeconds(2)));
+        await listener.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task CapsPendingUnauthenticatedConnectionsAtFour()
+    {
+        await using var listener = new TunnelListener(0, IPAddress.Loopback);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await listener.StartAsync(async (socket, ct) =>
+        {
+            try
+            {
+                await Task.WhenAny(release.Task, Task.Delay(System.Threading.Timeout.Infinite, ct));
+            }
+            finally
+            {
+                socket.Dispose();
+            }
+        }, CancellationToken.None);
+
+        var clients = new List<TcpClient>();
+        try
+        {
+            for (var i = 0; i < 6; i++)
+            {
+                var client = new TcpClient();
+                await client.ConnectAsync(IPAddress.Loopback, listener.Port);
+                clients.Add(client);
+            }
+
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (listener.InboundAttempts < 6 && DateTime.UtcNow < deadline) await Task.Delay(20);
+
+            Assert.Equal(6, listener.InboundAttempts);
+            Assert.Equal(TunnelListener.MaxPendingUnauthenticated, listener.Pending);
+            Assert.Equal(2, listener.RejectedOverCapacity);
+
+            var closed = 0;
+            foreach (var client in clients)
+                if (await StreamAssert.IsClosedWithinAsync(client.GetStream(), TimeSpan.FromMilliseconds(500))) closed++;
+            Assert.Equal(2, closed);
+
+            release.SetResult();
+            deadline = DateTime.UtcNow.AddSeconds(5);
+            while (listener.Pending > 0 && DateTime.UtcNow < deadline) await Task.Delay(20);
+            Assert.Equal(0, listener.Pending);
+        }
+        finally
+        {
+            foreach (var client in clients) client.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task StartAsync_Twice_Throws()
+    {
+        await using var listener = new TunnelListener(0, IPAddress.Loopback);
+        await listener.StartAsync((s, _) => { s.Dispose(); return Task.CompletedTask; }, CancellationToken.None);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => listener.StartAsync((s, _) => Task.CompletedTask, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task DefaultBind_IsDualModeOrIpv4Fallback()
+    {
+        await using var listener = new TunnelListener(0);
+        Assert.InRange(listener.Port, 1, 65535);
+        await listener.StartAsync((s, _) => { s.Dispose(); return Task.CompletedTask; }, CancellationToken.None);
+        using var v4 = new TcpClient(AddressFamily.InterNetwork);
+        await v4.ConnectAsync(IPAddress.Loopback, listener.Port);
+    }
+}

@@ -1,0 +1,72 @@
+<UserControl x:Class="RouteBridge.App.Views.GuestPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:app="clr-namespace:RouteBridge.App"
+             xmlns:vm="clr-namespace:RouteBridge.App.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:GuestViewModel, IsDesignTimeCreatable=False}"
+             d:DesignWidth="420" d:DesignHeight="420">
+    <Grid Margin="4,12,4,4">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+                <ui:TextBlock FontTypography="Subtitle" Text="{x:Static app:Strings.GuestPageTitle}" />
+                <ui:TextBlock Appearance="Secondary" TextWrapping="Wrap" Margin="0,4,0,0"
+                              Text="{x:Static app:Strings.GuestPageDescription}" />
+            </StackPanel>
+            <ui:Button Grid.Column="1" VerticalAlignment="Top" Margin="12,0,0,0"
+                       Content="{x:Static app:Strings.GuestRefresh}"
+                       Command="{Binding RefreshCommand}">
+                <ui:Button.Icon>
+                    <ui:SymbolIcon Symbol="ArrowSync24" />
+                </ui:Button.Icon>
+            </ui:Button>
+        </Grid>
+
+        <ListView Grid.Row="1"
+                  ItemsSource="{Binding Hosts}"
+                  SelectedItem="{Binding SelectedHost, Mode=TwoWay}"
+                  Visibility="{Binding HasHosts, Converter={StaticResource BoolToVis}}">
+            <ListView.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:HostListItem}">
+                    <Grid Margin="4,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ui:SymbolIcon Grid.Column="0" Symbol="Desktop24" FontSize="22" VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <ui:TextBlock FontTypography="BodyStrong" Text="{Binding UserDisplayName}" />
+                            <ui:TextBlock Appearance="Secondary" Text="{Binding DeviceName}" />
+                        </StackPanel>
+                        <ui:TextBlock Grid.Column="2" Appearance="Tertiary" FontTypography="Caption"
+                                      VerticalAlignment="Center" Text="{Binding ReachabilityText}" />
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24"
+                    Visibility="{Binding HasHosts, Converter={StaticResource InverseBoolToVis}}">
+            <ui:SymbolIcon Symbol="Desktop24" FontSize="40" HorizontalAlignment="Center" Opacity="0.6" />
+            <ui:TextBlock FontTypography="BodyStrong" HorizontalAlignment="Center" Margin="0,12,0,4"
+                          Text="{Binding EmptyStateTitle}" />
+            <ui:TextBlock Appearance="Secondary" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="300"
+                          Text="{Binding EmptyStateText}" />
+            <ui:ProgressRing IsIndeterminate="True" Width="24" Height="24" Margin="0,16,0,0"
+                             Visibility="{Binding IsRefreshing, Converter={StaticResource BoolToVis}}" />
+        </StackPanel>
+    </Grid>
+</UserControl>

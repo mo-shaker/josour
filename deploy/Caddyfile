@@ -1,0 +1,24 @@
+{
+  email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+  encode zstd gzip
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options nosniff
+    X-Frame-Options DENY
+    Referrer-Policy no-referrer
+    -Server
+  }
+
+  # WebSocket و REST معًا؛ Caddy يمرر Upgrade تلقائيًا
+  reverse_proxy api:8000 {
+    header_up X-Forwarded-For {remote_host}
+    transport http {
+      read_timeout 0
+      write_timeout 0
+    }
+  }
+}

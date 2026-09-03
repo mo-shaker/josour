@@ -1,0 +1,36 @@
+<UserControl x:Class="RouteBridge.App.Views.HostPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:app="clr-namespace:RouteBridge.App"
+             xmlns:vm="clr-namespace:RouteBridge.App.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:HostViewModel, IsDesignTimeCreatable=False}"
+             d:DesignWidth="420" d:DesignHeight="420">
+    <StackPanel Margin="4,12,4,4">
+        <ui:TextBlock FontTypography="Subtitle" Text="{x:Static app:Strings.HostPageTitle}" />
+        <ui:TextBlock Appearance="Secondary" TextWrapping="Wrap" Margin="0,4,0,16"
+                      Text="{x:Static app:Strings.HostPageDescription}" />
+
+        <ui:Card Padding="16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <ui:TextBlock FontTypography="BodyStrong" Text="{x:Static app:Strings.HostAvailableToggle}" />
+                    <ui:TextBlock Appearance="Secondary" Text="{Binding StatusText}" Margin="0,2,0,0" />
+                </StackPanel>
+                <ui:ToggleSwitch Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0"
+                                 IsChecked="{Binding IsAvailable, Mode=TwoWay}" />
+            </Grid>
+        </ui:Card>
+
+        <ui:InfoBar Margin="0,12,0,0" IsOpen="True" IsClosable="False" Severity="Informational"
+                    Title="{x:Static app:Strings.HostSignInHintTitle}"
+                    Message="{x:Static app:Strings.HostSignInHint}" />
+    </StackPanel>
+</UserControl>

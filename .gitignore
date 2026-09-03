@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+backend/.env
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+TestResults/
+client/**/publish/
+
+# Deploy
+deploy/.env
+deploy/backups/
+deploy/caddy_data/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
