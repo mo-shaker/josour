@@ -35,7 +35,7 @@
 - `GET /me` → `{ id, email, display_name, role }`
 - `GET /me/devices` → `[{ id, name, os_version, status, last_seen_at, created_at }]`
 - `DELETE /me/devices/{id}` → `204` (إلغاء تسجيل؛ يلغي refresh tokens الجهاز)
-- `GET /hosts` → `[{ device_id, user_display_name, device_name, reachable }]` (نفس شكل `hosts.snapshot`)
+- `GET /hosts` → `[{ device_id, user_display_name, device_name, reachable }]` — نفس شكل `hosts.snapshot` ونفس التصفية بالضبط (متصل، مفعِّل «متاح»، بلا جلسة غير منتهية، **مع استثناء أجهزة المستخدم نفسه**؛ ثُبّت في الأسبوع 3)
 - `GET /sessions/me?limit=50` → `[{ id, role, peer_display_name, peer_device_name, status, created_at, started_at, ended_at, end_reason, bytes_up, bytes_down }]`
 - `GET /domains` → `{ "version": 3, "entries": ["example.com", "=exact.com", "portal.corp:8443"] }` مع `ETag: "3"`؛ يدعم `If-None-Match` → `304`، و`?version=N` يعيد إصدارًا محددًا أو `404`.
 

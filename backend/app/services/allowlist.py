@@ -3,7 +3,7 @@
 Validation rules live in ``validate_entry`` and are shared by the CLI (``add-domain``) and
 ``PUT /admin/domains``. Publishing is two steps: a service call that flushes the new
 ``allowlist_versions`` row, then - after the caller commits - ``published_event`` on the event
-bus, which week 3 turns into ``allowlist.updated`` (see app.services.events).
+bus, which the WebSocket layer turns into ``allowlist.updated`` (see app.ws.subscribers).
 """
 
 import ipaddress
@@ -94,6 +94,12 @@ async def get_latest_version(db: AsyncSession) -> AllowlistVersion | None:
     return await db.scalar(
         select(AllowlistVersion).order_by(AllowlistVersion.version.desc()).limit(1)
     )
+
+
+async def current_version(db: AsyncSession) -> int:
+    """The published version number, or 0 when nothing has been published yet. Used by
+    ``hello.ack``, ``request.incoming`` and ``session.created``."""
+    return await db.scalar(select(func.max(AllowlistVersion.version))) or 0
 
 
 async def get_version(db: AsyncSession, version: int) -> AllowlistVersion | None:

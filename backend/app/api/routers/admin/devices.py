@@ -8,6 +8,8 @@ from app.core.errors import NotFound
 from app.models import Device
 from app.schemas.admin import AdminDeviceOut
 from app.services import devices as device_service
+from app.ws import notify
+from app.ws.protocol import CloseCode
 
 router = APIRouter(prefix="/devices")
 
@@ -35,4 +37,6 @@ async def revoke_device(
     )
     if changed:
         await db.commit()
+        # The token is dead, so the live control channel must go too (section 7).
+        await notify.close_device(device.id, CloseCode.NOT_ALLOWED)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

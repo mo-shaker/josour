@@ -3,8 +3,9 @@ using RouteBridge.Core.Control;
 namespace RouteBridge.App.Services;
 
 /// <summary>
-/// A channel that is never connected: every call fails with a clear message. Not registered in DI since week 2
-/// (<c>MockControlChannel</c> took its place; week 3 brings <c>RouteBridge.Infrastructure.ControlChannel</c>); kept as the
+/// A channel that is never connected: every call fails with a clear message. Since week 3 the app resolves
+/// <c>RouteBridge.Infrastructure.ControlChannel</c> (or <c>MockControlChannel</c> with <c>--mock</c>), which behaves exactly like
+/// this one until <see cref="ControlChannelConnector"/> has a server address and a signed-in session; this class stays as the
 /// explicit "not signed in / no server" stand-in for design-time data and tests.
 /// </summary>
 public sealed class NotConnectedControlChannel : IControlChannel
@@ -20,6 +21,12 @@ public sealed class NotConnectedControlChannel : IControlChannel
     }
 
     public event Action<ControlMessage>? MessageReceived
+    {
+        add { }
+        remove { }
+    }
+
+    public event Action<ControlChannelClosed>? Closed
     {
         add { }
         remove { }

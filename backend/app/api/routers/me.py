@@ -9,6 +9,8 @@ from app.models import Device
 from app.schemas.auth import UserOut
 from app.schemas.me import MeDeviceOut
 from app.services.devices import revoke_device
+from app.ws import notify
+from app.ws.protocol import CloseCode
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -38,4 +40,5 @@ async def revoke_my_device(
     )
     if changed:
         await db.commit()
+        await notify.close_device(device.id, CloseCode.NOT_ALLOWED)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

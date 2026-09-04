@@ -1,111 +1,43 @@
 using System.Net;
 using System.Net.Sockets;
-using System.Security.Cryptography;
 using System.Text;
-using RouteBridge.Core.Allowlist;
 using RouteBridge.Core.Net;
 using RouteBridge.Core.Tunnel;
-using RouteBridge.Egress;
 using RouteBridge.Proxy;
-using RouteBridge.Tunnel;
-using RouteBridge.Tunnel.Certificates;
-using RouteBridge.Tunnel.Mux;
-using RouteBridge.Tunnel.Transport;
 
 namespace RouteBridge.E2E.Tests;
 
 /// <summary>
-/// المسار كاملًا داخل العملية: SymmetricConnector على loopback → NerdbankMux في الطرفين → OpenHandler/EgressPolicy على المضيف →
-/// ConnectProxyServer على المستخدم → متصفح وهمي (مقبس خام + HttpClient بـ Proxy). المحلل يربط site.test/direct.test بـ 127.0.0.1
-/// وسياسة الحظر تُستبدل للسماح بـ loopback في هذا الاختبار فقط.
+/// المسار كاملًا داخل العملية عبر جلستَي <see cref="RouteBridge.Tunnel.TunnelSession"/> (بلا ربط يدوي):
+/// المضيف يشغّل سياسة الخروج، والضيف يشغّل الـ Proxy، ومتصفح وهمي (مقبس خام أو HttpClient بـ Proxy) يمر عليه.
 /// </summary>
 public class InProcessTunnelTests : IAsyncLifetime
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(20);
-    private const string PeerPublicIp = "203.0.113.7";
+    private InProcessTunnelPair _pair = null!;
 
-    private SessionCertificate? _hostCert, _guestCert;
-    private TunnelListener? _hostListener, _guestListener;
-    private NerdbankMux? _hostMux, _guestMux;
-    private HttpOrigin? _origin;
-    private OpenHandler? _handler;
-    private ConnectProxyServer? _proxy;
-    private string _tlsVersion = "";
+    public async Task InitializeAsync() => _pair = await InProcessTunnelPair.CreateAsync();
 
-    public async Task InitializeAsync()
-    {
-        _origin = new HttpOrigin();
-        var sessionId = Guid.NewGuid();
-        var secret = RandomNumberGenerator.GetBytes(32);
-        var expires = DateTimeOffset.UtcNow.AddMinutes(30);
-        var hostMaterial = new SessionMaterial(sessionId, TunnelRole.Host, secret, expires, true, "198.51.100.2");
-        var guestMaterial = new SessionMaterial(sessionId, TunnelRole.Guest, secret, expires, true, PeerPublicIp);
-        _hostCert = SessionCertificate.Create(expires);
-        _guestCert = SessionCertificate.Create(expires);
-        _hostListener = new TunnelListener(0, IPAddress.Loopback);
-        _guestListener = new TunnelListener(0, IPAddress.Loopback);
-        var hostCandidates = new[] { new CandidateEndpoint(CandidateType.Lan, "127.0.0.1", _hostListener.Port) };
-        var guestCandidates = new[] { new CandidateEndpoint(CandidateType.Lan, "127.0.0.1", _guestListener.Port) };
-        var hostConnector = new SymmetricConnector(hostMaterial, _hostCert, _hostListener, new DirectTransport(), hostCandidates);
-        var guestConnector = new SymmetricConnector(guestMaterial, _guestCert, _guestListener, new DirectTransport(), guestCandidates);
-
-        var hostTask = hostConnector.ConnectAsync(new PeerEndpointInfo(_guestCert.FingerprintHex, guestCandidates), Timeout, CancellationToken.None);
-        var guestTask = guestConnector.ConnectAsync(new PeerEndpointInfo(_hostCert.FingerprintHex, hostCandidates), Timeout, CancellationToken.None);
-        var host = await hostTask;
-        var guest = await guestTask;
-        if (!host.Result.Connected || !guest.Result.Connected) throw new InvalidOperationException("symmetric connect failed: " + host.Result.FailureReason + "/" + guest.Result.FailureReason);
-        _tlsVersion = host.Result.TlsVersion!;
-
-        // المضيف: Mux + سياسة الخروج (site.test مسموح على منفذ الأصل فقط)
-        _hostMux = NerdbankMux.Create(host.Connection!.Stream, TunnelRole.Host);
-        var allowlist = AllowlistMatcher.Parse(1, new[] { $"site.test:{_origin.Port}" });
-        var policy = new EgressPolicy(allowlist, new EgressPolicyOptions
-        {
-            Resolver = new StubResolver().Map("site.test", "127.0.0.1"),
-            AddressBlocker = a => !IPAddress.IsLoopback(a) && IpRangePolicy.IsBlocked(a), // loopback مسموح هنا فقط
-        });
-        _handler = new OpenHandler(policy);
-        _handler.Attach(_hostMux);
-
-        // المستخدم: Mux + Proxy (القائمة نفسها؛ direct.test غير مسموح → مباشر)
-        _guestMux = NerdbankMux.Create(guest.Connection!.Stream, TunnelRole.Guest);
-        _proxy = new ConnectProxyServer(new ConnectProxyOptions
-        {
-            Allowlist = allowlist,
-            Mux = _guestMux,
-            PeerPublicIp = PeerPublicIp,
-            Resolver = new StubResolver().Map("direct.test", "127.0.0.1").Map("site.test", "127.0.0.1"),
-        });
-        _proxy.Start();
-    }
-
-    public async Task DisposeAsync()
-    {
-        if (_proxy is not null) await _proxy.DisposeAsync();
-        if (_guestMux is not null) await _guestMux.DisposeAsync();
-        if (_hostMux is not null) await _hostMux.DisposeAsync();
-        if (_hostListener is not null) await _hostListener.DisposeAsync();
-        if (_guestListener is not null) await _guestListener.DisposeAsync();
-        _hostCert?.Dispose();
-        _guestCert?.Dispose();
-        _origin?.Dispose();
-    }
+    public async Task DisposeAsync() => await _pair.DisposeAsync();
 
     [Fact]
     public async Task Connect_Allowlisted_FlowsThroughTunnel_CountsBytes_CollectsDomain()
     {
-        Assert.Contains(_tlsVersion, new[] { "1.2", "1.3" });
-        var serve = _origin!.ServeOnceAsync("tunnelled body");
-        using var client = new TcpClient();
-        await client.ConnectAsync(IPAddress.Loopback, _proxy!.Port);
+        Assert.Contains(_pair.HostResult.TlsVersion, new[] { "1.2", "1.3" });
+        Assert.Equal(CandidateType.Lan, _pair.HostResult.WinnerType);
+        Assert.Equal(TunnelState.Connected, _pair.Host.State);
+        Assert.Equal(TunnelState.Connected, _pair.Guest.State);
+
+        var serve = _pair.Origin.ServeOnceAsync("tunnelled body");
+        using var client = await _pair.ConnectToProxyAsync();
         var stream = client.GetStream();
 
-        await stream.WriteAsync(Encoding.ASCII.GetBytes($"CONNECT site.test:{_origin.Port} HTTP/1.1\r\nHost: site.test:{_origin.Port}\r\n\r\n"));
+        await stream.WriteAsync(E2EWait.Ascii($"CONNECT site.test:{_pair.OriginPort} HTTP/1.1\r\nHost: site.test:{_pair.OriginPort}\r\n\r\n"));
         var connectHead = await Http.ReadHeadAsync(stream);
         Assert.Equal(200, connectHead.Status);
         Assert.Empty(connectHead.Remainder);
 
-        var request = Encoding.ASCII.GetBytes("GET /via-tunnel HTTP/1.1\r\nHost: site.test\r\n\r\n");
+        var request = E2EWait.Ascii("GET /via-tunnel HTTP/1.1\r\nHost: site.test\r\n\r\n");
         await stream.WriteAsync(request);
         var head = await Http.ReadHeadAsync(stream);
         Assert.Equal(200, head.Status);
@@ -115,114 +47,266 @@ public class InProcessTunnelTests : IAsyncLifetime
         // EOF من الأصل ينتقل عبر النفق إلى المتصفح (إغلاق نصفي)
         var one = new byte[1];
         Assert.Equal(0, await stream.ReadAsync(one).AsTask().WaitAsync(Timeout));
-        // المتصفح يغلق جانبه → ينتقل عبر النفق كـ Shutdown(Send) نحو الأصل فيرى نهاية الاتصال
+        // المتصفح يغلق جانبه → ينتقل عبر النفق كـ Shutdown(Send) نحو الأصل
         client.Client.Shutdown(SocketShutdown.Send);
         await serve.WaitAsync(Timeout);
-        Assert.StartsWith("GET /via-tunnel HTTP/1.1", _origin.ReceivedHead);
+        Assert.StartsWith("GET /via-tunnel HTTP/1.1", _pair.Origin.ReceivedHead);
 
-        Assert.Equal(request.Length, _handler!.Counter.Up);
-        Assert.True(_handler.Counter.Down >= body.Length, $"down={_handler.Counter.Down}");
-        Assert.Contains("site.test", _handler.Domains.Snapshot());
-        Assert.Equal(1, _handler.OpensOk);
-        Assert.True(_guestMux!.Stats.BytesUp > request.Length);
-        Assert.True(_hostMux!.Stats.BytesUp > body.Length);
-        Assert.Equal(1, _proxy.Counters.Tunneled);
-        var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (_handler.Limiter.Active > 0 && DateTime.UtcNow < deadline) await Task.Delay(20);
-        Assert.Equal(0, _handler.Limiter.Active);
+        // الإحصاءات والنطاقات تُقرأ من الجلسة نفسها (وهي ما يرسله التطبيق في session.stats/session.end)
+        Assert.Equal(request.Length, _pair.Host.Stats.BytesUp);
+        Assert.True(_pair.Host.Stats.BytesDown >= body.Length, $"down={_pair.Host.Stats.BytesDown}");
+        Assert.Contains("site.test", _pair.Host.DomainsSeen);
+        Assert.Empty(_pair.Guest.DomainsSeen);
+        Assert.Equal(1, _pair.HostHandler.OpensOk);
+        Assert.Equal(1, _pair.ProxyServer.Counters.Tunneled);
+        Assert.True(_pair.Guest.Stats.BytesUp > request.Length);
+
+        Assert.True(await E2EWait.UntilAsync(() => _pair.HostHandler.Limiter.Active == 0, TimeSpan.FromSeconds(5)));
+        Assert.True(await E2EWait.UntilAsync(() => _pair.Host.Stats.OpenStreams == 0, TimeSpan.FromSeconds(5)));
     }
 
     [Fact]
-    public async Task Http_NotAllowlisted_GoesDirect_ViaHttpClientProxy()
+    public async Task Http_NotAllowlisted_GoesDirect_NeverTouchingTheTunnel()
     {
-        var serve = _origin!.ServeOnceAsync("direct body");
-        using var http = NewProxiedClient();
-        var response = await http.GetAsync($"http://direct.test:{_origin.Port}/direct").WaitAsync(Timeout);
+        var serve = _pair.Origin.ServeOnceAsync("direct body");
+        using var http = _pair.NewProxiedClient();
+        var response = await http.GetAsync($"http://direct.test:{_pair.OriginPort}/direct").WaitAsync(Timeout);
+
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("direct body", await response.Content.ReadAsStringAsync());
         await serve.WaitAsync(Timeout);
-        Assert.StartsWith("GET /direct HTTP/1.1", _origin.ReceivedHead);
-        Assert.Contains("Connection: close", _origin.ReceivedHead);
-        Assert.DoesNotContain("direct.test", _handler!.Domains.Snapshot());
-        Assert.Equal(0, _handler.OpensOk);
-        Assert.Equal(1, _proxy!.Counters.DirectHttpRequests);
+        Assert.StartsWith("GET /direct HTTP/1.1", _pair.Origin.ReceivedHead);
+        Assert.Contains("Connection: close", _pair.Origin.ReceivedHead);
+
+        Assert.DoesNotContain("direct.test", _pair.Host.DomainsSeen);
+        Assert.Equal(0, _pair.HostHandler.OpensOk);
+        Assert.Equal(0, _pair.HostHandler.OpensFailed);
+        Assert.Equal(1, _pair.ProxyServer.Counters.DirectHttpRequests);
     }
 
     [Fact]
-    public async Task ProbePage_ThroughHttpClientProxy_RaisesProbeHit()
+    public async Task ProbePage_IsServed_AndRaisesProbeSeenOnTheSession()
     {
-        DateTimeOffset? hit = null;
-        _proxy!.ProbeHit += t => hit = t;
-        using var http = NewProxiedClient();
-        var html = await http.GetStringAsync("http://check.routebridge/").WaitAsync(Timeout);
-        Assert.Contains($"Tunnel active. Sites will see: {PeerPublicIp}", html);
-        Assert.NotNull(hit);
-        Assert.NotNull(_proxy.FirstProbeHitAt);
-    }
+        var seen = 0;
+        _pair.Guest.ProbeSeen += () => Interlocked.Increment(ref seen);
+        Assert.Equal(ProbePage.Url, _pair.Guest.Proxy!.ProbeUrl);
 
-    [Fact]
-    public async Task Connect_AllowlistedHost_WrongPort_HostRejects_403()
-    {
-        using var client = new TcpClient();
-        await client.ConnectAsync(IPAddress.Loopback, _proxy!.Port);
-        var stream = client.GetStream();
-        // المنفذ 443 ليس ضمن قيد المدخل site.test:<port> → المسار يعتبره غير مسموح ويحاول مباشرة → لا خادم على 443 → 502
-        await stream.WriteAsync(Encoding.ASCII.GetBytes("CONNECT site.test:443 HTTP/1.1\r\n\r\n"));
-        var head = await Http.ReadHeadAsync(stream);
-        Assert.Equal(502, head.Status);
-    }
+        using var http = _pair.NewProxiedClient();
+        var html = await http.GetStringAsync(_pair.Guest.Proxy.ProbeUrl).WaitAsync(Timeout);
 
-    [Fact]
-    public async Task Connect_AllowlistSkew_HostSaysNotAllowed_FallsBackToDirect()
-    {
-        // المضيف بقائمة أحدث لا تحوي site.test: OPEN_FAIL(not_allowed) → المستخدم يسقط إلى المباشر
-        var strict = new EgressPolicy(AllowlistMatcher.Parse(2, new[] { "other.example" }), new EgressPolicyOptions { Resolver = new StubResolver() });
-        var strictHandler = new OpenHandler(strict);
-        strictHandler.Attach(_hostMux!);
-        try
-        {
-            var serve = _origin!.ServeOnceAsync("fallback body");
-            using var client = new TcpClient();
-            await client.ConnectAsync(IPAddress.Loopback, _proxy!.Port);
-            var stream = client.GetStream();
-            await stream.WriteAsync(Encoding.ASCII.GetBytes($"CONNECT site.test:{_origin.Port} HTTP/1.1\r\n\r\n"));
-            Assert.Equal(200, (await Http.ReadHeadAsync(stream)).Status);
-            await stream.WriteAsync(Encoding.ASCII.GetBytes("GET /fb HTTP/1.1\r\nHost: site.test\r\n\r\n"));
-            var head = await Http.ReadHeadAsync(stream);
-            Assert.Equal("fallback body", Encoding.UTF8.GetString(await Http.ReadBodyAsync(stream, head)));
-            client.Client.Shutdown(SocketShutdown.Send);
-            await serve.WaitAsync(Timeout);
-            Assert.Equal(1, strictHandler.OpensFailed);
-            Assert.Equal(1, _proxy.Counters.DirectConnects);
-        }
-        finally
-        {
-            _handler!.Attach(_hostMux!);
-        }
+        Assert.Contains($"Tunnel active. Sites will see: {InProcessTunnelPair.PeerPublicIp}", html);
+        Assert.True(await E2EWait.UntilAsync(() => seen == 1, TimeSpan.FromSeconds(5)));
+        Assert.NotNull(_pair.Guest.ProbeSeenAt);
+        Assert.NotNull(_pair.ProxyServer.FirstProbeHitAt);
+        Assert.Equal(0, _pair.HostHandler.OpensOk); // صفحة الفحص لا تعبر النفق
     }
 
     [Fact]
     public async Task Connect_PrivateIpLiteral_RejectedLocally_NeverReachesHost()
     {
-        using var client = new TcpClient();
-        await client.ConnectAsync(IPAddress.Loopback, _proxy!.Port);
+        using var client = await _pair.ConnectToProxyAsync();
         var stream = client.GetStream();
-        await stream.WriteAsync(Encoding.ASCII.GetBytes("CONNECT 192.168.1.1:443 HTTP/1.1\r\n\r\n"));
+        await stream.WriteAsync(E2EWait.Ascii("CONNECT 192.168.1.1:443 HTTP/1.1\r\n\r\n"));
         Assert.Equal(403, (await Http.ReadHeadAsync(stream)).Status);
-        Assert.Equal(0, _handler!.OpensOk + _handler.OpensFailed);
+
+        using var loopbackClient = await _pair.ConnectToProxyAsync();
+        var loopbackStream = loopbackClient.GetStream();
+        await loopbackStream.WriteAsync(E2EWait.Ascii($"CONNECT 127.0.0.1:{_pair.OriginPort} HTTP/1.1\r\n\r\n"));
+        Assert.Equal(403, (await Http.ReadHeadAsync(loopbackStream)).Status);
+
+        using var localName = await _pair.ConnectToProxyAsync();
+        var localNameStream = localName.GetStream();
+        await localNameStream.WriteAsync(E2EWait.Ascii("CONNECT localhost:443 HTTP/1.1\r\n\r\n"));
+        Assert.Equal(403, (await Http.ReadHeadAsync(localNameStream)).Status);
+
+        Assert.Equal(0, _pair.HostHandler.OpensOk + _pair.HostHandler.OpensFailed);
+        Assert.Equal(3, _pair.ProxyServer.Counters.Rejected);
     }
 
     [Fact]
-    public async Task Tunnel_Liveness_PingWorks_BothWays()
+    public async Task Connect_AllowlistedHost_WrongPort_IsNotTunnelled()
     {
-        Assert.InRange((await _guestMux!.PingAsync(CancellationToken.None)).TotalMilliseconds, 0, 5000);
-        Assert.InRange((await _hostMux!.PingAsync(CancellationToken.None)).TotalMilliseconds, 0, 5000);
+        using var client = await _pair.ConnectToProxyAsync();
+        var stream = client.GetStream();
+        // المنفذ 443 ليس ضمن قيد المدخل site.test:<port> → غير مسموح → محاولة مباشرة → لا خادم هناك → 502
+        await stream.WriteAsync(E2EWait.Ascii("CONNECT site.test:443 HTTP/1.1\r\n\r\n"));
+        Assert.Equal(502, (await Http.ReadHeadAsync(stream)).Status);
+        Assert.Equal(0, _pair.HostHandler.OpensOk + _pair.HostHandler.OpensFailed);
     }
 
-    private HttpClient NewProxiedClient()
+    [Fact]
+    public async Task AllowlistSkew_HostSaysNotAllowed_GuestFallsBackToDirect()
     {
-        var handler = new HttpClientHandler { Proxy = new WebProxy($"http://127.0.0.1:{_proxy!.Port}"), UseProxy = true };
-        return new HttpClient(handler) { Timeout = Timeout };
+        // المضيف بقائمة أحدث لا تحوي site.test: OPEN_FAIL(not_allowed) → الضيف يسقط إلى المباشر (ADR-0004)
+        await using var skewed = await InProcessTunnelPair.CreateAsync(hostAllowlistOverride: new[] { "other.example" });
+        var serve = skewed.Origin.ServeOnceAsync("fallback body");
+        using var client = await skewed.ConnectToProxyAsync();
+        var stream = client.GetStream();
+
+        await stream.WriteAsync(E2EWait.Ascii($"CONNECT site.test:{skewed.OriginPort} HTTP/1.1\r\n\r\n"));
+        Assert.Equal(200, (await Http.ReadHeadAsync(stream)).Status);
+        await stream.WriteAsync(E2EWait.Ascii("GET /fb HTTP/1.1\r\nHost: site.test\r\n\r\n"));
+        var head = await Http.ReadHeadAsync(stream);
+        Assert.Equal("fallback body", Encoding.UTF8.GetString(await Http.ReadBodyAsync(stream, head)));
+        client.Client.Shutdown(SocketShutdown.Send);
+        await serve.WaitAsync(Timeout);
+
+        Assert.Equal(1, skewed.HostHandler.OpensFailed);
+        Assert.Equal(0, skewed.HostHandler.OpensOk);
+        Assert.Equal(1, skewed.ProxyServer.Counters.DirectConnects);
+        Assert.Empty(skewed.Host.DomainsSeen);
+    }
+}
+
+/// <summary>دورة حياة الجلسة من طرف إلى طرف: الإنهاء، الموت المفاجئ، وفشل الاتصال.</summary>
+public class InProcessTunnelLifecycleTests
+{
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(20);
+
+    [Fact]
+    public async Task EndAsync_LeavesNothingRunning_AndIsIdempotent()
+    {
+        var pair = await InProcessTunnelPair.CreateAsync();
+        var proxyPort = pair.ProxyPort;
+        var guestListenPort = pair.Guest.ListenPort;
+        var hostListenPort = pair.Host.ListenPort;
+        var guestStates = new List<TunnelState>();
+        pair.Guest.StateChanged += guestStates.Add;
+
+        // حركة حقيقية أولًا حتى تكون الإحصاءات النهائية ذات معنى
+        var serve = pair.Origin.ServeOnceAsync("bye");
+        using (var client = await pair.ConnectToProxyAsync())
+        {
+            var stream = client.GetStream();
+            await stream.WriteAsync(E2EWait.Ascii($"CONNECT site.test:{pair.OriginPort} HTTP/1.1\r\n\r\n"));
+            Assert.Equal(200, (await Http.ReadHeadAsync(stream)).Status);
+            await stream.WriteAsync(E2EWait.Ascii("GET /bye HTTP/1.1\r\nHost: site.test\r\n\r\n"));
+            var head = await Http.ReadHeadAsync(stream);
+            await Http.ReadBodyAsync(stream, head);
+            client.Client.Shutdown(SocketShutdown.Send);
+        }
+        await serve.WaitAsync(Timeout);
+
+        await pair.Guest.EndAsync(TunnelEndReason.GuestEnded, CancellationToken.None);
+        await pair.Host.EndAsync(TunnelEndReason.HostEnded, CancellationToken.None);
+
+        Assert.Equal(TunnelState.Ended, pair.Guest.State);
+        Assert.Equal(TunnelState.Ended, pair.Host.State);
+        Assert.True(pair.Guest.MuxClosed);
+        Assert.True(pair.Host.MuxClosed);
+        Assert.True(pair.Guest.CertificateDisposed);
+        Assert.True(pair.Host.CertificateDisposed);
+        Assert.False(pair.ProxyServer.IsAccepting);
+        Assert.True(await E2EWait.PortRefusesAsync(proxyPort), "proxy port still accepts");
+        Assert.True(await E2EWait.PortRefusesAsync(guestListenPort), "guest tunnel listener still accepts");
+        Assert.True(await E2EWait.PortRefusesAsync(hostListenPort), "host tunnel listener still accepts");
+
+        // الإحصاءات والنطاقات محفوظة بعد الإنهاء لرسالة session.end
+        Assert.True(pair.Host.Stats.BytesUp > 0);
+        Assert.True(pair.Host.Stats.BytesDown > 0);
+        Assert.Equal(0, pair.Host.Stats.OpenStreams);
+        Assert.Contains("site.test", pair.Host.DomainsSeen);
+
+        // التكرار بلا أثر: نفس المهمة، ولا حالة جديدة
+        var again = pair.Guest.EndAsync(TunnelEndReason.ProtocolError, CancellationToken.None);
+        Assert.Same(again, pair.Guest.EndAsync(TunnelEndReason.Expired, CancellationToken.None));
+        await again;
+        await pair.DisposeAsync();
+        Assert.Equal(new[] { TunnelState.Ended }, guestStates);
+        Assert.Equal("GuestEnded", pair.Guest.Diagnostics["end_reason"]);
+    }
+
+    [Fact]
+    public async Task KillingTheHostTransport_RaisesDied_WithDisconnectReason_AndIsNotACleanEnd()
+    {
+        await using var pair = await InProcessTunnelPair.CreateAsync();
+        TunnelEndReason? hostReason = null, guestReason = null;
+        var hostStates = new List<TunnelState>();
+        pair.Host.Died += r => hostReason = r;
+        pair.Guest.Died += r => guestReason = r;
+        pair.Host.StateChanged += hostStates.Add;
+
+        pair.HostTransport.KillAll();
+
+        // المضيف يكتشف فورًا (تخلّص محلي)؛ المستخدم يكتشف بـ EOF أو بمهلة الحيوية (~7 ث)،
+        // وقد يتأخر تحت تشبّع المعالج، فالهامش هنا أوسع من مهلة الاختبار العامة.
+        Assert.True(await E2EWait.UntilAsync(() => hostReason is not null && guestReason is not null, TimeSpan.FromSeconds(45)),
+            $"host={hostReason} guest={guestReason}");
+        Assert.Equal(TunnelEndReason.GuestDisconnected, hostReason);
+        Assert.Equal(TunnelEndReason.HostDisconnected, guestReason);
+        Assert.Equal("faulted", pair.Host.Diagnostics["mux_completion"]);
+        Assert.Equal("faulted", pair.Guest.Diagnostics["mux_completion"]);
+
+        // موت ≠ إنهاء نظيف: لا انتقال إلى Ended ولا سبب إنهاء حتى يقرر التطبيق
+        Assert.Empty(hostStates);
+        Assert.Equal(TunnelState.Connected, pair.Host.State);
+        Assert.False(pair.Host.Diagnostics.ContainsKey("end_reason"));
+
+        // بعد الموت: الـ Proxy يرد 502 لأن النفق مغلق (لا يتظاهر بالنجاح)
+        using var client = await pair.ConnectToProxyAsync();
+        var stream = client.GetStream();
+        await stream.WriteAsync(E2EWait.Ascii($"CONNECT site.test:{pair.OriginPort} HTTP/1.1\r\n\r\n"));
+        Assert.Equal(502, (await Http.ReadHeadAsync(stream)).Status);
+
+        // والتطبيق ينهي بالسبب المقترح؛ الإنهاء بعد الموت لا يرمي
+        await pair.Host.EndAsync(hostReason!.Value, CancellationToken.None);
+        Assert.Equal(TunnelState.Ended, pair.Host.State);
+        Assert.Equal("GuestDisconnected", pair.Host.Diagnostics["end_reason"]);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_Timeout_ReturnsNotConnected_WithPerCandidateDiagnostics()
+    {
+        var deadPort = ClosedPort();
+        await using var session = new RouteBridge.Tunnel.TunnelSession(
+            new SessionMaterial(Guid.NewGuid(), TunnelRole.Guest, new byte[32], DateTimeOffset.UtcNow.AddMinutes(30), true, InProcessTunnelPair.PeerPublicIp),
+            new RouteBridge.Tunnel.TunnelSessionOptions
+            {
+                BindAddress = IPAddress.Loopback,
+                CandidateSource = () => new LoopbackCandidateSource(),
+                GuestProxy = ProxyTunnelAdapter.Create,
+            });
+
+        var local = await session.PrepareAsync(CancellationToken.None);
+        Assert.Equal(64, local.CertFingerprintSha256Hex.Length);
+
+        var peer = new PeerEndpointInfo(
+            Convert.ToHexString(new byte[32]).ToLowerInvariant(),
+            new[]
+            {
+                new CandidateEndpoint(CandidateType.Public, "127.0.0.1", deadPort),
+                new CandidateEndpoint(CandidateType.Upnp, "127.0.0.1", deadPort),
+            });
+        var result = await session.ConnectAsync(peer, TimeSpan.FromSeconds(2), CancellationToken.None);
+
+        Assert.False(result.Connected);
+        Assert.Null(result.WinnerType);
+        Assert.Null(result.TlsVersion);
+        Assert.Equal("timeout", result.FailureReason);
+        Assert.Null(session.Proxy);
+
+        var connect = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(session.Diagnostics["connect"]);
+        var rows = Assert.IsType<List<Dictionary<string, object?>>>(connect["candidates"]);
+        Assert.Equal(2, rows.Count);
+        Assert.All(rows, row =>
+        {
+            Assert.Equal(deadPort, row["port"]);
+            Assert.Equal("connect", row["stage"]);
+            Assert.NotNull(row["error"]);
+        });
+        Assert.Equal(new[] { "public", "upnp" }, rows.Select(r => (string?)r["type"]));
+
+        await session.EndAsync(TunnelEndReason.ConnectFailed, CancellationToken.None);
+        Assert.Equal(TunnelState.Ended, session.State);
+    }
+
+    private static int ClosedPort()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
     }
 }
 

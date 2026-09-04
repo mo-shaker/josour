@@ -301,6 +301,35 @@ public sealed class AuthSessionTests
     }
 
     [Fact]
+    public async Task ForceSignOut_DeviceRevoked_ClearsTheDeviceIdentityWithoutCallingLogout()
+    {
+        using var h = new AuthHarness();
+        await h.SignInFreshAsync();
+
+        await h.Session.ForceSignOutAsync(SignOutReason.DeviceRevoked, None);
+
+        Assert.Empty(h.Http.RequestsTo(HttpMethod.Post, AuthHarness.LogoutPath));
+        Assert.False(h.Session.IsSignedIn);
+        Assert.False(h.Secrets.Values.ContainsKey(AuthSession.RefreshTokenKey));
+        Assert.False(h.Secrets.Values.ContainsKey(AuthSession.DeviceSecretKey));
+        Assert.False(h.Secrets.Values.ContainsKey(AuthSession.DeviceIdKey));
+        Assert.Equal(new[] { SignOutReason.DeviceRevoked }, h.SignedOutReasons);
+    }
+
+    [Fact]
+    public async Task ForceSignOut_SessionExpired_KeepsTheDeviceIdentity()
+    {
+        using var h = new AuthHarness();
+        await h.SignInFreshAsync();
+
+        await h.Session.ForceSignOutAsync(SignOutReason.SessionExpired, None);
+
+        Assert.False(h.Session.IsSignedIn);
+        Assert.Equal("dev-secret-1", h.Secrets.Values[AuthSession.DeviceSecretKey]);
+        Assert.Equal(new[] { SignOutReason.SessionExpired }, h.SignedOutReasons);
+    }
+
+    [Fact]
     public async Task SignOut_WhenServerDown_StillClearsLocally()
     {
         using var h = new AuthHarness();

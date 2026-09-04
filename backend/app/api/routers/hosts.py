@@ -8,5 +8,6 @@ router = APIRouter(prefix="/hosts", tags=["hosts"])
 
 
 @router.get("", response_model=list[HostOut])
-async def get_hosts(_: AuthDep, db: DbDep) -> list[HostOut]:
-    return await list_available_hosts(db)
+async def get_hosts(auth: AuthDep, db: DbDep) -> list[HostOut]:
+    """Same rows, same filter and same order as ``hosts.snapshot`` on the WebSocket."""
+    return await list_available_hosts(db, exclude_user_id=auth.user.id)

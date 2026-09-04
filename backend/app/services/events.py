@@ -1,6 +1,6 @@
 """Tiny in-process async event bus (publish/subscribe).
 
-This is the seam between the REST layer (week 2) and the WebSocket layer (week 3+): request
+This is the seam between the REST layer and the WebSocket layer: request
 handlers publish a domain event *after* their transaction is committed, and the WebSocket
 layer subscribes to turn events into frames from docs/ws-protocol.md section 4
 (``allowlist.updated``, ``session.terminate``, ``hosts.update``). The bus is process-local by

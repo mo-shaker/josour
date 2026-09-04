@@ -19,7 +19,7 @@ public static class Strings
     public const string TraySimulateIncomingRequest = "Simulate incoming request";
     public const string TraySignOut = "Sign out";
     public const string TrayExit = "Exit";
-    public const string TrayTooltipSignedInFormat = "RouteBridge — {0}";
+    public const string TrayTooltipSignedInFormat = "RouteBridge — {0} · {1}";
     public const string TrayTooltipNotSignedIn = "RouteBridge — not signed in";
 
     // ---- main window ----
@@ -31,6 +31,9 @@ public static class Strings
     public const string StatusConnecting = "Connecting…";
     public const string StatusConnected = "Connected";
     public const string StatusReconnecting = "Reconnecting…";
+    public const string StatusReplacedElsewhere = "Connected on another window";
+    public const string StatusSignInExpired = "Sign-in expired";
+    public const string StatusNoServer = "No server address";
 
     // ---- host page ----
     public const string HostPageTitle = "Share your connection";
@@ -38,6 +41,8 @@ public static class Strings
     public const string HostAvailableToggle = "Available for requests";
     public const string HostStatusAvailable = "Available — waiting for requests";
     public const string HostStatusNotAvailable = "Not available";
+    public const string HostStatusAnnouncing = "Telling the server you are available…";
+    public const string HostStatusAvailabilityFailed = "The server did not accept the change. Try again.";
     public const string HostNotConnectedTitle = "Not connected";
     public const string HostNotConnectedHint = "Requests only arrive while RouteBridge is connected to the server.";
     public const string HostSimulatedServerTitle = "Simulated server";
@@ -56,6 +61,23 @@ public static class Strings
     public const string GuestHostsUnavailableText = "The server cannot be reached. Check your connection and try again.";
     public const string GuestHostsErrorFormat = "The server answered: {0}";
     public const string GuestNotSignedInText = "Sign in to see available hosts.";
+    public const string GuestDurationLabel = "Session length";
+    public const string GuestRequestConnection = "Request connection";
+    public const string GuestWaitingTitle = "Waiting for an answer";
+    public const string GuestWaitingTextFormat = "{0} has one minute to accept your request.";
+    public const string GuestCancelRequest = "Cancel request";
+    public const string GuestRequestSentFormat = "Request sent to {0} for {1} minutes.";
+    public const string GuestRequestAccepted = "Accepted — preparing the session…";
+    public const string GuestRequestRejected = "The host declined the request.";
+    public const string GuestRequestExpiredText = "The host did not answer in time.";
+    public const string GuestRequestCancelled = "Request cancelled.";
+    public const string GuestRequestDisconnected = "The connection to the server was lost before the host answered.";
+    public const string GuestErrorHostUnavailable = "That host is not available any more.";
+    public const string GuestErrorSessionExists = "A session is already in progress.";
+    public const string GuestErrorRequestPending = "A request is already pending.";
+    public const string GuestErrorRateLimited = "Too many requests. Wait a moment and try again.";
+    public const string GuestErrorNotConnected = "Not connected to the server.";
+    public const string GuestErrorGenericFormat = "The server refused the request ({0}).";
 
     // ---- incoming request ----
     public const string IncomingRequestWindowTitle = "Incoming request";

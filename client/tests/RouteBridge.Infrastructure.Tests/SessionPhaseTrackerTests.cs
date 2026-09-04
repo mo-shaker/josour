@@ -19,7 +19,7 @@ public sealed class SessionPhaseTrackerTests
         {
             Channel = new MockControlChannel(options ?? MockControlChannelOptions.Fast);
             Tracker = new SessionPhaseTracker();
-            Tracker.PhaseChanged += Phases.Add;
+            Tracker.PhaseChanged += p => { lock (_phases) _phases.Add(p); };
             Channel.MessageReceived += message => Tracker.Apply(message); // subscribed BEFORE the collector: tracker state is current when a test sees a frame
             Messages = new MessageCollector(Channel);
         }
@@ -30,7 +30,10 @@ public sealed class SessionPhaseTrackerTests
 
         public MessageCollector Messages { get; }
 
-        public List<SessionPhase> Phases { get; } = new();
+        private readonly List<SessionPhase> _phases = new();
+
+        /// <summary>لقطة آمنة: الأطوار تُضاف من حلقة توزيع الرسائل بينما يقرأ الاختبار.</summary>
+        public SessionPhase[] Phases { get { lock (_phases) return _phases.ToArray(); } }
 
         public async Task ConnectAsync()
         {
@@ -69,7 +72,9 @@ public sealed class SessionPhaseTrackerTests
 
         await rig.Channel.SendAsync(new SessionEndpointMessage(session.SessionId, Fp, new[] { new CandidateDto("lan", "192.168.1.2", 45000) }), None);
         await rig.Messages.NextAsync<SessionPeerEndpointMessage>();
-        Assert.Equal(SessionPhase.Connecting, rig.Tracker.Phase);
+        // القناة المحاكية تتقدّم إلى session.active من تلقائها، فتأكيد الطور اللحظي هنا سباق.
+        // وجود Connecting في السجل يثبت حدوث الانتقال، وترتيبه يتأكد في تأكيد التسلسل أدناه.
+        Assert.Contains(SessionPhase.Connecting, rig.Phases);
 
         await rig.Messages.NextAsync<SessionActiveMessage>();
         Assert.Equal(SessionPhase.Active, rig.Tracker.Phase);
@@ -112,7 +117,9 @@ public sealed class SessionPhaseTrackerTests
 
         await rig.Channel.SendAsync(new SessionEndpointMessage(session.SessionId, Fp, new[] { new CandidateDto("public", "203.0.113.55", 45000) }), None);
         await rig.Messages.NextAsync<SessionPeerEndpointMessage>();
-        Assert.Equal(SessionPhase.Connecting, rig.Tracker.Phase);
+        // القناة المحاكية تتقدّم إلى session.active من تلقائها، فتأكيد الطور اللحظي هنا سباق.
+        // وجود Connecting في السجل يثبت حدوث الانتقال، وترتيبه يتأكد في تأكيد التسلسل أدناه.
+        Assert.Contains(SessionPhase.Connecting, rig.Phases);
 
         await rig.Channel.SendAsync(new SessionConnectedMessage(session.SessionId, "public", 120, "1.3"), None);
         await rig.Messages.NextAsync<SessionActiveMessage>();

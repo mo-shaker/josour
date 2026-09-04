@@ -178,9 +178,11 @@ public class NerdbankMuxTests
         pair.GuestRaw!.Dispose(); // قطع المقبس فجأة: لا GOAWAY ولا إغلاق مرتب
 
         var e = await Assert.ThrowsAsync<MuxClosedException>(() => pair.Host.Completion.WaitAsync(Timeout));
-        // أيّ المسارين سبق (حلقة التحكم أو اكتمال النقل) فالنتيجة عطل لا إغلاق نظيف.
+        // أيّ المسارات سبق (حلقة التحكم، أو نهاية النقل بلا GOAWAY، أو عطل قراءة على المقبس المقطوع)
+        // فالنتيجة عطل لا إغلاق نظيف. المهم أن Completion لا يكتمل بنجاح.
         Assert.True(e.Message.Contains("closed by peer", StringComparison.OrdinalIgnoreCase)
-                    || e.Message.Contains("dead", StringComparison.OrdinalIgnoreCase), e.Message);
+                    || e.Message.Contains("dead", StringComparison.OrdinalIgnoreCase)
+                    || e.Message.Contains("faulted", StringComparison.OrdinalIgnoreCase), e.Message);
         Assert.True(pair.Host.IsClosed);
     }
 
@@ -211,6 +213,15 @@ public class NerdbankMuxTests
         await StreamIo.WriteAllAsync(stream, 50_000);
         await ((IHalfClosable)stream).CompleteWritingAsync(CancellationToken.None);
         Assert.Equal(100_000, await StreamIo.ReadToEndAsync(stream).WaitAsync(Timeout));
+
+        // ما يرصده المضيف (استلامه، الإغلاق النصفي، وعدّاداته) يستقر بعد اكتمال قراءتنا بقليل.
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (DateTime.UtcNow < deadline
+               && !(target.PeerHalfClosed && target.Received == 50_000
+                    && pair.Host.Stats.BytesUp >= 100_000 && pair.Host.Stats.BytesDown >= 50_000))
+        {
+            await Task.Delay(20);
+        }
 
         Assert.InRange(pair.Guest.Stats.BytesUp, 50_000, 60_000);
         Assert.InRange(pair.Guest.Stats.BytesDown, 100_000, 120_000);

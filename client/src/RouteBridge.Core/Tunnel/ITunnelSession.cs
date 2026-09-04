@@ -22,6 +22,24 @@ public interface ITunnelSession : IAsyncDisposable
     /// <summary>النطاقات المميزة التي فُتحت عبر النفق. تُملأ على المضيف فقط.</summary>
     IReadOnlyCollection<string> DomainsSeen { get; }
 
+    /// <summary>
+    /// إضافة الأسبوع 3: منفذ الـ Proxy المحلي ورابط صفحة الفحص بعد ConnectAsync على جانب Guest (null على المضيف أو قبل الاتصال).
+    /// التطبيق يحتاجهما ليشغّل المتصفح؛ تشغيل المتصفح وإغلاقه يبقيان مسؤوليته لا مسؤولية النفق.
+    /// </summary>
+    GuestProxyInfo? Proxy { get; }
+
+    /// <summary>
+    /// إضافة الأسبوع 3: يُرفع عند أول وصول لصفحة الفحص عبر الـ Proxy (Guest فقط). غيابه بعد تشغيل المتصفح =
+    /// المتصفح لا يمر بالـ Proxy، وهو ما يبلّغ عنه التطبيق بـ browser_not_proxied (docs/ws-protocol.md القسم 5).
+    /// </summary>
+    event Action? ProbeSeen;
+
+    /// <summary>
+    /// إضافة الأسبوع 3: النفق مات من تلقائه (انقطاع، أو موت عملية الطرف الآخر، أو انتهاء مهلة PONG) لا بإنهاء مقصود.
+    /// الحمولة سبب مقترح ليبلّغ به التطبيق الخادم. الإغلاق النظيف (EndAsync أو GOAWAY متبادل) لا يرفع هذا الحدث أبدًا.
+    /// </summary>
+    event Action<TunnelEndReason>? Died;
+
     /// <summary>بيانات التشخيص لبوابة قرار Relay (المرشحون المجرَّبون، زمن وخطأ كل واحد).</summary>
     IReadOnlyDictionary<string, object?> Diagnostics { get; }
 

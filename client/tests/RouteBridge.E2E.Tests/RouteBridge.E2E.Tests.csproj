@@ -24,4 +24,9 @@
     <ProjectReference Include="../../src/RouteBridge.Proxy/RouteBridge.Proxy.csproj" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <!-- اختبارات تربط مقابس حقيقية وتعتمد مؤقتات: التوازي داخل التجميعة يجعلها متقطعة -->
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

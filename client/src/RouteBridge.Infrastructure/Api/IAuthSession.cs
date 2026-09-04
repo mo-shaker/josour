@@ -58,6 +58,12 @@ public interface IAuthSession
     /// <summary>Best-effort <c>POST /auth/logout</c>, then clears the tokens locally in every case.</summary>
     Task SignOutAsync(CancellationToken ct);
 
+    /// <summary>
+    /// Clears the session locally because the server ended it (control-channel close <c>4403</c>, a rejected token…),
+    /// without calling <c>POST /auth/logout</c>. Raises <see cref="SignedOut"/> with <paramref name="reason"/>.
+    /// </summary>
+    Task ForceSignOutAsync(SignOutReason reason, CancellationToken ct);
+
     /// <summary>Returns a token that is not about to expire, refreshing it first when needed (for the WebSocket <c>hello</c>). Null when signed out.</summary>
     Task<string?> GetValidAccessTokenAsync(CancellationToken ct);
 }

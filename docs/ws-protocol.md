@@ -22,6 +22,17 @@
 
 أكواد `error`: `unauthorized`, `bad_request`, `not_found`, `host_unavailable`, `session_exists`, `request_pending`, `forbidden`, `rate_limited`, `internal`.
 
+متى يُستخدم كل كود في `request.create` (ثُبّت في الأسبوع 3):
+
+| الحالة | الكود |
+|---|---|
+| للمستخدم جلسة غير منتهية | `session_exists` |
+| للمستخدم طلب `pending` بالفعل | `request_pending` |
+| المضيف غير متصل، أو غير مفعّل «متاح»، أو مشغول بجلسة، أو يردّ على طلب آخر | `host_unavailable` |
+| `host_device_id` لا يقابل جهازًا | `not_found` |
+| الجهاز المطلوب من أجهزة المستخدم نفسه | `bad_request` |
+| غير المضيف المخاطَب يحاول القبول أو الرفض | `forbidden` |
+
 الأوقات كلها ISO-8601 بتوقيت UTC مع اللاحقة `Z`. المعرّفات UUID نصية.
 
 ## 3. رسائل العميل إلى الخادم
@@ -51,7 +62,7 @@
 | `request.created` | `ref`, `request_id`, `expires_at` | المستخدم |
 | `request.incoming` | `request_id`, `guest_name`, `guest_device`, `duration_min`, `allowlist_version`, `expires_at` | المضيف |
 | `request.result` | `request_id`, `accepted` (bool), `reason` (`rejected`/`expired`/`cancelled`/`host_unavailable` عند `false`), `session_id` (عند `true`) | المستخدم |
-| `request.expired` | `request_id` | المضيف (لإغلاق نافذة الطلب) |
+| `request.expired` | `request_id` | المضيف: إطار «أغلق نافذة الطلب» عمومًا، يُرسل عند انتهاء المهلة وعند إلغاء المستخدم وعند انقطاعه |
 | `session.created` | `session_id`, `role` (`guest`/`host`), `secret_b64` (32 بايت Base64), `expires_at`, `allowlist_version`, `peer_public_ip`, `same_public_ip` (bool), `peer` (`{user_display_name, device_name}`) | الطرفان |
 | `session.peer_endpoint` | `session_id`, `cert_fp_sha256`, `candidates` | الطرف الآخر لمن أرسل `session.endpoint` |
 | `session.active` | `session_id`, `expires_at` | الطرفان |
@@ -82,7 +93,7 @@ ended: حذف session_keys، حفظ الإحصاءات والنطاقات، إر
 أسباب الإنهاء: `guest_ended`, `host_ended`, `expired`, `guest_disconnected`, `host_disconnected`, `connect_failed`, `admin_terminated`, `browser_not_proxied`, `protocol_error`.
 
 قواعد:
-- جلسة واحدة غير منتهية لكل مستخدم ولكل جهاز؛ `request.create` يفشل بـ `session_exists` إن كان لأي من الطرفين جلسة غير منتهية أو طلب `pending`.
+- جلسة واحدة غير منتهية لكل مستخدم ولكل جهاز؛ أكواد فشل `request.create` مفصّلة في جدول القسم 2.
 - المضيف الذي لديه جلسة غير منتهية لا يظهر في `hosts.*` حتى تنتهي.
 - `session.connected` من المستخدم يُتجاهل مع `error(forbidden)`.
 
@@ -98,3 +109,18 @@ ended: حذف session_keys، حفظ الإحصاءات والنطاقات، إر
 | `4403` | الجهاز ملغى أو المستخدم معطّل |
 | `4409` | اتصال أحدث من الجهاز نفسه |
 | `1012` | إعادة تشغيل الخادم؛ أعد الاتصال بتراجع أسّي (1، 2، 4… حتى 30 ثانية) |
+| `1001` | انتهت مهلة النبض (لا `pong` خلال 40 ثانية)؛ عابر، أعد الاتصال |
+| `1011` | عطل غير متوقع أثناء المصافحة؛ عابر، أعد الاتصال |
+
+## 8. تفاصيل ثُبّتت في الأسبوع 3
+
+- **`hosts.update` لكل مستلم على حدة** لا إطار واحد مشترك، لأن القائمة تستثني أجهزة المستلم نفسه. `GET /hosts` يستثنيها كذلك ليطابق `hosts.snapshot` تمامًا (تغيّر سلوك عن الأسبوع 2).
+- **`ref` في `request.cancel` و`request.accept` و`request.reject`** لا يقابله رد إيجابي؛ يُستخدم لربط رسالة `error` فقط.
+- **`peer_public_ip`** يكون سلسلة فارغة عند تعذّر معرفته، لا `null`.
+- **`hello.app_version`** اختياري: حقل تجميلي لا يجوز أن يمنع عميلًا من الاتصال.
+- **`hello.diagnostics`** يُحفظ في `connect_diagnostics` بـ `session_id` فارغ؛ ما يتجاوز 64 KB يُهمَل مع تحذير ولا يقطع الاتصال.
+- **`X-Forwarded-For`** يُحترم فقط إذا كان النظير عنوانًا خاصًا أو loopback (أي الـ Proxy أمامنا)، فلا يستطيع عميل مباشر تزوير `public_ip` وهو هدف فحص قابلية الوصول.
+- **فحص قابلية الوصول** لا يُجرى إلا على عنوان عام؛ غير ذلك يبقى `reachable = null` (غير معروف).
+- **الطلبات التي تُسوّى بانقطاع** تُخزَّن بحالة `cancelled` مع `responded_at`، بينما السبب على السلك `host_unavailable` للمستخدم و`request.expired` للمضيف.
+- **إلغاء تسجيل الجهاز** يُغلق قناته فورًا بالكود `4403` ويصفّر حضوره.
+- **رد `error` على `RequestAsync`:** قناة التحكم الحقيقية في العميل ترفع استثناءً يحمل الكود، بينما القناة المحاكية تعيد رسالة `error`. المستهلك يتعامل مع الحالتين حتى تُسحب المحاكية.

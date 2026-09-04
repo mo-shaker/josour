@@ -1,0 +1,37 @@
+"""Process start/stop for the WebSocket layer, called from the application lifespan.
+
+The registry is in memory, so a restart means nothing that claimed to be live can still be live:
+every presence row is reset and every unfinished session is ended before the first client can
+reconnect. On the way out, clients are closed with 1012 so they reconnect with backoff.
+"""
+
+import logging
+
+from app.db.session import session_scope
+from app.services import presence
+from app.services import sessions as session_service
+from app.services.events import event_bus
+from app.services.session_timer import scheduler
+from app.ws.connection_manager import connection_manager
+from app.ws.protocol import CloseCode
+
+log = logging.getLogger(__name__)
+
+
+async def on_startup() -> None:
+    scheduler.cancel_all()
+    connection_manager.reset()
+    async with session_scope() as db:
+        rows = await presence.reset_all(db)
+        events = await session_service.end_dangling_sessions(db)
+        await db.commit()
+    for event in events:
+        await event_bus.publish(event)
+    log.info("ws state reset", extra={"presence_rows": rows, "sessions_ended": len(events)})
+
+
+async def on_shutdown() -> None:
+    closed = await connection_manager.close_all(CloseCode.SERVER_RESTART)
+    connection_manager.reset()
+    timers = scheduler.cancel_all()
+    log.info("ws shutdown", extra={"connections": closed, "timers": timers})

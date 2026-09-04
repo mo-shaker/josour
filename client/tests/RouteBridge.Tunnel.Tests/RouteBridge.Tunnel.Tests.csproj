@@ -21,4 +21,9 @@
     <ProjectReference Include="../../src/RouteBridge.Tunnel/RouteBridge.Tunnel.csproj" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <!-- اختبارات تربط مقابس حقيقية وتعتمد مؤقتات: التوازي داخل التجميعة يجعلها متقطعة -->
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

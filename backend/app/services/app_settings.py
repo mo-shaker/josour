@@ -1,9 +1,9 @@
 """Operator-tunable settings persisted in ``app_settings`` (docs/api.md defaults).
 
 ``SettingsService.get()`` is the single read path for these values. Week 2 uses it for
-``GET/PATCH /admin/settings``; week 3 reads it for the ``hello.ack`` ``settings`` object and
-the request/connect/session timers. The result is cached in-process and the cache is dropped by
-``update()``; with a single uvicorn worker that is sufficient.
+``GET/PATCH /admin/settings``; the WebSocket layer reads it for the ``hello.ack`` ``settings``
+object and for the request/connect/session timers. The result is cached in-process and the cache
+is dropped by ``update()``; with a single uvicorn worker that is sufficient.
 """
 
 import logging
@@ -66,4 +66,4 @@ class SettingsService:
 
 
 settings_service = SettingsService()
-"""Process-wide instance shared by the admin router and (week 3) the WebSocket layer."""
+"""Process-wide instance shared by the admin router and the WebSocket layer."""

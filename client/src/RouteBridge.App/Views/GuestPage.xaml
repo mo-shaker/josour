@@ -13,6 +13,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <Grid Grid.Row="0" Margin="0,0,0,12">
@@ -51,8 +52,12 @@
                             <ui:TextBlock FontTypography="BodyStrong" Text="{Binding UserDisplayName}" />
                             <ui:TextBlock Appearance="Secondary" Text="{Binding DeviceName}" />
                         </StackPanel>
-                        <ui:TextBlock Grid.Column="2" Appearance="Tertiary" FontTypography="Caption"
-                                      VerticalAlignment="Center" Text="{Binding ReachabilityText}" />
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Ellipse Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,6,0"
+                                     Fill="{Binding Reachable, Converter={StaticResource ReachabilityBrush}}" />
+                            <ui:TextBlock Appearance="Tertiary" FontTypography="Caption"
+                                          VerticalAlignment="Center" Text="{Binding ReachabilityText}" />
+                        </StackPanel>
                     </Grid>
                 </DataTemplate>
             </ListView.ItemTemplate>
@@ -67,6 +72,58 @@
                           Text="{Binding EmptyStateText}" />
             <ui:ProgressRing IsIndeterminate="True" Width="24" Height="24" Margin="0,16,0,0"
                              Visibility="{Binding IsRefreshing, Converter={StaticResource BoolToVis}}" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Margin="0,12,0,0">
+            <!-- Pick a length and ask: request.create -->
+            <Grid Visibility="{Binding IsWaitingForHost, Converter={StaticResource InverseBoolToVis}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <ui:TextBlock Grid.Column="0" VerticalAlignment="Center" Appearance="Secondary"
+                              Text="{x:Static app:Strings.GuestDurationLabel}" />
+                <ComboBox Grid.Column="1" Margin="8,0,0,0" MinWidth="120" VerticalAlignment="Center"
+                          ItemsSource="{Binding DurationOptions}"
+                          SelectedItem="{Binding SelectedDuration, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding StringFormat={x:Static app:Strings.DurationMinutesFormat}}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <ui:Button Grid.Column="2" HorizontalAlignment="Right" Appearance="Primary"
+                           Content="{x:Static app:Strings.GuestRequestConnection}"
+                           Command="{Binding RequestConnectionCommand}">
+                    <ui:Button.Icon>
+                        <ui:SymbolIcon Symbol="Send24" />
+                    </ui:Button.Icon>
+                </ui:Button>
+            </Grid>
+
+            <!-- Waiting for request.result -->
+            <ui:Card Padding="12" Visibility="{Binding IsWaitingForHost, Converter={StaticResource BoolToVis}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ui:ProgressRing Grid.Column="0" IsIndeterminate="True" Width="20" Height="20" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                        <ui:TextBlock FontTypography="BodyStrong" Text="{x:Static app:Strings.GuestWaitingTitle}" />
+                        <ui:TextBlock Appearance="Secondary" TextWrapping="Wrap" Text="{Binding WaitingText}" />
+                    </StackPanel>
+                    <ui:Button Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center"
+                               Content="{x:Static app:Strings.GuestCancelRequest}"
+                               Command="{Binding CancelRequestCommand}" />
+                </Grid>
+            </ui:Card>
+
+            <ui:TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Appearance="Secondary" FontTypography="Caption"
+                          Text="{Binding StatusMessage}"
+                          Visibility="{Binding HasStatusMessage, Converter={StaticResource BoolToVis}}" />
         </StackPanel>
     </Grid>
 </UserControl>

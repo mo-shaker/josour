@@ -43,23 +43,34 @@ public class TunnelListenerTests
         }, CancellationToken.None);
 
         var clients = new List<TcpClient>();
+        var resetOnConnect = 0;
         try
         {
             for (var i = 0; i < 6; i++)
             {
                 var client = new TcpClient();
-                await client.ConnectAsync(IPAddress.Loopback, listener.Port);
-                clients.Add(client);
+                try
+                {
+                    await client.ConnectAsync(IPAddress.Loopback, listener.Port);
+                    clients.Add(client);
+                }
+                catch (SocketException)
+                {
+                    // الإغلاق الفوري (Close(0) = RST) قد يسبق اكتمال connect على هذا النظام: رفض أيضًا.
+                    resetOnConnect++;
+                    client.Dispose();
+                }
             }
 
+            // InboundAttempts يزداد قبل قرار الرفض، فالانتظار عليه وحده يترك سباقًا مع Pending/RejectedOverCapacity.
             var deadline = DateTime.UtcNow.AddSeconds(5);
-            while (listener.InboundAttempts < 6 && DateTime.UtcNow < deadline) await Task.Delay(20);
+            while ((listener.InboundAttempts < 6 || listener.RejectedOverCapacity < 2) && DateTime.UtcNow < deadline) await Task.Delay(20);
 
             Assert.Equal(6, listener.InboundAttempts);
             Assert.Equal(TunnelListener.MaxPendingUnauthenticated, listener.Pending);
             Assert.Equal(2, listener.RejectedOverCapacity);
 
-            var closed = 0;
+            var closed = resetOnConnect;
             foreach (var client in clients)
                 if (await StreamAssert.IsClosedWithinAsync(client.GetStream(), TimeSpan.FromMilliseconds(500))) closed++;
             Assert.Equal(2, closed);

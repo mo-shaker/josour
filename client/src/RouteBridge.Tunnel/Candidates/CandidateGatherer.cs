@@ -38,7 +38,7 @@ public sealed record GatherResult(IReadOnlyList<CandidateEndpoint> Candidates, G
 /// يجمع مرشحي docs/protocol.md القسم 2 الخطوة 2 لمنفذ استماع: lan (عند same_public_ip فقط)، v6 (عام غير مؤقت)،
 /// upnp (Mono.Nat)، public (IP الذي يراه الخادم + المنفذ). الترتيب lan, v6, upnp, public بلا تكرار. لا يرمي أبدًا.
 /// </summary>
-public sealed class CandidateGatherer : IAsyncDisposable
+public sealed class CandidateGatherer : ICandidateSource
 {
     public const string MappingDescription = "RouteBridge";
     public static readonly TimeSpan DefaultDiscoveryTimeout = TimeSpan.FromSeconds(4);

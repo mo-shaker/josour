@@ -5,12 +5,14 @@ namespace RouteBridge.App;
 /// <param name="DebugMenu"><c>--debug</c> (or any DEBUG build): show the hidden "Debug" tray menu with "Simulate incoming request".</param>
 /// <param name="ToastActivated"><c>-ToastActivated</c>: appended by Windows when a toast button launched the process (Microsoft.Toolkit.Uwp.Notifications).</param>
 /// <param name="UninstallNotifications"><c>--uninstall-notifications</c>: remove the toast registration (AppUserModelId + COM activator) and exit; run by the uninstaller.</param>
-public sealed record StartupOptions(bool StartMinimized, bool DebugMenu, bool ToastActivated, bool UninstallNotifications = false)
+/// <param name="MockControlChannel"><c>--mock</c>: talk to the built-in simulated server instead of <c>wss://…/ws</c> (demos and UI work without a backend).</param>
+public sealed record StartupOptions(bool StartMinimized, bool DebugMenu, bool ToastActivated, bool UninstallNotifications = false, bool MockControlChannel = false)
 {
     public const string MinimizedSwitch = "--minimized";
     public const string DebugSwitch = "--debug";
     public const string ToastActivatedSwitch = "-ToastActivated";
     public const string UninstallNotificationsSwitch = "--uninstall-notifications";
+    public const string MockChannelSwitch = "--mock";
 
     public static StartupOptions Parse(IReadOnlyList<string> args)
     {
@@ -20,6 +22,7 @@ public sealed record StartupOptions(bool StartMinimized, bool DebugMenu, bool To
         var debug = false;
         var toast = false;
         var uninstallNotifications = false;
+        var mock = false;
 
         foreach (var arg in args)
         {
@@ -39,12 +42,16 @@ public sealed record StartupOptions(bool StartMinimized, bool DebugMenu, bool To
             {
                 uninstallNotifications = true;
             }
+            else if (string.Equals(arg, MockChannelSwitch, StringComparison.OrdinalIgnoreCase))
+            {
+                mock = true;
+            }
         }
 
 #if DEBUG
         debug = true;
 #endif
 
-        return new StartupOptions(minimized, debug, toast, uninstallNotifications);
+        return new StartupOptions(minimized, debug, toast, uninstallNotifications, mock);
     }
 }

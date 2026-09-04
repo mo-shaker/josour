@@ -15,6 +15,8 @@ from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
 from app.db.session import dispose_engine
 from app.services.events import event_bus
+from app.ws.lifecycle import on_shutdown, on_startup
+from app.ws.router import router as ws_router
 from app.ws.subscribers import register_subscribers
 
 log = logging.getLogger(__name__)
@@ -27,9 +29,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         configure_logging("DEBUG" if settings.is_dev else "INFO")
         log.info("routebridge api starting", extra={"env": settings.env})
-        # TODO(week 3): reset presence rows, end dangling sessions, start SessionTimer.
-        yield
-        await dispose_engine()
+        await on_startup()
+        try:
+            yield
+        finally:
+            await on_shutdown()
+            await dispose_engine()
 
     app = FastAPI(
         title="RouteBridge API",
@@ -47,7 +52,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         register_guarded_docs(app)
     app.include_router(health_router)
     app.include_router(api_router)
-    # TODO(week 3): app.include_router(ws_router)  # /ws
+    app.include_router(ws_router)  # /ws (docs/ws-protocol.md)
     register_subscribers(event_bus)
     return app
 

@@ -34,7 +34,8 @@
                     Title="{x:Static app:Strings.HostNotConnectedTitle}"
                     Message="{x:Static app:Strings.HostNotConnectedHint}" />
 
-        <ui:InfoBar Margin="0,12,0,0" IsOpen="True" IsClosable="False" Severity="Informational"
+        <ui:InfoBar Margin="0,12,0,0" IsClosable="False" Severity="Informational"
+                    IsOpen="{Binding IsSimulatedServer, Mode=OneWay}"
                     Title="{x:Static app:Strings.HostSimulatedServerTitle}"
                     Message="{x:Static app:Strings.HostSimulatedServerHint}" />
     </StackPanel>

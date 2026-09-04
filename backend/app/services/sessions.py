@@ -18,7 +18,13 @@ from sqlalchemy.orm import aliased
 from app.core.clock import ensure_utc, utcnow
 from app.core.errors import Conflict, NotFound
 from app.models import Device, SecurityEvent, Session, SessionKey, User
-from app.models.enums import SecurityEventType, SessionEndReason, SessionRole, SessionStatus
+from app.models.enums import (
+    NON_ENDED_SESSION_STATUSES,
+    SecurityEventType,
+    SessionEndReason,
+    SessionRole,
+    SessionStatus,
+)
 from app.schemas.sessions import AdminSessionOut, MySessionOut
 from app.services.events import SessionEnded
 from app.services.security_events import record_event
@@ -139,6 +145,51 @@ async def end_session(
         reason=reason,
         ended_at=ended_at,
     )
+
+
+async def get_live_for_device(db: AsyncSession, device_id: uuid.UUID) -> Session | None:
+    """The device's non-ended session, if any (at most one; partial unique indexes)."""
+    return await db.scalar(
+        select(Session).where(
+            Session.status.in_(NON_ENDED_SESSION_STATUSES),
+            (Session.guest_device_id == device_id) | (Session.host_device_id == device_id),
+        )
+    )
+
+
+async def get_live_for_user(db: AsyncSession, user_id: uuid.UUID) -> Session | None:
+    return await db.scalar(
+        select(Session).where(
+            Session.status.in_(NON_ENDED_SESSION_STATUSES),
+            (Session.guest_user_id == user_id) | (Session.host_user_id == user_id),
+        )
+    )
+
+
+async def end_device_sessions(db: AsyncSession, device_id: uuid.UUID) -> list[SessionEnded]:
+    """The device's control channel dropped: end its session as ``guest_disconnected`` or
+    ``host_disconnected`` depending on which side it was (docs/ws-protocol.md section 1)."""
+    rows = await db.scalars(
+        select(Session).where(
+            Session.status.in_(NON_ENDED_SESSION_STATUSES),
+            (Session.guest_device_id == device_id) | (Session.host_device_id == device_id),
+        )
+    )
+    events = []
+    for session in rows:
+        reason = (
+            SessionEndReason.GUEST_DISCONNECTED
+            if session.guest_device_id == device_id
+            else SessionEndReason.HOST_DISCONNECTED
+        )
+        events.append(await end_session(db, session, reason))
+    return events
+
+
+async def end_dangling_sessions(db: AsyncSession) -> list[SessionEnded]:
+    """Server boot: no control channel survived the restart, so nothing can still be live."""
+    rows = await db.scalars(select(Session).where(Session.status.in_(NON_ENDED_SESSION_STATUSES)))
+    return [await end_session(db, session, SessionEndReason.HOST_DISCONNECTED) for session in rows]
 
 
 async def admin_terminate(

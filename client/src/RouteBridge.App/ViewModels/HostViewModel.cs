@@ -4,20 +4,25 @@ using Microsoft.Extensions.Logging;
 using RouteBridge.App.Models;
 using RouteBridge.App.Services;
 using RouteBridge.Core.Control;
+using RouteBridge.Core.Session;
+using RouteBridge.Infrastructure.Api;
 using RouteBridge.Infrastructure.Control.Mock;
 
 namespace RouteBridge.App.ViewModels;
 
 /// <summary>
-/// Host page: the "Available for requests" state (single source of truth, mirrored by the tray) published as <c>host.available</c>,
-/// and incoming-request handling (<c>request.incoming</c> → prompt → <c>request.accept</c>/<c>request.reject</c>).
+/// Host page: the "Available for requests" state (single source of truth, mirrored by the tray) published as <c>host.available</c>
+/// and only reported as available once the server echoes this device in <c>hosts.snapshot</c>/<c>hosts.update</c>;
+/// and incoming-request handling (<c>request.incoming</c> → prompt → <c>request.accept</c>/<c>request.reject</c>, <c>request.expired</c> closes it).
 /// </summary>
 public sealed partial class HostViewModel : ObservableObject
 {
     private readonly IControlChannel _controlChannel;
     private readonly SessionCoordinator _sessions;
     private readonly IIncomingRequestPresenter _presenter;
+    private readonly IAuthSession _auth;
     private readonly ILogger<HostViewModel> _logger;
+    private bool _suppressPublish;
 
     [ObservableProperty]
     private bool _isAvailable;
@@ -32,24 +37,50 @@ public sealed partial class HostViewModel : ObservableObject
     [ObservableProperty]
     private bool _isConnected;
 
-    public HostViewModel(IControlChannel controlChannel, SessionCoordinator sessions, IIncomingRequestPresenter presenter, ILogger<HostViewModel> logger)
+    /// <summary>The server has this device in its host list, i.e. <c>host.available</c> took effect.</summary>
+    [ObservableProperty]
+    private bool _isAnnounced;
+
+    public HostViewModel(
+        IControlChannel controlChannel,
+        SessionCoordinator sessions,
+        IIncomingRequestPresenter presenter,
+        IAuthSession auth,
+        ILogger<HostViewModel> logger)
     {
         _controlChannel = controlChannel;
         _sessions = sessions;
         _presenter = presenter;
+        _auth = auth;
         _logger = logger;
 
         _controlChannel.StateChanged += OnChannelStateChanged;
         _controlChannel.MessageReceived += OnMessage;
         IsConnected = _controlChannel.State == ControlChannelState.Connected;
+        IsSimulatedServer = controlChannel is MockControlChannel;
     }
+
+    /// <summary>True for the <c>--mock</c> build: the page then says the server is simulated.</summary>
+    public bool IsSimulatedServer { get; }
 
     partial void OnIsAvailableChanged(bool value)
     {
-        StatusText = value ? Strings.HostStatusAvailable : Strings.HostStatusNotAvailable;
+        if (!value)
+        {
+            IsAnnounced = false;
+        }
+
+        UpdateStatusText();
+        if (_suppressPublish)
+        {
+            return;
+        }
+
         _logger.LogInformation("Host availability set to {Available} (control channel {State})", value, _controlChannel.State);
         _ = PublishAvailabilityAsync(value);
     }
+
+    partial void OnIsAnnouncedChanged(bool value) => UpdateStatusText();
 
     /// <summary><c>host.available</c>. Deferred while disconnected; re-sent when the channel (re)connects.</summary>
     private async Task PublishAvailabilityAsync(bool available)
@@ -62,7 +93,7 @@ public sealed partial class HostViewModel : ObservableObject
 
         try
         {
-            // WEEK 3/5: FirewallRuleChecker + VpnAdapterDetector warnings before announcing; UPnP warm-up.
+            // WEEK 5: FirewallRuleChecker + VpnAdapterDetector warnings before announcing; UPnP warm-up.
             // WEEK 4: listen_port from ITunnelSession.PrepareAsync so the server can run the reachability probe.
             await _controlChannel.SendAsync(new HostAvailableMessage(available, ListenPort: null), CancellationToken.None);
             _logger.LogInformation("host.available={Available} sent", available);
@@ -70,15 +101,43 @@ public sealed partial class HostViewModel : ObservableObject
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Could not send host.available={Available}", available);
+            UiThread.Post(() =>
+            {
+                _suppressPublish = true;
+                try
+                {
+                    IsAvailable = false;
+                }
+                finally
+                {
+                    _suppressPublish = false;
+                }
+
+                StatusText = Strings.HostStatusAvailabilityFailed;
+            });
         }
     }
+
+    private void UpdateStatusText() => StatusText = (IsAvailable, IsAnnounced) switch
+    {
+        (false, _) => Strings.HostStatusNotAvailable,
+        (true, true) => Strings.HostStatusAvailable,
+        (true, false) => Strings.HostStatusAnnouncing,
+    };
 
     private void OnChannelStateChanged(ControlChannelState state) => UiThread.Post(() =>
     {
         IsConnected = state == ControlChannelState.Connected;
-        if (IsConnected && IsAvailable)
+        if (!IsConnected)
         {
-            _ = PublishAvailabilityAsync(true); // re-announce after (re)connect
+            IsAnnounced = false; // the server forgets our presence the moment the socket drops
+            return;
+        }
+
+        if (IsAvailable)
+        {
+            // The channel re-announces after its own reconnect; this covers "the user toggled while offline".
+            _ = PublishAvailabilityAsync(true);
         }
     });
 
@@ -86,13 +145,36 @@ public sealed partial class HostViewModel : ObservableObject
     {
         switch (message)
         {
+            case HostsMessage hosts:
+                var self = _auth.DeviceId;
+                var listed = self is not null && hosts.Hosts.Any(h => h.DeviceId == self.Value);
+
+                // A host with a session in progress is deliberately not listed (docs/ws-protocol.md section 5),
+                // so only an idle device may conclude "the server did not take my host.available".
+                UiThread.Post(() =>
+                {
+                    if (listed)
+                    {
+                        IsAnnounced = IsAvailable;
+                    }
+                    else if (_sessions.Phase == SessionPhase.Idle)
+                    {
+                        IsAnnounced = false;
+                    }
+                });
+                break;
+
             case RequestIncomingMessage incoming:
                 // WEEK 5: resolve the allow-list text for incoming.AllowlistVersion via GET /domains?version=N.
                 var request = IncomingRequest.FromMessage(incoming, Strings.AllowedSitesPlaceholder);
                 UiThread.Post(() => _ = HandleIncomingRequestAsync(request, CancellationToken.None));
                 break;
+
             case RequestExpiredMessage expired:
                 UiThread.Post(() => _presenter.Expire(expired.RequestId));
+                break;
+
+            default:
                 break;
         }
     }

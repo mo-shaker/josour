@@ -270,10 +270,19 @@ public class ConnectProxyServerTests
         browser.Owned.Add(1);
         var checker = new FakePidChecker { Pid = 4242 };
         await using var proxy = Proxies.Start(new FakeMux(), browser: browser, checker: checker);
-        await using var client = await ProxyClient.ConnectAsync(proxy.Port);
-        try { await client.SendAsync("GET http://check.routebridge/ HTTP/1.1\r\n\r\n"); }
-        catch (IOException) { /* أُغلق (RST) قبل أن نكتب */ }
-        Assert.True(await client.ClosedWithoutDataAsync());
+        // الرفض يغلق المقبس فورًا؛ قد يصل FIN أو RST، وقد يضرب RST عند الاتصال نفسه تحت الحمل.
+        // العدّادات هي التأكيد الحقيقي: طُلب الفحص مرة، ورُفض الاتصال، ولم تُخدَم صفحة الفحص.
+        try
+        {
+            await using var client = await ProxyClient.ConnectAsync(proxy.Port);
+            try { await client.SendAsync("GET http://check.routebridge/ HTTP/1.1\r\n\r\n"); }
+            catch (IOException) { }
+            catch (SocketException) { }
+            Assert.True(await client.ClosedWithoutDataAsync());
+        }
+        catch (SocketException) { /* أُعيد ضبط الاتصال فورًا: النتيجة نفسها */ }
+
+        await Proxies.WaitForAsync(() => proxy.Counters.RejectedByOwner == 1);
         Assert.Equal(1, checker.Calls);
         Assert.Equal(1, proxy.Counters.RejectedByOwner);
         Assert.Equal(0, proxy.Counters.ProbeHits);

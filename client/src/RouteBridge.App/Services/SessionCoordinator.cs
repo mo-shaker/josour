@@ -37,40 +37,61 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         _logger = logger;
         _tracker.PhaseChanged += OnTrackerPhaseChanged;
         _channel.MessageReceived += OnMessage;
+        _channel.StateChanged += OnChannelStateChanged;
     }
 
     /// <summary>The pending request id while <see cref="SessionPhase.RequestPending"/>.</summary>
     public Guid? PendingRequestId => _tracker.PendingRequestId;
 
+    /// <summary>Local failure codes of <see cref="RequestSessionAsync"/> (the server's own codes are in <c>ControlErrorCodes</c>).</summary>
+    public const string NotConnectedCode = "not_connected";
+    public const string BusyCode = "busy";
+    public const string TimeoutCode = "timeout";
+
     // ---------- guest ----------
 
-    /// <summary>Guest: <c>request.create</c>. Returns false when the server answered <c>error</c> (reason in <see cref="LastEndReason"/>) or the channel is unusable.</summary>
-    public async Task<bool> RequestSessionAsync(Guid hostDeviceId, int durationMin, CancellationToken ct)
+    /// <summary>
+    /// Guest: <c>request.create</c> and wait for <c>request.created</c> with the same <c>ref</c>.
+    /// Returns null when the request is pending on the server, otherwise the error code to show
+    /// (a <c>ControlErrorCodes</c> value, or one of <see cref="NotConnectedCode"/> / <see cref="BusyCode"/> / <see cref="TimeoutCode"/>).
+    /// </summary>
+    public async Task<string?> RequestSessionAsync(Guid hostDeviceId, int durationMin, CancellationToken ct)
     {
         var requestRef = ControlRef.Next();
         if (!_tracker.TrackRequest(requestRef))
         {
             _logger.LogWarning("request.create ignored: phase is {Phase}", _tracker.Phase);
-            return false;
+            return BusyCode;
         }
 
         try
         {
             var reply = await _channel.RequestAsync(new RequestCreateMessage(requestRef, hostDeviceId, durationMin), RequestReplyTimeout, ct);
+
+            // The real channel throws ControlErrorException; MockControlChannel still answers with the frame itself.
             if (reply is ErrorMessage error)
             {
                 _logger.LogWarning("request.create rejected: {Code} {Message}", error.Code, error.Message); // tracker already returned to Idle via OnMessage
-                return false;
+                return error.Code;
             }
 
-            _logger.LogInformation("request.create accepted by the server: request {RequestId}", (reply as RequestCreatedMessage)?.RequestId);
-            return true;
+            _logger.LogInformation(
+                "request.create accepted by the server: request {RequestId} for {DurationMin} min",
+                (reply as RequestCreatedMessage)?.RequestId,
+                durationMin);
+            return null;
         }
-        catch (Exception ex) when (ex is TimeoutException or InvalidOperationException)
+        catch (ControlErrorException ex)
+        {
+            _logger.LogWarning("request.create rejected: {Code} {Message}", ex.Code, ex.Message);
+            _tracker.Reset(); // the matching error frame also reaches the tracker; both land on Idle
+            return ex.Code;
+        }
+        catch (Exception ex) when (ex is TimeoutException or InvalidOperationException or ControlChannelClosedException)
         {
             _logger.LogWarning(ex, "request.create failed");
             _tracker.Reset();
-            return false;
+            return ex is TimeoutException ? TimeoutCode : NotConnectedCode;
         }
     }
 
@@ -147,14 +168,48 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 _ = FinishAsync();
                 break;
 
-            case RequestResultMessage m when !m.Accepted:
-                _logger.LogInformation("request.result {RequestId}: rejected ({Reason})", m.RequestId, m.Reason);
+            case RequestResultMessage m when m.Accepted:
+                // Stay in RequestPending: session.created carries the details and moves us to Preparing.
+                _logger.LogInformation("request.result {RequestId}: accepted (session {SessionId})", m.RequestId, m.SessionId);
+                break;
+
+            case RequestResultMessage m:
+                _logger.LogInformation("request.result {RequestId}: not accepted ({Reason})", m.RequestId, m.Reason);
+                break;
+
+            case RequestExpiredMessage m:
+                _logger.LogInformation("request.expired {RequestId}", m.RequestId);
+                break;
+
+            case HelloAckMessage m:
+                _logger.LogDebug("hello.ack: max_session_minutes={MaxMinutes} allowlist_version={AllowlistVersion}", m.Settings.MaxSessionMinutes, m.AllowlistVersion);
                 break;
 
             case ErrorMessage m when m.Ref is null:
                 _logger.LogWarning("Server error without ref: {Code} {Message}", m.Code, m.Message);
                 break;
         }
+    }
+
+    /// <summary>
+    /// The channel dropped: a request that was waiting for an answer cannot be answered any more (the server ends it too,
+    /// docs/ws-protocol.md section 1), so the UI goes back to Idle instead of waiting forever.
+    /// </summary>
+    private void OnChannelStateChanged(ControlChannelState state)
+    {
+        if (state == ControlChannelState.Connected)
+        {
+            return;
+        }
+
+        if (_tracker.Phase == SessionPhase.RequestPending)
+        {
+            _logger.LogInformation("Control channel is {State}: dropping the pending request", state);
+            _tracker.Reset();
+        }
+
+        // WEEK 4: a session that is Preparing/Connecting/Active when the channel drops must be torn down here
+        //         (the server ends it with guest_disconnected/host_disconnected and the tunnel is worthless without the relay).
     }
 
     private async Task FinishAsync()
@@ -191,6 +246,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     public void Dispose()
     {
         _channel.MessageReceived -= OnMessage;
+        _channel.StateChanged -= OnChannelStateChanged;
         _tracker.PhaseChanged -= OnTrackerPhaseChanged;
     }
 }

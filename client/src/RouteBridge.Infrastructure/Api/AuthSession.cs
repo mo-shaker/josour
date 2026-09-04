@@ -203,6 +203,20 @@ public sealed class AuthSession : IAuthSession, IAccessTokenSource
         _logger.LogInformation("Signed out");
     }
 
+    public Task ForceSignOutAsync(SignOutReason reason, CancellationToken ct)
+    {
+        var code = reason switch
+        {
+            SignOutReason.DeviceRevoked => ApiErrorCodes.DeviceRevoked,
+            SignOutReason.AccountDisabled => ApiErrorCodes.AccountDisabled,
+            SignOutReason.SessionExpired => ApiErrorCodes.Unauthorized,
+            _ => (string?)null,
+        };
+
+        _logger.LogWarning("Session ended by the server ({Reason}); clearing it locally", reason);
+        return ClearSessionAsync(code, ct);
+    }
+
     public async Task<string?> GetValidAccessTokenAsync(CancellationToken ct)
     {
         string? token;

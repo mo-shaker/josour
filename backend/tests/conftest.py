@@ -9,6 +9,8 @@ import asyncio
 import os
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -24,11 +26,16 @@ os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 
 from app.core.clock import utcnow  # noqa: E402
 from app.core.config import Settings, get_settings  # noqa: E402
+from app.core.security import AccessClaims, create_access_token  # noqa: E402
+from app.db import session as db_session  # noqa: E402
 from app.db.session import get_db, make_engine, make_sessionmaker  # noqa: E402
 from app.models import Base, ConnectionRequest, Device, Session, User  # noqa: E402
 from app.models.enums import RequestStatus, SessionStatus, UserRole  # noqa: E402
 from app.services.app_settings import settings_service  # noqa: E402
+from app.services.session_timer import scheduler  # noqa: E402
 from app.services.users import create_user  # noqa: E402
+from app.ws.connection_manager import connection_manager  # noqa: E402
+from tests.ws_client import ASGIWebSocket, WebSocketClosed  # noqa: E402
 
 PASSWORD = "correct-horse-battery"
 ADMIN_EMAIL = "admin@example.com"
@@ -79,10 +86,17 @@ def _clean_tables(database_url: str, _schema: None) -> Iterator[None]:
 
 @pytest.fixture(autouse=True)
 def _reset_process_state() -> Iterator[None]:
-    """In-process caches must not leak between tests (tables are emptied after each)."""
+    """In-process state must not leak between tests (tables are emptied after each).
+
+    The WebSocket registry and the timer scheduler are process-wide singletons, like the
+    settings cache, and every test gets its own event loop."""
     settings_service.invalidate()
+    connection_manager.reset()
+    scheduler.cancel_all()
     yield
     settings_service.invalidate()
+    connection_manager.reset()
+    scheduler.cancel_all()
 
 
 @pytest.fixture
@@ -102,11 +116,17 @@ AppFactory = Callable[[Settings | None], FastAPI]
 
 
 @pytest.fixture
-def app_factory(engine: AsyncEngine) -> AppFactory:
-    """Build an app (optionally with custom ``Settings``) bound to the test database."""
+def app_factory(engine: AsyncEngine) -> Iterator[AppFactory]:
+    """Build an app (optionally with custom ``Settings``) bound to the test database.
+
+    The WebSocket layer, its timers and the lifespan open sessions outside the request cycle
+    (``app.db.session.session_scope``), so the module-level factory is pointed at the test
+    engine too - not only the ``get_db`` dependency."""
     from app.main import create_app
 
     sessionmaker = make_sessionmaker(engine)
+    previous = (db_session._engine, db_session._sessionmaker)
+    db_session._engine, db_session._sessionmaker = engine, sessionmaker
 
     async def override_get_db() -> AsyncIterator[AsyncSession]:
         async with sessionmaker() as session:
@@ -117,7 +137,8 @@ def app_factory(engine: AsyncEngine) -> AppFactory:
         application.dependency_overrides[get_db] = override_get_db
         return application
 
-    return build
+    yield build
+    db_session._engine, db_session._sessionmaker = previous
 
 
 @pytest.fixture
@@ -219,6 +240,118 @@ def make_device(db: AsyncSession) -> DeviceFactory:
         return device
 
     return build
+
+
+@dataclass(frozen=True, slots=True)
+class Actor:
+    """A user with one device and a usable access token - one side of a WebSocket test."""
+
+    user: User
+    device: Device
+    token: str
+
+    @property
+    def device_id(self) -> str:
+        return str(self.device.id)
+
+
+ActorFactory = Callable[..., Awaitable[Actor]]
+
+
+@pytest.fixture
+def access_token() -> Callable[[User, Device], str]:
+    def build(user: User, device: Device) -> str:
+        token, _ = create_access_token(
+            make_settings(),
+            AccessClaims(user_id=user.id, device_id=device.id, role=user.role),
+        )
+        return token
+
+    return build
+
+
+@pytest.fixture
+def make_actor(db: AsyncSession, access_token: Callable[[User, Device], str]) -> ActorFactory:
+    """Create (and commit) a user + device pair the WebSocket layer can authenticate."""
+
+    async def build(
+        email: str = "guest@example.com",
+        *,
+        display_name: str = "Guest",
+        device_name: str = "GUEST-PC",
+        role: UserRole = UserRole.USER,
+    ) -> Actor:
+        user = await create_user(
+            db, email=email, password=PASSWORD, display_name=display_name, role=role
+        )
+        device = Device(
+            user_id=user.id, name=device_name, os_version="Windows 11", device_secret_hash="x"
+        )
+        db.add(device)
+        await db.commit()
+        return Actor(user=user, device=device, token=access_token(user, device))
+
+    return build
+
+
+WsFactory = Callable[..., Awaitable[ASGIWebSocket]]
+
+
+@pytest.fixture
+async def ws_connect(app: FastAPI) -> AsyncIterator[WsFactory]:
+    """Open a ``/ws`` connection; by default it also performs the ``hello`` handshake and
+    stores ``hello_ack`` / ``snapshot`` on the returned client."""
+    opened: list[ASGIWebSocket] = []
+
+    async def build(
+        actor: Actor | None = None,
+        *,
+        token: str | None = None,
+        device_id: str | None = None,
+        hello: bool = True,
+        app_version: str = "0.1.0-test",
+        diagnostics: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        client: tuple[str, int] = ("203.0.113.10", 51000),
+    ) -> ASGIWebSocket:
+        ws = ASGIWebSocket(app, headers=headers, client=client)
+        opened.append(ws)
+        await ws.open()
+        if hello:
+            payload: dict[str, Any] = {
+                "type": "hello",
+                "token": token if token is not None else (actor.token if actor else ""),
+                "device_id": device_id
+                if device_id is not None
+                else (actor.device_id if actor else str(uuid.uuid4())),
+                "app_version": app_version,
+            }
+            if diagnostics is not None:
+                payload["diagnostics"] = diagnostics
+            await ws.send(payload)
+            try:
+                ws.hello_ack = await ws.expect("hello.ack", skip=frozenset({"error"}))
+                ws.snapshot = await ws.expect("hosts.snapshot")
+            except WebSocketClosed:
+                # A rejected hello: the caller asserts on ``wait_closed()``.
+                pass
+        return ws
+
+    yield build
+    for ws in opened:
+        await ws.disconnect(raise_app_error=False)
+
+
+@pytest.fixture
+def run_lifespan(app: FastAPI) -> Callable[[], Any]:
+    """Run the application lifespan (startup reset / shutdown) around a block of test code."""
+
+    @asynccontextmanager
+    async def runner() -> AsyncIterator[FastAPI]:
+        async with app.router.lifespan_context(app):
+            yield app
+
+    return runner
 
 
 SessionFactory = Callable[..., Awaitable[Session]]

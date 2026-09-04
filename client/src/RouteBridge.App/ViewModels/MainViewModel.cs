@@ -16,6 +16,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IStartupRegistration _startup;
     private readonly IShellService _shell;
     private readonly IControlChannel _controlChannel;
+    private readonly ControlChannelConnector _connector;
     private readonly IAuthSession _auth;
     private readonly IAuthFlow _authFlow;
     private readonly ILogger<MainViewModel> _logger;
@@ -40,6 +41,7 @@ public sealed partial class MainViewModel : ObservableObject
         IStartupRegistration startup,
         IShellService shell,
         IControlChannel controlChannel,
+        ControlChannelConnector connector,
         IAuthSession auth,
         IAuthFlow authFlow,
         IDeviceInfoProvider deviceInfo,
@@ -52,6 +54,7 @@ public sealed partial class MainViewModel : ObservableObject
         _startup = startup;
         _shell = shell;
         _controlChannel = controlChannel;
+        _connector = connector;
         _auth = auth;
         _authFlow = authFlow;
         _logger = logger;
@@ -61,6 +64,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         Host.PropertyChanged += OnHostPropertyChanged;
         _controlChannel.StateChanged += _ => UiThread.Post(UpdateStatus);
+        _connector.Changed += () => UiThread.Post(UpdateStatus);
         _auth.Changed += (_, _) => UiThread.Post(UpdateStatus);
         UpdateStatus();
     }
@@ -121,20 +125,42 @@ public sealed partial class MainViewModel : ObservableObject
         IsSignedIn = user is not null;
         UserDisplayName = user?.DisplayName ?? string.Empty;
 
-        var connection = _controlChannel.State switch
-        {
-            ControlChannelState.Connected => Strings.StatusConnected,
-            ControlChannelState.Connecting => Strings.StatusConnecting,
-            ControlChannelState.Reconnecting => Strings.StatusReconnecting,
-            _ => Strings.StatusOffline,
-        };
-
+        var connection = DescribeConnection();
         StatusText = user is null
             ? Strings.StatusNotSignedIn
             : string.Format(CultureInfo.CurrentCulture, Strings.StatusSignedInFormat, user.DisplayName, connection);
         TrayTooltip = user is null
             ? Strings.TrayTooltipNotSignedIn
-            : string.Format(CultureInfo.CurrentCulture, Strings.TrayTooltipSignedInFormat, user.DisplayName);
+            : string.Format(CultureInfo.CurrentCulture, Strings.TrayTooltipSignedInFormat, user.DisplayName, connection);
+    }
+
+    /// <summary>The connection half of the status line and the tray tooltip: live state first, then why it stopped for good.</summary>
+    private string DescribeConnection()
+    {
+        var state = _controlChannel.State;
+        if (state is ControlChannelState.Connected)
+        {
+            return Strings.StatusConnected;
+        }
+
+        if (state is ControlChannelState.Connecting)
+        {
+            return Strings.StatusConnecting;
+        }
+
+        if (state is ControlChannelState.Reconnecting)
+        {
+            return Strings.StatusReconnecting;
+        }
+
+        return _connector.LastClose?.Reason switch
+        {
+            ControlCloseReason.ReplacedByAnotherConnection => Strings.StatusReplacedElsewhere,
+            ControlCloseReason.Unauthorized => Strings.StatusSignInExpired,
+            ControlCloseReason.DeviceRevoked => Strings.SignedOutDeviceRevoked,
+            ControlCloseReason.Failed when !_connector.CanConnect => Strings.StatusNoServer,
+            _ => Strings.StatusOffline,
+        };
     }
 
     [RelayCommand]

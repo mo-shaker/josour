@@ -1,6 +1,7 @@
 """Async engine / session factory and the FastAPI request-scoped session dependency."""
 
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -50,5 +51,14 @@ async def dispose_engine() -> None:
 
 async def get_db() -> AsyncIterator[AsyncSession]:
     """FastAPI dependency. Handlers commit explicitly; the session rolls back on error."""
+    async with get_sessionmaker()() as session:
+        yield session
+
+
+@asynccontextmanager
+async def session_scope() -> AsyncIterator[AsyncSession]:
+    """A session outside the request cycle: the WebSocket layer, its timers and the lifespan.
+
+    Same factory as :func:`get_db`, usable with ``async with``; callers commit explicitly."""
     async with get_sessionmaker()() as session:
         yield session

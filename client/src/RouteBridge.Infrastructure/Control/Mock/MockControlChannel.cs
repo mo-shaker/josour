@@ -8,7 +8,8 @@ using RouteBridge.Core.Control;
 namespace RouteBridge.Infrastructure.Control.Mock;
 
 /// <summary>
-/// In-process stand-in for the server side of docs/ws-protocol.md, used by the app until the real ControlChannel (week 3).
+/// In-process stand-in for the server side of docs/ws-protocol.md. Since week 3 the app talks to the real <see cref="ControlChannel"/>
+/// and only uses this one behind the <c>--mock</c> switch (demos and UI work without a backend).
 /// It scripts one fake server: <c>hello.ack</c> + <c>hosts.snapshot</c> on connect, <c>hosts.update</c> on <c>host.available</c>,
 /// the guest flow (<c>request.create → request.created → request.result → session.created → session.peer_endpoint → session.active → session.terminate</c>),
 /// the host flow (<see cref="SimulateIncomingRequest"/> → <c>request.incoming → request.accept → session.created …</c>), request/session expiry timers,
@@ -75,6 +76,13 @@ public sealed class MockControlChannel : IControlChannel
     public event Action<ControlChannelState>? StateChanged;
 
     public event Action<ControlMessage>? MessageReceived;
+
+    /// <summary>Never raised: the fake server has no close codes, so the mock only ever disconnects on request.</summary>
+    public event Action<ControlChannelClosed>? Closed
+    {
+        add { }
+        remove { }
+    }
 
     /// <summary>The session the fake server currently holds for this device, or null.</summary>
     public Guid? CurrentSessionId

@@ -10,7 +10,8 @@ from app.db.types import UtcDateTime
 
 
 class Presence(Base):
-    """Live WebSocket state per device. Reset on server boot (TODO week 3: presence service)."""
+    """Live WebSocket state per device, owned by ``app.services.presence``; every row is reset
+    on server boot because the registry behind it is in memory."""
 
     __tablename__ = "presence"
 

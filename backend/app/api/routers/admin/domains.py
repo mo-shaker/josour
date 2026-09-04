@@ -25,7 +25,8 @@ async def get_domains(_: AdminDep, db: DbDep) -> AdminDomainsOut:
 @router.put("", response_model=AdminDomainsOut)
 async def put_domains(payload: AdminDomainsIn, auth: AdminDep, db: DbDep) -> AdminDomainsOut:
     """Full replacement; any invalid entry rejects the whole request (422 listing them all).
-    Publishes ``AllowlistPublished`` on the bus once committed (week 3: ``allowlist.updated``)."""
+    Publishes ``AllowlistPublished`` on the bus once committed; the WebSocket layer turns that
+    into an ``allowlist.updated`` broadcast (app.ws.subscribers)."""
     version = await allowlist.replace_entries(db, payload.entries, created_by=auth.user.id)
     await db.commit()
     await event_bus.publish(allowlist.published_event(version))

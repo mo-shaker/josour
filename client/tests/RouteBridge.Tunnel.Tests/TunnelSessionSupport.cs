@@ -1,0 +1,249 @@
+using System.Net;
+using RouteBridge.Core.Tunnel;
+using RouteBridge.Tunnel.Candidates;
+using RouteBridge.Tunnel.Mux;
+using RouteBridge.Tunnel.Transport;
+
+namespace RouteBridge.Tunnel.Tests;
+
+/// <summary>مصدر مرشحين ثابت بلا شبكة ولا UPnP: يعطي lan 127.0.0.1:&lt;منفذ المستمع&gt; ويحصي استدعاءات إزالة التعيين.</summary>
+internal sealed class StaticCandidateSource : ICandidateSource
+{
+    private readonly bool _withCandidate;
+
+    public StaticCandidateSource(bool withCandidate = true, bool hasMapping = false)
+    {
+        _withCandidate = withCandidate;
+        HasMapping = hasMapping;
+    }
+
+    public int GatherCalls { get; private set; }
+    public GatherOptions? LastOptions { get; private set; }
+    public bool HasMapping { get; private set; }
+    public int RemoveMappingCalls { get; private set; }
+    public bool Disposed { get; private set; }
+
+    public Task<GatherResult> GatherAsync(GatherOptions options, CancellationToken ct)
+    {
+        GatherCalls++;
+        LastOptions = options;
+        var candidates = _withCandidate
+            ? new[] { new CandidateEndpoint(CandidateType.Lan, "127.0.0.1", options.ListenPort) }
+            : Array.Empty<CandidateEndpoint>();
+        var diagnostics = new GatherDiagnostics(false, HasMapping, null, false, false, new[] { "static source" });
+        return Task.FromResult(new GatherResult(candidates, diagnostics));
+    }
+
+    public Task<bool> RemoveMappingAsync(CancellationToken ct)
+    {
+        RemoveMappingCalls++;
+        var had = HasMapping;
+        HasMapping = false;
+        return Task.FromResult(had);
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        Disposed = true;
+        return ValueTask.CompletedTask;
+    }
+}
+
+/// <summary>نقل مباشر يحتفظ بالـ streams التي أنشأها ليستطيع الاختبار قتل النقل تحت TLS (نفق ميت بلا GOAWAY).</summary>
+internal sealed class RecordingTransport : ITunnelTransport
+{
+    private readonly ITunnelTransport _inner = new DirectTransport();
+    private readonly List<Stream> _streams = new();
+    private readonly object _gate = new();
+
+    public string Name => "recording";
+    public int ConnectCount { get { lock (_gate) return _streams.Count; } }
+
+    public async Task<Stream> ConnectAsync(CandidateEndpoint endpoint, TimeSpan timeout, CancellationToken ct)
+    {
+        var stream = await _inner.ConnectAsync(endpoint, timeout, ct);
+        lock (_gate) _streams.Add(stream);
+        return stream;
+    }
+
+    /// <summary>يغلق المقبس تحت TLS بلا GOAWAY: الطرفان يريان النفق ميتًا.</summary>
+    public void KillAll()
+    {
+        Stream[] streams;
+        lock (_gate) streams = _streams.ToArray();
+        foreach (var stream in streams)
+        {
+            try { stream.Dispose(); } catch { /* مقتول أصلًا */ }
+        }
+    }
+}
+
+/// <summary>سياسة خروج وهمية: تسجّل الربط والتخلص وتعطي أعدادًا ثابتة.</summary>
+internal sealed class FakeEgress : ITunnelEgress
+{
+    private readonly List<string> _log;
+
+    public FakeEgress(List<string>? log = null) => _log = log ?? new List<string>();
+
+    public IMuxAcceptor? Attached { get; private set; }
+    public bool Disposed { get; private set; }
+    public long BytesUp { get; set; } = 11;
+    public long BytesDown { get; set; } = 22;
+    public List<string> DomainList { get; } = new() { "example.test" };
+    public IReadOnlyCollection<string> Domains => DomainList;
+
+    public void Attach(IMuxAcceptor acceptor)
+    {
+        Attached = acceptor;
+        acceptor.OpenRequested = (_, _) => Task.FromResult(MuxOpenDecision.Fail(OpenFailReason.NotAllowed));
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        Disposed = true;
+        lock (_log) _log.Add("egress.dispose");
+        return ValueTask.CompletedTask;
+    }
+}
+
+/// <summary>Proxy وهمي: يسجّل ترتيب خطوات الإيقاف ويسمح برفع إشارة صفحة الفحص يدويًا.</summary>
+internal sealed class FakeProxy : ITunnelProxy
+{
+    private readonly List<string> _log;
+
+    public FakeProxy(List<string>? log = null) => _log = log ?? new List<string>();
+
+    public int Port { get; init; } = 43110;
+    public string ProbeUrl => "http://check.routebridge/";
+    public bool Started { get; private set; }
+    public bool Disposed { get; private set; }
+
+    public event Action? ProbeSeen;
+
+    public void RaiseProbe() => ProbeSeen?.Invoke();
+
+    public void Start()
+    {
+        Started = true;
+        lock (_log) _log.Add("proxy.start");
+    }
+
+    public void StopAccepting()
+    {
+        lock (_log) _log.Add("proxy.stop_accepting");
+    }
+
+    public Task StopAsync()
+    {
+        lock (_log) _log.Add("proxy.stop");
+        return Task.CompletedTask;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        Disposed = true;
+        lock (_log) _log.Add("proxy.dispose");
+        return ValueTask.CompletedTask;
+    }
+}
+
+/// <summary>جلستان (مضيف + ضيف) على loopback داخل العملية، بمرشحين ثابتين وقطع وهمية. المضيف هو الذي يتصل.</summary>
+internal sealed class TunnelSessionPair : IAsyncDisposable
+{
+    private TunnelSessionPair(TunnelSession host, TunnelSession guest, FakeEgress egress, FakeProxy proxy, RecordingTransport hostTransport, List<string> log)
+    {
+        Host = host;
+        Guest = guest;
+        Egress = egress;
+        Proxy = proxy;
+        HostTransport = hostTransport;
+        Log = log;
+    }
+
+    public TunnelSession Host { get; }
+    public TunnelSession Guest { get; }
+    public FakeEgress Egress { get; }
+    public FakeProxy Proxy { get; }
+    public RecordingTransport HostTransport { get; }
+    public List<string> Log { get; }
+    public TunnelConnectResult HostResult { get; private set; } = null!;
+    public TunnelConnectResult GuestResult { get; private set; } = null!;
+    /// <summary>الـ Mux كما مُرِّر إلى مصنع الـ Proxy على جانب الضيف (الواجهة لا تكشفه).</summary>
+    public IMuxConnection? GuestMux { get; private set; }
+    public List<TunnelState> HostStates { get; } = new();
+    public List<TunnelState> GuestStates { get; } = new();
+
+    public static async Task<TunnelSessionPair> CreateAsync(TimeSpan? timeout = null, Func<CancellationToken, Task>? guestCloseBrowser = null, List<string>? sharedLog = null)
+    {
+        var log = sharedLog ?? new List<string>();
+        var sessionId = Guid.NewGuid();
+        var secret = TestMaterial.NewSecret();
+        var expires = DateTimeOffset.UtcNow.AddMinutes(30);
+        var egress = new FakeEgress(log);
+        var proxy = new FakeProxy(log);
+        var hostTransport = new RecordingTransport();
+
+        var host = new TunnelSession(
+            new SessionMaterial(sessionId, TunnelRole.Host, (byte[])secret.Clone(), expires, true, "198.51.100.2"),
+            new TunnelSessionOptions
+            {
+                BindAddress = IPAddress.Loopback,
+                CandidateSource = () => new StaticCandidateSource(),
+                Transport = hostTransport,
+                HostEgress = _ => egress,
+                // حيوية قصيرة بدل تعطيلها: المسار الأساسي لكشف الموت هو EOF، وهذه شبكة أمان
+                // تجعل الكشف حتميًا داخل مهلة الاختبار بدل انتظار 60 ثانية الافتراضية.
+                Mux = new MuxOptions { PingInterval = TimeSpan.FromSeconds(2), DeadAfter = TimeSpan.FromSeconds(8) },
+            });
+        IMuxConnection? guestMux = null;
+        var guest = new TunnelSession(
+            new SessionMaterial(sessionId, TunnelRole.Guest, (byte[])secret.Clone(), expires, true, "203.0.113.7"),
+            new TunnelSessionOptions
+            {
+                BindAddress = IPAddress.Loopback,
+                CandidateSource = () => new StaticCandidateSource(),
+                GuestProxy = ctx => { guestMux = ctx.Mux; return proxy; },
+                CloseBrowserAsync = guestCloseBrowser,
+                // حيوية قصيرة بدل تعطيلها: المسار الأساسي لكشف الموت هو EOF، وهذه شبكة أمان
+                // تجعل الكشف حتميًا داخل مهلة الاختبار بدل انتظار 60 ثانية الافتراضية.
+                Mux = new MuxOptions { PingInterval = TimeSpan.FromSeconds(2), DeadAfter = TimeSpan.FromSeconds(8) },
+            });
+
+        var pair = new TunnelSessionPair(host, guest, egress, proxy, hostTransport, log);
+        host.StateChanged += s => { lock (pair.HostStates) pair.HostStates.Add(s); };
+        guest.StateChanged += s => { lock (pair.GuestStates) pair.GuestStates.Add(s); };
+
+        var hostLocal = await host.PrepareAsync(CancellationToken.None);
+        var guestLocal = await guest.PrepareAsync(CancellationToken.None);
+        var window = timeout ?? TimeSpan.FromSeconds(20);
+
+        // المضيف هو المتصل (الضيف بلا مرشحين للطرف الآخر)، فيملك الاختبار مقبس النقل ويستطيع قتله.
+        var hostTask = host.ConnectAsync(new PeerEndpointInfo(guestLocal.CertFingerprintSha256Hex, guestLocal.Candidates), window, CancellationToken.None);
+        var guestTask = guest.ConnectAsync(new PeerEndpointInfo(hostLocal.CertFingerprintSha256Hex, Array.Empty<CandidateEndpoint>()), window, CancellationToken.None);
+        pair.HostResult = await hostTask;
+        pair.GuestResult = await guestTask;
+        pair.GuestMux = guestMux;
+        return pair;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Guest.DisposeAsync();
+        await Host.DisposeAsync();
+    }
+}
+
+internal static class Wait
+{
+    /// <summary>ينتظر شرطًا حتى المهلة (للأحداث التي تصل من خيوط أخرى).</summary>
+    public static async Task<bool> UntilAsync(Func<bool> condition, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (condition()) return true;
+            await Task.Delay(20);
+        }
+        return condition();
+    }
+}

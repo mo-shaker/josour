@@ -7,6 +7,10 @@ namespace RouteBridge.Proxy;
 public static class ProbePage
 {
     public const string Host = "check.routebridge";
+
+    /// <summary>الرابط الذي يُفتح عليه المتصفح (BrowserLaunchOptions.ProbeUrl) ويُكشف في GuestProxyInfo.ProbeUrl.</summary>
+    public const string Url = "http://check.routebridge/";
+
     public const string TitleEnglish = "Tunnel active. Sites will see: ";
 
     public static string Html(string peerPublicIp)

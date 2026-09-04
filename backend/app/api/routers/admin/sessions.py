@@ -29,7 +29,8 @@ async def terminate_session(
     session_id: uuid.UUID, auth: AdminDep, db: DbDep, request: Request
 ) -> Response:
     """Ends a non-ended session with ``admin_terminated`` (404 unknown, 409 already ended) and
-    publishes ``SessionEnded`` on the bus (week 3: ``session.terminate`` to both peers)."""
+    publishes ``SessionEnded`` on the bus, which the WebSocket layer turns into
+    ``session.terminate`` for both peers (app.ws.subscribers)."""
     event = await session_service.admin_terminate(
         db,
         session_id,

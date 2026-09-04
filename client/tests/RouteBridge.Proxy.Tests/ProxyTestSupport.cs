@@ -203,7 +203,9 @@ internal sealed class ProxyClient : IAsyncDisposable
             var n = await Stream.ReadAsync(one).AsTask().WaitAsync(Timeout);
             return n == 0;
         }
+        // الإغلاق الفوري قد يصل FIN نظيفًا أو RST؛ كلاهما "أُغلق بلا بيانات" لغرض هذا الفحص.
         catch (IOException) { return true; }
+        catch (SocketException) { return true; }
     }
 
     public async Task<byte[]> ReadToEndAsync()
@@ -240,6 +242,13 @@ internal static class TcpPair
 
 internal static class Proxies
 {
+    /// <summary>ينتظر شرطًا يتحقق من مهمة خلفية (الرفض والعدّ يحدثان بعد إغلاق المقبس).</summary>
+    public static async Task WaitForAsync(Func<bool> condition, int timeoutMs = 5000)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (!condition() && DateTime.UtcNow < deadline) await Task.Delay(20);
+    }
+
     public static readonly string[] DefaultEntries = { "allowed.example", "=exact.example", "portal.example:8443" };
 
     public static ConnectProxyServer Start(FakeMux? mux = null, StubResolver? resolver = null, IBrowserSession? browser = null, IOwnerPidChecker? checker = null, bool? rejectUnknown = null, string[]? entries = null, int[]? allowedPorts = null)

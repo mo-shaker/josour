@@ -11,6 +11,7 @@ using RouteBridge.App.Views;
 using RouteBridge.Core.Control;
 using RouteBridge.Core.Security;
 using RouteBridge.Infrastructure.Api;
+using RouteBridge.Infrastructure.Control;
 using RouteBridge.Infrastructure.Control.Mock;
 using RouteBridge.Infrastructure.Device;
 using RouteBridge.Infrastructure.Logging;
@@ -60,13 +61,14 @@ public partial class App : Application
             var settings = services.GetRequiredService<IAppSettingsStore>();
 
             logger.LogInformation(
-                "RouteBridge {AppVersion} starting on {OsVersion} (build {OsBuild}) as {DeviceName}; minimized={Minimized} toastActivated={ToastActivated} server={ServerUrl} logs={LogDirectory}",
+                "RouteBridge {AppVersion} starting on {OsVersion} (build {OsBuild}) as {DeviceName}; minimized={Minimized} toastActivated={ToastActivated} channel={Channel} server={ServerUrl} logs={LogDirectory}",
                 device.AppVersion,
                 device.OsVersion,
                 device.OsBuild,
                 device.DeviceName,
                 _options.StartMinimized,
                 _options.ToastActivated,
+                _options.MockControlChannel ? "mock" : "wss",
                 string.IsNullOrEmpty(settings.Current.ServerUrl) ? "(not set)" : settings.Current.ServerUrl,
                 LoggingSetup.DefaultLogDirectory);
 
@@ -166,12 +168,20 @@ public partial class App : Application
         services.AddSingleton<IAuthSession>(sp => sp.GetRequiredService<AuthSession>());
         services.AddSingleton<IAccessTokenSource>(sp => sp.GetRequiredService<AuthSession>());
 
-        // Control channel. WEEK 3: replace MockControlChannel with RouteBridge.Infrastructure.ControlChannel (real WSS);
-        // NotConnectedControlChannel remains the explicit "no server" stand-in.
-        services.AddSingleton<IControlChannel>(sp => new MockControlChannel(
-            MockControlChannelOptions.Default,
-            TimeProvider.System,
-            sp.GetRequiredService<ILogger<MockControlChannel>>()));
+        // Control channel: the real WSS channel, or the built-in simulated server with --mock (demos, UI work without a backend).
+        // The real channel starts Disconnected — exactly what NotConnectedControlChannel stands for — and ControlChannelConnector
+        // only opens it once a server URL is configured AND the user is signed in.
+        services.AddSingleton<IControlChannel>(sp => _options.MockControlChannel
+            ? new MockControlChannel(
+                MockControlChannelOptions.Default,
+                TimeProvider.System,
+                sp.GetRequiredService<ILogger<MockControlChannel>>())
+            : new ControlChannel(
+                sp.GetRequiredService<IAppSettingsStore>(),
+                sp.GetRequiredService<IAccessTokenSource>(),
+                sp.GetRequiredService<IDeviceInfoProvider>(),
+                ControlChannelOptions.Default,
+                sp.GetRequiredService<ILogger<ControlChannel>>()));
         services.AddSingleton<ControlChannelConnector>();
         services.AddSingleton<SessionCoordinator>();
 

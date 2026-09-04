@@ -53,6 +53,12 @@ public sealed class SymmetricConnector
         _ourCandidates = ourCandidates ?? Array.Empty<CandidateEndpoint>();
     }
 
+    /// <summary>
+    /// تقدّم أي محاولة إلى مرحلة جديدة ("tls" ثم "auth" ثم "ok"). يُرفع من خيوط متعددة وقد يتكرر؛
+    /// <see cref="TunnelSession"/> يستعمله ليعكس Connecting → Authenticating في StateChanged. أخطاء المستمع تُبتلع.
+    /// </summary>
+    public event Action<string>? StageReached;
+
     /// <summary>يُستدعى مرة واحدة. عند الانتهاء يكون المستمع متوقفًا وكل المحاولات الأخرى مغلقة.</summary>
     public async Task<SymmetricConnectOutcome> ConnectAsync(PeerEndpointInfo peer, TimeSpan timeout, CancellationToken ct)
     {
@@ -152,14 +158,14 @@ public sealed class SymmetricConnector
 
     private async Task AuthenticateAsync(Stream raw, bool inbound, Attempt attempt, byte[] peerFp, byte[] ourFp, TaskCompletionSource<(AuthenticatedConnection, long)> winner, Stopwatch clock, CancellationToken ct)
     {
-        attempt.Stage = "tls";
+        Stage(attempt, "tls");
         var tls = inbound
             ? await TlsChannel.AuthenticateAsServerAsync(raw, _certificate.Certificate, TlsTimeout, ct).ConfigureAwait(false)
             : await TlsChannel.AuthenticateAsClientAsync(raw, peerFp, TlsTimeout, ct).ConfigureAwait(false);
 
         // listener_cert_fp = شهادة من يعمل TLS Server في هذا الاتصال: نحن عند القبول، والطرف الآخر عند الاتصال.
         var listenerFp = inbound ? ourFp : peerFp;
-        attempt.Stage = "auth";
+        Stage(attempt, "auth");
         try
         {
             if (_material.Role == TunnelRole.Host)
@@ -183,7 +189,7 @@ public sealed class SymmetricConnector
             }
 
             var connection = new AuthenticatedConnection(tls.Stream, attempt.Type ?? CandidateType.Public, tls.TlsVersion, inbound, $"{attempt.Ip}:{attempt.Port}");
-            attempt.Stage = "ok";
+            Stage(attempt, "ok");
             if (!winner.TrySetResult((connection, clock.ElapsedMilliseconds)))
                 throw new SupersededException();
         }
@@ -195,6 +201,12 @@ public sealed class SymmetricConnector
     }
 
     private bool TryClaim() => Interlocked.CompareExchange(ref _claimed, 1, 0) == 0;
+
+    private void Stage(Attempt attempt, string stage)
+    {
+        attempt.Stage = stage;
+        try { StageReached?.Invoke(stage); } catch { /* المستمع مسؤول عن أخطائه */ }
+    }
 
     private void Record(Attempt attempt)
     {
