@@ -6,7 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 from app.db.types import JSONVariant
 
-# Defaults per docs/api.md; rows override them (TODO week 2: admin settings router).
+# Defaults per docs/api.md; rows override them. Read through app.services.app_settings.
 DEFAULT_SETTINGS: dict[str, Any] = {
     "max_session_minutes": 120,
     "request_timeout_seconds": 60,

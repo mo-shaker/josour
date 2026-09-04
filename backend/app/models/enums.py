@@ -66,4 +66,5 @@ class SecurityEventType(enum.StrEnum):
     LOGOUT = "logout"
     REFRESH_REUSE = "refresh_reuse"
     DEVICE_REVOKED = "device_revoked"
-    # TODO(week 4/5): admin_terminated, listener_unauthenticated (from client diagnostics)
+    SESSION_ADMIN_TERMINATED = "session_admin_terminated"
+    # TODO(week 4/5): listener_unauthenticated (from client diagnostics)

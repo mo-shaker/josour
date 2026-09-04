@@ -9,6 +9,8 @@
   <ItemGroup>
     <ProjectReference Include="../../src/RouteBridge.Core/RouteBridge.Core.csproj" />
     <ProjectReference Include="../../src/RouteBridge.Tunnel/RouteBridge.Tunnel.csproj" />
+    <ProjectReference Include="../../src/RouteBridge.Proxy/RouteBridge.Proxy.csproj" />
+    <ProjectReference Include="../../src/RouteBridge.Browser/RouteBridge.Browser.csproj" />
   </ItemGroup>
 
 </Project>

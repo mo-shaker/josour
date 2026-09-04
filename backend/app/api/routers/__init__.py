@@ -2,12 +2,14 @@
 
 from fastapi import APIRouter
 
-from app.api.routers import auth, domains, hosts, me, probe
+from app.api.routers import admin, auth, diagnostics, domains, hosts, me, probe, sessions
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router)
 api_router.include_router(me.router)
 api_router.include_router(hosts.router)
+api_router.include_router(sessions.router)
 api_router.include_router(domains.router)
 api_router.include_router(probe.router)
-# TODO(week 2): sessions (GET /sessions/me) and admin_* routers.
+api_router.include_router(diagnostics.router)
+api_router.include_router(admin.router)

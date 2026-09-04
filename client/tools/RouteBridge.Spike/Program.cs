@@ -26,6 +26,7 @@ try
         "gather" => await GatherCommand.RunAsync(options, cancel.Token),
         "symmetric" => await SymmetricCommand.RunAsync(options, cancel.Token),
         "probe" => await ProbeCommand.RunAsync(options, cancel.Token),
+        "browser" => await BrowserCommand.RunAsync(options, cancel.Token),
         _ => Unknown(args[0]),
     };
 }
@@ -61,9 +62,18 @@ static void Usage()
 
           symmetric --role host|guest --session <guid> --secret-b64 <s> --public-ip X
                     [--peer-file path] [--port N] [--same-public-ip] [--no-upnp] [--timeout-s 30]
+                    [--post-to <api base url> --token <jwt>]
               Print OUR endpoint JSON (stdout + endpoint-<role>.json), wait for the peer's endpoint JSON
               (from --peer-file when it appears, or pasted on stdin), run the symmetric connect, print the
               result + diagnostics JSON, then exchange hello/hello-ack over the authenticated stream.
+              With --post-to, POST the final result JSON to <base>/api/v1/diagnostics as {session_id, role, data}.
+
+          browser --proxy-port N | --self-hosted [--browser chrome|edge] [--profile path]
+              Locate the browser (App Paths + Authenticode publisher), detect enterprise proxy/profile policies,
+              launch it inside a Job Object on http://check.routebridge/ (with --self-hosted: a local
+              ConnectProxyServer with an empty allowlist serves the probe page and everything goes direct),
+              report probe_hit_ms (10 s timeout), close it after 5 s and report close_ms. JSON on stdout.
+              This is the Windows browser-matrix tool (Chrome/Edge x managed/unmanaged x Win10/11).
 
           probe --api https://host --token T --ip X --port N
               POST /api/v1/probe on the backend (best effort).

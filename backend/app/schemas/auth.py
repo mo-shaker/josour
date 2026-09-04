@@ -3,7 +3,7 @@ import uuid
 from pydantic import BaseModel, Field, field_validator
 
 from app.models.enums import UserRole
-from app.schemas.common import ApiModel
+from app.schemas.common import ApiModel, normalise_email_address
 
 
 class DeviceLogin(BaseModel):
@@ -22,11 +22,7 @@ class LoginRequest(BaseModel):
     @field_validator("email")
     @classmethod
     def _normalise_email(cls, value: str) -> str:
-        value = value.strip().lower()
-        local, sep, domain = value.partition("@")
-        if not sep or not local or not domain or "." not in domain:
-            raise ValueError("must be a valid email address")
-        return value
+        return normalise_email_address(value)
 
 
 class UserOut(ApiModel):

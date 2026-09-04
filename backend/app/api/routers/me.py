@@ -6,11 +6,9 @@ from sqlalchemy import select
 from app.api.deps import AuthDep, DbDep, client_ip
 from app.core.errors import NotFound
 from app.models import Device
-from app.models.enums import DeviceStatus, SecurityEventType
 from app.schemas.auth import UserOut
 from app.schemas.me import MeDeviceOut
-from app.services.security_events import record_event
-from app.services.tokens import revoke_device_tokens
+from app.services.devices import revoke_device
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -35,17 +33,9 @@ async def revoke_my_device(
     device = await db.get(Device, device_id)
     if device is None or device.user_id != auth.user.id:
         raise NotFound("Device not found")
-    if device.status != DeviceStatus.REVOKED:
-        device.status = DeviceStatus.REVOKED
-        await revoke_device_tokens(db, device.id)
-        record_event(
-            db,
-            SecurityEventType.DEVICE_REVOKED,
-            user_id=auth.user.id,
-            device_id=device.id,
-            ip=client_ip(request),
-            details={"by": "owner"},
-        )
-        # TODO(week 3): close the device's WebSocket (4403) and clear its presence row.
+    changed = await revoke_device(
+        db, device, by="owner", actor_user_id=auth.user.id, ip=client_ip(request)
+    )
+    if changed:
         await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

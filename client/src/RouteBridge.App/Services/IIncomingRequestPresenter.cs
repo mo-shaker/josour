@@ -6,4 +6,7 @@ namespace RouteBridge.App.Services;
 public interface IIncomingRequestPresenter
 {
     Task<IncomingRequestDecision> PresentAsync(IncomingRequest request, CancellationToken ct);
+
+    /// <summary>The server sent <c>request.expired</c>: close the prompt for that request (no-op when it is not being shown).</summary>
+    void Expire(Guid requestId);
 }

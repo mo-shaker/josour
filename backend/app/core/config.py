@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     access_token_minutes: int = 15
     refresh_token_days: int = 30
     env: Environment = "dev"
+    # POST /auth/login: 5 requests/minute/IP (docs/api.md). Tests disable it via the env.
+    rate_limit_enabled: bool = True
+    login_rate_limit_per_minute: int = Field(default=5, ge=1)
 
     @property
     def is_dev(self) -> bool:

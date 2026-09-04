@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
@@ -5,16 +7,23 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using RouteBridge.App.Services;
 using RouteBridge.App.ViewModels;
+using RouteBridge.App.Views;
 using RouteBridge.Core.Control;
 using RouteBridge.Core.Security;
+using RouteBridge.Infrastructure.Api;
+using RouteBridge.Infrastructure.Control.Mock;
 using RouteBridge.Infrastructure.Device;
 using RouteBridge.Infrastructure.Logging;
 using RouteBridge.Infrastructure.Security;
+using RouteBridge.Infrastructure.Settings;
 using Serilog;
 
 namespace RouteBridge.App;
 
-/// <summary>Composition root: Serilog, Generic Host + DI, tray, toasts, and the main window.</summary>
+/// <summary>
+/// Composition root: Serilog, Generic Host + DI, tray, toasts, then the start-up flow
+/// (<see cref="IAuthFlow.RunStartupAsync"/>: silent sign-in → MainWindow / tray, otherwise LoginWindow).
+/// </summary>
 public partial class App : Application
 {
     private readonly StartupOptions _options;
@@ -48,15 +57,17 @@ public partial class App : Application
             var services = _host.Services;
             var logger = services.GetRequiredService<ILogger<App>>();
             var device = services.GetRequiredService<IDeviceInfoProvider>();
+            var settings = services.GetRequiredService<IAppSettingsStore>();
 
             logger.LogInformation(
-                "RouteBridge {AppVersion} starting on {OsVersion} (build {OsBuild}) as {DeviceName}; minimized={Minimized} toastActivated={ToastActivated} logs={LogDirectory}",
+                "RouteBridge {AppVersion} starting on {OsVersion} (build {OsBuild}) as {DeviceName}; minimized={Minimized} toastActivated={ToastActivated} server={ServerUrl} logs={LogDirectory}",
                 device.AppVersion,
                 device.OsVersion,
                 device.OsBuild,
                 device.DeviceName,
                 _options.StartMinimized,
                 _options.ToastActivated,
+                string.IsNullOrEmpty(settings.Current.ServerUrl) ? "(not set)" : settings.Current.ServerUrl,
                 LoggingSetup.DefaultLogDirectory);
 
             if (!DpapiSecretStore.IsProtectionAvailable)
@@ -71,19 +82,14 @@ public partial class App : Application
 
             services.GetRequiredService<ToastService>().RegisterActivation();
             services.GetRequiredService<TrayService>().Initialize();
+            services.GetRequiredService<SessionCoordinator>(); // subscribe to the control channel from the start
 
             var shell = services.GetRequiredService<IShellService>();
             _instance.ShowWindowRequested += shell.ShowMainWindow;
             _instance.StartListening();
 
-            if (_options.StartMinimized)
-            {
-                logger.LogInformation("Started minimized to the tray");
-            }
-            else
-            {
-                shell.ShowMainWindow();
-            }
+            var flow = services.GetRequiredService<IAuthFlow>();
+            _ = RunStartupFlowAsync(flow, logger);
         }
         catch (Exception ex)
         {
@@ -94,6 +100,18 @@ public partial class App : Application
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
             Shutdown(1);
+        }
+    }
+
+    private static async Task RunStartupFlowAsync(IAuthFlow flow, ILogger<App> logger)
+    {
+        try
+        {
+            await flow.RunStartupAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Start-up flow failed");
         }
     }
 
@@ -116,15 +134,50 @@ public partial class App : Application
         services.AddSingleton(_options);
         services.AddSingleton(_instance);
 
-        // Infrastructure
+        // Infrastructure: settings, secrets, device
+        services.AddSingleton<IAppSettingsStore>(sp => new AppSettingsStore(sp.GetRequiredService<ILogger<AppSettingsStore>>()));
         services.AddSingleton<ISecretStore>(sp => new DpapiSecretStore(sp.GetRequiredService<ILogger<DpapiSecretStore>>()));
         services.AddSingleton<IDeviceInfoProvider>(_ => new DeviceInfoProvider(typeof(App).Assembly));
 
-        // WEEK 2: MockControlChannel (docs/ws-protocol.md); WEEK 3: RouteBridge.Infrastructure.ControlChannel.
-        services.AddSingleton<IControlChannel, NotConnectedControlChannel>();
+        // REST + auth. AuthenticatedHandler resolves the token source lazily because AuthSession itself calls the API through it.
+        services.AddSingleton<IApiClient>(sp =>
+        {
+            var inner = new SocketsHttpHandler
+            {
+                PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+                AutomaticDecompression = DecompressionMethods.All,
+                UseProxy = true, // corporate system proxy (plan 8.5)
+            };
+            var handler = new AuthenticatedHandler(
+                () => sp.GetRequiredService<IAccessTokenSource>(),
+                sp.GetRequiredService<ILogger<AuthenticatedHandler>>())
+            {
+                InnerHandler = inner,
+            };
+            var device = sp.GetRequiredService<IDeviceInfoProvider>();
+            var http = ApiClient.CreateHttpClient(handler, userAgent: $"{Strings.AppName}/{device.AppVersion}");
+            return new ApiClient(http, sp.GetRequiredService<IAppSettingsStore>(), sp.GetRequiredService<ILogger<ApiClient>>());
+        });
+        services.AddSingleton<AuthSession>(sp => new AuthSession(
+            sp.GetRequiredService<IApiClient>(),
+            sp.GetRequiredService<ISecretStore>(),
+            sp.GetRequiredService<IDeviceInfoProvider>(),
+            sp.GetRequiredService<ILogger<AuthSession>>()));
+        services.AddSingleton<IAuthSession>(sp => sp.GetRequiredService<AuthSession>());
+        services.AddSingleton<IAccessTokenSource>(sp => sp.GetRequiredService<AuthSession>());
+
+        // Control channel. WEEK 3: replace MockControlChannel with RouteBridge.Infrastructure.ControlChannel (real WSS);
+        // NotConnectedControlChannel remains the explicit "no server" stand-in.
+        services.AddSingleton<IControlChannel>(sp => new MockControlChannel(
+            MockControlChannelOptions.Default,
+            TimeProvider.System,
+            sp.GetRequiredService<ILogger<MockControlChannel>>()));
+        services.AddSingleton<ControlChannelConnector>();
+        services.AddSingleton<SessionCoordinator>();
 
         // App services
         services.AddSingleton<IShellService, ShellService>();
+        services.AddSingleton<IAuthFlow, AuthFlow>();
         services.AddSingleton<IStartupRegistration, StartupRegistration>();
         services.AddSingleton<IToastActivationHandler, ToastActivationHandler>();
         services.AddSingleton<ToastService>();
@@ -132,11 +185,14 @@ public partial class App : Application
         services.AddSingleton<IIncomingRequestPresenter, IncomingRequestPresenter>();
         services.AddSingleton<TrayService>();
 
-        // ViewModels + windows (IncomingRequestViewModel/Window are created per request by IncomingRequestPresenter)
+        // ViewModels + windows (IncomingRequestViewModel/Window are created per request by IncomingRequestPresenter;
+        // LoginWindow/LoginViewModel per sign-in by ShellService)
         services.AddSingleton<HostViewModel>();
         services.AddSingleton<GuestViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
+        services.AddTransient<LoginViewModel>();
+        services.AddTransient<LoginWindow>();
     }
 
     protected override void OnExit(ExitEventArgs e)

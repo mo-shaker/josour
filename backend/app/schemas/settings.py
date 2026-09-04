@@ -1,0 +1,53 @@
+"""Operator settings (docs/api.md "القيم الافتراضية للإعدادات")."""
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.models.app_setting import DEFAULT_SETTINGS
+
+MinutesField = Field(ge=1, le=1440)
+SecondsField = Field(ge=10, le=300)
+
+
+def _validate_ports(ports: list[int]) -> list[int]:
+    for port in ports:
+        if not 1 <= port <= 65535:
+            raise ValueError("ports must be integers between 1 and 65535")
+    if len(set(ports)) != len(ports):
+        raise ValueError("ports must not contain duplicates")
+    return ports
+
+
+class AppSettings(BaseModel):
+    """Effective settings: the docs/api.md defaults overridden by ``app_settings`` rows."""
+
+    model_config = ConfigDict(frozen=True)
+
+    max_session_minutes: int = Field(DEFAULT_SETTINGS["max_session_minutes"], ge=1, le=1440)
+    request_timeout_seconds: int = Field(DEFAULT_SETTINGS["request_timeout_seconds"], ge=10, le=300)
+    connect_timeout_seconds: int = Field(DEFAULT_SETTINGS["connect_timeout_seconds"], ge=10, le=300)
+    log_domains: bool = DEFAULT_SETTINGS["log_domains"]
+    allowed_ports: list[int] = Field(
+        default_factory=lambda: list(DEFAULT_SETTINGS["allowed_ports"]), min_length=1
+    )
+
+    @field_validator("allowed_ports")
+    @classmethod
+    def _ports(cls, value: list[int]) -> list[int]:
+        return _validate_ports(value)
+
+
+class SettingsPatch(BaseModel):
+    """``PATCH /admin/settings`` body; every field optional, unknown keys rejected."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    max_session_minutes: int | None = Field(None, ge=1, le=1440)
+    request_timeout_seconds: int | None = Field(None, ge=10, le=300)
+    connect_timeout_seconds: int | None = Field(None, ge=10, le=300)
+    log_domains: bool | None = None
+    allowed_ports: list[int] | None = Field(None, min_length=1)
+
+    @field_validator("allowed_ports")
+    @classmethod
+    def _ports(cls, value: list[int] | None) -> list[int] | None:
+        return None if value is None else _validate_ports(value)

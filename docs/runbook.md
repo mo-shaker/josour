@@ -28,7 +28,7 @@ docker compose up -d --build
 docker compose logs -f api   # انتظر: "Application startup complete"
 # المسؤول الأول
 docker compose exec api python manage.py create-admin --email admin@example.com --password '…' --display-name "Admin"
-curl -s https://rb.example.com/api/v1/healthz
+curl -s https://rb.example.com/healthz     # فحص الحياة خارج /api/v1، بلا مصادقة
 ```
 
 ## 3. الترقية

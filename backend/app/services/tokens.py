@@ -47,6 +47,16 @@ async def revoke_device_tokens(db: AsyncSession, device_id: uuid.UUID) -> int:
     return result.rowcount or 0
 
 
+async def revoke_user_tokens(db: AsyncSession, user_id: uuid.UUID) -> int:
+    """Revoke every live refresh token of a user (admin deactivation / password reset)."""
+    result = await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None))
+        .values(revoked_at=utcnow())
+    )
+    return result.rowcount or 0
+
+
 async def rotate_refresh_token(
     db: AsyncSession, settings: Settings, presented: str, ip: str | None
 ) -> tuple[str, User, Device]:

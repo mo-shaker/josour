@@ -13,6 +13,7 @@
             </ResourceDictionary.MergedDictionaries>
             <BooleanToVisibilityConverter x:Key="BoolToVis" />
             <conv:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis" />
+            <conv:InverseBooleanConverter x:Key="InverseBool" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

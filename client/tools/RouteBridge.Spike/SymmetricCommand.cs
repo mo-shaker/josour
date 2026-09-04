@@ -41,6 +41,9 @@ public static class SymmetricCommand
         var samePublicIp = args.Has("same-public-ip");
         var enableUpnp = !args.Has("no-upnp");
         var timeout = TimeSpan.FromSeconds(args.GetInt("timeout-s", 30));
+        var postTo = args.Get("post-to");
+        var token = args.Get("token");
+        if (postTo is not null && string.IsNullOrWhiteSpace(token)) throw new UsageException("--token is required with --post-to");
         var sessionMinutes = 30;
 
         var expiresAt = DateTimeOffset.UtcNow.AddMinutes(sessionMinutes);
@@ -98,6 +101,9 @@ public static class SymmetricCommand
         Console.Error.WriteLine($"=== RESULT ({roleText}) ===");
         Console.WriteLine(JsonSerializer.Serialize(report, Json.Pretty));
         Console.Error.WriteLine("=== END ===");
+
+        if (postTo is not null)
+            await DiagnosticsPoster.PostAsync(postTo, token!, sessionId, roleText, report, ct);
 
         var exit = 2;
         if (outcome.Connection is { } connection)

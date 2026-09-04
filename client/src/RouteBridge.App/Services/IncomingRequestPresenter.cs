@@ -73,6 +73,14 @@ public sealed class IncomingRequestPresenter : IIncomingRequestPresenter, IDispo
         }
     }
 
+    public void Expire(Guid requestId)
+    {
+        if (_active.TryGetValue(requestId, out var active))
+        {
+            active.ViewModel.Expire(); // marshals itself to the window's dispatcher
+        }
+    }
+
     private void OnToastActivated(object? sender, ToastActivation e)
     {
         if (e.RequestId is not Guid requestId || !_active.TryGetValue(requestId, out var active))

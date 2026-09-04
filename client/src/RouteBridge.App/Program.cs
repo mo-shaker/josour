@@ -1,3 +1,4 @@
+using Microsoft.Toolkit.Uwp.Notifications;
 using RouteBridge.App.Services;
 
 namespace RouteBridge.App;
@@ -12,6 +13,12 @@ public static class Program
     {
         var options = StartupOptions.Parse(args);
 
+        if (options.UninstallNotifications)
+        {
+            // Installer's [UninstallRun]: no window, no single-instance mutex, no logging.
+            return UninstallNotifications();
+        }
+
         using var instance = SingleInstanceGuard.TryAcquire();
         if (instance is null)
         {
@@ -23,5 +30,28 @@ public static class Program
         var app = new App(options, instance);
         app.InitializeComponent();
         return app.Run();
+    }
+
+    /// <summary>
+    /// Removes what <see cref="ToastNotificationManagerCompat"/> registered under <c>HKCU\Software\Classes</c> (AppUserModelId + COM
+    /// activator CLSID). Exit code 0 on success (or off Windows, where there is nothing to remove); 1 when Windows refused.
+    /// </summary>
+    private static int UninstallNotifications()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return 0;
+        }
+
+        try
+        {
+            ToastNotificationManagerCompat.Uninstall();
+            return 0;
+        }
+        catch (Exception)
+        {
+            // Nothing sensible to show from an uninstaller context; the registry keys can be removed by hand if needed.
+            return 1;
+        }
     }
 }

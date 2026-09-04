@@ -19,4 +19,7 @@ public static class AppPaths
 
     /// <summary><c>%LOCALAPPDATA%\RouteBridge\secrets</c>.</summary>
     public static string SecretsDirectory => Path.Combine(LocalAppDataRoot, "secrets");
+
+    /// <summary><c>%LOCALAPPDATA%\RouteBridge\settings.json</c> (see <c>Settings.AppSettingsStore</c>).</summary>
+    public static string SettingsFile => Path.Combine(LocalAppDataRoot, "settings.json");
 }

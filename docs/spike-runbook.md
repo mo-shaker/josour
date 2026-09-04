@@ -57,3 +57,31 @@ dotnet run --project tools/RouteBridge.Spike -c Release -- symmetric --role gues
 7. المستمع والمتصل بوضع DualMode على Windows، بما فيها أجهزة IPv6 معطّل (يسقط إلى IPv4).
 8. تفاعل Windows Firewall: القبول الوارد على المنفذ المؤقت مع القاعدة وبدونها.
 9. سلوك `Socket.Close(0)` للاتصالات الزائدة عن السعة على Windows.
+
+---
+
+# مصفوفة تشغيل المتصفح (الأسبوع 2)
+
+الهدف: إثبات أن متصفح العمل يمر فعلًا عبر الـ Proxy المحلي، وكشف الحالات التي تتجاوز فيها سياسات الشركة سطر الأوامر. الأداة: `dotnet run --project tools/RouteBridge.Spike -c Release -- browser --self-hosted [--browser chrome|edge]`.
+
+مع `--self-hosted` تشغّل الأداة `ConnectProxyServer` بقائمة مواقع فارغة (كل شيء مباشر) وتفتح المتصفح على `http://check.routebridge/`، ثم تطبع JSON يشمل: مسار المتصفح، التحقق من ناشره، حالة السياسات، نتيجة التشغيل، هل حدث Handoff، زمن وصول صفحة الفحص، وعدّادات الـ Proxy.
+
+## الخانات الثماني المطلوب تعبئتها
+
+| # | النظام | المتصفح | مُدار بسياسة | المتوقع |
+|---|---|---|---|---|
+| 1 | Windows 10 | Chrome | لا | `probe_hit_ms` < 10000، `handoff` = false |
+| 2 | Windows 10 | Edge | لا | نفسه |
+| 3 | Windows 11 | Chrome | لا | نفسه |
+| 4 | Windows 11 | Edge | لا | نفسه |
+| 5 | Windows 11 | Chrome | نعم (`ProxySettings`) | `policy.proxy_managed` = true، ولا تصل صفحة الفحص |
+| 6 | Windows 11 | Edge | نعم (`ProxySettings`) | نفسه |
+| 7 | Windows 11 | Chrome | نعم (`UserDataDir`) | `policy.user_data_dir_managed` = true |
+| 8 | Windows 11 | Chrome | نسخة تعمل بالفعل بنفس الـ Profile | `handoff` = true |
+
+لمحاكاة الإدارة في الخانات 5 إلى 7 (على جهاز اختبار فقط): أضف القيم تحت `HKLM\SOFTWARE\Policies\Google\Chrome` أو `\Microsoft\Edge` ثم احذفها بعد الاختبار.
+
+## ما يُسجَّل لكل خانة
+`browser`, `path`, `publisher_verified`, `policy.*`, `launch.success`, `launch.failure`, `handoff`, `exit_type_set`, `probe_hit_ms`, `close_ms`, و`proxy_counters`.
+
+**معيار القبول:** الخانات 1 إلى 4 تعطي صفحة فحص خلال 10 ثوانٍ وإغلاقًا نظيفًا؛ الخانات 5 إلى 8 تُكتشف قبل التشغيل أو خلال 10 ثوانٍ فينتهي المسار بـ `browser_not_proxied` بدل جلسة تتصفح بعنوان المستخدم دون أن يدري.

@@ -3,12 +3,13 @@ using RouteBridge.Core.Control;
 namespace RouteBridge.App.Services;
 
 /// <summary>
-/// Week 1 stand-in so ViewModels can already take <see cref="IControlChannel"/> by constructor.
-/// WEEK 2: replace the DI registration with MockControlChannel (from docs/ws-protocol.md), WEEK 3: with RouteBridge.Infrastructure.ControlChannel.
+/// A channel that is never connected: every call fails with a clear message. Not registered in DI since week 2
+/// (<c>MockControlChannel</c> took its place; week 3 brings <c>RouteBridge.Infrastructure.ControlChannel</c>); kept as the
+/// explicit "not signed in / no server" stand-in for design-time data and tests.
 /// </summary>
 public sealed class NotConnectedControlChannel : IControlChannel
 {
-    private const string Reason = "The control channel is not available yet (RouteBridge.Infrastructure.ControlChannel arrives in week 2/3).";
+    private const string Reason = "The control channel is not connected.";
 
     public ControlChannelState State => ControlChannelState.Disconnected;
 

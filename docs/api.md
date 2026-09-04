@@ -42,6 +42,7 @@
 ## النموذج التقني
 
 - `POST /probe`  `{ "ip": "…", "port": 12345 }` → `{ "reachable": true, "latency_ms": 42 }` (عند الفشل: `{ "reachable": false, "latency_ms": null }`). يتطلب مصادقة. العناوين الخاصة وloopback تُرفض بـ `400 validation_error`. الخادم يجرب اتصال TCP بمهلة 3 ثوانٍ ويغلقه فورًا. يُستخدم في نموذج الأسبوع 1 وفي فحص قابلية الوصول.
+- `POST /diagnostics`  `{ "session_id": "uuid|null", "role": "guest|host|null", "data": { … } }` → `201 { "id": "…" }`. يتطلب مصادقة (أي دور). يخزّن صفًا في `connect_diagnostics` لجهاز المرسِل (من التوكن). `data` كائن JSON حر بحد أقصى 64 KB بعد التسلسل، وإلا `422 validation_error`. عند تمرير `session_id` يجب أن تكون الجلسة موجودة (`404 not_found`) وأن يكون المستخدم أحد طرفيها (`403 forbidden`). تستخدمه أداة نموذج NAT في الأسبوع 2 لرفع نتائج الأزواج العشرة؛ الملخص عبر `GET /admin/diagnostics`.
 
 ## الإدارة (role = admin)
 

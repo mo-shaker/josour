@@ -23,7 +23,10 @@ jobs:
       - name: Build
         run: dotnet build RouteBridge.sln --no-restore -c Release -warnaserror:nullable
       - name: Test
-        run: dotnet test RouteBridge.sln --no-build -c Release --logger "trx;LogFileName=results.trx"
+        run: dotnet test RouteBridge.sln --no-build -c Release --filter "Category!=Benchmark" --logger "trx;LogFileName=results.trx"
+
+      - name: Mux benchmarks (informational, ADR-0006 criteria)
+        run: dotnet test tests/RouteBridge.Tunnel.Tests --no-build -c Release --filter "Category=Benchmark" --logger "console;verbosity=detailed"
       - name: Publish app (unsigned, artifact for QA)
         run: dotnet publish src/RouteBridge.App -c Release -r win-x64 --self-contained false -o publish/app
       - uses: actions/upload-artifact@v4
@@ -45,6 +48,6 @@ jobs:
           dotnet-version: "8.0.x"
       - name: Test libraries
         run: |
-          for p in Core Tunnel Proxy Egress Browser; do
-            dotnet test tests/RouteBridge.$p.Tests -c Release
+          for p in Core Tunnel Proxy Egress Browser Infrastructure E2E; do
+            dotnet test tests/RouteBridge.$p.Tests -c Release --filter "Category!=Benchmark"
           done

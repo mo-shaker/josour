@@ -1,14 +1,24 @@
-"""Allowlist entries and immutable published versions."""
+"""Allowlist entries and immutable published versions.
+
+Validation rules live in ``validate_entry`` and are shared by the CLI (``add-domain``) and
+``PUT /admin/domains``. Publishing is two steps: a service call that flushes the new
+``allowlist_versions`` row, then - after the caller commits - ``published_event`` on the event
+bus, which week 3 turns into ``allowlist.updated`` (see app.services.events).
+"""
 
 import ipaddress
 import re
 import uuid
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.clock import ensure_utc
 from app.core.errors import Conflict, ValidationFailed
 from app.models import AllowedDomain, AllowlistVersion
+from app.services.events import AllowlistPublished
 
 _LABEL_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 
@@ -50,6 +60,36 @@ def validate_entry(raw: str) -> str:
     return entry
 
 
+@dataclass(frozen=True, slots=True)
+class EntryError:
+    entry: str
+    reason: str
+
+
+def validate_entries(raw_entries: Iterable[str]) -> tuple[list[str], list[EntryError]]:
+    """Validate every entry with ``validate_entry`` and collect *all* problems instead of
+    stopping at the first. Duplicates (after normalisation) are reported as errors too."""
+    entries: list[str] = []
+    errors: list[EntryError] = []
+    seen: set[str] = set()
+    for raw in raw_entries:
+        try:
+            entry = validate_entry(raw)
+        except ValidationFailed as exc:
+            errors.append(EntryError(entry=raw, reason=exc.message))
+            continue
+        if entry in seen:
+            errors.append(EntryError(entry=raw, reason="duplicate entry"))
+            continue
+        seen.add(entry)
+        entries.append(entry)
+    return entries, errors
+
+
+def format_entry_errors(errors: Sequence[EntryError]) -> str:
+    return "invalid entries: " + "; ".join(f"{e.entry!r} ({e.reason})" for e in errors)
+
+
 async def get_latest_version(db: AsyncSession) -> AllowlistVersion | None:
     return await db.scalar(
         select(AllowlistVersion).order_by(AllowlistVersion.version.desc()).limit(1)
@@ -70,19 +110,54 @@ async def list_active_entries(db: AsyncSession) -> list[str]:
 
 
 async def publish_version(
-    db: AsyncSession, created_by: uuid.UUID | None = None
+    db: AsyncSession,
+    created_by: uuid.UUID | None = None,
+    entries: Sequence[str] | None = None,
 ) -> AllowlistVersion:
-    """Snapshot the active entries into a new allowlist_versions row (flushed, not committed)."""
+    """Insert a new allowlist_versions row (flushed, not committed).
+
+    ``entries`` defaults to a snapshot of the active rows; ``replace_entries`` passes the
+    request order explicitly so the published version matches what the admin sent."""
     current = await db.scalar(select(func.max(AllowlistVersion.version)))
     snapshot = AllowlistVersion(
         version=(current or 0) + 1,
-        entries=await list_active_entries(db),
+        entries=list(entries) if entries is not None else await list_active_entries(db),
         created_by=created_by,
     )
     db.add(snapshot)
     await db.flush()
-    # TODO(week 5): broadcast allowlist.updated {version} to all WebSocket clients.
     return snapshot
+
+
+def published_event(version: AllowlistVersion) -> AllowlistPublished:
+    """Event to publish on the bus once the version's transaction is committed."""
+    updated_at = ensure_utc(version.created_at)
+    assert updated_at is not None
+    return AllowlistPublished(
+        version=version.version, entries=tuple(version.entries), updated_at=updated_at
+    )
+
+
+async def replace_entries(
+    db: AsyncSession, raw_entries: Iterable[str], *, created_by: uuid.UUID | None = None
+) -> AllowlistVersion:
+    """Full replacement (``PUT /admin/domains``): every entry is validated first and the whole
+    request is rejected if any is invalid. Entries absent from the new list are deactivated,
+    known ones re-activated, new ones inserted; then a version is published. Callers commit."""
+    entries, errors = validate_entries(raw_entries)
+    if errors:
+        raise ValidationFailed(format_entry_errors(errors))
+    existing = {row.entry: row for row in await db.scalars(select(AllowedDomain))}
+    wanted = set(entries)
+    for entry, row in existing.items():
+        active = entry in wanted
+        if row.is_active != active:
+            row.is_active = active
+    for entry in entries:
+        if entry not in existing:
+            db.add(AllowedDomain(entry=entry))
+    await db.flush()
+    return await publish_version(db, created_by, entries=entries)
 
 
 async def add_domain(

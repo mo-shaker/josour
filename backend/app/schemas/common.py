@@ -18,6 +18,15 @@ def _iso_utc_z(value: datetime) -> str:
 UtcDatetime = Annotated[datetime, PlainSerializer(_iso_utc_z, return_type=str, when_used="json")]
 
 
+def normalise_email_address(value: str) -> str:
+    """Lowercase/trim and require ``local@domain.tld``; raises ``ValueError`` for pydantic."""
+    value = value.strip().lower()
+    local, sep, domain = value.partition("@")
+    if not sep or not local or not domain or "." not in domain:
+        raise ValueError("must be a valid email address")
+    return value
+
+
 class ApiModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

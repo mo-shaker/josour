@@ -1,16 +1,14 @@
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 
-from app.api.deps import DbDep, SettingsDep, client_ip
+from app.api.deps import DbDep, SettingsDep, client_ip, login_rate_limit
 from app.schemas.auth import LoginRequest, LogoutRequest, RefreshRequest, TokenResponse
 from app.services import auth as auth_service
 from app.services import tokens as token_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# TODO(week 2): rate limit POST /auth/login at 5 requests/minute/IP -> 429 rate_limited.
 
-
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse, dependencies=[Depends(login_rate_limit)])
 async def login(
     payload: LoginRequest, request: Request, db: DbDep, settings: SettingsDep
 ) -> TokenResponse:

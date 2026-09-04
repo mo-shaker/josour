@@ -17,12 +17,17 @@ public static class Strings
     public const string TrayStartWithWindows = "Start with Windows";
     public const string TrayDebug = "Debug";
     public const string TraySimulateIncomingRequest = "Simulate incoming request";
+    public const string TraySignOut = "Sign out";
     public const string TrayExit = "Exit";
+    public const string TrayTooltipSignedInFormat = "RouteBridge — {0}";
+    public const string TrayTooltipNotSignedIn = "RouteBridge — not signed in";
 
     // ---- main window ----
     public const string HostTab = "Host";
     public const string GuestTab = "Guest";
-    public const string StatusOffline = "Offline — not signed in";
+    public const string StatusNotSignedIn = "Not signed in";
+    public const string StatusSignedInFormat = "{0} · {1}";
+    public const string StatusOffline = "Offline";
     public const string StatusConnecting = "Connecting…";
     public const string StatusConnected = "Connected";
     public const string StatusReconnecting = "Reconnecting…";
@@ -33,8 +38,10 @@ public static class Strings
     public const string HostAvailableToggle = "Available for requests";
     public const string HostStatusAvailable = "Available — waiting for requests";
     public const string HostStatusNotAvailable = "Not available";
-    public const string HostSignInHintTitle = "Sign-in coming soon";
-    public const string HostSignInHint = "Requests only arrive after you sign in. Sign-in ships in the next build.";
+    public const string HostNotConnectedTitle = "Not connected";
+    public const string HostNotConnectedHint = "Requests only arrive while RouteBridge is connected to the server.";
+    public const string HostSimulatedServerTitle = "Simulated server";
+    public const string HostSimulatedServerHint = "This build talks to a built-in simulated server: hosts, requests and sessions are scripted. Real connections arrive in a later build.";
 
     // ---- guest page ----
     public const string GuestPageTitle = "Browse through a host";
@@ -45,6 +52,10 @@ public static class Strings
     public const string HostReachable = "Reachable";
     public const string HostUnreachable = "Not reachable";
     public const string HostReachabilityUnknown = "Checking…";
+    public const string GuestHostsUnavailableTitle = "Could not load hosts";
+    public const string GuestHostsUnavailableText = "The server cannot be reached. Check your connection and try again.";
+    public const string GuestHostsErrorFormat = "The server answered: {0}";
+    public const string GuestNotSignedInText = "Sign in to see available hosts.";
 
     // ---- incoming request ----
     public const string IncomingRequestWindowTitle = "Incoming request";
@@ -69,6 +80,33 @@ public static class Strings
     // ---- debug ----
     public const string DebugSampleGuestName = "Sara Ahmed";
     public const string DebugSampleGuestDevice = "SARA-LAPTOP";
+
+    // ---- login ----
+    public const string LoginWindowTitle = "Sign in";
+    public const string LoginHeading = "Sign in to RouteBridge";
+    public const string LoginDescription = "Use the account your administrator created for you.";
+    public const string LoginServerUrlLabel = "Server address";
+    public const string LoginServerUrlPlaceholder = "https://routebridge.example.com";
+    public const string LoginEmailLabel = "Email";
+    public const string LoginPasswordLabel = "Password";
+    public const string LoginSignIn = "Sign in";
+    public const string LoginSigningIn = "Signing in…";
+    public const string LoginErrorServerUrl = "Enter the server address as https://… (http:// is only accepted for localhost).";
+    public const string LoginErrorInvalidCredentials = "Wrong email or password.";
+    public const string LoginErrorAccountLocked = "Too many failed attempts. The account is locked for 15 minutes.";
+    public const string LoginErrorAccountDisabled = "This account is disabled. Contact your administrator.";
+    public const string LoginErrorDeviceRevoked = "An administrator removed this device. Sign in again to register it anew.";
+    public const string LoginErrorDeviceRejected = "This device could not be verified. Sign in again to register it anew.";
+    public const string LoginErrorRateLimited = "Too many sign-in attempts. Wait a minute and try again.";
+    public const string LoginErrorUnavailable = "The server cannot be reached. Check the address and your connection.";
+    public const string LoginErrorValidationFormat = "The server rejected the request: {0}";
+    public const string LoginErrorGenericFormat = "Sign-in failed ({0}).";
+
+    // ---- signed out notices ----
+    public const string SignedOutTitle = "Signed out of RouteBridge";
+    public const string SignedOutSessionExpired = "Your session expired. Please sign in again.";
+    public const string SignedOutDeviceRevoked = "An administrator removed this device.";
+    public const string SignedOutAccountDisabled = "Your account was disabled.";
 
     // ---- errors ----
     public const string StartupFailedTitle = "RouteBridge could not start";

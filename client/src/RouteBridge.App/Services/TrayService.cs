@@ -42,6 +42,7 @@ public sealed class TrayService : IDisposable
             DoubleClickCommand = _viewModel.ShowWindowCommand,
             NoLeftClickDelay = true,
         };
+        _icon.SetBinding(TaskbarIcon.ToolTipTextProperty, new Binding(nameof(MainViewModel.TrayTooltip)));
 
         // Efficiency mode (EcoQoS) would throttle the tunnel while the window is hidden, so keep it off.
         _icon.ForceCreate(enablesEfficiencyMode: false);
@@ -76,6 +77,7 @@ public sealed class TrayService : IDisposable
         }
 
         menu.Items.Add(new Separator());
+        menu.Items.Add(new MenuItem { Header = Strings.TraySignOut, Command = _viewModel.SignOutCommand });
         menu.Items.Add(new MenuItem { Header = Strings.TrayExit, Command = _viewModel.ExitCommand });
         return menu;
     }

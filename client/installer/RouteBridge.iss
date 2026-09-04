@@ -51,4 +51,6 @@ Filename: "netsh"; Parameters: "advfirewall firewall add rule name=""RouteBridge
 Filename: "{app}\RouteBridge.exe"; Description: "Launch RouteBridge"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
+; إزالة تسجيل إشعارات Toast (CLSID تحت HKCU\Software\Classes) قبل حذف الملفات
+Filename: "{app}\RouteBridge.exe"; Parameters: "--uninstall-notifications"; Flags: runhidden waituntilterminated; RunOnceId: "UninstallNotifications"
 Filename: "netsh"; Parameters: "advfirewall firewall delete rule name=""RouteBridge Tunnel"""; Flags: runhidden; RunOnceId: "RemoveFirewallRule"
