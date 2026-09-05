@@ -27,6 +27,10 @@ public sealed class LocalizationTests
         UiStringKeys.BytesFormat,
         UiStringKeys.LoginServerUrlPlaceholder,
         UiStringKeys.DebugSampleGuestDevice,
+
+        // Browser names are product names: "Chrome" is Chrome in Arabic too, and translating them would be a bug.
+        UiStringKeys.SettingsBrowserChrome,
+        UiStringKeys.SettingsBrowserEdge,
     };
 
     private static readonly Regex Placeholder = new(@"\{(\d+)(?::[^}]*)?\}", RegexOptions.CultureInvariant);

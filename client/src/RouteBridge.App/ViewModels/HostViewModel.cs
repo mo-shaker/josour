@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -23,11 +24,10 @@ public sealed partial class HostViewModel : ObservableObject
     private readonly SessionCoordinator _sessions;
     private readonly IIncomingRequestPresenter _presenter;
     private readonly IAllowlistDisclosure _allowlist;
-    private readonly HostDiagnosticsProbe _diagnostics;
+    private readonly HostReadinessMonitor _readiness;
     private readonly IAuthSession _auth;
     private readonly ILogger<HostViewModel> _logger;
     private bool _suppressPublish;
-    private bool _firewallChecked;
 
     [ObservableProperty]
     private bool _isAvailable;
@@ -50,12 +50,20 @@ public sealed partial class HostViewModel : ObservableObject
     [ObservableProperty]
     private bool _isFirewallRuleMissing;
 
+    /// <summary>A VPN adapter holds the outbound route: the sites will see its exit address, not this machine's.</summary>
+    [ObservableProperty]
+    private bool _isVpnWarningVisible;
+
+    /// <summary>The VPN warning with the adapter named; empty while <see cref="IsVpnWarningVisible"/> is false.</summary>
+    [ObservableProperty]
+    private string _vpnWarningMessage = string.Empty;
+
     public HostViewModel(
         IControlChannel controlChannel,
         SessionCoordinator sessions,
         IIncomingRequestPresenter presenter,
         IAllowlistDisclosure allowlist,
-        HostDiagnosticsProbe diagnostics,
+        HostReadinessMonitor readiness,
         IAuthSession auth,
         ILogger<HostViewModel> logger)
     {
@@ -63,14 +71,21 @@ public sealed partial class HostViewModel : ObservableObject
         _sessions = sessions;
         _presenter = presenter;
         _allowlist = allowlist;
-        _diagnostics = diagnostics;
+        _readiness = readiness;
         _auth = auth;
         _logger = logger;
 
         _controlChannel.StateChanged += OnChannelStateChanged;
         _controlChannel.MessageReceived += OnMessage;
+        _sessions.PropertyChanged += OnSessionPropertyChanged;
         IsConnected = _controlChannel.State == ControlChannelState.Connected;
         IsSimulatedServer = controlChannel is MockControlChannel;
+
+        // A probe that already ran (the first run does one) is shown at once rather than repeated.
+        if (_readiness.HasProbed)
+        {
+            ApplyReadiness(_readiness.Last);
+        }
     }
 
     /// <summary>True for the <c>--mock</c> build: the page then says the server is simulated.</summary>
@@ -92,48 +107,62 @@ public sealed partial class HostViewModel : ObservableObject
         _logger.LogInformation("Host availability set to {Available} (control channel {State})", value, _controlChannel.State);
         if (value)
         {
-            _ = CheckFirewallAsync();
+            _ = CheckReadinessAsync(force: false);
+        }
+        else
+        {
+            // Not available: neither warning is about anything any more.
+            IsVpnWarningVisible = false;
+            IsFirewallRuleMissing = false;
         }
 
         _ = PublishAvailabilityAsync(value);
     }
 
     /// <summary>
-    /// Plan 8.3 step 2: check the inbound firewall rule when the host makes itself available and warn about it, because a
-    /// blocked listener looks exactly like a NAT failure later. Runs once per process, off the UI thread, and never
-    /// blocks the announcement — the answer is advisory.
+    /// Plan 8.3 step 2, both halves. Before the host announces itself: the inbound firewall rule (a blocked listener looks
+    /// exactly like a NAT failure later) and the VPN adapter (the sites would see the VPN's exit address, which defeats the
+    /// point of borrowing this machine's address at all). Runs off the UI thread and never blocks the announcement — both
+    /// answers are advisory, and the host may proceed with either warning showing.
     /// <para>
-    /// WEEK 6 SEAM: the VPN-adapter half of that step waits for Track B's typed detection (<c>Core.Net.VpnDetector</c>), and the UPnP
-    /// warm-up belongs to the tunnel's <c>CandidateGatherer</c>; neither is duplicated here.
+    /// It runs a second time, forced, when a session starts: a VPN can be brought up at any point between "available" and
+    /// the first request, and the moment the traffic is about to flow is the one where the warning is worth something.
+    /// The UPnP warm-up of that plan step belongs to the tunnel's <c>CandidateGatherer</c> and is not duplicated here.
     /// </para>
     /// </summary>
-    private async Task CheckFirewallAsync()
+    private async Task CheckReadinessAsync(bool force)
     {
-        if (_firewallChecked)
-        {
-            return;
-        }
-
-        _firewallChecked = true;
         try
         {
-            var collected = await Task.Run(() => _diagnostics.ProbeAsync(CancellationToken.None)).ConfigureAwait(false);
-            if (collected.FirewallRulePresent is false)
-            {
-                _logger.LogWarning(
-                    "No inbound firewall rule named '{RuleName}' (profile {Profile}): incoming tunnel connections may be blocked",
-                    HostDiagnosticsProbe.FirewallRuleName,
-                    collected.FirewallProfile ?? HostDiagnosticsProbe.UnknownProfile);
-                UiThread.Post(() => IsFirewallRuleMissing = true);
-            }
-            else
-            {
-                UiThread.Post(() => IsFirewallRuleMissing = false);
-            }
+            var readiness = await _readiness.RefreshAsync(force, CancellationToken.None).ConfigureAwait(false);
+            UiThread.Post(() => ApplyReadiness(readiness));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "The firewall check before announcing availability failed");
+            _logger.LogWarning(ex, "The readiness check before announcing availability failed");
+        }
+    }
+
+    /// <summary>
+    /// Turns a probe into the two warnings on the page. Only <see cref="HostReadiness.ShouldWarnAboutVpn"/> — high
+    /// confidence, i.e. an adapter that actually holds the outbound route — raises the VPN warning; a VPN client that is
+    /// merely running changes nothing about the exit address, and warning about it would make the warning permanent.
+    /// </summary>
+    private void ApplyReadiness(HostReadiness readiness)
+    {
+        IsFirewallRuleMissing = readiness.IsFirewallRuleMissing;
+        IsVpnWarningVisible = readiness.ShouldWarnAboutVpn;
+        VpnWarningMessage = readiness.ShouldWarnAboutVpn
+            ? string.Format(UiFlow.Culture, Strings.HostVpnWarningMessageFormat, UiFlow.Ltr(readiness.VpnAdapterName))
+            : string.Empty;
+    }
+
+    /// <summary>A session is being prepared: ask again, because this is the moment the answer decides something.</summary>
+    private void OnSessionPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SessionCoordinator.Phase) && _sessions.Phase == SessionPhase.Preparing)
+        {
+            _ = CheckReadinessAsync(force: true);
         }
     }
 

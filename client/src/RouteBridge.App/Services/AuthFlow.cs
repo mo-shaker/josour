@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using RouteBridge.Infrastructure.Api;
+using RouteBridge.Infrastructure.Settings;
 
 namespace RouteBridge.App.Services;
 
@@ -10,6 +11,7 @@ public sealed class AuthFlow : IAuthFlow, IDisposable
     private readonly IShellService _shell;
     private readonly ControlChannelConnector _connector;
     private readonly IToastService _toasts;
+    private readonly IAppSettingsStore _settings;
     private readonly StartupOptions _options;
     private readonly ILogger<AuthFlow> _logger;
 
@@ -18,6 +20,7 @@ public sealed class AuthFlow : IAuthFlow, IDisposable
         IShellService shell,
         ControlChannelConnector connector,
         IToastService toasts,
+        IAppSettingsStore settings,
         StartupOptions options,
         ILogger<AuthFlow> logger)
     {
@@ -25,11 +28,17 @@ public sealed class AuthFlow : IAuthFlow, IDisposable
         _shell = shell;
         _connector = connector;
         _toasts = toasts;
+        _settings = settings;
         _options = options;
         _logger = logger;
         _auth.SignedOut += OnSignedOut;
     }
 
+    /// <summary>
+    /// Where a start-up lands is decided by <see cref="StartupPlanner"/>, not here — the rule is testable and the same one
+    /// applies wherever it is asked. What changed in week 6: a machine with no usable server address goes to the guided
+    /// first run instead of to the sign-in window with an empty address field.
+    /// </summary>
     public async Task RunStartupAsync(CancellationToken ct)
     {
         bool restored;
@@ -43,24 +52,60 @@ public sealed class AuthFlow : IAuthFlow, IDisposable
             restored = false;
         }
 
+        var credentialsStored = restored;
         if (!restored)
         {
-            _logger.LogInformation("No restorable session: showing the sign-in window");
-            _shell.ShowLoginWindow();
+            try
+            {
+                credentialsStored = await _auth.HasStoredCredentialsAsync(ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Could not tell whether this machine has ever been signed in");
+            }
+        }
+
+        var plan = StartupPlanner.Decide(_settings.Current, credentialsStored, restored);
+        _logger.LogInformation(
+            "Start-up plan: {Destination} (server={ServerUrl} freshInstall={Fresh})",
+            plan.Destination,
+            string.IsNullOrEmpty(plan.ServerUrl) ? "(not set)" : plan.ServerUrl,
+            plan.IsFreshInstall);
+
+        switch (plan.Destination)
+        {
+            case StartupDestination.FirstRun:
+                _shell.ShowFirstRunWindow();
+                return;
+
+            case StartupDestination.SignIn:
+                _shell.ShowLoginWindow();
+                return;
+
+            default:
+                _logger.LogInformation("Session restored for {Email}", _auth.CurrentUser?.Email);
+                await ConnectQuietlyAsync(ct);
+                ShowOrStayInTray();
+                return;
+        }
+    }
+
+    /// <summary>
+    /// <c>--minimized</c> (the Run-key launch) OR the "start minimized" setting — which until week 6 was written to the
+    /// settings file by nothing and read by nobody.
+    /// </summary>
+    private void ShowOrStayInTray()
+    {
+        if (_options.StartMinimized || _settings.Current.StartMinimized)
+        {
+            _logger.LogInformation(
+                "Started minimized to the tray (switch={FromSwitch} setting={FromSetting})",
+                _options.StartMinimized,
+                _settings.Current.StartMinimized);
             return;
         }
 
-        _logger.LogInformation("Session restored for {Email}", _auth.CurrentUser?.Email);
-        await ConnectQuietlyAsync(ct);
-
-        if (_options.StartMinimized)
-        {
-            _logger.LogInformation("Started minimized to the tray");
-        }
-        else
-        {
-            _shell.ShowMainWindow();
-        }
+        _shell.ShowMainWindow();
     }
 
     public async Task CompleteSignInAsync(CancellationToken ct)

@@ -40,6 +40,13 @@
                     Title="{x:Static app:Strings.HostFirewallWarningTitle}"
                     Message="{x:Static app:Strings.HostFirewallWarningMessage}" />
 
+        <!-- Plan 8.5: a VPN that holds the outbound route makes the sites see ITS address, not this machine's.
+             Only the high-confidence result opens this bar; a VPN client that is merely running does not. -->
+        <ui:InfoBar Margin="0,12,0,0" IsClosable="False" Severity="Warning"
+                    IsOpen="{Binding IsVpnWarningVisible, Mode=OneWay}"
+                    Title="{x:Static app:Strings.HostVpnWarningTitle}"
+                    Message="{Binding VpnWarningMessage}" />
+
         <ui:InfoBar Margin="0,12,0,0" IsClosable="False" Severity="Informational"
                     IsOpen="{Binding IsSimulatedServer, Mode=OneWay}"
                     Title="{x:Static app:Strings.HostSimulatedServerTitle}"

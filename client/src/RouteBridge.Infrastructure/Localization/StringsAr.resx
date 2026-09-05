@@ -512,6 +512,239 @@
   <data name="SignedOutAccountDisabled" xml:space="preserve">
     <value>عُطّل حسابك.</value>
   </data>
+  <!-- host readiness: firewall + VPN (week 6) -->
+  <data name="HostVpnWarningTitle" xml:space="preserve">
+    <value>هذا الجهاز يخرج عبر VPN</value>
+  </data>
+  <data name="HostVpnWarningMessageFormat" xml:space="preserve">
+    <value>حركة الخروج من هذا الجهاز تمر عبر محوّل «{0}»، فسترى المواقعُ عنوانَ الـ VPN لا عنوان هذا الجهاز. يمكنك المتابعة، لكن الغرض من مشاركة جهازك قد لا يتحقق.</value>
+  </data>
+  <data name="ReadinessTitle" xml:space="preserve">
+    <value>جاهزية هذا الجهاز للاستضافة</value>
+  </data>
+  <data name="ReadinessChecking" xml:space="preserve">
+    <value>جارٍ الفحص…</value>
+  </data>
+  <data name="ReadinessRecheck" xml:space="preserve">
+    <value>إعادة الفحص</value>
+  </data>
+  <data name="ReadinessFirewallOk" xml:space="preserve">
+    <value>جدار الحماية يسمح بالاتصال الوارد إلى RouteBridge.</value>
+  </data>
+  <data name="ReadinessFirewallMissing" xml:space="preserve">
+    <value>لا توجد قاعدة واردة لـ RouteBridge في جدار الحماية، وقد يتعذّر على الجهاز الآخر الوصول إلى هذا الجهاز.</value>
+  </data>
+  <data name="ReadinessFirewallUnknown" xml:space="preserve">
+    <value>تعذّر التحقق من قاعدة جدار الحماية على هذا الجهاز.</value>
+  </data>
+  <data name="ReadinessVpnOk" xml:space="preserve">
+    <value>لا توجد شبكة VPN تحمل حركة الخروج.</value>
+  </data>
+  <data name="ReadinessVpnWarningFormat" xml:space="preserve">
+    <value>حركة الخروج تمر عبر «{0}»، فسترى المواقع عنوان الـ VPN.</value>
+  </data>
+  <!-- settings -->
+  <data name="SettingsWindowTitle" xml:space="preserve">
+    <value>إعدادات RouteBridge</value>
+  </data>
+  <data name="SettingsHeading" xml:space="preserve">
+    <value>الإعدادات</value>
+  </data>
+  <data name="SettingsDescription" xml:space="preserve">
+    <value>تُحفظ هذه الإعدادات على هذا الجهاز وحده.</value>
+  </data>
+  <data name="SettingsServerSection" xml:space="preserve">
+    <value>الخادم</value>
+  </data>
+  <data name="SettingsServerUrlLabel" xml:space="preserve">
+    <value>عنوان الخادم</value>
+  </data>
+  <data name="SettingsServerUrlHint" xml:space="preserve">
+    <value>عنوان HTTPS يعطيك إياه مسؤول النظام.</value>
+  </data>
+  <data name="SettingsTestConnection" xml:space="preserve">
+    <value>اختبار الاتصال</value>
+  </data>
+  <data name="SettingsTesting" xml:space="preserve">
+    <value>جارٍ الاختبار…</value>
+  </data>
+  <data name="SettingsServerOk" xml:space="preserve">
+    <value>الخادم استجاب.</value>
+  </data>
+  <data name="SettingsServerInvalidUrl" xml:space="preserve">
+    <value>العنوان غير صالح. اكتب عنوانًا كاملًا مثل https://routebridge.example.com</value>
+  </data>
+  <data name="SettingsServerInsecure" xml:space="preserve">
+    <value>يجب أن يبدأ العنوان بـ https.</value>
+  </data>
+  <data name="SettingsServerUnreachable" xml:space="preserve">
+    <value>تعذّر الوصول إلى الخادم على هذا العنوان.</value>
+  </data>
+  <data name="SettingsServerNotRouteBridge" xml:space="preserve">
+    <value>هناك خادم يردّ على هذا العنوان، لكنه ليس خادم RouteBridge.</value>
+  </data>
+  <data name="SettingsServerDetailFormat" xml:space="preserve">
+    <value>التفصيل: {0}</value>
+  </data>
+  <data name="SettingsInterfaceSection" xml:space="preserve">
+    <value>الواجهة</value>
+  </data>
+  <data name="SettingsLanguageLabel" xml:space="preserve">
+    <value>لغة الواجهة</value>
+  </data>
+  <data name="SettingsLanguageArabic" xml:space="preserve">
+    <value>العربية</value>
+  </data>
+  <data name="SettingsLanguageEnglish" xml:space="preserve">
+    <value>الإنجليزية</value>
+  </data>
+  <data name="SettingsLanguageRestartNote" xml:space="preserve">
+    <value>تسري اللغة الجديدة عند إعادة تشغيل RouteBridge.</value>
+  </data>
+  <data name="SettingsBrowserLabel" xml:space="preserve">
+    <value>متصفح العمل</value>
+  </data>
+  <data name="SettingsBrowserHint" xml:space="preserve">
+    <value>المتصفح الذي يُفتح بملف تعريف منفصل أثناء الجلسة.</value>
+  </data>
+  <data name="SettingsBrowserAuto" xml:space="preserve">
+    <value>تلقائي</value>
+  </data>
+  <data name="SettingsBrowserChrome" xml:space="preserve">
+    <value>Chrome</value>
+  </data>
+  <data name="SettingsBrowserEdge" xml:space="preserve">
+    <value>Edge</value>
+  </data>
+  <data name="SettingsStartupSection" xml:space="preserve">
+    <value>بدء التشغيل</value>
+  </data>
+  <data name="SettingsStartWithWindows" xml:space="preserve">
+    <value>التشغيل مع بدء Windows</value>
+  </data>
+  <data name="SettingsStartWithWindowsUnavailable" xml:space="preserve">
+    <value>غير متاح على هذا النظام.</value>
+  </data>
+  <data name="SettingsStartMinimized" xml:space="preserve">
+    <value>البدء مصغّرًا في منطقة الإشعارات</value>
+  </data>
+  <data name="SettingsSave" xml:space="preserve">
+    <value>حفظ</value>
+  </data>
+  <data name="SettingsCancel" xml:space="preserve">
+    <value>إلغاء</value>
+  </data>
+  <data name="SettingsSaved" xml:space="preserve">
+    <value>حُفظت الإعدادات.</value>
+  </data>
+  <data name="SettingsSaveFailedFormat" xml:space="preserve">
+    <value>تعذّر حفظ الإعدادات: {0}</value>
+  </data>
+  <!-- first run -->
+  <data name="FirstRunWindowTitle" xml:space="preserve">
+    <value>إعداد RouteBridge</value>
+  </data>
+  <data name="FirstRunWelcomeHeading" xml:space="preserve">
+    <value>أهلًا بك في RouteBridge</value>
+  </data>
+  <data name="FirstRunWelcomeText" xml:space="preserve">
+    <value>خطوتان قبل البدء: عنوان الخادم، ثم تسجيل الدخول.</value>
+  </data>
+  <data name="FirstRunStepFormat" xml:space="preserve">
+    <value>الخطوة {0} من {1}</value>
+  </data>
+  <data name="FirstRunServerTitle" xml:space="preserve">
+    <value>عنوان الخادم</value>
+  </data>
+  <data name="FirstRunServerText" xml:space="preserve">
+    <value>اكتب العنوان الذي أعطاك إياه مسؤول النظام، ثم اختبره قبل المتابعة.</value>
+  </data>
+  <data name="FirstRunSignInTitle" xml:space="preserve">
+    <value>تسجيل الدخول</value>
+  </data>
+  <data name="FirstRunSignInText" xml:space="preserve">
+    <value>استخدم البريد وكلمة المرور اللذين أنشأهما لك المسؤول.</value>
+  </data>
+  <data name="FirstRunReadyTitle" xml:space="preserve">
+    <value>قبل أن تتيح جهازك</value>
+  </data>
+  <data name="FirstRunReadyText" xml:space="preserve">
+    <value>هذا ما سيجده الجهاز الآخر إن فعّلت «متاح للطلبات». لا شيء هنا يمنعك من المتابعة.</value>
+  </data>
+  <data name="FirstRunNext" xml:space="preserve">
+    <value>التالي</value>
+  </data>
+  <data name="FirstRunBack" xml:space="preserve">
+    <value>رجوع</value>
+  </data>
+  <data name="FirstRunFinish" xml:space="preserve">
+    <value>إنهاء</value>
+  </data>
+  <!-- about / diagnostics -->
+  <data name="AboutWindowTitle" xml:space="preserve">
+    <value>حول RouteBridge</value>
+  </data>
+  <data name="AboutHeading" xml:space="preserve">
+    <value>حول البرنامج والتشخيص</value>
+  </data>
+  <data name="AboutDescription" xml:space="preserve">
+    <value>اذكر هذه القيم عند طلب الدعم.</value>
+  </data>
+  <data name="AboutAppVersionLabel" xml:space="preserve">
+    <value>إصدار التطبيق</value>
+  </data>
+  <data name="AboutDeviceNameLabel" xml:space="preserve">
+    <value>اسم الجهاز</value>
+  </data>
+  <data name="AboutDeviceIdLabel" xml:space="preserve">
+    <value>معرّف الجهاز</value>
+  </data>
+  <data name="AboutOsLabel" xml:space="preserve">
+    <value>نظام التشغيل</value>
+  </data>
+  <data name="AboutServerLabel" xml:space="preserve">
+    <value>الخادم</value>
+  </data>
+  <data name="AboutSignedInLabel" xml:space="preserve">
+    <value>الحساب</value>
+  </data>
+  <data name="AboutConnectionLabel" xml:space="preserve">
+    <value>حالة الاتصال</value>
+  </data>
+  <data name="AboutLogsLabel" xml:space="preserve">
+    <value>مجلد السجلات</value>
+  </data>
+  <data name="AboutOpenLogFolder" xml:space="preserve">
+    <value>فتح مجلد السجلات</value>
+  </data>
+  <data name="AboutOpenLogFolderFailedFormat" xml:space="preserve">
+    <value>تعذّر فتح المجلد: {0}</value>
+  </data>
+  <data name="AboutCopy" xml:space="preserve">
+    <value>نسخ التفاصيل</value>
+  </data>
+  <data name="AboutCopied" xml:space="preserve">
+    <value>نُسخت التفاصيل.</value>
+  </data>
+  <data name="AboutSecretsNote" xml:space="preserve">
+    <value>لا يظهر هنا أي رمز دخول ولا سرّ الجهاز.</value>
+  </data>
+  <data name="AboutNotAvailable" xml:space="preserve">
+    <value>غير متاح</value>
+  </data>
+  <!-- tray and main window entry points (week 6) -->
+  <data name="TraySettings" xml:space="preserve">
+    <value>الإعدادات…</value>
+  </data>
+  <data name="TrayAbout" xml:space="preserve">
+    <value>حول البرنامج والتشخيص…</value>
+  </data>
+  <data name="MainSettingsTooltip" xml:space="preserve">
+    <value>الإعدادات</value>
+  </data>
+  <data name="MainAboutTooltip" xml:space="preserve">
+    <value>حول البرنامج والتشخيص</value>
+  </data>
   <!-- errors -->
   <data name="StartupFailedTitle" xml:space="preserve">
     <value>تعذّر تشغيل RouteBridge</value>

@@ -101,6 +101,20 @@ public sealed class AuthSession : IAuthSession, IAccessTokenSource
 
     public event EventHandler<SignedOutEventArgs>? SignedOut;
 
+    public async Task<bool> HasStoredCredentialsAsync(CancellationToken ct)
+    {
+        try
+        {
+            // Presence only: the value is never returned, logged or compared.
+            return !string.IsNullOrEmpty(await _secrets.GetAsync(RefreshTokenKey, ct).ConfigureAwait(false));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Could not read the secret store; treating this machine as never signed in");
+            return false;
+        }
+    }
+
     public async Task<bool> TryRestoreAsync(CancellationToken ct)
     {
         var refreshToken = await _secrets.GetAsync(RefreshTokenKey, ct).ConfigureAwait(false);

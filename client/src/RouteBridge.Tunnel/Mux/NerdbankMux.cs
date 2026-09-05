@@ -107,6 +107,12 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
     public bool IsClosed => Volatile.Read(ref _closed) != 0;
 
     /// <summary>
+    /// عدد الـ PING المعلّقة بلا PONG. تشخيص لا سلوك: اختبار التحمّل يراقبه لأن كل مُعلَّق يحمل
+    /// <c>TaskCompletionSource</c> وتسجيل إلغاء على <c>_cts</c>، فنموّه = تسريب.
+    /// </summary>
+    public int PendingPings => _pendingPings.Count;
+
+    /// <summary>
     /// ينشئ الـ Mux فوق الـ stream المصادَق (SslStream من SymmetricConnector) ويبدأ الاستماع فورًا. يملك الـ stream.
     /// </summary>
     /// <param name="window">
@@ -148,6 +154,11 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
 
     private void Start()
     {
+        // ‏Completion قد لا يراقبه أحد: TunnelSession يعلّق WatchAsync لكن هناك مسارات تسبقه (فشل بناء الطرف
+        // الخاص بالدور فتخلص فوري) واستعمالات بلا TunnelSession أصلًا (أداة Spike، الاختبارات). بلا هذا المراقب
+        // الصامت يصير كل موت نفق استثناء مهمة غير مُلاحَظ يرفعه خيط الإنهاء — ضجيج اليوم، وانهيار عملية على أي
+        // مضيف يُشغّل ThrowUnobservedTaskExceptions. المراقبون الحقيقيون لا يتأثرون: كلهم يقرؤون المهمة نفسها.
+        _ = _completion.Task.ContinueWith(static t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
         _controlLoop = Task.Run(ControlLoopAsync);
         if (_options.EnableLiveness) _livenessLoop = Task.Run(LivenessLoopAsync);
         _ = _mx.Completion.ContinueWith(t =>
@@ -288,7 +299,28 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
 
     private async Task HandleOfferAsync(MultiplexingStream.Channel channel, string name)
     {
-        Interlocked.Increment(ref _openStreams);
+        // حد الشريحة على مسار القبول أيضًا، لا على مسار الفتح وحده: الطرف الآخر هو من يقرر عدد القنوات المعروضة،
+        // فبلا هذا الحد يستطيع طرف معادٍ إجبارنا على إنشاء قنوات (وأنابيبها) بلا سقف. المضيف يملك حدًّا أدق في
+        // RouteBridge.Egress.StreamLimiter (يشمل 50 فتحًا/ثانية) ويقع قبله؛ وهذا يحمي الطرفين معًا، والضيف بلا حدّ آخر.
+        if (Interlocked.Increment(ref _openStreams) > _window.MaxConcurrentStreams)
+        {
+            try
+            {
+                await WriteStatusAsync(channel, (byte)OpenFailReason.Limit, _cts.Token).ConfigureAwait(false);
+                channel.Output.Complete();
+                channel.Input.Complete();
+            }
+            catch (Exception)
+            {
+                try { channel.Dispose(); } catch { /* تجاهل */ }
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _openStreams);
+            }
+            return;
+        }
+
         try
         {
             var decision = await DecideAsync(name).ConfigureAwait(false);
@@ -393,13 +425,16 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
             {
                 var result = await reader.ReadAsync(_cts.Token).ConfigureAwait(false);
                 var buffer = result.Buffer;
-                while (buffer.Length >= CtlFrameLength)
+                var terminal = false;
+                while (!terminal && buffer.Length >= CtlFrameLength)
                 {
                     buffer.Slice(0, CtlFrameLength).CopyTo(frame);
                     buffer = buffer.Slice(CtlFrameLength);
-                    await ProcessControlFrameAsync(frame).ConfigureAwait(false);
+                    terminal = !await ProcessControlFrameAsync(frame).ConfigureAwait(false);
                 }
                 reader.AdvanceTo(buffer.Start, buffer.End);
+                // إطار منهٍ (GOAWAY أو خطأ بروتوكول): من عالجه ضبط الحالة النهائية، ولا معنى لقراءة ما بعده.
+                if (terminal) return;
                 if (result.IsCompleted || result.IsCanceled) break;
             }
             if (RemoteGoAway is null && !IsClosed) Fail(new MuxClosedException("control channel closed by peer"));
@@ -415,29 +450,71 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
         }
     }
 
-    private async Task ProcessControlFrameAsync(byte[] frame)
+    /// <summary>يعالج إطار تحكم واحدًا. <c>false</c> = إطار منهٍ (GOAWAY أو خطأ بروتوكول) فتتوقف حلقة التحكم.</summary>
+    private async Task<bool> ProcessControlFrameAsync(byte[] frame)
     {
         switch (frame[0])
         {
             case CtlPing:
                 await SendControlAsync(CtlPong, frame.AsMemory(1, 8).ToArray(), _cts.Token).ConfigureAwait(false);
-                break;
+                return true;
+
             case CtlPong:
                 Volatile.Write(ref _lastPongMs, _clock.ElapsedMilliseconds);
+                // نونس مجهول (PONG مكرر أو مصطنع) يُهمل بلا أثر: لا شيء يُضاف إلى _pendingPings من السلك.
                 if (_pendingPings.TryRemove(BitConverter.ToUInt64(frame, 1), out var tcs)) tcs.TrySetResult(_clock.ElapsedMilliseconds);
-                break;
+                return true;
+
             case CtlGoAway:
             {
-                var reason = (GoAwayReason)frame[1];
-                RemoteGoAway = MuxWire.IsValid(reason) ? reason : GoAwayReason.ProtocolError;
+                var raw = frame[1];
+                var reason = (GoAwayReason)raw;
+                if (!MuxWire.IsValid(reason))
+                {
+                    // سبب خارج العقد: يُعامل معاملة خطأ البروتوكول لا معاملة إغلاق نظيف.
+                    RemoteGoAway = GoAwayReason.ProtocolError;
+                    _ = FailProtocolAsync($"GOAWAY carried an unknown reason {raw}", sendGoAway: true);
+                    return false;
+                }
+
+                RemoteGoAway = reason;
+                if (reason == GoAwayReason.ProtocolError)
+                {
+                    // الطرف الآخر يقول إن السلك انكسر: نهاية غير طبيعية يجب أن يبلّغ عنها التطبيق
+                    // (TunnelSession.SuggestDeathReason ⇒ TunnelEndReason.ProtocolError)، لا إغلاق نظيف صامت.
+                    _ = FailProtocolAsync("peer sent GOAWAY(protocol_error)", sendGoAway: false);
+                    return false;
+                }
+
                 _ = Task.Run(() => ShutdownAsync(sendGoAway: false, GoAwayReason.SessionEnd));
-                break;
+                return false;
             }
+
             default:
                 RemoteGoAway = GoAwayReason.ProtocolError;
-                _ = Task.Run(() => ShutdownAsync(sendGoAway: true, GoAwayReason.ProtocolError));
-                break;
+                _ = FailProtocolAsync($"unknown control frame type 0x{frame[0]:x2}", sendGoAway: true);
+                return false;
         }
+    }
+
+    /// <summary>
+    /// خطأ بروتوكول على قناة التحكم: GOAWAY(protocol_error) إن كنا نحن من اكتشفه، ثم <b>عطل</b> صريح على
+    /// <see cref="Completion"/>. المهم أن الإخفاق يظهر عطلًا: الإغلاق النظيف لا يرفع <c>Died</c> في
+    /// <c>TunnelSession</c>، فكان طرف معادٍ يفسد قناة التحكم فتنتهي الجلسة بلا سبب ويبلَّغ الخادم بإنهاء عادي.
+    /// </summary>
+    private async Task FailProtocolAsync(string detail, bool sendGoAway)
+    {
+        if (sendGoAway && Volatile.Read(ref _closed) == 0)
+        {
+            try
+            {
+                await SendControlAsync(CtlGoAway, new[] { (byte)GoAwayReason.ProtocolError }, CancellationToken.None)
+                    .WaitAsync(GoAwayFlushTimeout).ConfigureAwait(false);
+                await Task.WhenAny(_control.Completion, _mx.Completion, Task.Delay(GoAwayDrainTimeout)).ConfigureAwait(false);
+            }
+            catch { /* النفق ميت أصلًا */ }
+        }
+        Fail(new MuxClosedException($"control channel protocol error: {detail}"));
     }
 
     private async Task SendControlAsync(byte type, ReadOnlyMemory<byte> payload8, CancellationToken ct)
@@ -479,11 +556,31 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
                     Fail(new MuxClosedException($"no PONG for {sinceLast} ms; tunnel is dead"));
                     return;
                 }
-                _ = PingAsync(_cts.Token).ContinueWith(_ => { }, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
+                _ = LivenessPingAsync();
                 if (lastPong == 0) Volatile.Write(ref _lastPongMs, _clock.ElapsedMilliseconds); // بداية العد من أول PING
             }
         }
         catch (OperationCanceledException) { }
+    }
+
+    /// <summary>
+    /// PING الحيوية: يتخلى عن الانتظار بعد <see cref="MuxOptions.DeadAfter"/> بدل أن يبقى معلّقًا حتى موت النفق.
+    /// بلا هذا الحد كان كل PING بلا PONG يترك مدخلًا في <c>_pendingPings</c> وتسجيلَ إلغاء على <c>_cts</c> يعيشان
+    /// ما عاش النفق، فينمو الاثنان بلا حد كلما تأخرت الـ PONG دون أن تنقطع. النتيجة هنا لا تُقرأ: الحكم بالموت
+    /// وظيفة الحلقة نفسها عبر <c>_lastPongMs</c>، وكل ما يهم أن يُحرَّر المُعلَّق.
+    /// </summary>
+    private async Task LivenessPingAsync()
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+            cts.CancelAfter(_options.DeadAfter);
+            await PingAsync(cts.Token).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // إلغاء، أو مهلة، أو نفق مغلق: كلها ملاحظة هنا حتى لا تصير استثناءً غير مراقَب.
+        }
     }
 
     // ---------- shutdown ----------

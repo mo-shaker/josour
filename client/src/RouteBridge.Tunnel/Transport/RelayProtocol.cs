@@ -72,6 +72,13 @@ public static class RelayProtocol
 
     private static readonly TimeSpan DefaultIoTimeout = TimeSpan.FromSeconds(5);
 
+    /// <summary>
+    /// فك ترميز التوكن يرمي على أي بايت غير صالح بدل أن يستبدله بـ U+FFFD كما يفعل <see cref="Encoding.UTF8"/>
+    /// الافتراضي. بلا هذا كان فرع «token is not valid UTF-8» ميتًا، وكان الـ Relay يمرر إلى التحقق توكنًا
+    /// <b>مشوَّهًا</b> لا التوكن الذي أُرسل — أي أن السلك لم يكن يرفض حمولة تالفة بل يعيد كتابتها بصمت.
+    /// </summary>
+    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
     public static ReadOnlySpan<byte> Magic => "RBRL"u8;
 
     public static string ToWire(RelayStatus status) => status switch
@@ -127,7 +134,8 @@ public static class RelayProtocol
         if (buffer.Length < FixedPreambleLength + tokenLength) { error = "preamble is truncated"; return false; }
 
         string token;
-        try { token = Encoding.UTF8.GetString(buffer.Slice(FixedPreambleLength, tokenLength)); }
+        // DecoderFallbackException ترث ArgumentException.
+        try { token = StrictUtf8.GetString(buffer.Slice(FixedPreambleLength, tokenLength)); }
         catch (ArgumentException) { error = "token is not valid UTF-8"; return false; }
 
         preamble = new RelayPreamble(sessionId, role, token);

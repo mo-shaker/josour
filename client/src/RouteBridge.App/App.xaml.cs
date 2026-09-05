@@ -11,6 +11,7 @@ using RouteBridge.App.Services;
 using RouteBridge.App.ViewModels;
 using RouteBridge.App.Views;
 using RouteBridge.Core.Control;
+using RouteBridge.Core.Diagnostics;
 using RouteBridge.Core.Security;
 using RouteBridge.Infrastructure.Api;
 using RouteBridge.Infrastructure.Control;
@@ -224,7 +225,21 @@ public partial class App : Application
         services.AddSingleton<IAppSettingsStore>(_settings ?? new AppSettingsStore());
         services.AddSingleton<ISecretStore>(sp => new DpapiSecretStore(sp.GetRequiredService<ILogger<DpapiSecretStore>>()));
         services.AddSingleton<IDeviceInfoProvider>(_ => new DeviceInfoProvider(typeof(App).Assembly));
-        services.AddSingleton(sp => new HostDiagnosticsProbe(logger: sp.GetRequiredService<ILogger<HostDiagnosticsProbe>>()));
+
+        // Host diagnostics, week 6: neither detection is written here any more. The firewall check is Core's single owner
+        // (it used to exist in this layer AND in track B's tunnel diagnostics), and the VPN verdict is track B's own
+        // HostDiagnostics.DetectVpn() reached through the Core interface, because Infrastructure cannot reference Tunnel.
+        services.AddSingleton<IFirewallDiagnostics>(_ => FirewallDiagnostics.System);
+        services.AddSingleton<IVpnDetector, TunnelVpnDetector>();
+        services.AddSingleton(sp => new HostDiagnosticsProbe(
+            sp.GetRequiredService<IFirewallDiagnostics>(),
+            sp.GetRequiredService<IVpnDetector>(),
+            sp.GetRequiredService<ILogger<HostDiagnosticsProbe>>()));
+        services.AddSingleton<IHostReadinessProbe>(sp => sp.GetRequiredService<HostDiagnosticsProbe>());
+        services.AddSingleton<HostReadinessMonitor>();
+
+        // The server address the user types: validated like the API client will, then asked GET /healthz on a short budget.
+        services.AddSingleton<IServerCheck>(sp => new HttpServerCheck(logger: sp.GetRequiredService<ILogger<HttpServerCheck>>()));
 
         // REST + auth. AuthenticatedHandler resolves the token source lazily because AuthSession itself calls the API through it.
         services.AddSingleton<IApiClient>(sp =>
@@ -334,6 +349,14 @@ public partial class App : Application
         services.AddSingleton<MainWindow>();
         services.AddTransient<LoginViewModel>();
         services.AddTransient<LoginWindow>();
+
+        // Week 6 windows. Transient, so each one opens on the settings as they are now rather than as they were at start-up.
+        services.AddTransient<FirstRunViewModel>();
+        services.AddTransient<FirstRunWindow>();
+        services.AddTransient<SettingsViewModel>();
+        services.AddTransient<SettingsWindow>();
+        services.AddTransient<AboutViewModel>();
+        services.AddTransient<AboutWindow>();
     }
 
     protected override void OnExit(ExitEventArgs e)

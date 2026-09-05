@@ -1,9 +1,13 @@
-"""In-process token-bucket rate limiter keyed by an opaque string (the client IP).
+"""In-process token-bucket rate limiters keyed by an opaque string.
 
 The API runs as a single uvicorn worker (Dockerfile), so process-local state is authoritative;
 this is deliberately not shared across processes or hosts.
+
+The policy the four buckets implement - which endpoint, which key, which numbers, and why they
+do not fight the account lockout - is ADR-0008 (docs/decisions/0008-rate-limit-policy.md).
 """
 
+import hashlib
 import math
 import time
 from collections.abc import Callable
@@ -60,6 +64,18 @@ class TokenBucketLimiter:
         wait = (1.0 - bucket.tokens) / self.refill_per_second
         return RateLimitDecision(allowed=False, retry_after_seconds=max(1, math.ceil(wait)))
 
+    def refund(self, key: str) -> None:
+        """Give one token back, never exceeding ``capacity``.
+
+        Used by ``POST /auth/login`` on the per-email bucket after a *successful* login, so that
+        only failed attempts durably spend the budget (ADR-0008). A refund for a key that was
+        never checked is a no-op rather than a new full bucket."""
+        bucket = self._buckets.get(key)
+        if bucket is None:
+            return
+        self._refill(bucket, self._clock())
+        bucket.tokens = min(float(self.capacity), bucket.tokens + 1.0)
+
     def reset(self) -> None:
         self._buckets.clear()
 
@@ -78,3 +94,36 @@ class TokenBucketLimiter:
             oldest = sorted(self._buckets, key=lambda k: self._buckets[k].updated)
             for key in oldest[: len(oldest) // 2 + 1]:
                 del self._buckets[key]
+
+
+def opaque_key(value: str) -> str:
+    """A fixed-length bucket key for a caller-supplied, personally identifying string.
+
+    The submitted email keys one of the login buckets (ADR-0008). Hashing it bounds the key
+    length (the input is attacker-controlled and up to 320 characters) and keeps a table of real
+    addresses out of process memory, which is the same reasoning as privacy item 15.x elsewhere.
+    """
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class RateLimiters:
+    """The four buckets of ADR-0008, built once per application.
+
+    ``None`` in ``app.state`` (``RATE_LIMIT_ENABLED=false``) disables all of them together; there
+    is deliberately no way to disable one and not the others, so the load harness and the
+    test-suite cannot end up exercising a half-limited server.
+    """
+
+    login_ip: TokenBucketLimiter
+    """``POST /auth/login`` per client IP."""
+    login_email: TokenBucketLimiter
+    """``POST /auth/login`` per submitted email (hashed with :func:`opaque_key`)."""
+    refresh_ip: TokenBucketLimiter
+    """``POST /auth/refresh`` per client IP."""
+    probe_user: TokenBucketLimiter
+    """``POST /probe`` per authenticated user."""
+
+    def reset(self) -> None:
+        for limiter in (self.login_ip, self.login_email, self.refresh_ip, self.probe_user):
+            limiter.reset()

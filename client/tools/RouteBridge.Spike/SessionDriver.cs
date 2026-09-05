@@ -155,6 +155,30 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
         return _coordinator?.DisconnectAsync() ?? Task.CompletedTask;
     }
 
+    /// <summary>
+    /// محاولات الوصول غير المصرَّح بها على مستمع النفق، بالمفاتيح المحجوزة في <c>docs/api.md</c>
+    /// (‏<c>POST /api/v1/diagnostics</c>): <c>listener_unauthenticated</c> و<c>listener_port</c>
+    /// و<c>unauthenticated_peers</c> (≤ 10 عناوين)، وتُنقل كما هي من <c>ITunnelSession.Diagnostics</c> بلا تعديل
+    /// ولا إعادة تسمية. <c>null</c> إن لم يُنشأ نفق أصلًا (فلا مستمع ولا شيء يُبلَّغ عنه).
+    ///
+    /// <para>تُرفع حتى حين يكون العدّاد صفرًا: الخادم لا يكتب صف <c>security_events</c> إلا على قيمة موجبة، لكن
+    /// الجلسات الخالية من المحاولات هي مقام النسبة — وبلا مقام لا يعني «عشر محاولات» شيئًا.</para>
+    /// </summary>
+    public (Guid SessionId, Dictionary<string, object?> Data)? ListenerDiagnostics()
+    {
+        var tunnel = Volatile.Read(ref _tunnel);
+        if (tunnel is null) return null;
+        var diagnostics = tunnel.Diagnostics;
+        if (!diagnostics.TryGetValue("listener_unauthenticated", out var count)) return null;
+
+        var data = new Dictionary<string, object?>(StringComparer.Ordinal) { ["listener_unauthenticated"] = count };
+        foreach (var key in new[] { "listener_port", "unauthenticated_peers", "unauthenticated_peers_distinct" })
+        {
+            if (diagnostics.TryGetValue(key, out var value)) data[key] = value;
+        }
+        return (tunnel.SessionId, data);
+    }
+
     /// <summary>الحصيلة النهائية بعد <see cref="Ended"/>.</summary>
     public SessionOutcome Outcome()
     {

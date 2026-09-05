@@ -141,37 +141,18 @@ public sealed partial class MainViewModel : ObservableObject
             : string.Format(UiFlow.Culture, Strings.TrayTooltipSignedInFormat, user.DisplayName, connection);
     }
 
-    /// <summary>The connection half of the status line and the tray tooltip: live state first, then why it stopped for good.</summary>
-    private string DescribeConnection()
-    {
-        var state = _controlChannel.State;
-        if (state is ControlChannelState.Connected)
-        {
-            return Strings.StatusConnected;
-        }
-
-        if (state is ControlChannelState.Connecting)
-        {
-            return Strings.StatusConnecting;
-        }
-
-        if (state is ControlChannelState.Reconnecting)
-        {
-            return Strings.StatusReconnecting;
-        }
-
-        return _connector.LastClose?.Reason switch
-        {
-            ControlCloseReason.ReplacedByAnotherConnection => Strings.StatusReplacedElsewhere,
-            ControlCloseReason.Unauthorized => Strings.StatusSignInExpired,
-            ControlCloseReason.DeviceRevoked => Strings.SignedOutDeviceRevoked,
-            ControlCloseReason.Failed when !_connector.CanConnect => Strings.StatusNoServer,
-            _ => Strings.StatusOffline,
-        };
-    }
+    /// <summary>The connection half of the status line and the tray tooltip; the About window quotes the same sentence.</summary>
+    private string DescribeConnection() =>
+        ConnectionStatusText.Describe(_controlChannel.State, _connector.LastClose, _connector.CanConnect);
 
     [RelayCommand]
     private void ShowWindow() => _shell.ShowMainWindow();
+
+    [RelayCommand]
+    private void ShowSettings() => _shell.ShowSettingsWindow();
+
+    [RelayCommand]
+    private void ShowAbout() => _shell.ShowAboutWindow();
 
     [RelayCommand(CanExecute = nameof(IsSignedIn))]
     private async Task SignOutAsync()

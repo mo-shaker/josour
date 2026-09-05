@@ -114,6 +114,18 @@ public sealed record ProbeRequest(
     [property: JsonPropertyName("ip")] string Ip,
     [property: JsonPropertyName("port")] int Port);
 
+/// <summary>
+/// Body of <c>POST /diagnostics</c>. <see cref="Data"/> is a free JSON object capped at 64 KB serialized; the reserved keys
+/// inside it are listed in docs/api.md and built by <c>Diagnostics.ListenerAuthDiagnostics</c> — nothing else goes in.
+/// </summary>
+public sealed record DiagnosticsRequest(
+    [property: JsonPropertyName("session_id")] Guid? SessionId,
+    [property: JsonPropertyName("role")] string? Role,
+    [property: JsonPropertyName("data")] IReadOnlyDictionary<string, object?> Data);
+
+/// <summary>Response of <c>POST /diagnostics</c>: the id of the stored row.</summary>
+public sealed record DiagnosticsAccepted([property: JsonPropertyName("id")] Guid Id);
+
 /// <summary>Response of <c>POST /probe</c>; <see cref="LatencyMs"/> is null when unreachable.</summary>
 public sealed record ProbeResult(
     [property: JsonPropertyName("reachable")] bool Reachable,

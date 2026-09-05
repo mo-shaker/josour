@@ -52,6 +52,13 @@ public interface IAuthSession
     /// <summary>Silent sign-in with the stored refresh token. False when there is none, it was rejected (secrets cleared) or the server is unreachable (secrets kept).</summary>
     Task<bool> TryRestoreAsync(CancellationToken ct);
 
+    /// <summary>
+    /// Whether this machine has ever been signed in, i.e. a refresh token is on disk — even one the server would now
+    /// reject. It is how the start-up tells a brand-new install from one whose session merely expired
+    /// (<c>Settings.StartupPlanner</c>); it never says the token is still good, and it reads no token value.
+    /// </summary>
+    Task<bool> HasStoredCredentialsAsync(CancellationToken ct);
+
     /// <summary>Interactive sign-in. Registers the device on first use (stores the one-time device secret); throws <see cref="ApiException"/> / <see cref="ApiUnavailableException"/>.</summary>
     Task SignInAsync(string email, string password, CancellationToken ct);
 

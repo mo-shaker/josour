@@ -190,6 +190,92 @@ public static class Strings
     public static string SignedOutDeviceRevoked => LocalizedStrings.Current[UiStringKeys.SignedOutDeviceRevoked];
     public static string SignedOutAccountDisabled => LocalizedStrings.Current[UiStringKeys.SignedOutAccountDisabled];
 
+    // ---- host readiness: firewall + VPN (week 6) ----
+    public static string HostVpnWarningTitle => LocalizedStrings.Current[UiStringKeys.HostVpnWarningTitle];
+    public static string HostVpnWarningMessageFormat => LocalizedStrings.Current[UiStringKeys.HostVpnWarningMessageFormat];
+    public static string ReadinessTitle => LocalizedStrings.Current[UiStringKeys.ReadinessTitle];
+    public static string ReadinessChecking => LocalizedStrings.Current[UiStringKeys.ReadinessChecking];
+    public static string ReadinessRecheck => LocalizedStrings.Current[UiStringKeys.ReadinessRecheck];
+    public static string ReadinessFirewallOk => LocalizedStrings.Current[UiStringKeys.ReadinessFirewallOk];
+    public static string ReadinessFirewallMissing => LocalizedStrings.Current[UiStringKeys.ReadinessFirewallMissing];
+    public static string ReadinessFirewallUnknown => LocalizedStrings.Current[UiStringKeys.ReadinessFirewallUnknown];
+    public static string ReadinessVpnOk => LocalizedStrings.Current[UiStringKeys.ReadinessVpnOk];
+    public static string ReadinessVpnWarningFormat => LocalizedStrings.Current[UiStringKeys.ReadinessVpnWarningFormat];
+
+    // ---- settings ----
+    public static string SettingsWindowTitle => LocalizedStrings.Current[UiStringKeys.SettingsWindowTitle];
+    public static string SettingsHeading => LocalizedStrings.Current[UiStringKeys.SettingsHeading];
+    public static string SettingsDescription => LocalizedStrings.Current[UiStringKeys.SettingsDescription];
+    public static string SettingsServerSection => LocalizedStrings.Current[UiStringKeys.SettingsServerSection];
+    public static string SettingsServerUrlLabel => LocalizedStrings.Current[UiStringKeys.SettingsServerUrlLabel];
+    public static string SettingsServerUrlHint => LocalizedStrings.Current[UiStringKeys.SettingsServerUrlHint];
+    public static string SettingsTestConnection => LocalizedStrings.Current[UiStringKeys.SettingsTestConnection];
+    public static string SettingsTesting => LocalizedStrings.Current[UiStringKeys.SettingsTesting];
+    public static string SettingsServerOk => LocalizedStrings.Current[UiStringKeys.SettingsServerOk];
+    public static string SettingsServerInvalidUrl => LocalizedStrings.Current[UiStringKeys.SettingsServerInvalidUrl];
+    public static string SettingsServerInsecure => LocalizedStrings.Current[UiStringKeys.SettingsServerInsecure];
+    public static string SettingsServerUnreachable => LocalizedStrings.Current[UiStringKeys.SettingsServerUnreachable];
+    public static string SettingsServerNotRouteBridge => LocalizedStrings.Current[UiStringKeys.SettingsServerNotRouteBridge];
+    public static string SettingsServerDetailFormat => LocalizedStrings.Current[UiStringKeys.SettingsServerDetailFormat];
+    public static string SettingsInterfaceSection => LocalizedStrings.Current[UiStringKeys.SettingsInterfaceSection];
+    public static string SettingsLanguageLabel => LocalizedStrings.Current[UiStringKeys.SettingsLanguageLabel];
+    public static string SettingsLanguageArabic => LocalizedStrings.Current[UiStringKeys.SettingsLanguageArabic];
+    public static string SettingsLanguageEnglish => LocalizedStrings.Current[UiStringKeys.SettingsLanguageEnglish];
+    public static string SettingsLanguageRestartNote => LocalizedStrings.Current[UiStringKeys.SettingsLanguageRestartNote];
+    public static string SettingsBrowserLabel => LocalizedStrings.Current[UiStringKeys.SettingsBrowserLabel];
+    public static string SettingsBrowserHint => LocalizedStrings.Current[UiStringKeys.SettingsBrowserHint];
+    public static string SettingsBrowserAuto => LocalizedStrings.Current[UiStringKeys.SettingsBrowserAuto];
+    public static string SettingsBrowserChrome => LocalizedStrings.Current[UiStringKeys.SettingsBrowserChrome];
+    public static string SettingsBrowserEdge => LocalizedStrings.Current[UiStringKeys.SettingsBrowserEdge];
+    public static string SettingsStartupSection => LocalizedStrings.Current[UiStringKeys.SettingsStartupSection];
+    public static string SettingsStartWithWindows => LocalizedStrings.Current[UiStringKeys.SettingsStartWithWindows];
+    public static string SettingsStartWithWindowsUnavailable => LocalizedStrings.Current[UiStringKeys.SettingsStartWithWindowsUnavailable];
+    public static string SettingsStartMinimized => LocalizedStrings.Current[UiStringKeys.SettingsStartMinimized];
+    public static string SettingsSave => LocalizedStrings.Current[UiStringKeys.SettingsSave];
+    public static string SettingsCancel => LocalizedStrings.Current[UiStringKeys.SettingsCancel];
+    public static string SettingsSaved => LocalizedStrings.Current[UiStringKeys.SettingsSaved];
+    public static string SettingsSaveFailedFormat => LocalizedStrings.Current[UiStringKeys.SettingsSaveFailedFormat];
+
+    // ---- first run ----
+    public static string FirstRunWindowTitle => LocalizedStrings.Current[UiStringKeys.FirstRunWindowTitle];
+    public static string FirstRunWelcomeHeading => LocalizedStrings.Current[UiStringKeys.FirstRunWelcomeHeading];
+    public static string FirstRunWelcomeText => LocalizedStrings.Current[UiStringKeys.FirstRunWelcomeText];
+    public static string FirstRunStepFormat => LocalizedStrings.Current[UiStringKeys.FirstRunStepFormat];
+    public static string FirstRunServerTitle => LocalizedStrings.Current[UiStringKeys.FirstRunServerTitle];
+    public static string FirstRunServerText => LocalizedStrings.Current[UiStringKeys.FirstRunServerText];
+    public static string FirstRunSignInTitle => LocalizedStrings.Current[UiStringKeys.FirstRunSignInTitle];
+    public static string FirstRunSignInText => LocalizedStrings.Current[UiStringKeys.FirstRunSignInText];
+    public static string FirstRunReadyTitle => LocalizedStrings.Current[UiStringKeys.FirstRunReadyTitle];
+    public static string FirstRunReadyText => LocalizedStrings.Current[UiStringKeys.FirstRunReadyText];
+    public static string FirstRunNext => LocalizedStrings.Current[UiStringKeys.FirstRunNext];
+    public static string FirstRunBack => LocalizedStrings.Current[UiStringKeys.FirstRunBack];
+    public static string FirstRunFinish => LocalizedStrings.Current[UiStringKeys.FirstRunFinish];
+
+    // ---- about / diagnostics ----
+    public static string AboutWindowTitle => LocalizedStrings.Current[UiStringKeys.AboutWindowTitle];
+    public static string AboutHeading => LocalizedStrings.Current[UiStringKeys.AboutHeading];
+    public static string AboutDescription => LocalizedStrings.Current[UiStringKeys.AboutDescription];
+    public static string AboutAppVersionLabel => LocalizedStrings.Current[UiStringKeys.AboutAppVersionLabel];
+    public static string AboutDeviceNameLabel => LocalizedStrings.Current[UiStringKeys.AboutDeviceNameLabel];
+    public static string AboutDeviceIdLabel => LocalizedStrings.Current[UiStringKeys.AboutDeviceIdLabel];
+    public static string AboutOsLabel => LocalizedStrings.Current[UiStringKeys.AboutOsLabel];
+    public static string AboutServerLabel => LocalizedStrings.Current[UiStringKeys.AboutServerLabel];
+    public static string AboutSignedInLabel => LocalizedStrings.Current[UiStringKeys.AboutSignedInLabel];
+    public static string AboutConnectionLabel => LocalizedStrings.Current[UiStringKeys.AboutConnectionLabel];
+    public static string AboutLogsLabel => LocalizedStrings.Current[UiStringKeys.AboutLogsLabel];
+    public static string AboutOpenLogFolder => LocalizedStrings.Current[UiStringKeys.AboutOpenLogFolder];
+    public static string AboutOpenLogFolderFailedFormat => LocalizedStrings.Current[UiStringKeys.AboutOpenLogFolderFailedFormat];
+    public static string AboutCopy => LocalizedStrings.Current[UiStringKeys.AboutCopy];
+    public static string AboutCopied => LocalizedStrings.Current[UiStringKeys.AboutCopied];
+    public static string AboutSecretsNote => LocalizedStrings.Current[UiStringKeys.AboutSecretsNote];
+    public static string AboutNotAvailable => LocalizedStrings.Current[UiStringKeys.AboutNotAvailable];
+
+    // ---- tray and main window entry points (week 6) ----
+    public static string TraySettings => LocalizedStrings.Current[UiStringKeys.TraySettings];
+    public static string TrayAbout => LocalizedStrings.Current[UiStringKeys.TrayAbout];
+    public static string MainSettingsTooltip => LocalizedStrings.Current[UiStringKeys.MainSettingsTooltip];
+    public static string MainAboutTooltip => LocalizedStrings.Current[UiStringKeys.MainAboutTooltip];
+
     // ---- errors ----
     public static string StartupFailedTitle => LocalizedStrings.Current[UiStringKeys.StartupFailedTitle];
     public static string StartupFailedMessageFormat => LocalizedStrings.Current[UiStringKeys.StartupFailedMessageFormat];

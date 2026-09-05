@@ -33,8 +33,18 @@ class ApiModel(BaseModel):
 
 class ErrorBody(BaseModel):
     code: str
+    """Stable machine-readable code; clients branch on this, never on ``message``."""
     message: str
+    """Human-readable detail, for logs and developers. Not localised."""
 
 
 class ErrorEnvelope(BaseModel):
+    """Every failure response in this API, whatever the status code."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [{"error": {"code": "rate_limited", "message": "Too many requests"}}]
+        }
+    )
+
     error: ErrorBody

@@ -1,10 +1,17 @@
 import ipaddress
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ProbeRequest(BaseModel):
-    ip: str
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"ip": "203.0.113.7", "port": 51820}]}
+    )
+
+    ip: str = Field(
+        description="Public IPv4 or IPv6 address. Loopback, private, link-local, multicast and "
+        "otherwise reserved addresses are refused with 400."
+    )
     port: int = Field(ge=1, le=65535)
 
     @field_validator("ip")
@@ -17,5 +24,17 @@ class ProbeRequest(BaseModel):
 
 
 class ProbeResponse(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"reachable": True, "latency_ms": 42},
+                {"reachable": False, "latency_ms": None},
+            ]
+        }
+    )
+
     reachable: bool
-    latency_ms: int | None
+    """Whether the TCP handshake completed within the 3 second timeout."""
+    latency_ms: int | None = Field(
+        default=None, description="Handshake time in milliseconds; null when unreachable."
+    )

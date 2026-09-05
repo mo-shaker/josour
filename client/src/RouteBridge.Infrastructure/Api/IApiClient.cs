@@ -46,4 +46,11 @@ public interface IApiClient
 
     /// <summary><c>POST /probe</c>.</summary>
     Task<ProbeResult> ProbeAsync(string ip, int port, CancellationToken ct);
+
+    /// <summary>
+    /// <c>POST /diagnostics</c> → <c>201 { id }</c>. <paramref name="data"/> is stored as-is (64 KB limit) and may carry the
+    /// reserved keys of docs/api.md; <paramref name="sessionId"/> must name a session this device is a party to, or the
+    /// server answers <c>404</c>/<c>403</c>.
+    /// </summary>
+    Task<DiagnosticsAccepted> PostDiagnosticsAsync(Guid? sessionId, string? role, IReadOnlyDictionary<string, object?> data, CancellationToken ct);
 }

@@ -24,7 +24,9 @@ What it does, in order:
    connections, and the server process's RSS and CPU.
 
 The server under test should run with ``RATE_LIMIT_ENABLED=false``: ``POST /auth/login`` is
-capped at 5/min per IP (docs/api.md), and every simulated user logs in from this one address.
+capped per client IP (ADR-0008) and every simulated user logs in from this one address. The
+per-email half of that limit would not fire here - each simulated user has its own email and the
+logins succeed, which refunds the token - but the per-IP cap would.
 """
 
 import argparse

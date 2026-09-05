@@ -285,6 +285,49 @@ public sealed class ApiClientTests
         Assert.Equal(ApiErrorCodes.InvalidResponse, ex.Code);
     }
 
+    [Fact]
+    public async Task PostDiagnostics_SendsTheContractBody_Authenticated()
+    {
+        var (api, http, _) = Create();
+        http.On(HttpMethod.Post, "/api/v1/diagnostics", _ => FakeHttpMessageHandler.Json(HttpStatusCode.Created, """{"id":"6f1b0f3a-0000-4000-8000-000000000001"}"""));
+
+        var accepted = await api.PostDiagnosticsAsync(
+            AuthHarness.DeviceId,
+            "host",
+            new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["listener_unauthenticated"] = 3,
+                ["listener_port"] = 51234,
+                ["unauthenticated_peers"] = new[] { "203.0.113.9" },
+            },
+            None);
+
+        var request = Assert.Single(http.Requests);
+        using var body = JsonDocument.Parse(request.Body!);
+        var root = body.RootElement;
+        Assert.Equal(AuthHarness.DeviceId, root.GetProperty("session_id").GetGuid());
+        Assert.Equal("host", root.GetProperty("role").GetString());
+
+        var data = root.GetProperty("data");
+        Assert.Equal(3, data.GetProperty("listener_unauthenticated").GetInt32());
+        Assert.Equal(51234, data.GetProperty("listener_port").GetInt32());
+        Assert.Equal("203.0.113.9", Assert.Single(data.GetProperty("unauthenticated_peers").EnumerateArray().Select(e => e.GetString())));
+        Assert.Equal(new Guid("6f1b0f3a-0000-4000-8000-000000000001"), accepted.Id);
+    }
+
+    [Fact]
+    public async Task PostDiagnostics_WithoutASession_OmitsTheNullFields()
+    {
+        var (api, http, _) = Create();
+        http.On(HttpMethod.Post, "/api/v1/diagnostics", _ => FakeHttpMessageHandler.Json(HttpStatusCode.Created, """{"id":"6f1b0f3a-0000-4000-8000-000000000002"}"""));
+
+        await api.PostDiagnosticsAsync(null, null, new Dictionary<string, object?> { ["listener_unauthenticated"] = 1 }, None);
+
+        using var body = JsonDocument.Parse(Assert.Single(http.Requests).Body!);
+        Assert.False(body.RootElement.TryGetProperty("session_id", out _));
+        Assert.False(body.RootElement.TryGetProperty("role", out _));
+    }
+
     [Theory]
     [InlineData("https://server.test", true, "https://server.test/")]
     [InlineData("  https://Server.test/rb/  ", true, "https://server.test/rb/")]

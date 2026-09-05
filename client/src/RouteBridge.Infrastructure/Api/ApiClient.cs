@@ -138,6 +138,12 @@ public sealed class ApiClient : IApiClient
         return PostAsync<ProbeResult>("probe", new ProbeRequest(ip.Trim(), port), anonymous: false, ct);
     }
 
+    public Task<DiagnosticsAccepted> PostDiagnosticsAsync(Guid? sessionId, string? role, IReadOnlyDictionary<string, object?> data, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        return PostAsync<DiagnosticsAccepted>("diagnostics", new DiagnosticsRequest(sessionId, role, data), anonymous: false, ct);
+    }
+
     /// <summary>The contract's ETag for an allow-list version: the quoted number, e.g. <c>"3"</c>.</summary>
     public static string FormatETag(int version) => "\"" + version.ToString(CultureInfo.InvariantCulture) + "\"";
 

@@ -180,6 +180,92 @@ public static class UiStringKeys
     public const string SignedOutDeviceRevoked = "SignedOutDeviceRevoked";
     public const string SignedOutAccountDisabled = "SignedOutAccountDisabled";
 
+    // ---- host readiness: firewall + VPN (week 6) ----
+    public const string HostVpnWarningTitle = "HostVpnWarningTitle";
+    public const string HostVpnWarningMessageFormat = "HostVpnWarningMessageFormat";
+    public const string ReadinessTitle = "ReadinessTitle";
+    public const string ReadinessChecking = "ReadinessChecking";
+    public const string ReadinessRecheck = "ReadinessRecheck";
+    public const string ReadinessFirewallOk = "ReadinessFirewallOk";
+    public const string ReadinessFirewallMissing = "ReadinessFirewallMissing";
+    public const string ReadinessFirewallUnknown = "ReadinessFirewallUnknown";
+    public const string ReadinessVpnOk = "ReadinessVpnOk";
+    public const string ReadinessVpnWarningFormat = "ReadinessVpnWarningFormat";
+
+    // ---- settings ----
+    public const string SettingsWindowTitle = "SettingsWindowTitle";
+    public const string SettingsHeading = "SettingsHeading";
+    public const string SettingsDescription = "SettingsDescription";
+    public const string SettingsServerSection = "SettingsServerSection";
+    public const string SettingsServerUrlLabel = "SettingsServerUrlLabel";
+    public const string SettingsServerUrlHint = "SettingsServerUrlHint";
+    public const string SettingsTestConnection = "SettingsTestConnection";
+    public const string SettingsTesting = "SettingsTesting";
+    public const string SettingsServerOk = "SettingsServerOk";
+    public const string SettingsServerInvalidUrl = "SettingsServerInvalidUrl";
+    public const string SettingsServerInsecure = "SettingsServerInsecure";
+    public const string SettingsServerUnreachable = "SettingsServerUnreachable";
+    public const string SettingsServerNotRouteBridge = "SettingsServerNotRouteBridge";
+    public const string SettingsServerDetailFormat = "SettingsServerDetailFormat";
+    public const string SettingsInterfaceSection = "SettingsInterfaceSection";
+    public const string SettingsLanguageLabel = "SettingsLanguageLabel";
+    public const string SettingsLanguageArabic = "SettingsLanguageArabic";
+    public const string SettingsLanguageEnglish = "SettingsLanguageEnglish";
+    public const string SettingsLanguageRestartNote = "SettingsLanguageRestartNote";
+    public const string SettingsBrowserLabel = "SettingsBrowserLabel";
+    public const string SettingsBrowserHint = "SettingsBrowserHint";
+    public const string SettingsBrowserAuto = "SettingsBrowserAuto";
+    public const string SettingsBrowserChrome = "SettingsBrowserChrome";
+    public const string SettingsBrowserEdge = "SettingsBrowserEdge";
+    public const string SettingsStartupSection = "SettingsStartupSection";
+    public const string SettingsStartWithWindows = "SettingsStartWithWindows";
+    public const string SettingsStartWithWindowsUnavailable = "SettingsStartWithWindowsUnavailable";
+    public const string SettingsStartMinimized = "SettingsStartMinimized";
+    public const string SettingsSave = "SettingsSave";
+    public const string SettingsCancel = "SettingsCancel";
+    public const string SettingsSaved = "SettingsSaved";
+    public const string SettingsSaveFailedFormat = "SettingsSaveFailedFormat";
+
+    // ---- first run ----
+    public const string FirstRunWindowTitle = "FirstRunWindowTitle";
+    public const string FirstRunWelcomeHeading = "FirstRunWelcomeHeading";
+    public const string FirstRunWelcomeText = "FirstRunWelcomeText";
+    public const string FirstRunStepFormat = "FirstRunStepFormat";
+    public const string FirstRunServerTitle = "FirstRunServerTitle";
+    public const string FirstRunServerText = "FirstRunServerText";
+    public const string FirstRunSignInTitle = "FirstRunSignInTitle";
+    public const string FirstRunSignInText = "FirstRunSignInText";
+    public const string FirstRunReadyTitle = "FirstRunReadyTitle";
+    public const string FirstRunReadyText = "FirstRunReadyText";
+    public const string FirstRunNext = "FirstRunNext";
+    public const string FirstRunBack = "FirstRunBack";
+    public const string FirstRunFinish = "FirstRunFinish";
+
+    // ---- about / diagnostics ----
+    public const string AboutWindowTitle = "AboutWindowTitle";
+    public const string AboutHeading = "AboutHeading";
+    public const string AboutDescription = "AboutDescription";
+    public const string AboutAppVersionLabel = "AboutAppVersionLabel";
+    public const string AboutDeviceNameLabel = "AboutDeviceNameLabel";
+    public const string AboutDeviceIdLabel = "AboutDeviceIdLabel";
+    public const string AboutOsLabel = "AboutOsLabel";
+    public const string AboutServerLabel = "AboutServerLabel";
+    public const string AboutSignedInLabel = "AboutSignedInLabel";
+    public const string AboutConnectionLabel = "AboutConnectionLabel";
+    public const string AboutLogsLabel = "AboutLogsLabel";
+    public const string AboutOpenLogFolder = "AboutOpenLogFolder";
+    public const string AboutOpenLogFolderFailedFormat = "AboutOpenLogFolderFailedFormat";
+    public const string AboutCopy = "AboutCopy";
+    public const string AboutCopied = "AboutCopied";
+    public const string AboutSecretsNote = "AboutSecretsNote";
+    public const string AboutNotAvailable = "AboutNotAvailable";
+
+    // ---- tray and main window entry points (week 6) ----
+    public const string TraySettings = "TraySettings";
+    public const string TrayAbout = "TrayAbout";
+    public const string MainSettingsTooltip = "MainSettingsTooltip";
+    public const string MainAboutTooltip = "MainAboutTooltip";
+
     // ---- errors ----
     public const string StartupFailedTitle = "StartupFailedTitle";
     public const string StartupFailedMessageFormat = "StartupFailedMessageFormat";

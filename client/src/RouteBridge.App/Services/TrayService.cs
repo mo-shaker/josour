@@ -65,6 +65,9 @@ public sealed class TrayService : IDisposable
         menu.Items.Add(new Separator());
         menu.Items.Add(CheckableItem(Strings.TrayAvailableForRequests, nameof(MainViewModel.IsAvailable)));
         menu.Items.Add(CheckableItem(Strings.TrayStartWithWindows, nameof(MainViewModel.StartWithWindows)));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(new MenuItem { Header = Strings.TraySettings, Command = _viewModel.ShowSettingsCommand });
+        menu.Items.Add(new MenuItem { Header = Strings.TrayAbout, Command = _viewModel.ShowAboutCommand });
 
         if (_viewModel.IsDebugMenuVisible)
         {

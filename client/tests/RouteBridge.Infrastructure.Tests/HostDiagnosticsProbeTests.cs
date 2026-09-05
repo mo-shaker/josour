@@ -1,156 +1,140 @@
+using RouteBridge.Core.Net;
 using RouteBridge.Infrastructure.Diagnostics;
+using RouteBridge.Infrastructure.Tests.Support;
 
 namespace RouteBridge.Infrastructure.Tests;
 
 /// <summary>
-/// The <c>hello.diagnostics</c> values this layer answers (docs/ws-protocol.md section 3): the firewall rule and profile
-/// from netsh, and <c>ipv6_global</c> from the interfaces. netsh is driven by a scripted runner, so the parsing is tested
-/// on every platform — including the case that matters most in the field, a non-English Windows.
+/// The probe that combines the two host checks into the two things the app consumes: the <c>hello.diagnostics</c> frame
+/// (docs/ws-protocol.md section 3) and the readiness the user is shown. Both detections are injected, so what is tested
+/// here is the decision — above all the one week 6 added: <b>warn about a VPN only when it holds the outbound route</b>.
 /// </summary>
 public sealed class HostDiagnosticsProbeTests
 {
     private static readonly CancellationToken None = CancellationToken.None;
 
-    /// <summary>netsh as an English Windows prints it for a rule that exists.</summary>
-    private const string RuleFound = """
+    private static HostDiagnosticsProbe Probe(FakeFirewallDiagnostics? firewall = null, FakeVpnDetector? vpn = null) =>
+        new(firewall ?? new FakeFirewallDiagnostics(rulePresent: true, profile: "public"), vpn ?? new FakeVpnDetector());
 
-        Rule Name:                            RouteBridge Tunnel
-        ----------------------------------------------------------------------
-        Enabled:                              Yes
-        Direction:                            In
-        Profiles:                             Domain,Private,Public
-        Grouping:
-        LocalIP:                              Any
-        RemoteIP:                             Any
-        Protocol:                             TCP
-        Action:                               Allow
-        """;
-
-    private const string CurrentProfileEnglish = """
-
-        Public Profile Settings:
-        ----------------------------------------------------------------------
-        State                                 ON
-        Firewall Policy                       BlockInbound,AllowOutbound
-        """;
-
-    /// <summary>The same command on an Arabic Windows: nothing to match a word against.</summary>
-    private const string CurrentProfileArabic = """
-
-        إعدادات ملف تعريف عام:
-        ----------------------------------------------------------------------
-        الحالة                                 تشغيل
-        """;
-
-    private sealed class ScriptedRunner : IProcessRunner
-    {
-        private readonly Func<string, (int?, string)> _answer;
-
-        public ScriptedRunner(Func<string, (int?, string)> answer) => _answer = answer;
-
-        public List<string> Commands { get; } = new();
-
-        public Task<(int? ExitCode, string Output)> RunAsync(string fileName, string arguments, TimeSpan timeout, CancellationToken ct)
-        {
-            Commands.Add(fileName + " " + arguments);
-            return Task.FromResult(_answer(arguments));
-        }
-    }
-
-    private static HostDiagnosticsProbe Probe(ScriptedRunner runner, bool windows = true) => new(runner, logger: null, isWindows: windows);
+    // ---- the VPN decision ----
 
     [Fact]
-    public async Task RuleAndProfile_AreReadFromNetsh()
+    public async Task AVpnHoldingTheOutboundRoute_Warns_AndNamesTheAdapter()
     {
-        var runner = new ScriptedRunner(arguments => arguments.Contains("show rule", StringComparison.Ordinal)
-            ? (0, RuleFound)
-            : (0, CurrentProfileEnglish));
+        var vpn = new FakeVpnDetector(FakeVpnDetector.Holding("Mullvad", "Mullvad VPN Tunnel"));
 
-        var collected = await Probe(runner).ProbeAsync(None);
+        var readiness = await Probe(vpn: vpn).InspectAsync(None);
 
-        Assert.True(collected.FirewallRulePresent);
-        Assert.Equal("public", collected.FirewallProfile);
-        Assert.Contains(runner.Commands, c => c.Contains("RouteBridge Tunnel", StringComparison.Ordinal) && c.Contains("dir=in", StringComparison.Ordinal));
+        Assert.True(readiness.ShouldWarnAboutVpn);
+        Assert.Equal("Mullvad VPN Tunnel", readiness.VpnAdapterName);
+        Assert.False(readiness.IsClear);
     }
 
     [Fact]
-    public async Task NoSuchRule_IsAMissingRule_NotAnUnknownOne()
+    public async Task AVpnAdapterThatCarriesNothing_IsNotWorthAWarning()
     {
-        // netsh exits non-zero with a localized "No rules match the specified criteria": the exit code carries the answer.
-        var runner = new ScriptedRunner(arguments => arguments.Contains("show rule", StringComparison.Ordinal)
-            ? (1, "لا توجد قواعد تطابق المعايير المحددة.")
-            : (0, CurrentProfileEnglish));
+        // Low confidence: the adapter is up (split tunnelling, an idle client) but the traffic does not go through it.
+        // Warning here would make the warning permanent on many machines, and therefore worthless on the one that matters.
+        var vpn = new FakeVpnDetector(FakeVpnDetector.Present());
 
-        var collected = await Probe(runner).ProbeAsync(None);
+        var readiness = await Probe(vpn: vpn).InspectAsync(None);
 
-        Assert.False(collected.FirewallRulePresent);
+        Assert.False(readiness.ShouldWarnAboutVpn);
+        Assert.Null(readiness.VpnAdapterName);
+        Assert.True(readiness.IsClear);
+        Assert.True(readiness.Vpn.IsVpn); // still reported on the wire
     }
 
     [Fact]
-    public async Task NetshThatCannotBeRun_LeavesTheFirewallValuesUnknown()
+    public async Task NoVpnAtAll_IsClear()
     {
-        var runner = new ScriptedRunner(_ => (null, string.Empty));
+        var readiness = await Probe().InspectAsync(None);
 
-        var collected = await Probe(runner).ProbeAsync(None);
-        var diagnostics = await Probe(runner).CollectAsync(None);
-
-        Assert.Null(collected.FirewallRulePresent);
-        Assert.Null(collected.FirewallProfile);
-
-        // "we could not look" is left out of the frame entirely rather than sent as a null the server would store.
-        Assert.False(diagnostics.ContainsKey("firewall_rule_present"));
-        Assert.False(diagnostics.ContainsKey("firewall_profile"));
+        Assert.False(readiness.ShouldWarnAboutVpn);
+        Assert.False(readiness.Vpn.IsVpn);
+        Assert.True(readiness.IsClear);
     }
 
     [Fact]
-    public async Task ALocalizedWindows_ReportsAnUnknownProfileRatherThanAGuess()
+    public async Task ADetectorThatThrows_IsTreatedAsNoVpn_AndDoesNotFailTheProbe()
     {
-        var runner = new ScriptedRunner(arguments => arguments.Contains("show rule", StringComparison.Ordinal)
-            ? (0, RuleFound)
-            : (0, CurrentProfileArabic));
+        var vpn = new FakeVpnDetector { Throw = new InvalidOperationException("no adapters") };
 
-        var collected = await Probe(runner).ProbeAsync(None);
+        var readiness = await Probe(vpn: vpn).InspectAsync(None);
 
-        Assert.Equal(HostDiagnosticsProbe.UnknownProfile, collected.FirewallProfile);
-        Assert.True(collected.FirewallRulePresent); // the rule check does not depend on the language
+        Assert.False(readiness.ShouldWarnAboutVpn);
+        Assert.Equal(VpnDetectionResult.NotDetected, readiness.Vpn);
+    }
+
+    // ---- the firewall half, now delegated to Core ----
+
+    [Fact]
+    public async Task AMissingFirewallRule_IsReported_AndAnUnknownOneIsNot()
+    {
+        var missing = await Probe(new FakeFirewallDiagnostics(rulePresent: false, profile: "public")).InspectAsync(None);
+        var unknown = await Probe(new FakeFirewallDiagnostics(rulePresent: null)).InspectAsync(None);
+
+        Assert.True(missing.IsFirewallRuleMissing);
+        Assert.False(unknown.IsFirewallRuleMissing);
+        Assert.True(unknown.IsClear); // nothing to say is not the same as something to warn about
     }
 
     [Fact]
-    public async Task SeveralActiveProfiles_AreAllReported()
+    public async Task AFirewallCheckThatThrows_LeavesTheValuesUnknown()
     {
-        var runner = new ScriptedRunner(arguments => arguments.Contains("show rule", StringComparison.Ordinal)
-            ? (0, RuleFound)
-            : (0, "\nDomain Profile Settings:\n---\nState ON\n\nPrivate Profile Settings:\n---\nState ON\n"));
+        var firewall = new FakeFirewallDiagnostics { Throw = new InvalidOperationException("netsh exploded") };
 
-        var collected = await Probe(runner).ProbeAsync(None);
+        var readiness = await Probe(firewall).InspectAsync(None);
 
-        Assert.Equal("domain,private", collected.FirewallProfile);
+        Assert.Null(readiness.FirewallRulePresent);
+        Assert.False(readiness.IsFirewallRuleMissing);
     }
 
-    [Fact]
-    public async Task OffWindows_NetshIsNeverRun()
-    {
-        var runner = new ScriptedRunner(_ => (0, RuleFound));
-
-        var collected = await Probe(runner, windows: false).ProbeAsync(None);
-
-        Assert.Empty(runner.Commands);
-        Assert.Null(collected.FirewallRulePresent);
-    }
+    // ---- the wire frame ----
 
     [Fact]
-    public async Task TheWireDictionary_CarriesTheContractsKeys_AndLeavesVpnAdapterToTrackB()
+    public async Task TheWireDictionary_CarriesTheContractsKeys_IncludingVpnAdapterAsABool()
     {
-        var runner = new ScriptedRunner(arguments => arguments.Contains("show rule", StringComparison.Ordinal)
-            ? (0, RuleFound)
-            : (0, CurrentProfileEnglish));
-
-        var diagnostics = await Probe(runner).CollectAsync(None);
+        var diagnostics = await Probe(
+                new FakeFirewallDiagnostics(rulePresent: true, profile: "public"),
+                new FakeVpnDetector(FakeVpnDetector.Holding()))
+            .CollectAsync(None);
 
         Assert.True((bool)diagnostics["firewall_rule_present"]!);
         Assert.Equal("public", diagnostics["firewall_profile"]);
         Assert.IsType<bool>(diagnostics["ipv6_global"]);
-        Assert.False(diagnostics.ContainsKey("vpn_adapter")); // Track B's typed detector fills this in, not a second heuristic
+
+        // The key is frozen as a bool, and it means "a VPN adapter is present", the same flattening track B does.
+        Assert.IsType<bool>(diagnostics["vpn_adapter"]);
+        Assert.True((bool)diagnostics["vpn_adapter"]!);
+    }
+
+    [Fact]
+    public async Task APresentButIdleVpn_StillSetsVpnAdapterOnTheWire()
+    {
+        // The wire key is about presence; only the human-facing warning is about confidence.
+        var diagnostics = await Probe(vpn: new FakeVpnDetector(FakeVpnDetector.Present())).CollectAsync(None);
+
+        Assert.True((bool)diagnostics["vpn_adapter"]!);
+    }
+
+    [Fact]
+    public async Task NoVpn_SendsFalseRatherThanOmittingTheKey()
+    {
+        var diagnostics = await Probe().CollectAsync(None);
+
+        Assert.False((bool)diagnostics["vpn_adapter"]!);
+    }
+
+    [Fact]
+    public async Task ValuesThatCouldNotBeDetermined_AreLeftOutOfTheFrameEntirely()
+    {
+        // "we did not look" must not reach the server as "we looked and found nothing".
+        var diagnostics = await Probe(new FakeFirewallDiagnostics(rulePresent: null)).CollectAsync(None);
+
+        Assert.False(diagnostics.ContainsKey("firewall_rule_present"));
+        Assert.False(diagnostics.ContainsKey("firewall_profile"));
+        Assert.True(diagnostics.ContainsKey("ipv6_global"));
     }
 
     [Fact]
@@ -163,5 +147,14 @@ public sealed class HostDiagnosticsProbeTests
         var second = probe.HasGlobalIpv6();
 
         Assert.Equal(first, second);
+    }
+
+    [Fact]
+    public async Task TheDefaultProbe_UsesTheRealDetectionsWithoutThrowing()
+    {
+        // No injection at all: the constructor's defaults must be usable on any machine the tests run on.
+        var readiness = await new HostDiagnosticsProbe().InspectAsync(None);
+
+        Assert.NotNull(readiness.Vpn);
     }
 }

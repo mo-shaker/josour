@@ -20,7 +20,20 @@ def _validate_ports(ports: list[int]) -> list[int]:
 class AppSettings(BaseModel):
     """Effective settings: the docs/api.md defaults overridden by ``app_settings`` rows."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(
+        frozen=True,
+        json_schema_extra={
+            "examples": [
+                {
+                    "max_session_minutes": 120,
+                    "request_timeout_seconds": 60,
+                    "connect_timeout_seconds": 30,
+                    "log_domains": False,
+                    "allowed_ports": [80, 443],
+                }
+            ]
+        },
+    )
 
     max_session_minutes: int = Field(DEFAULT_SETTINGS["max_session_minutes"], ge=1, le=1440)
     request_timeout_seconds: int = Field(DEFAULT_SETTINGS["request_timeout_seconds"], ge=10, le=300)
@@ -39,7 +52,10 @@ class AppSettings(BaseModel):
 class SettingsPatch(BaseModel):
     """``PATCH /admin/settings`` body; every field optional, unknown keys rejected."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"examples": [{"max_session_minutes": 60, "log_domains": False}]},
+    )
 
     max_session_minutes: int | None = Field(None, ge=1, le=1440)
     request_timeout_seconds: int | None = Field(None, ge=10, le=300)

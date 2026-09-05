@@ -512,6 +512,239 @@
   <data name="SignedOutAccountDisabled" xml:space="preserve">
     <value>Your account was disabled.</value>
   </data>
+  <!-- host readiness: firewall + VPN (week 6) -->
+  <data name="HostVpnWarningTitle" xml:space="preserve">
+    <value>This device goes out through a VPN</value>
+  </data>
+  <data name="HostVpnWarningMessageFormat" xml:space="preserve">
+    <value>Outbound traffic from this device goes through the “{0}” adapter, so sites will see the VPN's exit address, not this device's. You may continue, but the point of sharing your device may be lost.</value>
+  </data>
+  <data name="ReadinessTitle" xml:space="preserve">
+    <value>This device's readiness to host</value>
+  </data>
+  <data name="ReadinessChecking" xml:space="preserve">
+    <value>Checking…</value>
+  </data>
+  <data name="ReadinessRecheck" xml:space="preserve">
+    <value>Check again</value>
+  </data>
+  <data name="ReadinessFirewallOk" xml:space="preserve">
+    <value>The firewall allows RouteBridge's inbound connection.</value>
+  </data>
+  <data name="ReadinessFirewallMissing" xml:space="preserve">
+    <value>There is no inbound RouteBridge firewall rule, so the other device may not be able to reach this one.</value>
+  </data>
+  <data name="ReadinessFirewallUnknown" xml:space="preserve">
+    <value>The firewall rule could not be checked on this device.</value>
+  </data>
+  <data name="ReadinessVpnOk" xml:space="preserve">
+    <value>No VPN is carrying the outbound traffic.</value>
+  </data>
+  <data name="ReadinessVpnWarningFormat" xml:space="preserve">
+    <value>Outbound traffic goes through “{0}”, so sites will see the VPN's address.</value>
+  </data>
+  <!-- settings -->
+  <data name="SettingsWindowTitle" xml:space="preserve">
+    <value>RouteBridge settings</value>
+  </data>
+  <data name="SettingsHeading" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="SettingsDescription" xml:space="preserve">
+    <value>These settings are stored on this device only.</value>
+  </data>
+  <data name="SettingsServerSection" xml:space="preserve">
+    <value>Server</value>
+  </data>
+  <data name="SettingsServerUrlLabel" xml:space="preserve">
+    <value>Server address</value>
+  </data>
+  <data name="SettingsServerUrlHint" xml:space="preserve">
+    <value>An HTTPS address your administrator gives you.</value>
+  </data>
+  <data name="SettingsTestConnection" xml:space="preserve">
+    <value>Test the connection</value>
+  </data>
+  <data name="SettingsTesting" xml:space="preserve">
+    <value>Testing…</value>
+  </data>
+  <data name="SettingsServerOk" xml:space="preserve">
+    <value>The server answered.</value>
+  </data>
+  <data name="SettingsServerInvalidUrl" xml:space="preserve">
+    <value>That is not a valid address. Enter a full address such as https://routebridge.example.com</value>
+  </data>
+  <data name="SettingsServerInsecure" xml:space="preserve">
+    <value>The address must start with https.</value>
+  </data>
+  <data name="SettingsServerUnreachable" xml:space="preserve">
+    <value>The server at this address could not be reached.</value>
+  </data>
+  <data name="SettingsServerNotRouteBridge" xml:space="preserve">
+    <value>Something answers at this address, but it is not a RouteBridge server.</value>
+  </data>
+  <data name="SettingsServerDetailFormat" xml:space="preserve">
+    <value>Detail: {0}</value>
+  </data>
+  <data name="SettingsInterfaceSection" xml:space="preserve">
+    <value>Interface</value>
+  </data>
+  <data name="SettingsLanguageLabel" xml:space="preserve">
+    <value>Interface language</value>
+  </data>
+  <data name="SettingsLanguageArabic" xml:space="preserve">
+    <value>Arabic</value>
+  </data>
+  <data name="SettingsLanguageEnglish" xml:space="preserve">
+    <value>English</value>
+  </data>
+  <data name="SettingsLanguageRestartNote" xml:space="preserve">
+    <value>The new language applies the next time RouteBridge starts.</value>
+  </data>
+  <data name="SettingsBrowserLabel" xml:space="preserve">
+    <value>Work browser</value>
+  </data>
+  <data name="SettingsBrowserHint" xml:space="preserve">
+    <value>The browser opened with a separate profile during a session.</value>
+  </data>
+  <data name="SettingsBrowserAuto" xml:space="preserve">
+    <value>Automatic</value>
+  </data>
+  <data name="SettingsBrowserChrome" xml:space="preserve">
+    <value>Chrome</value>
+  </data>
+  <data name="SettingsBrowserEdge" xml:space="preserve">
+    <value>Edge</value>
+  </data>
+  <data name="SettingsStartupSection" xml:space="preserve">
+    <value>Start-up</value>
+  </data>
+  <data name="SettingsStartWithWindows" xml:space="preserve">
+    <value>Start with Windows</value>
+  </data>
+  <data name="SettingsStartWithWindowsUnavailable" xml:space="preserve">
+    <value>Not available on this system.</value>
+  </data>
+  <data name="SettingsStartMinimized" xml:space="preserve">
+    <value>Start minimized to the notification area</value>
+  </data>
+  <data name="SettingsSave" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="SettingsCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="SettingsSaved" xml:space="preserve">
+    <value>Settings saved.</value>
+  </data>
+  <data name="SettingsSaveFailedFormat" xml:space="preserve">
+    <value>The settings could not be saved: {0}</value>
+  </data>
+  <!-- first run -->
+  <data name="FirstRunWindowTitle" xml:space="preserve">
+    <value>Set up RouteBridge</value>
+  </data>
+  <data name="FirstRunWelcomeHeading" xml:space="preserve">
+    <value>Welcome to RouteBridge</value>
+  </data>
+  <data name="FirstRunWelcomeText" xml:space="preserve">
+    <value>Two steps before you begin: the server address, then signing in.</value>
+  </data>
+  <data name="FirstRunStepFormat" xml:space="preserve">
+    <value>Step {0} of {1}</value>
+  </data>
+  <data name="FirstRunServerTitle" xml:space="preserve">
+    <value>The server address</value>
+  </data>
+  <data name="FirstRunServerText" xml:space="preserve">
+    <value>Enter the address your administrator gave you, and test it before continuing.</value>
+  </data>
+  <data name="FirstRunSignInTitle" xml:space="preserve">
+    <value>Sign in</value>
+  </data>
+  <data name="FirstRunSignInText" xml:space="preserve">
+    <value>Use the e-mail and password your administrator created for you.</value>
+  </data>
+  <data name="FirstRunReadyTitle" xml:space="preserve">
+    <value>Before you make your device available</value>
+  </data>
+  <data name="FirstRunReadyText" xml:space="preserve">
+    <value>This is what the other device will meet if you turn on “Available for requests”. Nothing here stops you from continuing.</value>
+  </data>
+  <data name="FirstRunNext" xml:space="preserve">
+    <value>Next</value>
+  </data>
+  <data name="FirstRunBack" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="FirstRunFinish" xml:space="preserve">
+    <value>Finish</value>
+  </data>
+  <!-- about / diagnostics -->
+  <data name="AboutWindowTitle" xml:space="preserve">
+    <value>About RouteBridge</value>
+  </data>
+  <data name="AboutHeading" xml:space="preserve">
+    <value>About and diagnostics</value>
+  </data>
+  <data name="AboutDescription" xml:space="preserve">
+    <value>Quote these values when you ask for support.</value>
+  </data>
+  <data name="AboutAppVersionLabel" xml:space="preserve">
+    <value>App version</value>
+  </data>
+  <data name="AboutDeviceNameLabel" xml:space="preserve">
+    <value>Device name</value>
+  </data>
+  <data name="AboutDeviceIdLabel" xml:space="preserve">
+    <value>Device id</value>
+  </data>
+  <data name="AboutOsLabel" xml:space="preserve">
+    <value>Operating system</value>
+  </data>
+  <data name="AboutServerLabel" xml:space="preserve">
+    <value>Server</value>
+  </data>
+  <data name="AboutSignedInLabel" xml:space="preserve">
+    <value>Account</value>
+  </data>
+  <data name="AboutConnectionLabel" xml:space="preserve">
+    <value>Connection</value>
+  </data>
+  <data name="AboutLogsLabel" xml:space="preserve">
+    <value>Log folder</value>
+  </data>
+  <data name="AboutOpenLogFolder" xml:space="preserve">
+    <value>Open the log folder</value>
+  </data>
+  <data name="AboutOpenLogFolderFailedFormat" xml:space="preserve">
+    <value>The folder could not be opened: {0}</value>
+  </data>
+  <data name="AboutCopy" xml:space="preserve">
+    <value>Copy the details</value>
+  </data>
+  <data name="AboutCopied" xml:space="preserve">
+    <value>The details were copied.</value>
+  </data>
+  <data name="AboutSecretsNote" xml:space="preserve">
+    <value>No access token and no device secret appear here.</value>
+  </data>
+  <data name="AboutNotAvailable" xml:space="preserve">
+    <value>Not available</value>
+  </data>
+  <!-- tray and main window entry points (week 6) -->
+  <data name="TraySettings" xml:space="preserve">
+    <value>Settings…</value>
+  </data>
+  <data name="TrayAbout" xml:space="preserve">
+    <value>About and diagnostics…</value>
+  </data>
+  <data name="MainSettingsTooltip" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="MainAboutTooltip" xml:space="preserve">
+    <value>About and diagnostics</value>
+  </data>
   <!-- errors -->
   <data name="StartupFailedTitle" xml:space="preserve">
     <value>RouteBridge could not start</value>

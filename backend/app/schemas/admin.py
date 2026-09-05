@@ -18,6 +18,19 @@ def _strip_non_empty(value: str) -> str:
 
 
 class AdminUserCreate(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "email": "bob@example.com",
+                    "password": "correct-horse-battery",
+                    "display_name": "Bob",
+                    "role": "user",
+                }
+            ]
+        }
+    )
+
     email: str = Field(min_length=3, max_length=320)
     password: str = Field(min_length=8, max_length=1024)
     display_name: str = Field(min_length=1, max_length=100)
@@ -37,7 +50,10 @@ class AdminUserCreate(BaseModel):
 class AdminUserPatch(BaseModel):
     """``{ is_active?, password?, display_name?, unlock?: true }``; unknown keys rejected."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"examples": [{"unlock": True}, {"is_active": False}]},
+    )
 
     is_active: bool | None = None
     password: str | None = Field(None, min_length=8, max_length=1024)
@@ -53,6 +69,23 @@ class AdminUserPatch(BaseModel):
 class AdminUserOut(UserOut):
     """``UserOut`` plus the account-state fields an administrator acts on."""
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "8c1d4b6a-2e70-4f18-90a5-3b7c6e2d10ff",
+                    "email": "alice@example.com",
+                    "display_name": "Alice",
+                    "role": "user",
+                    "is_active": True,
+                    "failed_logins": 0,
+                    "locked_until": None,
+                    "created_at": "2026-08-30T07:02:10.000Z",
+                }
+            ]
+        }
+    )
+
     is_active: bool
     failed_logins: int
     locked_until: UtcDatetime | None
@@ -60,6 +93,23 @@ class AdminUserOut(UserOut):
 
 
 class AdminDeviceOut(ApiModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "1f0a3d2c-5b7e-4a91-9c33-6d2f8e40b1aa",
+                    "user_id": "8c1d4b6a-2e70-4f18-90a5-3b7c6e2d10ff",
+                    "name": "LAPTOP-01",
+                    "os_version": "Windows 11 Pro",
+                    "os_build": "22631",
+                    "status": "active",
+                    "last_seen_at": "2026-09-05T09:14:22.000Z",
+                    "created_at": "2026-08-30T07:02:10.000Z",
+                }
+            ]
+        }
+    )
+
     id: uuid.UUID
     user_id: uuid.UUID
     name: str
@@ -71,6 +121,14 @@ class AdminDeviceOut(ApiModel):
 
 
 class AdminDomainsIn(BaseModel):
+    """Full replacement of the allow-list; a single invalid entry rejects the whole request."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [{"entries": ["example.com", "=exact.com", "portal.corp:8443"]}]
+        }
+    )
+
     entries: list[str] = Field(max_length=10_000)
 
     @field_validator("entries")
@@ -82,6 +140,18 @@ class AdminDomainsIn(BaseModel):
 
 
 class AdminDomainsOut(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "version": 3,
+                    "entries": ["example.com", "=exact.com", "portal.corp:8443"],
+                    "updated_at": "2026-09-04T18:20:00.000Z",
+                }
+            ]
+        }
+    )
+
     version: int
     entries: list[str]
     updated_at: UtcDatetime | None
@@ -89,6 +159,29 @@ class AdminDomainsOut(BaseModel):
 
 
 class SecurityEventOut(ApiModel):
+    """One audit row. ``details`` never carries a secret, a URL or any browsing content."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "0a7c9e21-4b38-4f5d-8c60-1e2f3a4b5c6d",
+                    "type": "device_revoked",
+                    "user_id": "8c1d4b6a-2e70-4f18-90a5-3b7c6e2d10ff",
+                    "device_id": "1f0a3d2c-5b7e-4a91-9c33-6d2f8e40b1aa",
+                    "ip": None,
+                    "details": {
+                        "by": "auto",
+                        "rule": "device_secret_invalid",
+                        "matches": 12,
+                        "window_minutes": 60,
+                    },
+                    "created_at": "2026-09-05T09:40:00.000Z",
+                }
+            ]
+        }
+    )
+
     id: uuid.UUID
     type: str
     user_id: uuid.UUID | None
@@ -103,6 +196,22 @@ class DiagnosticsSummary(BaseModel):
 
     Additive only: week 4 filled the connect columns with real data and added
     ``end_reason_distribution``; no existing field was renamed or changed shape."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "total_sessions": 128,
+                    "sessions_with_connect_result": 121,
+                    "connect_ok_ratio": 0.9421487603305785,
+                    "winner_type_distribution": {"lan": 14, "public": 92, "upnp": 8, "v6": 7},
+                    "tls_version_distribution": {"1.2": 3, "1.3": 118},
+                    "connect_diagnostics_count": 340,
+                    "end_reason_distribution": {"expired": 11, "guest_ended": 96, "host_ended": 14},
+                }
+            ]
+        }
+    )
 
     total_sessions: int
     sessions_with_connect_result: int

@@ -6,9 +6,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api.deps import build_login_rate_limiter
+from app.api.deps import build_rate_limiters
 from app.api.docs import register_guarded_docs
 from app.api.errors import register_exception_handlers
+from app.api.openapi import API_DESCRIPTION, TAGS_METADATA
 from app.api.routers import api_router
 from app.api.routers.health import router as health_router
 from app.core.config import Settings, get_settings
@@ -29,7 +30,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         configure_logging("DEBUG" if settings.is_dev else "INFO")
         log.info("routebridge api starting", extra={"env": settings.env})
-        await on_startup()
+        await on_startup(settings)
         try:
             yield
         finally:
@@ -39,6 +40,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title="RouteBridge API",
         version="1",
+        summary="Control plane for peer-to-peer browsing sessions between two Windows devices.",
+        description=API_DESCRIPTION,
+        openapi_tags=TAGS_METADATA,
         # Open in dev; otherwise served by admin-gated routes (register_guarded_docs).
         docs_url="/docs" if settings.is_dev else None,
         redoc_url=None,
@@ -46,7 +50,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = settings
-    app.state.login_rate_limiter = build_login_rate_limiter(settings)
+    app.state.rate_limiters = build_rate_limiters(settings)
     register_exception_handlers(app)
     if not settings.is_dev:
         register_guarded_docs(app)

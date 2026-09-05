@@ -6,7 +6,15 @@ namespace RouteBridge.Tunnel.Auth;
 /// <summary>فشل AUTH1/AUTH2 (تحقق خاطئ، إصدار خاطئ، أو إغلاق الطرف الآخر قبل الرد). المستدعي يغلق الاتصال.</summary>
 public sealed class AuthFailedException : Exception
 {
-    public AuthFailedException(string message, Exception? inner = null) : base(message, inner) { }
+    public AuthFailedException(string message, Exception? inner = null, bool peerClosed = false) : base(message, inner)
+        => PeerClosed = peerClosed;
+
+    /// <summary>
+    /// الطرف الآخر أغلق أو انقطع قبل أن تكتمل الرسالة، لا أن رسالته فشلت في التحقق. الفرق ليس تجميليًا:
+    /// <b>الإغلاق بلا رد هو ما يفعله المضيف بالاتصال الخاسر</b> (docs/protocol.md القسم 2 الخطوة 5)، فلا يصح
+    /// عدّه محاولة وصول غير مصرَّح بها؛ أما فشل التحقق فهو أقوى دليل ممكن على العكس (طرف يعرف الشكل ولا يعرف السر).
+    /// </summary>
+    public bool PeerClosed { get; }
 }
 
 /// <summary>ما يحتاجه المضيف من AUTH1 لبناء AUTH2 (client_random).</summary>
@@ -172,11 +180,11 @@ public static class AuthHandshake
         }
         catch (EndOfStreamException e)
         {
-            throw new AuthFailedException($"peer closed the connection before {what}", e);
+            throw new AuthFailedException($"peer closed the connection before {what}", e, peerClosed: true);
         }
         catch (IOException e)
         {
-            throw new AuthFailedException($"connection failed before {what}", e);
+            throw new AuthFailedException($"connection failed before {what}", e, peerClosed: true);
         }
     }
 

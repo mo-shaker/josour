@@ -18,8 +18,8 @@ from app.core.clock import utcnow
 from app.models import ConnectDiagnostic, Session, SessionDomain, SessionKey
 from app.models.enums import SessionStatus, UserRole
 from app.schemas.settings import AppSettings, SettingsPatch
+from app.services import device_risk, session_flow
 from app.services import requests as request_service
-from app.services import session_flow
 from app.services import sessions as session_service
 from app.services.app_settings import settings_service
 from app.services.session_timer import scheduler
@@ -707,7 +707,10 @@ async def test_startup_leaves_no_live_session_and_no_session_timer(
             )
             == 0
         )
-        assert len(scheduler) == 0
+        # No *session* timer survives. The one timer a running process always holds is the
+        # periodic suspicious-device sweep (ADR-0008), armed by the same startup path.
+        assert scheduler.is_scheduled(device_risk.SWEEP_KEY)
+        assert len(scheduler) == 1
 
 
 # ---------------------------------------------------------------- every ending path

@@ -37,6 +37,13 @@ public sealed class TunnelListener : IAsyncDisposable
     public int InboundAttempts => Volatile.Read(ref _inboundAttempts);
     public int RejectedOverCapacity => Volatile.Read(ref _rejectedOverCapacity);
 
+    /// <summary>
+    /// الاتصالات التي أُغلقت قبل اجتياز AUTH1. المستمع يسجّل هنا ما يرفضه بنفسه (تجاوز الأربعة المعلّقة)؛ ونتيجة
+    /// المصادقة نفسها يسجّلها <see cref="SymmetricConnector"/> لأنه وحده يعرفها. يبقى صالحًا للقراءة بعد
+    /// <see cref="StopAsync"/> و<see cref="DisposeAsync"/> ليُرفع في <c>POST /api/v1/diagnostics</c>.
+    /// </summary>
+    public UnauthenticatedProbeLog Probes { get; } = new();
+
     /// <summary>يبدأ حلقة القبول. المعالج يملك المقبس؛ عند اكتماله يُحرَّر مكان من الأربعة.</summary>
     public Task StartAsync(Func<Socket, CancellationToken, Task> handler, CancellationToken ct)
     {
@@ -96,6 +103,8 @@ public sealed class TunnelListener : IAsyncDisposable
             {
                 Interlocked.Decrement(ref _pending);
                 Interlocked.Increment(ref _rejectedOverCapacity);
+                // أُغلق بلا قراءة بايت واحد، فهو بالتعريف اتصال لم يجتز AUTH1.
+                Probes.Record(RemoteAddress(accepted));
                 SafeClose(accepted);
                 continue;
             }
@@ -129,6 +138,14 @@ public sealed class TunnelListener : IAsyncDisposable
     private static void SafeClose(Socket socket)
     {
         try { socket.Close(0); } catch { /* تجاهل */ }
+    }
+
+    /// <summary>عنوان الطرف الآخر إن كان المقبس ما زال يعرفه (قد يكون أُغلق بيننا وبين القبول).</summary>
+    private static IPAddress? RemoteAddress(Socket socket)
+    {
+        try { return (socket.RemoteEndPoint as IPEndPoint)?.Address; }
+        catch (ObjectDisposedException) { return null; }
+        catch (SocketException) { return null; }
     }
 
     private static Socket Bind(IPAddress? bindAddress, int port, int backlog)

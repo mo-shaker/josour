@@ -1,0 +1,117 @@
+<ui:FluentWindow x:Class="RouteBridge.App.Views.FirstRunWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 xmlns:app="clr-namespace:RouteBridge.App"
+                 xmlns:vm="clr-namespace:RouteBridge.App.ViewModels"
+                 mc:Ignorable="d"
+                 d:DataContext="{d:DesignInstance Type=vm:FirstRunViewModel, IsDesignTimeCreatable=False}"
+                 Title="{x:Static app:Strings.FirstRunWindowTitle}"
+                 FlowDirection="{x:Static app:UiFlow.Direction}"
+                 Language="{x:Static app:UiFlow.Language}"
+                 NumberSubstitution.Substitution="European"
+                 Icon="pack://application:,,,/Assets/routebridge.ico"
+                 Width="460" SizeToContent="Height" MinHeight="480"
+                 ResizeMode="NoResize"
+                 WindowStartupLocation="CenterScreen"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="Mica"
+                 WindowCornerPreference="Round">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="{x:Static app:Strings.AppName}" ShowMaximize="False" ShowMinimize="False" />
+
+        <StackPanel Grid.Row="1" Margin="24,8,24,24" IsEnabled="{Binding IsIdle}">
+            <ui:TextBlock FontTypography="Title" Text="{x:Static app:Strings.FirstRunWelcomeHeading}"
+                          Visibility="{Binding IsServerStep, Converter={StaticResource BoolToVis}}" />
+            <ui:TextBlock Appearance="Secondary" TextWrapping="Wrap" Margin="0,4,0,12"
+                          Text="{x:Static app:Strings.FirstRunWelcomeText}"
+                          Visibility="{Binding IsServerStep, Converter={StaticResource BoolToVis}}" />
+
+            <ui:TextBlock Appearance="Tertiary" FontTypography="Caption" Text="{Binding StepText}" />
+            <ui:TextBlock FontTypography="Subtitle" Margin="0,2,0,0" Text="{Binding StepTitle}" />
+            <ui:TextBlock Appearance="Secondary" TextWrapping="Wrap" Margin="0,4,0,16" Text="{Binding StepDescription}" />
+
+            <!-- step 1: the server address -->
+            <StackPanel Visibility="{Binding IsServerStep, Converter={StaticResource BoolToVis}}">
+                <ui:TextBlock Appearance="Secondary" FontTypography="Caption" Text="{x:Static app:Strings.SettingsServerUrlLabel}" />
+                <!-- A URL is typed left to right whatever the interface language is. -->
+                <ui:TextBox Margin="0,4,0,4"
+                            FlowDirection="{x:Static app:UiFlow.Technical}"
+                            Text="{Binding ServerUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                            PlaceholderText="{x:Static app:Strings.LoginServerUrlPlaceholder}"
+                            Icon="{ui:SymbolIcon Globe24}" />
+                <ui:TextBlock Appearance="Tertiary" FontTypography="Caption" TextWrapping="Wrap"
+                              Text="{x:Static app:Strings.SettingsServerUrlHint}" />
+            </StackPanel>
+
+            <!-- step 2: sign in -->
+            <StackPanel Visibility="{Binding IsSignInStep, Converter={StaticResource BoolToVis}}">
+                <ui:TextBlock Appearance="Secondary" FontTypography="Caption" Text="{x:Static app:Strings.LoginEmailLabel}" />
+                <ui:TextBox Margin="0,4,0,12"
+                            FlowDirection="{x:Static app:UiFlow.Technical}"
+                            Text="{Binding Email, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                            Icon="{ui:SymbolIcon Mail24}" />
+                <ui:TextBlock Appearance="Secondary" FontTypography="Caption" Text="{x:Static app:Strings.LoginPasswordLabel}" />
+                <ui:PasswordBox Margin="0,4,0,0"
+                                FlowDirection="{x:Static app:UiFlow.Technical}"
+                                Password="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                Icon="{ui:SymbolIcon Key24}" />
+            </StackPanel>
+
+            <!-- step 3: what this machine looks like as a host (never a gate) -->
+            <StackPanel Visibility="{Binding IsReadinessStep, Converter={StaticResource BoolToVis}}">
+                <ui:InfoBar IsClosable="False" IsOpen="True"
+                            Severity="{Binding IsFirewallWarning, Converter={StaticResource WarningSeverity}}"
+                            Message="{Binding FirewallText}" />
+                <ui:InfoBar Margin="0,8,0,0" IsClosable="False" IsOpen="True"
+                            Severity="{Binding IsVpnWarning, Converter={StaticResource WarningSeverity}}"
+                            Message="{Binding VpnText}" />
+                <ui:Button Margin="0,12,0,0" HorizontalAlignment="Left"
+                           Content="{x:Static app:Strings.ReadinessRecheck}"
+                           Command="{Binding RecheckReadinessCommand}"
+                           IsEnabled="{Binding IsReadinessChecking, Converter={StaticResource InverseBool}}" />
+            </StackPanel>
+
+            <ui:InfoBar Margin="0,12,0,0" IsClosable="False"
+                        IsOpen="{Binding HasMessage, Mode=OneWay}"
+                        Severity="{Binding IsMessageAnError, Converter={StaticResource ErrorSeverity}}"
+                        Message="{Binding Message}" />
+
+            <Grid Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <ui:ProgressRing Grid.Column="0" IsIndeterminate="True" Width="24" Height="24" HorizontalAlignment="Left"
+                                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
+
+                <ui:Button Grid.Column="1" HorizontalAlignment="Left" Margin="12,0,0,0"
+                           Content="{x:Static app:Strings.FirstRunBack}"
+                           Command="{Binding BackToServerCommand}"
+                           Visibility="{Binding IsSignInStep, Converter={StaticResource BoolToVis}}" />
+
+                <ui:Button Grid.Column="2" MinWidth="140" Appearance="Primary" IsDefault="True"
+                           Content="{x:Static app:Strings.FirstRunNext}"
+                           Command="{Binding ContinueFromServerCommand}"
+                           Visibility="{Binding IsServerStep, Converter={StaticResource BoolToVis}}" />
+                <ui:Button Grid.Column="2" MinWidth="140" Appearance="Primary" IsDefault="True"
+                           Content="{x:Static app:Strings.LoginSignIn}"
+                           Command="{Binding SignInCommand}"
+                           Visibility="{Binding IsSignInStep, Converter={StaticResource BoolToVis}}" />
+                <ui:Button Grid.Column="2" MinWidth="140" Appearance="Primary" IsDefault="True"
+                           Content="{x:Static app:Strings.FirstRunFinish}"
+                           Command="{Binding FinishCommand}"
+                           Visibility="{Binding IsReadinessStep, Converter={StaticResource BoolToVis}}" />
+            </Grid>
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>

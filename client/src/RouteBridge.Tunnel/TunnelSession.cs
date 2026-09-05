@@ -186,6 +186,7 @@ public sealed class TunnelSession : ITunnelSession
         }
 
         Note("connect", outcome.Diagnostics);
+        NoteUnauthenticatedProbes(); // المستمع أُغلق الآن، فالعدّ نهائي حتى لو فشل الاتصال
         if (!outcome.Result.Connected || outcome.Connection is null) return outcome.Result;
 
         await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
@@ -362,6 +363,7 @@ public sealed class TunnelSession : ITunnelSession
         if (_egress is { } egress) await TryAsync("egress_dispose", () => egress.DisposeAsync().AsTask()).ConfigureAwait(false);
 
         // 4) إغلاق المستمع وإزالة تعيين UPnP.
+        NoteUnauthenticatedProbes(); // آخر فرصة: جلسة انتهت قبل ConnectAsync لها مستمع عمل ورأى ما رآه
         if (_listener is { } listener) await TryAsync("listener_dispose", () => listener.DisposeAsync().AsTask()).ConfigureAwait(false);
         if (_candidateSource is { } source)
         {
@@ -440,6 +442,22 @@ public sealed class TunnelSession : ITunnelSession
         if (previous == next) return;
         Note("state", next.ToString());
         try { StateChanged?.Invoke(next); } catch { /* المستمع مسؤول عن أخطائه */ }
+    }
+
+    /// <summary>
+    /// محاولات الوصول غير المصرَّح بها على مستمع النفق، بالمفاتيح المحجوزة في <c>docs/api.md</c> (‏<c>POST /diagnostics</c>):
+    /// <c>listener_unauthenticated</c> (عدد) و<c>listener_port</c> (يُكتب في PrepareAsync) و<c>unauthenticated_peers</c>
+    /// (عناوين IP، بحد 10). يقرأها المسار C من <see cref="Diagnostics"/> كما هي ويضعها في <c>data</c> بلا تعديل.
+    /// المفتاح <c>unauthenticated_peers_distinct</c> إضافة اختيارية: كم عنوانًا مميزًا رُئي فعلًا قبل حد العشرة.
+    /// لا حمولات ولا منافذ مصدر ولا أوقات — عدّاد وعناوين فقط.
+    /// </summary>
+    private void NoteUnauthenticatedProbes()
+    {
+        if (_listener is not { } listener) return;
+        var probes = listener.Probes;
+        Note("listener_unauthenticated", probes.Count);
+        Note("unauthenticated_peers", probes.Peers.ToList());
+        Note("unauthenticated_peers_distinct", probes.DistinctPeers);
     }
 
     private void Note(string key, object? value)

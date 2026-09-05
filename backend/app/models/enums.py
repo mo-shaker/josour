@@ -70,4 +70,8 @@ class SecurityEventType(enum.StrEnum):
     REFRESH_REUSE = "refresh_reuse"
     DEVICE_REVOKED = "device_revoked"
     SESSION_ADMIN_TERMINATED = "session_admin_terminated"
-    # TODO(week 4/5): listener_unauthenticated (from client diagnostics)
+    LISTENER_UNAUTHENTICATED = "listener_unauthenticated"
+    """Reported by a host client through ``POST /diagnostics``: connections that reached its
+    listening port during a connect window and failed ``AUTH1``. The server cannot observe this
+    itself. It describes the network *around* a device, not the device's own behaviour, so it is
+    surfaced to administrators and deliberately never revokes anything (ADR-0008)."""

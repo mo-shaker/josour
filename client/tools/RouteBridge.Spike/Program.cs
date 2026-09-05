@@ -83,7 +83,7 @@ static void Usage()
           session --api https://host --email E --password P --role guest --host-device <id|name>
                   [--minutes 30] [--list-hosts] [--curl-test <url>] [--browser chrome|edge] [--profile path]
                   common: [--state-dir path] [--reset-device] [--listen-port N] [--no-upnp]
-                          [--connect-timeout-s 30] [--stats-interval-s 30] [--quiet]
+                          [--connect-timeout-s 30] [--stats-interval-s 30] [--quiet] [--no-diagnostics]
               The headless equivalent of the WPF app: sign in through ApiClient/AuthSession, open the real
               ControlChannel over WSS, run the full TunnelSession for the role, and print one JSON event per
               line on stdout (machine-readable) with a human summary on stderr.
@@ -96,7 +96,11 @@ static void Usage()
                     guest side, prints the local proxy port, and with --curl-test performs an HTTP GET through
                     the proxy itself (no browser) so the response body proves the traffic left via the host's IP.
                     --browser launches the real work browser instead (cannot be combined with --curl-test).
-              Both honour session.terminate, expires_at and Ctrl+C with the protocol section-7 cleanup.
+              Both honour session.terminate, expires_at and Ctrl+C with the protocol section-7 cleanup, and both
+              POST the tunnel listener's unauthenticated-connection count to /api/v1/diagnostics at session end
+              (docs/api.md reserved keys: listener_unauthenticated, listener_port, unauthenticated_peers).
+              The listener is the only place the system sees an unauthorised probe of this device's port, and
+              the server cannot observe it. --no-diagnostics suppresses that report.
               Exit codes: 0 success, 1 usage, 2 connect failed, 3 tunnel died, 4 protocol/auth error.
               See docs/spike-runbook.md for the two-machine procedure and the event schema.
         """);

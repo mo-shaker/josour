@@ -1,6 +1,8 @@
 """Device queries and revocation, shared by ``DELETE /me/devices/{id}`` and the admin API."""
 
 import uuid
+from collections.abc import Mapping
+from typing import Any
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,10 +29,15 @@ async def revoke_device(
     by: str,
     actor_user_id: uuid.UUID | None,
     ip: str | None,
+    reason: Mapping[str, Any] | None = None,
 ) -> bool:
     """Mark the device revoked, revoke its refresh tokens and clear its presence row. Idempotent:
     returns False (and writes nothing) when it was already revoked. Callers commit and then call
-    ``app.ws.notify.close_device`` so the live control channel is dropped with 4403."""
+    ``app.ws.notify.close_device`` so the live control channel is dropped with 4403.
+
+    ``by`` names who did it (``admin``, ``owner``, ``auto``) and ``reason`` carries any extra
+    audit detail - for an automatic revocation, which rule fired and on how many events. It ends
+    up in the ``device_revoked`` row, so ``GET /admin/security-events`` explains itself."""
     if device.status == DeviceStatus.REVOKED:
         return False
     device.status = DeviceStatus.REVOKED
@@ -40,9 +47,11 @@ async def revoke_device(
         .where(Presence.device_id == device.id)
         .values(connected=False, is_available_host=False, reachable=None)
     )
-    details: dict[str, str] = {"by": by}
+    details: dict[str, Any] = {"by": by}
     if actor_user_id is not None and actor_user_id != device.user_id:
         details["actor_user_id"] = str(actor_user_id)
+    if reason:
+        details.update(reason)
     record_event(
         db,
         SecurityEventType.DEVICE_REVOKED,

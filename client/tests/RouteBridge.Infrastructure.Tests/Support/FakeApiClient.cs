@@ -81,4 +81,26 @@ public sealed class FakeApiClient : IApiClient
     public Task<IReadOnlyList<SessionDto>> GetMySessionsAsync(int limit, CancellationToken ct) => throw new NotSupportedException();
 
     public Task<ProbeResult> ProbeAsync(string ip, int port, CancellationToken ct) => throw new NotSupportedException();
+
+    // ---- POST /diagnostics ----
+
+    /// <summary>One recorded <c>POST /diagnostics</c>.</summary>
+    public sealed record PostedDiagnostics(Guid? SessionId, string? Role, IReadOnlyDictionary<string, object?> Data);
+
+    /// <summary>Every diagnostics post, in order.</summary>
+    public List<PostedDiagnostics> DiagnosticsPosts { get; } = new();
+
+    /// <summary>Set to make the post fail the way an unreachable server does.</summary>
+    public Exception? DiagnosticsError { get; set; }
+
+    public Task<DiagnosticsAccepted> PostDiagnosticsAsync(Guid? sessionId, string? role, IReadOnlyDictionary<string, object?> data, CancellationToken ct)
+    {
+        DiagnosticsPosts.Add(new PostedDiagnostics(sessionId, role, new Dictionary<string, object?>(data, StringComparer.Ordinal)));
+        if (DiagnosticsError is { } error)
+        {
+            return Task.FromException<DiagnosticsAccepted>(error);
+        }
+
+        return Task.FromResult(new DiagnosticsAccepted(Guid.NewGuid()));
+    }
 }

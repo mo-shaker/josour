@@ -4,6 +4,7 @@ from fastapi import APIRouter, Header, Query, Response, status
 from fastapi.responses import JSONResponse
 
 from app.api.deps import AuthDep, DbDep
+from app.api.openapi import errors
 from app.core.errors import NotFound
 from app.schemas.domains import DomainsOut
 from app.services import allowlist
@@ -22,13 +23,39 @@ def _matches(if_none_match: str | None, etag: str) -> bool:
     return "*" in candidates or any(c.removeprefix("W/") == etag for c in candidates)
 
 
-@router.get("", response_model=DomainsOut, responses={304: {"description": "Not modified"}})
+@router.get(
+    "",
+    response_model=DomainsOut,
+    summary="Get the domain allow-list",
+    responses={
+        304: {"description": "Not modified - the `If-None-Match` version is still current."},
+        **errors(
+            401,
+            403,
+            404,
+            422,
+            custom={404: "`not_found` - no allow-list version with that number was published."},
+        ),
+    },
+)
 async def get_domains(
     _: AuthDep,
     db: DbDep,
-    version: Annotated[int | None, Query(ge=0, description="Fetch a specific version")] = None,
+    version: Annotated[
+        int | None,
+        Query(ge=0, description="Fetch one specific published version instead of the latest"),
+    ] = None,
     if_none_match: Annotated[str | None, Header()] = None,
 ) -> Response:
+    """The centrally managed allow-list, as an immutable numbered snapshot.
+
+    Carries `ETag: "<version>"`; send it back as `If-None-Match` to get `304` when nothing
+    changed. Published versions are never deleted or edited, because a host fetches the exact
+    version a pending request will apply (`request.incoming.allowlist_version`) in order to show
+    the requester what will really be allowed before accepting.
+
+    Version `0` is the implicit empty baseline before anything has been published.
+    """
     if version is None:
         row = await allowlist.get_latest_version(db)
     elif version == 0:

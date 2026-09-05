@@ -139,10 +139,10 @@ public sealed class ControlChannelConnector : IDisposable
     /// <summary>
     /// What the server may use to explain a failed session later (docs/ws-protocol.md <c>hello.diagnostics</c>). No secrets.
     /// <para>
-    /// <c>firewall_rule_present</c>, <c>firewall_profile</c> and <c>ipv6_global</c> come from
-    /// <see cref="HostDiagnosticsProbe"/>; a value it cannot determine is left out rather than sent as null.
-    /// <c>vpn_adapter</c> is deliberately absent until Track B's typed <c>VpnAdapterDetector</c> lands — a second
-    /// implementation here would be one more thing to keep in agreement (see the probe's remarks).
+    /// <c>firewall_rule_present</c>, <c>firewall_profile</c>, <c>ipv6_global</c> and — since week 6 — <c>vpn_adapter</c>
+    /// all come from <see cref="HostDiagnosticsProbe"/>, which owns neither detection itself: the firewall check is
+    /// <c>Core.Diagnostics.FirewallDiagnostics</c> and the VPN verdict is track B's, injected as
+    /// <c>Core.Diagnostics.IVpnDetector</c>. A value that cannot be determined is left out rather than sent as null.
     /// </para>
     /// <para>Never fails the connection: a probe that throws or hangs costs the diagnostics, not the session.</para>
     /// </summary>

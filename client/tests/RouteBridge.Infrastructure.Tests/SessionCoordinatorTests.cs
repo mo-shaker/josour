@@ -2,6 +2,7 @@ using RouteBridge.Core.Browser;
 using RouteBridge.Core.Control;
 using RouteBridge.Core.Session;
 using RouteBridge.Core.Tunnel;
+using RouteBridge.Infrastructure.Api;
 using RouteBridge.Infrastructure.Control;
 using RouteBridge.Infrastructure.Session;
 using RouteBridge.Infrastructure.Tests.Support;
@@ -538,7 +539,7 @@ public sealed class SessionCoordinatorTests
     // ---------- the allow-list ----------
 
     [Fact]
-    public async Task Allowlist_IsFetchedOnceAndCachedByVersion()
+    public async Task Allowlist_IsFetchedAtTheSessionsExactVersion_AndCached()
     {
         await using var rig = await Rig.StartAsync();
 
@@ -550,7 +551,10 @@ public sealed class SessionCoordinatorTests
         Assert.Equal(3, request.Allowlist.Entries.Count);
         Assert.Equal(new[] { 80, 443 }, request.AllowedPorts);
         Assert.Equal("203.0.113.7", request.OurPublicIp);
-        Assert.Equal(new int?[] { null }, rig.Api.DomainsCalls);
+
+        // week 6: GET /domains?version=7, never the unversioned "current list" (docs/api.md: versions are retained).
+        Assert.Equal(new[] { 7 }, rig.Api.DomainsVersionCalls);
+        Assert.Empty(rig.Api.DomainsCalls);
 
         // a second session at the same version must not ask the server again
         await rig.Coordinator.DisconnectAsync();
@@ -560,8 +564,138 @@ public sealed class SessionCoordinatorTests
         await rig.Connection.NextAsync<SessionEndpointMessage>();
 
         Assert.Equal(2, rig.Tunnels.Requests.Count);
-        Assert.Single(rig.Api.DomainsCalls);
+        Assert.Equal(new[] { 7 }, rig.Api.DomainsVersionCalls);
         Assert.Equal(7, rig.Tunnels.Requests[1].Allowlist.Version);
+    }
+
+    [Fact]
+    public async Task Allowlist_ANewVersion_IsFetchedAgain_NotServedFromTheCache()
+    {
+        await using var rig = await Rig.StartAsync();
+
+        await rig.CreateSessionAsync(SessionInfo.GuestRole, allowlistVersion: 7);
+        await rig.Connection.NextAsync<SessionEndpointMessage>();
+        await rig.Coordinator.DisconnectAsync();
+        await rig.Connection.NextAsync<SessionEndMessage>();
+        rig.Coordinator.Acknowledge();
+
+        await rig.CreateSessionAsync(SessionInfo.GuestRole, allowlistVersion: 8);
+        await rig.Connection.NextAsync<SessionEndpointMessage>();
+
+        Assert.Equal(new[] { 7, 8 }, rig.Api.DomainsVersionCalls);
+        Assert.Equal(8, rig.Tunnels.Requests[1].Allowlist.Version);
+    }
+
+    [Fact]
+    public async Task Allowlist_AVersionThatCannotBeFetched_RefusesTheSession_RatherThanGuessing()
+    {
+        // The tunnel enforces the list. Substituting the current list would enforce rules neither party saw, and an empty
+        // list would deny everything silently. Neither is acceptable, so the session is refused with a named reason.
+        await using var rig = await Rig.StartAsync();
+        rig.Api.DomainsVersionError = new ApiUnavailableException("the server is unreachable");
+
+        var session = await rig.CreateSessionAsync(SessionInfo.HostRole, allowlistVersion: 9);
+
+        var failed = await rig.Connection.NextAsync<SessionConnectFailedMessage>();
+        Assert.Equal(session, failed.SessionId);
+        Assert.Equal(AllowlistUnavailableException.FailureReason, failed.Diagnostics["failure_reason"]?.ToString());
+
+        // No tunnel was ever built, so nothing could carry traffic under a list we do not have.
+        Assert.Empty(rig.Tunnels.Sessions);
+
+        // connect_failed is the server's verdict: the client tears down locally and sends no session.end.
+        await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Ended);
+        Assert.DoesNotContain(rig.Connection.Received, m => m is SessionEndMessage);
+    }
+
+    [Fact]
+    public async Task Allowlist_AServerThatAnswersWithADifferentVersion_IsAlsoRefused()
+    {
+        // Retention says this cannot happen; if it does, the answer is not a list this session may be policed with.
+        await using var rig = await Rig.StartAsync();
+        rig.Api.DomainsVersionOverride = 4;
+
+        await rig.CreateSessionAsync(SessionInfo.GuestRole, allowlistVersion: 9);
+
+        var failed = await rig.Connection.NextAsync<SessionConnectFailedMessage>();
+        Assert.Equal(AllowlistUnavailableException.FailureReason, failed.Diagnostics["failure_reason"]?.ToString());
+        Assert.Empty(rig.Tunnels.Sessions);
+    }
+
+    [Fact]
+    public async Task Allowlist_A404ForARetainedVersion_IsTreatedTheSameWay()
+    {
+        await using var rig = await Rig.StartAsync();
+        rig.Api.DomainsVersionError = new ApiException(System.Net.HttpStatusCode.NotFound, ApiErrorCodes.NotFound, "no such version");
+
+        await rig.CreateSessionAsync(SessionInfo.GuestRole, allowlistVersion: 9);
+
+        var failed = await rig.Connection.NextAsync<SessionConnectFailedMessage>();
+        Assert.Equal(AllowlistUnavailableException.FailureReason, failed.Diagnostics["failure_reason"]?.ToString());
+    }
+
+    // ---------- unauthenticated listener hits (docs/api.md reserved keys) ----------
+
+    [Fact]
+    public async Task ListenerHits_ArePostedAtSessionEnd_WithTheReservedKeysAndNothingElse()
+    {
+        await using var rig = await Rig.StartAsync(configure: tunnel => tunnel.Diagnostics = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["listener_unauthenticated"] = 3,
+            ["listener_port"] = 51234,
+            ["unauthenticated_peers"] = new[] { "203.0.113.9", "198.51.100.4" },
+
+            // The tunnel's own connect diagnostics sit in the same dictionary and must not travel with the report.
+            ["winner_type"] = "public",
+            ["candidate_lan_error"] = "timeout",
+        });
+
+        var session = await rig.RunToActiveAsync(SessionInfo.HostRole);
+        await rig.Coordinator.DisconnectAsync();
+        await rig.Connection.NextAsync<SessionEndMessage>();
+        await rig.WaitAsync(() => rig.Api.DiagnosticsPosts.Count == 1);
+
+        var posted = rig.Api.DiagnosticsPosts[0];
+        Assert.Equal(session, posted.SessionId);
+        Assert.Equal(SessionInfo.HostRole, posted.Role);
+        Assert.Equal(3, posted.Data["listener_unauthenticated"]);
+        Assert.Equal(51234, posted.Data["listener_port"]);
+        Assert.Equal(new[] { "203.0.113.9", "198.51.100.4" }, Assert.IsType<string[]>(posted.Data["unauthenticated_peers"]));
+
+        // Exactly the three documented keys: no payload, no domain, no candidate diagnostics.
+        Assert.Equal(
+            new[] { "listener_port", "listener_unauthenticated", "unauthenticated_peers" },
+            posted.Data.Keys.OrderBy(k => k, StringComparer.Ordinal).ToArray());
+    }
+
+    [Fact]
+    public async Task ListenerHits_AreNotPostedWhenNobodyKnocked()
+    {
+        await using var rig = await Rig.StartAsync(); // the default fake tunnel reports only its connect diagnostics
+
+        await rig.RunToActiveAsync(SessionInfo.HostRole);
+        await rig.Coordinator.DisconnectAsync();
+        await rig.Connection.NextAsync<SessionEndMessage>();
+
+        Assert.Empty(rig.Api.DiagnosticsPosts);
+    }
+
+    [Fact]
+    public async Task ListenerHits_AFailedPost_DoesNotDisturbTheEnding()
+    {
+        await using var rig = await Rig.StartAsync(configure: tunnel => tunnel.Diagnostics = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["listener_unauthenticated"] = 1,
+        });
+        rig.Api.DiagnosticsError = new ApiUnavailableException("the server is unreachable");
+
+        await rig.RunToActiveAsync(SessionInfo.HostRole);
+        await rig.Coordinator.DisconnectAsync();
+
+        // session.end still went out, the phase still settled, and the failure stayed in the log.
+        await rig.Connection.NextAsync<SessionEndMessage>();
+        await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Ended);
+        Assert.Single(rig.Api.DiagnosticsPosts);
     }
 
     // ---------- the clock (plan 8.5: "الوقت") ----------

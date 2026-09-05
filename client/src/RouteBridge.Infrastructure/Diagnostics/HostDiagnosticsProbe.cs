@@ -1,67 +1,48 @@
-using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using RouteBridge.Core.Diagnostics;
+using RouteBridge.Core.Net;
 
 namespace RouteBridge.Infrastructure.Diagnostics;
 
-/// <summary>Runs a console tool and returns what it printed; abstracted so the netsh parsing can be tested without Windows.</summary>
-public interface IProcessRunner
-{
-    /// <summary>Exit code and standard output; <c>null</c> exit code when the tool could not be run or timed out.</summary>
-    Task<(int? ExitCode, string Output)> RunAsync(string fileName, string arguments, TimeSpan timeout, CancellationToken ct);
-}
-
 /// <summary>
-/// The part of <c>hello.diagnostics</c> (docs/ws-protocol.md section 3) this layer can answer on its own:
-/// <c>firewall_rule_present</c>, <c>firewall_profile</c> and <c>ipv6_global</c>.
+/// Everything the app needs to know about this machine before it offers itself as a host: the two <c>hello.diagnostics</c>
+/// values this layer answers (<c>firewall_rule_present</c>, <c>firewall_profile</c>, plus <c>ipv6_global</c>) and, from week 6,
+/// the VPN verdict behind the host's warning.
 /// <para>
-/// <b>Locale.</b> netsh prints in the machine's display language, so nothing here depends on English prose. The rule check
-/// reads the exit code (netsh exits non-zero when no rule matches) and only then looks for the rule NAME, which is the
-/// same on every Windows because the installer wrote it. The profile is the one value that has to read a word back:
-/// on a non-English Windows it stays <c>unknown</c> rather than guessing — the field is diagnostic, and a wrong value is
-/// worse than a missing one. (A locale-independent profile needs <c>INetworkListManager</c>; noted for the spike.)
-/// </para>
-/// <para>
-/// <c>vpn_adapter</c> is deliberately NOT here: Track B owns adapter detection and is replacing its heuristic with a
-/// typed result (<c>RouteBridge.Core.Net.VpnDetector</c>, landing this week); a second implementation in this layer
-/// would be one more thing to keep in agreement and would disagree first. <see cref="CollectAsync"/> leaves the key
-/// out entirely — the contract has every diagnostics field optional — and the seam is
-/// <see cref="Collected.VpnAdapter"/>, which that detector fills in next week.
+/// <b>Neither detection is implemented here any more.</b> The firewall check moved to
+/// <see cref="FirewallDiagnostics"/> in <c>RouteBridge.Core</c> because this class and track B's
+/// <c>RouteBridge.Tunnel.Diagnostics.HostDiagnostics</c> both shelled out to netsh with slightly different arguments and
+/// parsers; VPN detection was always track B's (<see cref="VpnDetector"/>), reached through
+/// <see cref="IVpnDetector"/> so that the app can hand in <c>HostDiagnostics.DetectVpn()</c> and the tests a scripted result.
+/// This class is now the place where those answers are combined into the two things the app consumes:
+/// <see cref="CollectAsync"/> (the wire frame) and <see cref="InspectAsync"/> (the readiness the user is shown).
 /// </para>
 /// </summary>
-public sealed class HostDiagnosticsProbe
+public sealed class HostDiagnosticsProbe : IHostReadinessProbe
 {
-    /// <summary>The rule the installer adds (RouteBridge.iss): <c>netsh advfirewall firewall add rule name="RouteBridge Tunnel" …</c>.</summary>
-    public const string FirewallRuleName = "RouteBridge Tunnel";
+    /// <summary>The rule the installer adds; kept as an alias so existing call sites and log lines do not move.</summary>
+    public const string FirewallRuleName = FirewallDiagnostics.RuleName;
 
     /// <summary>What a profile that could not be determined is reported as.</summary>
-    public const string UnknownProfile = "unknown";
+    public const string UnknownProfile = FirewallDiagnostics.UnknownProfile;
 
-    private static readonly TimeSpan NetshTimeout = TimeSpan.FromSeconds(3);
-
-    /// <summary>The profile words netsh prints on an English Windows; anything else stays <see cref="UnknownProfile"/>.</summary>
-    private static readonly string[] ProfileWords = { "domain", "private", "public" };
-
-    private readonly IProcessRunner _runner;
+    private readonly IFirewallDiagnostics _firewall;
+    private readonly IVpnDetector _vpn;
     private readonly ILogger _logger;
-    private readonly bool _windows;
 
-    public HostDiagnosticsProbe(IProcessRunner? runner = null, ILogger<HostDiagnosticsProbe>? logger = null, bool? isWindows = null)
+    public HostDiagnosticsProbe(
+        IFirewallDiagnostics? firewall = null,
+        IVpnDetector? vpn = null,
+        ILogger<HostDiagnosticsProbe>? logger = null)
     {
-        _runner = runner ?? new SystemProcessRunner();
+        _firewall = firewall ?? FirewallDiagnostics.System;
+        _vpn = vpn ?? SystemVpnDetector.Instance;
         _logger = (ILogger?)logger ?? NullLogger.Instance;
-        _windows = isWindows ?? OperatingSystem.IsWindows();
     }
-
-    /// <summary>What this probe found; a null value means "could not be determined on this machine".</summary>
-    /// <param name="FirewallRulePresent">An enabled inbound rule named <see cref="FirewallRuleName"/> exists.</param>
-    /// <param name="FirewallProfile">The active firewall profile, or <see cref="UnknownProfile"/>.</param>
-    /// <param name="Ipv6Global">This machine has a global (routable) IPv6 address.</param>
-    /// <param name="VpnAdapter">Always null here: Track B's typed detector fills it in (see the class remarks).</param>
-    public sealed record Collected(bool? FirewallRulePresent, string? FirewallProfile, bool Ipv6Global, bool? VpnAdapter = null);
 
     /// <summary>
     /// The diagnostics as the <c>hello</c> frame carries them. Keys are the contract's, values are JSON-friendly, and a
@@ -70,40 +51,84 @@ public sealed class HostDiagnosticsProbe
     /// </summary>
     public async Task<Dictionary<string, object?>> CollectAsync(CancellationToken ct)
     {
-        var collected = await ProbeAsync(ct).ConfigureAwait(false);
+        var readiness = await InspectAsync(ct).ConfigureAwait(false);
         var diagnostics = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["ipv6_global"] = collected.Ipv6Global,
+            ["ipv6_global"] = readiness.Ipv6Global,
+
+            // docs/ws-protocol.md freezes vpn_adapter as a bool, so the classified result is flattened the same way track B
+            // flattens it: PRESENT (any confidence), not "should warn". The confidence only decides whether the human is told.
+            ["vpn_adapter"] = readiness.Vpn.IsVpn,
         };
 
-        if (collected.FirewallRulePresent is bool present)
+        if (readiness.FirewallRulePresent is bool present)
         {
             diagnostics["firewall_rule_present"] = present;
         }
 
-        if (!string.IsNullOrEmpty(collected.FirewallProfile))
+        if (!string.IsNullOrEmpty(readiness.FirewallProfile))
         {
-            diagnostics["firewall_profile"] = collected.FirewallProfile;
+            diagnostics["firewall_profile"] = readiness.FirewallProfile;
         }
 
-        // WEEK 6 SEAM: ["vpn_adapter"] comes from Track B's typed detection (RouteBridge.Core.Net.VpnDetector, landing
-        // this week) — one call once it is merged. Do not add a second detector here; see the class remarks.
         return diagnostics;
     }
 
-    /// <summary>The raw findings (what <see cref="CollectAsync"/> turns into the wire dictionary). Never throws.</summary>
-    public async Task<Collected> ProbeAsync(CancellationToken ct)
+    /// <summary>The raw findings, for the readiness summary and the host's warnings. Never throws.</summary>
+    public async Task<HostReadiness> InspectAsync(CancellationToken ct)
     {
         var ipv6 = HasGlobalIpv6();
-        if (!_windows)
+
+        FirewallStatus firewall;
+        try
         {
-            // netsh is Windows-only; on a developer machine the two firewall values are simply unknown.
-            return new Collected(FirewallRulePresent: null, FirewallProfile: null, ipv6);
+            firewall = await _firewall.InspectAsync(ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "The firewall check failed; its values stay unknown");
+            firewall = FirewallStatus.Unknown;
         }
 
-        var rule = await FirewallRulePresentAsync(ct).ConfigureAwait(false);
-        var profile = await FirewallProfileAsync(ct).ConfigureAwait(false);
-        return new Collected(rule, profile, ipv6);
+        if (firewall.RuleMissing)
+        {
+            _logger.LogInformation(
+                "No inbound firewall rule named '{RuleName}' (profile {Profile}): the listener may be blocked silently",
+                FirewallRuleName,
+                firewall.Profile ?? UnknownProfile);
+        }
+        else if (firewall.RulePresent is null)
+        {
+            _logger.LogDebug("netsh could not be run: firewall_rule_present stays unknown");
+        }
+
+        VpnDetectionResult vpn;
+        try
+        {
+            vpn = _vpn.Detect() ?? VpnDetectionResult.NotDetected;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "VPN detection failed; treating this machine as not behind a VPN");
+            vpn = VpnDetectionResult.NotDetected;
+        }
+
+        if (vpn.ShouldWarn)
+        {
+            _logger.LogWarning(
+                "A VPN adapter holds the outbound route ({Vpn}): sites will see the VPN's exit address, not this machine's",
+                vpn.Describe());
+        }
+        else if (vpn.IsVpn)
+        {
+            _logger.LogInformation("A VPN adapter is present but does not hold the outbound route ({Vpn}): no warning", vpn.Describe());
+        }
+
+        return new HostReadiness(firewall.RulePresent, firewall.Profile, ipv6, vpn);
     }
 
     /// <summary>
@@ -155,110 +180,4 @@ public sealed class HostDiagnosticsProbe
 
     /// <summary><c>fc00::/7</c>: private addressing, not reachable from the other device's network.</summary>
     private static bool IsUniqueLocal(IPAddress address) => (address.GetAddressBytes()[0] & 0xFE) == 0xFC;
-
-    private async Task<bool?> FirewallRulePresentAsync(CancellationToken ct)
-    {
-        var (exitCode, output) = await _runner
-            .RunAsync("netsh", $"advfirewall firewall show rule name=\"{FirewallRuleName}\" dir=in", NetshTimeout, ct)
-            .ConfigureAwait(false);
-
-        if (exitCode is null)
-        {
-            _logger.LogDebug("netsh could not be run: firewall_rule_present stays unknown");
-            return null;
-        }
-
-        // netsh exits non-zero ("No rules match the specified criteria", localized) when there is no such rule.
-        var present = exitCode == 0 && output.Contains(FirewallRuleName, StringComparison.OrdinalIgnoreCase);
-        if (!present)
-        {
-            _logger.LogInformation("No inbound firewall rule named '{RuleName}': the listener may be blocked silently", FirewallRuleName);
-        }
-
-        return present;
-    }
-
-    private async Task<string?> FirewallProfileAsync(CancellationToken ct)
-    {
-        var (exitCode, output) = await _runner
-            .RunAsync("netsh", "advfirewall show currentprofile", NetshTimeout, ct)
-            .ConfigureAwait(false);
-
-        if (exitCode is null or not 0)
-        {
-            return exitCode is null ? null : UnknownProfile;
-        }
-
-        // English Windows prints e.g. "Public Profile Settings:"; several profiles can be active at once.
-        var profiles = new List<string>();
-        foreach (var line in output.Split('\n'))
-        {
-            var first = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.ToLowerInvariant();
-            if (first is not null && ProfileWords.Contains(first) && !profiles.Contains(first))
-            {
-                profiles.Add(first);
-            }
-        }
-
-        if (profiles.Count > 0)
-        {
-            return string.Join(",", profiles);
-        }
-
-        _logger.LogDebug("netsh printed no recognisable profile name (localized Windows): firewall_profile stays '{Unknown}'", UnknownProfile);
-        return UnknownProfile;
-    }
-}
-
-/// <summary><see cref="IProcessRunner"/> over <see cref="Process"/>: no window, output captured, killed on timeout.</summary>
-public sealed class SystemProcessRunner : IProcessRunner
-{
-    public async Task<(int? ExitCode, string Output)> RunAsync(string fileName, string arguments, TimeSpan timeout, CancellationToken ct)
-    {
-        try
-        {
-            using var process = new Process
-            {
-                StartInfo = new ProcessStartInfo(fileName, arguments)
-                {
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                },
-            };
-
-            if (!process.Start())
-            {
-                return (null, string.Empty);
-            }
-
-            using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            budget.CancelAfter(timeout);
-            var stdout = process.StandardOutput.ReadToEndAsync(budget.Token);
-            try
-            {
-                await process.WaitForExitAsync(budget.Token).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                try
-                {
-                    process.Kill(entireProcessTree: true);
-                }
-                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
-                {
-                    // it exited on its own between the timeout and the kill
-                }
-
-                return (null, string.Empty);
-            }
-
-            return (process.ExitCode, await stdout.ConfigureAwait(false));
-        }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or PlatformNotSupportedException or IOException)
-        {
-            return (null, string.Empty);
-        }
-    }
 }

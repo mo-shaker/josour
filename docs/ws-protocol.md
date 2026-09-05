@@ -41,7 +41,7 @@
 
 | النوع | الحقول | ملاحظات |
 |---|---|---|
-| `hello` | `token` (access JWT), `device_id`, `app_version`, `diagnostics` (كائن اختياري: `firewall_rule_present`, `firewall_profile`, `vpn_adapter`, `system_proxy_present`, `os_build`, `ipv6_global`) | الرد `hello.ack` أو إغلاق `4401` |
+| `hello` | `token` (access JWT), `device_id`, `app_version`, `diagnostics` (كائن اختياري: `firewall_rule_present`, `firewall_profile`, `vpn_adapter`, `vpn_holds_default_route`, `system_proxy_present`, `os_build`, `ipv6_global`) | الرد `hello.ack` أو إغلاق `4401` |
 | `host.available` | `available` (bool), `listen_port` (int اختياري عند `true`) | يحدّث `presence.is_available_host`. مع `listen_port` يشغّل الخادم فحص قابلية الوصول |
 | `request.create` | `ref`, `host_device_id`, `duration_min` (1..max_session_minutes) | يرد `request.created {ref, request_id, expires_at}` ثم لاحقًا `request.result` |
 | `request.cancel` | `ref`, `request_id` | فقط بحالة `pending` |
@@ -120,7 +120,9 @@ ended: حذف session_keys، حفظ الإحصاءات والنطاقات، إر
 - **`ref` في `request.cancel` و`request.accept` و`request.reject`** لا يقابله رد إيجابي؛ يُستخدم لربط رسالة `error` فقط.
 - **`peer_public_ip`** يكون سلسلة فارغة عند تعذّر معرفته، لا `null`.
 - **`hello.app_version`** اختياري: حقل تجميلي لا يجوز أن يمنع عميلًا من الاتصال.
-- **`hello.diagnostics`** يُحفظ في `connect_diagnostics` بـ `session_id` فارغ؛ ما يتجاوز 64 KB يُهمَل مع تحذير ولا يقطع الاتصال.
+- **`hello.diagnostics`** يُحفظ في `connect_diagnostics` بـ `session_id` فارغ؛ ما يتجاوز 64 KB يُهمَل مع تحذير ولا يقطع الاتصال. الكائن مفتوح: المفاتيح المذكورة هي المتوقعة، وأي مفتاح إضافي يُخزَّن كما هو.
+
+`vpn_adapter` يقول إن محوّل VPN **موجود**، و`vpn_holds_default_route` (أُضيف في الأسبوع 6) يقول إنه **يملك مسار الخروج فعلًا** — وهذه وحدها هي التي تتنبأ بأن المواقع سترى عنوانًا غير المتوقع. العميل يحذّر المضيف على الثانية لا الأولى، والفصل بينهما يجعل الخادم قادرًا على تفسير جلسة بعد وقوعها.
 - **`X-Forwarded-For`** يُحترم فقط إذا كان النظير عنوانًا خاصًا أو loopback (أي الـ Proxy أمامنا)، فلا يستطيع عميل مباشر تزوير `public_ip` وهو هدف فحص قابلية الوصول.
 - **فحص قابلية الوصول** لا يُجرى إلا على عنوان عام؛ غير ذلك يبقى `reachable = null` (غير معروف).
 - **الطلبات التي تُسوّى بانقطاع** تُخزَّن بحالة `cancelled` مع `responded_at`، بينما السبب على السلك `host_unavailable` للمستخدم و`request.expired` للمضيف.

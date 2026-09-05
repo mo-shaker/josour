@@ -33,6 +33,14 @@ public sealed class SymmetricConnector
     public static readonly TimeSpan TlsTimeout = TimeSpan.FromSeconds(10);
     public static readonly TimeSpan AuthTimeout = TimeSpan.FromSeconds(5);
 
+    /// <summary>
+    /// سقف صفوف الاتصالات الواردة في التشخيص. المشروع لا يتوقع أكثر من عدد مرشحي الطرف الآخر، لكن أي طرف على
+    /// الشبكة يستطيع فتح اتصالات على المنفذ خلال نافذة الاتصال. بلا سقف تنمو القائمة بلا حد (ذاكرة)، ويتضخم
+    /// <c>session.connect_failed</c> فوق حد 64 KB في <c>docs/api.md</c> فيُرفض التشخيص كله. الزائد يبقى معدودًا في
+    /// <c>inbound_attempts</c> و<c>inbound_unauthenticated</c> وفي <see cref="TunnelListener.Probes"/>.
+    /// </summary>
+    public const int MaxRecordedInboundAttempts = 16;
+
     private readonly SessionMaterial _material;
     private readonly SessionCertificate _certificate;
     private readonly TunnelListener _listener;
@@ -43,6 +51,10 @@ public sealed class SymmetricConnector
     private readonly object _gate = new();
     private int _claimed;
     private int _started;
+    private int _inboundSeen;
+    private int _inboundDropped;
+    /// <summary>رُفع مرة واحدة عند أول اتصال يجتاز المصادقة، ولا يعود. انظر <see cref="IsUnauthenticatedProbe"/>.</summary>
+    private int _authenticatedAny;
 
     public SymmetricConnector(SessionMaterial material, SessionCertificate ourCertificate, TunnelListener listener, ITunnelTransport transport, IReadOnlyList<CandidateEndpoint>? ourCandidates = null)
     {
@@ -125,11 +137,35 @@ public sealed class SymmetricConnector
         catch (Exception e)
         {
             attempt.Error = Describe(e);
+            attempt.PeerClosed = e is AuthFailedException { PeerClosed: true };
         }
         finally
         {
             attempt.Ms = sw.ElapsedMilliseconds;
+            if (IsUnauthenticatedProbe(attempt)) _listener.Probes.Record(remoteAddress);
         }
+    }
+
+    /// <summary>
+    /// هل هذا الاتصال الوارد محاولة وصول غير مصرَّح بها إلى منفذنا (‏<c>docs/api.md</c>: <c>listener_unauthenticated</c>)؟
+    ///
+    /// <para>الإشارة لا تحتمل إيجابية كاذبة واحدة: إيجابية في كل جلسة ناجحة تُفقدها معناها تمامًا. لذلك تُستثنى
+    /// ثلاث حالات، كلٌّ منها تصف <b>الطرف الآخر الشرعي</b> لا مهاجمًا:</para>
+    /// <list type="number">
+    ///   <item><b>ما ألغيناه نحن</b> (‏<c>cancelled</c>): فوز اتصال آخر أو انتهاء نافذة الاتصال.</item>
+    ///   <item><b>ما أغلقه الطرف الآخر بلا رد</b> (‏<see cref="AuthFailedException.PeerClosed"/>): هذا نصًّا ما
+    ///     يفعله المضيف بالاتصال الخاسر في القسم 2 الخطوة 5 — «يغلق أي اتصال آخر بلا رد». والاتصال المتماثل يفتح
+    ///     اتصالين بين الجهازين دائمًا، فأحدهما خاسر <b>في كل جلسة ناجحة</b>.</item>
+    ///   <item><b>ما أخفق بعد أن صادقنا أحدًا</b>: من تلك اللحظة كل إخفاق حطام سباق لا دليل.</item>
+    /// </list>
+    /// <para>الثمن مقبول ومعلوم: فاحص منافذ يكمل مصافحة TLS ثم يغلق بلا كلام لا يُحتسب. أما ما يُحتسب فيشمل
+    /// كل فحص لا يكمل TLS (الأغلبية الساحقة)، وكل مهلة، و<b>كل فشل تحقق</b> — وهو أقوى دليل ممكن.</para>
+    /// </summary>
+    private bool IsUnauthenticatedProbe(Attempt attempt)
+    {
+        if (attempt.Authenticated || attempt.Error is null) return false;
+        if (attempt.Error == "cancelled" || attempt.PeerClosed) return false;
+        return Volatile.Read(ref _authenticatedAny) == 0;
     }
 
     // ---------- dial ----------
@@ -171,6 +207,8 @@ public sealed class SymmetricConnector
             if (_material.Role == TunnelRole.Host)
             {
                 var auth1 = await AuthHandshake.VerifyAuth1Async(tls.Stream, _material, listenerFp, AuthTimeout, ct).ConfigureAwait(false);
+                attempt.Authenticated = true; // اجتاز AUTH1: ليس محاولة غير مصرَّح بها حتى لو خسر السباق بعد ذلك
+                Volatile.Write(ref _authenticatedAny, 1);
                 if (!TryClaim()) throw new SupersededException();
                 try
                 {
@@ -185,6 +223,8 @@ public sealed class SymmetricConnector
             else
             {
                 await AuthHandshake.SendAuth1AndVerifyAuth2Async(tls.Stream, _material, listenerFp, AuthTimeout, ct).ConfigureAwait(false);
+                attempt.Authenticated = true;
+                Volatile.Write(ref _authenticatedAny, 1);
                 if (!TryClaim()) throw new SupersededException();
             }
 
@@ -208,8 +248,17 @@ public sealed class SymmetricConnector
         try { StageReached?.Invoke(stage); } catch { /* المستمع مسؤول عن أخطائه */ }
     }
 
+    /// <summary>
+    /// يضيف المحاولة إلى التشخيص. صفوف الاتصال (dial) تُسجَّل كلها لأن عددها = عدد مرشحي الطرف الآخر؛ أما الواردة
+    /// فيحدها <see cref="MaxRecordedInboundAttempts"/> لأن مصدرها الشبكة لا نحن (انظر تعليق الثابت).
+    /// </summary>
     private void Record(Attempt attempt)
     {
+        if (attempt.Direction == "inbound" && Interlocked.Increment(ref _inboundSeen) > MaxRecordedInboundAttempts)
+        {
+            Interlocked.Increment(ref _inboundDropped);
+            return;
+        }
         lock (_gate) _attempts.Add(attempt);
     }
 
@@ -253,6 +302,9 @@ public sealed class SymmetricConnector
             ["listener_port"] = _listener.Port,
             ["inbound_attempts"] = _listener.InboundAttempts,
             ["inbound_rejected"] = _listener.RejectedOverCapacity,
+            // اتصالات واردة لم تجتز AUTH1، وعدد الصفوف التي أُسقطت من القائمة بسبب السقف (كلاهما معدود لا مسجَّل).
+            ["inbound_unauthenticated"] = _listener.Probes.Count,
+            ["inbound_dropped"] = Volatile.Read(ref _inboundDropped),
             ["candidates"] = rows,
             ["winner"] = connection is null ? null : $"{(connection.Inbound ? "inbound" : "dial")} {CandidateTypeNames.ToWire(connection.WinnerType)} {connection.RemoteDescription}",
             ["winner_type"] = connection is null ? null : CandidateTypeNames.ToWire(connection.WinnerType),
@@ -296,5 +348,11 @@ public sealed class SymmetricConnector
         public long Ms { get; set; }
         public string? Stage { get; set; }
         public string? Error { get; set; }
+
+        /// <summary>اجتاز AUTH1 (المضيف) أو تحقق من AUTH2 (Guest)، ولو خسر السباق بعدها.</summary>
+        public bool Authenticated { get; set; }
+
+        /// <summary>أغلق الطرف الآخر أو انقطع قبل اكتمال رسالة المصادقة (لا فشل تحقق).</summary>
+        public bool PeerClosed { get; set; }
     }
 }

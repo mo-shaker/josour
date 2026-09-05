@@ -103,6 +103,30 @@ public sealed class AppSettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task TheSettingsWindowsWholeUpdate_RoundTripsInOneWrite()
+    {
+        // Exactly what the settings window saves: every file-backed field at once, on top of whatever is already there.
+        var store = new AppSettingsStore(FilePath);
+        await store.SaveAsync(new AppSettings { ServerUrl = "https://old.example" }, CancellationToken.None);
+
+        await store.SaveAsync(
+            store.Current with
+            {
+                ServerUrl = "https://routebridge.example.com",
+                Language = "en",
+                PreferredBrowser = BrowserPreference.Edge,
+                StartMinimized = true,
+            },
+            CancellationToken.None);
+
+        var reloaded = new AppSettingsStore(FilePath).Current;
+        Assert.Equal("https://routebridge.example.com", reloaded.ServerUrl);
+        Assert.Equal("en", reloaded.Language);
+        Assert.Equal(BrowserPreference.Edge, reloaded.PreferredBrowser);
+        Assert.True(reloaded.StartMinimized);
+    }
+
+    [Fact]
     public async Task UnknownBrowserValue_FallsBackToDefaults()
     {
         Directory.CreateDirectory(_dir);

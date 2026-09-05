@@ -10,6 +10,7 @@ using RouteBridge.Core.Session;
 using RouteBridge.Core.Tunnel;
 using RouteBridge.Infrastructure.Api;
 using RouteBridge.Infrastructure.Control;
+using RouteBridge.Infrastructure.Diagnostics;
 
 namespace RouteBridge.Infrastructure.Session;
 
@@ -513,6 +514,15 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
         {
             _logger.LogInformation("Preparing session {SessionId} was cancelled by the ending", run.SessionId);
         }
+        catch (AllowlistUnavailableException ex)
+        {
+            // A named failure, not a stack trace: the peer and the server learn the session was refused because the list
+            // it was approved under could not be read, which is a different thing from a network that would not connect.
+            _logger.LogError(
+                "Session {SessionId} refused: allow-list version {Version} could not be loaded ({Detail})",
+                run.SessionId, ex.Version, ex.Message);
+            await ReportConnectFailedAsync(run, AllowlistUnavailableException.FailureReason).ConfigureAwait(false);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Preparing session {SessionId} failed", run.SessionId);
@@ -825,6 +835,7 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
             long bytesUp = 0;
             long bytesDown = 0;
             IReadOnlyList<string> domains = Array.Empty<string>();
+            ListenerAuthReport? listenerHits = null;
 
             if (run.Tunnel is { } tunnel)
             {
@@ -838,6 +849,13 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
                 bytesUp = stats.BytesUp;
                 bytesDown = stats.BytesDown;
                 domains = tunnel.DomainsSeen.ToArray();
+
+                // Read before Dispose: the counters live on the tunnel, and the listener is already gone by now.
+                if (ListenerAuthDiagnostics.TryRead(tunnel.Diagnostics, out var hits))
+                {
+                    listenerHits = hits;
+                }
+
                 await SafeAsync("tunnel dispose", () => tunnel.DisposeAsync().AsTask().WaitAsync(_options.CleanupTimeout)).ConfigureAwait(false);
             }
 
@@ -857,6 +875,11 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
             if (notifyServer)
             {
                 await SafeAsync("session.end", () => SendSessionEndAsync(run, wire, bytesUp, bytesDown, reported)).ConfigureAwait(false);
+            }
+
+            if (listenerHits is not null)
+            {
+                await SafeAsync("POST /diagnostics", () => ReportListenerHitsAsync(run, listenerHits)).ConfigureAwait(false);
             }
         }
         catch (Exception ex)
@@ -890,6 +913,34 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
             "session.end {SessionId}: reason={Reason} bytes_up={BytesUp} bytes_down={BytesDown} domains={DomainCount}",
             run.SessionId, wire, bytesUp, bytesDown, domains.Count);
         return _channel.SendAsync(new SessionEndMessage(run.SessionId, wire, bytesUp, bytesDown, domains), CancellationToken.None);
+    }
+
+    /// <summary>
+    /// <c>POST /api/v1/diagnostics</c> with the reserved keys of docs/api.md when the tunnel's listener was knocked on by
+    /// something that could not authenticate. The server turns a positive <c>listener_unauthenticated</c> into a
+    /// <c>security_events</c> row, because that moment — a connection reaching the host's port during the connect window
+    /// and failing <c>AUTH1</c> — is invisible to it otherwise.
+    /// <para>
+    /// It runs after <c>session.end</c> and on its own short budget: this is a report about a session that is already over,
+    /// so it may cost the ending nothing. A failure is logged and dropped (<see cref="SafeAsync"/> wraps the call).
+    /// </para>
+    /// </summary>
+    private async Task ReportListenerHitsAsync(SessionRun run, ListenerAuthReport report)
+    {
+        var data = report.ToDiagnosticsData();
+        _logger.LogWarning(
+            "{Count} connection(s) reached the tunnel listener of session {SessionId} without passing AUTH1 from {PeerCount} address(es); reporting to the server",
+            report.UnauthenticatedCount,
+            run.SessionId,
+            report.Peers.Count);
+
+        using var budget = new CancellationTokenSource(_options.DiagnosticsTimeout);
+        var accepted = await _api.PostDiagnosticsAsync(
+            run.SessionId,
+            run.IsHost ? SessionInfo.HostRole : SessionInfo.GuestRole,
+            data,
+            budget.Token).ConfigureAwait(false);
+        _logger.LogInformation("Listener diagnostics stored as {DiagnosticsId}", accepted.Id);
     }
 
     /// <summary>Domains are the host's observation and are only reported when the server asks for them (<c>settings.log_domains</c>).</summary>
@@ -934,10 +985,26 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
     // ---------- allow-list ----------
 
     /// <summary>
-    /// The allow-list at the session's version, cached by version. <c>GET /domains</c> answers with the current list (or 304
-    /// for the version we already hold); it has no "give me exactly version N" on <see cref="IApiClient"/>, so a mismatch is
-    /// logged and the server's current list is used.
+    /// The allow-list at EXACTLY the version <c>session.created</c> named, cached by version.
+    /// <para>
+    /// Week 6: this asks <c>GET /domains?version=N</c>, not <c>GET /domains</c>. Until the retention guarantee was written
+    /// down (docs/api.md: versions are immutable snapshots and are never pruned) the only safe fetch was "the current list",
+    /// and a version mismatch could only be logged. It is now safe to depend on the exact version, and the difference is not
+    /// cosmetic: the guest was told which sites the session grants and the host approved that same list, so running the
+    /// tunnel against a list the admin has changed since would enforce something nobody agreed to — in either direction.
+    /// </para>
+    /// <para>
+    /// <b>When that version cannot be fetched, the session does not start.</b> This is the same principle as the host's
+    /// pre-accept disclosure (<see cref="AllowlistDisclosure"/>): a list that could not be loaded is not an empty list, and
+    /// the two must never be treated alike. The disclosure can afford to say "could not be loaded" and let a human decide,
+    /// because nothing is enforced by a screen. The tunnel has no such option — it is the thing doing the enforcing — and
+    /// both fallbacks available to it are wrong: the current list would enforce rules the parties never saw, and an empty
+    /// list would silently deny everything, leaving the user in a session where nothing loads and nothing says why. Failing
+    /// the session with a stated reason (<c>allowlist_unavailable</c>) is the only answer that is neither a silent
+    /// over-permission nor a silent denial.
+    /// </para>
     /// </summary>
+    /// <exception cref="AllowlistUnavailableException">The exact version could not be fetched.</exception>
     private async Task<IAllowlist> GetAllowlistAsync(int version, CancellationToken ct)
     {
         IAllowlist? cached;
@@ -951,49 +1018,52 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
             return cached;
         }
 
+        if (version < 1)
+        {
+            // The server never sends this; a malformed frame must not turn into a request for "?version=0".
+            throw new AllowlistUnavailableException(version, $"'{version}' is not an allow-list version.");
+        }
+
+        DomainsDto dto;
         try
         {
-            var result = await _api.GetDomainsAsync(cached?.Version, ct).ConfigureAwait(false);
-            if (result.IsNotModified || result.Domains is not { } dto)
-            {
-                return cached ?? Empty(version);
-            }
-
-            var entries = new List<AllowlistEntry>(dto.Entries.Count);
-            foreach (var raw in dto.Entries)
-            {
-                if (AllowlistMatcher.TryParseEntry(raw, out var entry, out var error))
-                {
-                    entries.Add(entry);
-                }
-                else
-                {
-                    _logger.LogWarning("Ignoring allow-list entry '{Entry}': {Error}", raw, error);
-                }
-            }
-
-            var list = new AllowlistMatcher(dto.Version, entries);
-            lock (_allowlistGate)
-            {
-                _allowlist = list;
-            }
-
-            if (list.Version != version)
-            {
-                _logger.LogWarning("The session asked for allow-list version {Wanted} but GET /domains returned {Got}", version, list.Version);
-            }
-
-            _logger.LogInformation("Allow-list version {Version}: {EntryCount} entries", list.Version, entries.Count);
-            return list;
+            dto = await _api.GetDomainsVersionAsync(version, ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is ApiException or ApiUnavailableException)
         {
-            _logger.LogError(ex, "Could not load the allow-list for version {Version}", version);
-            return cached ?? Empty(version);
+            _logger.LogError(ex, "Could not load allow-list version {Version}: the session cannot be policed and will not start", version);
+            throw new AllowlistUnavailableException(version, ex.Message, ex);
         }
-    }
 
-    private static AllowlistMatcher Empty(int version) => new(version, Array.Empty<AllowlistEntry>());
+        if (dto.Version != version)
+        {
+            // A server contradicting itself is not a list we may enforce (retention says this cannot happen).
+            _logger.LogError("GET /domains?version={Wanted} answered with version {Got}: refusing to run the session on it", version, dto.Version);
+            throw new AllowlistUnavailableException(version, $"the server answered with version {dto.Version}");
+        }
+
+        var entries = new List<AllowlistEntry>(dto.Entries.Count);
+        foreach (var raw in dto.Entries)
+        {
+            if (AllowlistMatcher.TryParseEntry(raw, out var entry, out var error))
+            {
+                entries.Add(entry);
+            }
+            else
+            {
+                _logger.LogWarning("Ignoring allow-list entry '{Entry}': {Error}", raw, error);
+            }
+        }
+
+        var list = new AllowlistMatcher(version, entries);
+        lock (_allowlistGate)
+        {
+            _allowlist = list;
+        }
+
+        _logger.LogInformation("Allow-list version {Version}: {EntryCount} entries", version, entries.Count);
+        return list;
+    }
 
     // ---------- plumbing ----------
 

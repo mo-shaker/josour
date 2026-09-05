@@ -209,6 +209,8 @@ public static class SessionCommand
             Console.CancelKeyPress -= OnCancelKey;
         }
 
+        await ReportListenerProbesAsync(stack, api, driver, log, args, roleText);
+
         var exit = ExitFor(outcome.Kind);
         log.Emit("tool.exit", EventLog.Fields(
             ("code", exit), ("kind", outcome.Kind.ToString()), ("end_reason", outcome.EndReason.ToString()),
@@ -216,6 +218,47 @@ public static class SessionCommand
             ("detail", outcome.Detail)),
             $"exit {exit}: {outcome.Kind} ({outcome.Detail ?? outcome.EndReason.ToString()}); {outcome.Stats.BytesUp} B up / {outcome.Stats.BytesDown} B down");
         return exit;
+    }
+
+    // ---------- الإشارة الأمنية للمستمع ----------
+
+    /// <summary>
+    /// يرفع محاولات الوصول غير المصرَّح بها على مستمع النفق إلى <c>POST /api/v1/diagnostics</c> عند نهاية الجلسة،
+    /// بالمفاتيح المحجوزة في <c>docs/api.md</c>. مستمع النفق هو الموضع الوحيد الذي يرى فيه النظام محاولة كهذه،
+    /// والخادم لا يستطيع رصدها بنفسه، فإن لم يرفعها العميل لم تُرصد أبدًا.
+    ///
+    /// <para>أفضل جهد بحت: لا يرمي، ولا يغيّر رمز الخروج، ومهلته مستقلة عن رمز الإلغاء لأن السبب المعتاد لبلوغ
+    /// هذه النقطة هو Ctrl+C (فالرمز ملغى بالفعل، والتقرير ما زال مطلوبًا). يُعطَّل بـ <c>--no-diagnostics</c>.</para>
+    /// </summary>
+    private static async Task ReportListenerProbesAsync(SessionStack stack, string apiBase, SessionDriver driver, EventLog log, Args args, string role)
+    {
+        if (args.Has("no-diagnostics")) return;
+        if (driver.ListenerDiagnostics() is not { } report) return;
+        var (sessionId, data) = report;
+
+        var count = data.TryGetValue("listener_unauthenticated", out var value) ? value : 0;
+        var peers = data.TryGetValue("unauthenticated_peers", out var list) && list is IReadOnlyCollection<string> ips ? ips.Count : 0;
+        log.Emit("listener.unauthenticated", EventLog.Fields(
+            ("session_id", sessionId), ("count", count), ("distinct_peers_listed", peers),
+            ("listener_port", data.TryGetValue("listener_port", out var port) ? port : null)),
+            $"listener saw {count} connection(s) that never passed AUTH1 ({peers} source address(es) reported)");
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        try
+        {
+            var token = await stack.Auth.GetValidAccessTokenAsync(timeout.Token).ConfigureAwait(false);
+            if (token is null)
+            {
+                log.Note("no access token at session end: the unauthenticated-listener report was not sent");
+                return;
+            }
+            var posted = await DiagnosticsPoster.PostAsync(apiBase, token, sessionId, role, data, timeout.Token).ConfigureAwait(false);
+            log.Emit("diagnostics.posted", EventLog.Fields(("kind", "listener_unauthenticated"), ("ok", posted)));
+        }
+        catch (Exception e)
+        {
+            log.Emit("diagnostics.posted", EventLog.Fields(("kind", "listener_unauthenticated"), ("ok", false), ("error", $"{e.GetType().Name}: {e.Message}")));
+        }
     }
 
     // ---------- المضيف ----------

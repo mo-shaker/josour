@@ -43,6 +43,12 @@ public sealed record SessionCoordinatorOptions
     public TimeSpan RequestReplyTimeout { get; init; } = TimeSpan.FromSeconds(10);
 
     /// <summary>
+    /// Budget for the end-of-session <c>POST /diagnostics</c> that reports unauthenticated listener hits. Shorter than the
+    /// API client's own 15 s: the session is already over, so the report may not hold the teardown open.
+    /// </summary>
+    public TimeSpan DiagnosticsTimeout { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
     /// A local clock this far from <c>hello.ack.server_time</c> is logged as a warning. It does not change the countdown —
     /// that is anchored on server time and counted monotonically — but it explains TLS validity failures and log lines
     /// that do not line up with the server's.
