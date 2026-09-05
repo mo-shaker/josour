@@ -11,6 +11,8 @@
 | `deploy/` | Docker Compose للإنتاج (Caddy + API + PostgreSQL + نسخ احتياطي) |
 | `docs/` | خطة التنفيذ، العقود (REST / WebSocket / بروتوكول القناة)، قرارات ADR، runbook |
 
+**للبدء بتجربة حقيقية:** [docs/trial-setup-guide.md](docs/trial-setup-guide.md) — دليل من الصفر لنشر الخادم وتثبيت التطبيق على Windows 11.
+
 الخطة الكاملة: [docs/RouteBridge-MVP-Implementation-Plan.md](docs/RouteBridge-MVP-Implementation-Plan.md)
 
 ## العقود المجمّدة
