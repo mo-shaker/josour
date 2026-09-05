@@ -269,7 +269,8 @@ internal static class Proxies
         bool? rejectUnknown = null,
         string[]? entries = null,
         int[]? allowedPorts = null,
-        Func<IPAddress, bool>? addressBlocker = null)
+        Func<IPAddress, bool>? addressBlocker = null,
+        ISystemProxyResolver? systemProxy = null)
     {
         var server = new ConnectProxyServer(new ConnectProxyOptions
         {
@@ -282,6 +283,8 @@ internal static class Proxies
             OwnerPidChecker = checker ?? PermissiveOwnerPidChecker.Instance,
             RejectUnknownOwner = rejectUnknown,
             AddressBlocker = addressBlocker ?? BlockedExceptLoopback,
+            // الافتراضي: لا Proxy نظام. الاختبارات لا تعتمد على إعدادات جهاز المطوّر أو متغيرات بيئته.
+            SystemProxy = systemProxy ?? NoSystemProxy.Instance,
             DirectConnectTimeout = TimeSpan.FromSeconds(3),
         });
         server.Start();

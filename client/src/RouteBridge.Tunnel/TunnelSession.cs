@@ -198,13 +198,21 @@ public sealed class TunnelSession : ITunnelSession
                 return new TunnelConnectResult(false, null, outcome.Result.ConnectMs, outcome.Result.TlsVersion, "session_ended");
             }
 
-            var mux = NerdbankMux.Create(outcome.Connection.Stream, _material.Role, _options.Mux);
+            // docs/protocol.md القسم 5: النافذة تُشتق من الـ RTT المقيس عند الاتصال، وهذا أول موضع يعرفه
+            // (SymmetricConnector عاد للتو). كل طرف يشتق من قياسه هو — نافذة الاستقبال خاصية المستقبل
+            // وتُعلَن لكل قناة في بروتوكول Nerdbank 3، فلا حاجة إلى اتفاق على السلك (انظر MuxWindow).
+            var muxOptions = _options.Mux ?? new MuxOptions();
+            var window = muxOptions.Resolve(MuxWindow.ForRoundTrip(TimeSpan.FromMilliseconds(outcome.Result.ConnectMs)));
+            Note("mux_window", window.ReceiveWindow);
+            Note("mux_max_streams", window.MaxConcurrentStreams);
+            Note("mux_window_reason", window.Reason); // لماذا هذه الشريحة، وسبب الملاذ عند قياس فاسد
+            var mux = NerdbankMux.Create(outcome.Connection.Stream, _material.Role, muxOptions, window);
             try
             {
                 if (_material.Role == TunnelRole.Host)
                 {
                     var egress = _options.HostEgress!(new TunnelEgressContext(
-                        _options.Allowlist, _options.AllowedPorts, _options.Resolver, BlockedLocalAddresses(), mux));
+                        _options.Allowlist, _options.AllowedPorts, _options.Resolver, BlockedLocalAddresses(), mux, window.MaxConcurrentStreams));
                     egress.Attach(mux);
                     _egress = egress;
                 }

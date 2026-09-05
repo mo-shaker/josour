@@ -39,6 +39,8 @@
 - `GET /sessions/me?limit=50` → `[{ id, role, peer_display_name, peer_device_name, status, created_at, started_at, ended_at, end_reason, bytes_up, bytes_down }]`
 - `GET /domains` → `{ "version": 3, "entries": ["example.com", "=exact.com", "portal.corp:8443"] }` مع `ETag: "3"`؛ يدعم `If-None-Match` → `304`، و`?version=N` يعيد إصدارًا محددًا أو `404`.
 
+  **الاحتفاظ بالإصدارات (ثُبّت في الأسبوع 5):** إصدارات القائمة لقطات غير قابلة للتعديل ولا تُحذف أبدًا. الاعتماد عليها حقيقي: المضيف يستدعي `?version=N` ليعرض للطالب المواقع التي ستُمنح فعلًا قبل القبول (متطلب القسم 15 من وثيقة المنتج)، وحذف إصدار قديم يجعل هذا الإفصاح يفشل. أي تنظيف مستقبلي يجب أن يستثني الإصدارات المشار إليها من جلسات غير منتهية.
+
 ## النموذج التقني
 
 - `POST /probe`  `{ "ip": "…", "port": 12345 }` → `{ "reachable": true, "latency_ms": 42 }` (عند الفشل: `{ "reachable": false, "latency_ms": null }`). يتطلب مصادقة. العناوين الخاصة وloopback تُرفض بـ `400 validation_error`. الخادم يجرب اتصال TCP بمهلة 3 ثوانٍ ويغلقه فورًا. يُستخدم في نموذج الأسبوع 1 وفي فحص قابلية الوصول.

@@ -22,6 +22,8 @@
 
 أكواد `error`: `unauthorized`, `bad_request`, `not_found`, `host_unavailable`, `session_exists`, `request_pending`, `forbidden`, `rate_limited`, `internal`.
 
+`rate_limited` يُستخدم كذلك على القناة نفسها (ثُبّت في الأسبوع 5): لكل اتصال ميزانية إطارات (100 إطار في 10 ثوانٍ)؛ تجاوزها يرد `rate_limited` **بلا قطع الاتصال**، حمايةً للعامل الواحد من جهاز مصادَق يغرق حلقة الأحداث.
+
 متى يُستخدم كل كود في `request.create` (ثُبّت في الأسبوع 3):
 
 | الحالة | الكود |

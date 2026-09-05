@@ -103,6 +103,11 @@ def test_validate_entry_accepts(entry: str) -> None:
         "bad-.com",
         "a..b",
         "http://example.com",
+        # Product document section 14: the published list must never point at the host itself.
+        "localhost",
+        "localhost:8080",
+        "=localhost",
+        "app.localhost",
     ],
 )
 def test_validate_entry_rejects(entry: str) -> None:

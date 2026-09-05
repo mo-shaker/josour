@@ -57,6 +57,10 @@ public sealed class SessionPhaseTrackerTests
 
         Assert.True(rig.Tracker.TrackRequest("c1"));
         var created = Assert.IsType<RequestCreatedMessage>(await rig.Channel.RequestAsync(new RequestCreateMessage("c1", MockControlChannelOptions.ReachableHostId, 30), Timeout, None));
+
+        // RequestAsync completes from the ref waiter, which runs BEFORE the dispatch loop hands the same frame to the
+        // subscribers: waiting for the collector to see it is what makes "the tracker has applied it" true rather than likely.
+        await rig.Messages.NextAsync<RequestCreatedMessage>();
         Assert.Equal(SessionPhase.RequestPending, rig.Tracker.Phase);
         Assert.Equal(created.RequestId, rig.Tracker.PendingRequestId);
 

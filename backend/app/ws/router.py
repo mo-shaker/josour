@@ -274,6 +274,15 @@ async def _handle_host_available(connection: Connection, message: HostAvailable)
 
 
 async def _dispatch(connection: Connection, raw: str) -> None:
+    if not connection.accept_frame():
+        # Section 2's ``rate_limited``: the frame is dropped, the connection is not. Logged on
+        # the first refusal only; the total is reported once at teardown.
+        if connection.dropped_frames == 1:
+            log.warning("ws frame budget exceeded", extra={"device_id": str(connection.device_id)})
+        await connection.send(
+            ErrorFrame(code=ErrorCode.RATE_LIMITED, message="Too many frames; slow down")
+        )
+        return
     try:
         message = parse_client_message(raw)
     except WsError as exc:
@@ -362,7 +371,13 @@ async def _teardown(connection: Connection) -> None:
     except Exception:  # pragma: no cover - cleanup must never escape
         log.exception("ws teardown failed", extra={"device_id": str(connection.device_id)})
     await connection.close(CloseCode.NORMAL)
-    log.info("ws disconnected", extra={"device_id": str(connection.device_id)})
+    log.info(
+        "ws disconnected",
+        extra={
+            "device_id": str(connection.device_id),
+            "dropped_frames": connection.dropped_frames,
+        },
+    )
 
 
 @router.websocket("/ws")

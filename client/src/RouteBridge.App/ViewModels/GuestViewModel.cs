@@ -140,7 +140,7 @@ public sealed partial class GuestViewModel : ObservableObject
         {
             _logger.LogWarning("Guest: GET /hosts failed: {Status} {Code}", (int)ex.StatusCode, ex.Code);
             Hosts.Clear();
-            SetEmptyState(Strings.GuestHostsUnavailableTitle, string.Format(CultureInfo.CurrentCulture, Strings.GuestHostsErrorFormat, ex.Message));
+            SetEmptyState(Strings.GuestHostsUnavailableTitle, string.Format(UiFlow.Culture, Strings.GuestHostsErrorFormat, ex.Message));
         }
         catch (OperationCanceledException)
         {
@@ -165,7 +165,7 @@ public sealed partial class GuestViewModel : ObservableObject
         var duration = SelectedDuration;
         StatusMessage = string.Empty;
         OnPropertyChanged(nameof(HasStatusMessage));
-        WaitingText = string.Format(CultureInfo.CurrentCulture, Strings.GuestWaitingTextFormat, host.UserDisplayName);
+        WaitingText = string.Format(UiFlow.Culture, Strings.GuestWaitingTextFormat, host.UserDisplayName);
 
         _logger.LogInformation("Guest: requesting {DurationMin} min from {DeviceName} ({DeviceId})", duration, host.DeviceName, host.DeviceId);
         var error = await _sessions.RequestSessionAsync(host.DeviceId, duration, ct).ConfigureAwait(true);
@@ -175,7 +175,7 @@ public sealed partial class GuestViewModel : ObservableObject
             return;
         }
 
-        SetStatus(string.Format(CultureInfo.CurrentCulture, Strings.GuestRequestSentFormat, host.UserDisplayName, duration));
+        SetStatus(string.Format(UiFlow.Culture, Strings.GuestRequestSentFormat, host.UserDisplayName, duration));
     }
 
     /// <summary>Sends <c>request.cancel</c> for the pending request.</summary>
@@ -321,7 +321,7 @@ public sealed partial class GuestViewModel : ObservableObject
         ControlErrorCodes.RateLimited => Strings.GuestErrorRateLimited,
         SessionCoordinator.NotConnectedCode => Strings.GuestErrorNotConnected,
         SessionCoordinator.TimeoutCode => Strings.GuestRequestDisconnected,
-        _ => string.Format(CultureInfo.CurrentCulture, Strings.GuestErrorGenericFormat, code),
+        _ => string.Format(UiFlow.Culture, Strings.GuestErrorGenericFormat, code),
     };
 
     private void SetStatus(string message)

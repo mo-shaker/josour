@@ -521,9 +521,13 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
                 return result; // the coordinator answers with session.connect_failed, which raises tunnel.connect_failed
             }
 
+            // النافذة مشتقة من connect_ms (docs/protocol.md القسم 5): تُطبع في التشغيل الميداني لأن الشريحة
+            // تفسّر سقف التنزيل الواحد وحد الـ streams المتزامنة في نفس التشغيل.
             _driver._log.Emit("tunnel.connected", EventLog.Fields(
                 ("winner_type", result.WinnerType is null ? null : CandidateTypeNames.ToWire(result.WinnerType.Value)),
                 ("connect_ms", result.ConnectMs), ("tls_version", result.TlsVersion),
+                ("mux_window", _inner.Diagnostics.TryGetValue("mux_window", out var window) ? window : null),
+                ("mux_max_streams", _inner.Diagnostics.TryGetValue("mux_max_streams", out var streams) ? streams : null),
                 ("proxy_port", _inner.Proxy?.Port), ("probe_url", _inner.Proxy?.ProbeUrl)),
                 $"CONNECTED via {Text(result.WinnerType is null ? null : CandidateTypeNames.ToWire(result.WinnerType.Value))} in {result.ConnectMs} ms over TLS {Text(result.TlsVersion)}");
 

@@ -35,6 +35,7 @@ from app.services.app_settings import settings_service  # noqa: E402
 from app.services.session_timer import scheduler  # noqa: E402
 from app.services.users import create_user  # noqa: E402
 from app.ws.connection_manager import connection_manager  # noqa: E402
+from app.ws.notify import reset_broadcast_state  # noqa: E402
 from tests.ws_client import ASGIWebSocket, WebSocketClosed  # noqa: E402
 
 PASSWORD = "correct-horse-battery"
@@ -92,10 +93,12 @@ def _reset_process_state() -> Iterator[None]:
     settings cache, and every test gets its own event loop."""
     settings_service.invalidate()
     connection_manager.reset()
+    reset_broadcast_state()
     scheduler.cancel_all()
     yield
     settings_service.invalidate()
     connection_manager.reset()
+    reset_broadcast_state()
     scheduler.cancel_all()
 
 

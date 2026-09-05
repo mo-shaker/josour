@@ -474,6 +474,54 @@ public sealed class SessionCoordinatorTests
     }
 
     [Fact]
+    public async Task SleepAndResume_EndsTheLiveSessionCleanly_AndTheChannelComesBack()
+    {
+        // plan 8.5 (نوم الجهاز): the socket does not survive the sleep, so the server has already ended the session by
+        // the time Windows says "resumed". The local side must tear down — browser closed, tunnel disposed — and the
+        // channel must come back on its own, with the resume signal cutting short the wait.
+        await using var rig = await Rig.StartAsync();
+        await rig.RunToActiveAsync(SessionInfo.GuestRole);
+
+        var signals = new FakeConnectivitySignals();
+        using var watcher = new ConnectivityWatcher(rig.Channel, signals);
+
+        rig.Connection.Drop();
+        signals.Resume();
+
+        await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Ended, TimeSpan.FromSeconds(10));
+        Assert.Equal(TunnelEndReason.GuestDisconnected, rig.Tunnels.Last.EndReason);
+        Assert.True(rig.Tunnels.Last.Disposed);
+        Assert.True(rig.Browsers.Last.CloseCount > 0);
+        Assert.DoesNotContain(rig.Connection.Received, m => m is SessionEndMessage);
+
+        await rig.WaitAsync(() => rig.Channel.State == ControlChannelState.Connected, TimeSpan.FromSeconds(10));
+        Assert.Equal(1, watcher.Handled);
+        Assert.False(rig.Coordinator.HasLiveSession);
+    }
+
+    [Fact]
+    public async Task TokenExpiryMidSession_TearsTheSessionDownCleanly_AndTheChannelComesBack()
+    {
+        // plan 8.5 "انتهاء access token", on the WebSocket side: the server closes the live connection with 4401. The
+        // channel refreshes once and reconnects, and because the socket was gone in between the server has already ended
+        // the session (guest_disconnected) — so the local side must tear down cleanly rather than keep a dead tunnel.
+        await using var rig = await Rig.StartAsync();
+        await rig.RunToActiveAsync(SessionInfo.GuestRole);
+
+        await rig.Connection.CloseAsync(ControlCloseCodes.Unauthorized, "token expired");
+
+        await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Ended, TimeSpan.FromSeconds(10));
+        Assert.Equal(TunnelEndReason.GuestDisconnected, rig.Tunnels.Last.EndReason);
+        Assert.True(rig.Tunnels.Last.Disposed);
+        Assert.True(rig.Browsers.Last.CloseCount > 0);
+        Assert.DoesNotContain(rig.Connection.Received, m => m is SessionEndMessage); // the socket was gone; the server knows
+
+        // The channel itself recovered on the refreshed token, so the app is usable again without signing in.
+        await rig.WaitAsync(() => rig.Channel.State == ControlChannelState.Connected, TimeSpan.FromSeconds(10));
+        Assert.False(rig.Coordinator.HasLiveSession);
+    }
+
+    [Fact]
     public async Task Shutdown_EndsALiveSessionBeforeTheAppExits()
     {
         await using var rig = await Rig.StartAsync();
@@ -514,6 +562,68 @@ public sealed class SessionCoordinatorTests
         Assert.Equal(2, rig.Tunnels.Requests.Count);
         Assert.Single(rig.Api.DomainsCalls);
         Assert.Equal(7, rig.Tunnels.Requests[1].Allowlist.Version);
+    }
+
+    // ---------- the clock (plan 8.5: "الوقت") ----------
+
+    [Theory]
+    [InlineData(45)]   // this machine is 45 minutes behind the server
+    [InlineData(-45)]  // …and 45 minutes ahead of it
+    public async Task ASkewedLocalClock_NeitherShortensNorExtendsTheSession(int serverOffsetMinutes)
+    {
+        // expires_at is server time; the client anchors on hello.ack.server_time and then counts monotonically, so a
+        // machine whose clock is wrong still gets exactly the 30 minutes the server granted.
+        await using var rig = await Rig.StartAsync(serverOffset: TimeSpan.FromMinutes(serverOffsetMinutes));
+
+        await rig.RunToActiveAsync(SessionInfo.GuestRole);
+        Assert.Equal(TimeSpan.FromMinutes(30), rig.Coordinator.TimeRemaining);
+
+        rig.Clock.Advance(TimeSpan.FromMinutes(10));
+        await rig.WaitAsync(() => rig.Coordinator.TimeRemaining == TimeSpan.FromMinutes(20));
+
+        // …and the session is still live: a skew this size would have expired it instantly if the countdown used the
+        // local clock, or held it open for an extra 45 minutes in the other direction.
+        Assert.Equal(SessionPhase.Active, rig.Coordinator.Phase);
+        Assert.True(rig.Coordinator.HasLiveSession);
+    }
+
+    [Fact]
+    public async Task ASkewedClockIsWarnedAbout_Once_PerConnect()
+    {
+        await using var rig = await Rig.StartAsync(serverOffset: TimeSpan.FromMinutes(45));
+
+        await rig.WaitAsync(() => rig.Logger.Contains("clock"));
+
+        var warning = Assert.Single(rig.Logger.Lines.Where(l => l.Contains("away from the server", StringComparison.Ordinal)));
+        Assert.Contains("2700", warning, StringComparison.Ordinal); // 45 minutes, in seconds
+    }
+
+    [Fact]
+    public async Task AClockWithinAMinuteOfTheServer_IsNotWorthAWarning()
+    {
+        await using var rig = await Rig.StartAsync(serverOffset: TimeSpan.FromSeconds(20));
+
+        await rig.RunToActiveAsync(SessionInfo.GuestRole);
+
+        Assert.Equal(TimeSpan.FromMinutes(30), rig.Coordinator.TimeRemaining);
+        Assert.DoesNotContain(rig.Logger.Lines, l => l.Contains("away from the server", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ASessionThatRanOutWhileTheClockWasSkewed_EndsAtTheServersMoment()
+    {
+        await using var rig = await Rig.StartAsync(serverOffset: TimeSpan.FromMinutes(45));
+        await rig.RunToActiveAsync(SessionInfo.GuestRole);
+
+        rig.Clock.Advance(TimeSpan.FromMinutes(29));
+        await rig.WaitAsync(() => rig.Coordinator.TimeRemaining <= TimeSpan.FromMinutes(1));
+        Assert.Equal(SessionPhase.Active, rig.Coordinator.Phase);
+
+        rig.Clock.Advance(TimeSpan.FromMinutes(1));
+
+        // Locally torn down, and no session.end: "expired" is the server's verdict (docs/ws-protocol.md section 9).
+        await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Ended);
+        Assert.DoesNotContain(rig.Connection.Received, m => m is SessionEndMessage);
     }
 
     // ---------- the rig ----------
@@ -596,20 +706,32 @@ public sealed class SessionCoordinatorTests
             }
         }
 
+        /// <summary>How far this machine's clock is behind the server's; everything the rig sends is in server time.</summary>
+        public TimeSpan ServerOffset { get; private set; }
+
+        /// <summary>The time the server believes it is (what <c>expires_at</c> is expressed in).</summary>
+        public DateTimeOffset ServerNow => Clock.GetUtcNow() + ServerOffset;
+
         /// <param name="browser">Overrides the default fake work browser (pass <see cref="NoWorkBrowser.Instance"/> for a head-less run).</param>
-        public static async Task<Rig> StartAsync(Action<FakeTunnelSession>? configure = null, bool logDomains = false, IWorkBrowser? browser = null)
+        /// <param name="serverOffset">Clock skew: how far <c>hello.ack.server_time</c> is ahead of this machine's clock.</param>
+        public static async Task<Rig> StartAsync(
+            Action<FakeTunnelSession>? configure = null,
+            bool logDomains = false,
+            IWorkBrowser? browser = null,
+            TimeSpan? serverOffset = null)
         {
             var clock = new TestClock();
+            var offset = serverOffset ?? TimeSpan.Zero;
             var server = new FakeControlServer
             {
                 Ack = new HelloAckMessage(
-                    clock.GetUtcNow(),
+                    clock.GetUtcNow() + offset,
                     "203.0.113.7",
                     new ServerSettings(120, 60, new[] { 80, 443 }, logDomains),
                     AllowlistVersion: 7),
             };
 
-            var rig = new Rig(server, clock, new RecordingLogger<SessionCoordinator>(), browser);
+            var rig = new Rig(server, clock, new RecordingLogger<SessionCoordinator>(), browser) { ServerOffset = offset };
             rig.Tunnels.Configure = configure;
             await rig.Channel.ConnectAsync("at-1", DeviceId, null, None);
             rig.Connection = await server.NextConnectionAsync();
@@ -629,7 +751,7 @@ public sealed class SessionCoordinatorTests
                 sessionId,
                 role,
                 LastSecretB64,
-                Clock.GetUtcNow().AddMinutes(30),
+                ServerNow.AddMinutes(30),
                 allowlistVersion,
                 "198.51.100.9",
                 SamePublicIp: true,
@@ -644,7 +766,7 @@ public sealed class SessionCoordinatorTests
             PeerFingerprint,
             new[] { new CandidateDto("public", "198.51.100.9", 40001) }));
 
-        public Task SendActiveAsync(Guid sessionId) => Connection.SendAsync(new SessionActiveMessage(sessionId, Clock.GetUtcNow().AddMinutes(30)));
+        public Task SendActiveAsync(Guid sessionId) => Connection.SendAsync(new SessionActiveMessage(sessionId, ServerNow.AddMinutes(30)));
 
         /// <summary>created → endpoint → peer_endpoint → connected → active (+ the probe page on the guest).</summary>
         public async Task<Guid> RunToActiveAsync(string role)

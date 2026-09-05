@@ -51,8 +51,10 @@ public sealed class TrayService : IDisposable
 
     private ContextMenu BuildMenu()
     {
-        // A ContextMenu is not part of the visual tree, so it does not inherit DataContext: set it explicitly.
+        // A ContextMenu is not part of the visual tree, so it inherits neither the DataContext nor the window's flow
+        // direction: both are set explicitly, or the tray menu would be the one part of the app left unmirrored.
         var menu = new ContextMenu { DataContext = _viewModel };
+        UiFlow.Apply(menu);
 
         menu.Items.Add(new MenuItem
         {

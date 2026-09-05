@@ -31,7 +31,7 @@ namespace RouteBridge.Infrastructure.Control;
 /// Tokens are never logged.
 /// </para>
 /// </summary>
-public sealed class ControlChannel : IControlChannel
+public sealed class ControlChannel : IControlChannel, IReconnectNow
 {
     private enum FrameKind { Message, Ignored, Closed }
 
@@ -62,6 +62,9 @@ public sealed class ControlChannel : IControlChannel
     private readonly ConcurrentDictionary<string, TaskCompletionSource<ControlMessage>> _waiters = new(StringComparer.Ordinal);
 
     private ControlChannelState _state = ControlChannelState.Disconnected;
+
+    /// <summary>Cancelled (and replaced) by <see cref="ReconnectNow"/>; every timed wait of the channel links to it.</summary>
+    private CancellationTokenSource _wake = new();
     private CancellationTokenSource? _lifetime;
     private ClientWebSocket? _socket;
     private Task? _supervisor;
@@ -245,6 +248,33 @@ public sealed class ControlChannel : IControlChannel
         finally
         {
             _waiters.TryRemove(requestRef, out _);
+        }
+    }
+
+    /// <summary>
+    /// <see cref="IReconnectNow.ReconnectNow"/>: cancels the token every timed wait of this channel is linked to, then
+    /// installs a fresh one. The reconnect wait gives up its remaining delay and starts the ladder again, and a live
+    /// connection's heart-beat pings straight away instead of at its next tick — which is how a socket that died while
+    /// the machine was asleep becomes visible on resume instead of up to <see cref="ControlChannelOptions.DeadInterval"/>
+    /// later.
+    /// </summary>
+    public void ReconnectNow(string reason)
+    {
+        CancellationTokenSource previous;
+        lock (_gate)
+        {
+            previous = _wake;
+            _wake = new CancellationTokenSource();
+        }
+
+        _logger.LogInformation("Control channel asked to re-evaluate its connection now ({Reason}); state={State}", reason, State);
+        try
+        {
+            previous.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // the channel was disposed in the meantime; nothing is waiting on it any more
         }
     }
 
@@ -562,7 +592,24 @@ public sealed class ControlChannel : IControlChannel
         {
             while (!ct.IsCancellationRequested)
             {
-                await Task.Delay(_options.PingInterval, _time, ct).ConfigureAwait(false);
+                // A wake (resume / network change) ends the wait early: ping now, so a socket that did not survive the
+                // sleep fails here instead of at the end of the interval.
+                using (var wait = CancellationTokenSource.CreateLinkedTokenSource(ct, CurrentWakeToken()))
+                {
+                    try
+                    {
+                        await Task.Delay(_options.PingInterval, _time, wait.Token).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                    {
+                        _logger.LogDebug("Heart-beat woken early: sending ping now");
+                    }
+                }
+
+                if (ct.IsCancellationRequested)
+                {
+                    return;
+                }
 
                 var idle = _time.GetUtcNow() - LastTrafficAt;
                 if (idle >= _options.DeadInterval)
@@ -645,13 +692,28 @@ public sealed class ControlChannel : IControlChannel
         {
             var delay = BackoffFor(attempt);
             _logger.LogInformation("Reconnecting the control channel in {Delay:0.#} s (attempt {Attempt})", delay.TotalSeconds, attempt + 1);
-            try
+            var woken = false;
+            using (var wait = CancellationTokenSource.CreateLinkedTokenSource(ct, CurrentWakeToken()))
             {
-                await _options.BackoffDelay(delay, ct).ConfigureAwait(false);
+                try
+                {
+                    await _options.BackoffDelay(delay, wait.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested && !_disposing)
+                {
+                    // ReconnectNow: the machine resumed or changed network, so the reason this failed is likely gone.
+                    woken = true;
+                }
+                catch (OperationCanceledException)
+                {
+                    return false;
+                }
             }
-            catch (OperationCanceledException)
+
+            if (woken)
             {
-                return false;
+                _logger.LogInformation("Backoff cut short after {Attempts} attempt(s): retrying the control channel now", attempt);
+                attempt = 0; // conditions changed; start the ladder again rather than at 30 s
             }
 
             if (ct.IsCancellationRequested || _disposing)
@@ -894,6 +956,22 @@ public sealed class ControlChannel : IControlChannel
         }
 
         socket.Dispose();
+    }
+
+    /// <summary>The token of the current wake generation; a wake cancels it and puts a fresh one in its place.</summary>
+    private CancellationToken CurrentWakeToken()
+    {
+        lock (_gate)
+        {
+            try
+            {
+                return _wake.Token;
+            }
+            catch (ObjectDisposedException)
+            {
+                return CancellationToken.None;
+            }
+        }
     }
 
     private DateTimeOffset LastTrafficAt => new(Volatile.Read(ref _lastTrafficTicks), TimeSpan.Zero);

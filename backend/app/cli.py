@@ -1,6 +1,7 @@
 """Management CLI (``python manage.py ...`` or ``python -m app.cli ...``)."""
 
 import asyncio
+import uuid
 from collections.abc import Awaitable, Callable
 from typing import Annotated
 
@@ -10,8 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.errors import ApiError
 from app.db.session import make_engine, make_sessionmaker
-from app.models.enums import UserRole
+from app.models.enums import SessionStatus, UserRole
+from app.schemas.sessions import AdminSessionOut
 from app.services import allowlist
+from app.services import sessions as session_service
 from app.services.users import create_user
 
 cli = typer.Typer(help="RouteBridge management commands.", no_args_is_help=True)
@@ -104,7 +107,57 @@ def list_domains() -> None:
         typer.echo(item)
 
 
-# TODO(week 2+): list-sessions, end-session (plan section 3).
+@cli.command("list-sessions")
+def list_sessions(
+    status: Annotated[
+        SessionStatus | None, typer.Option(help="connecting | active | ended")
+    ] = None,
+    limit: Annotated[int, typer.Option(min=1, max=500, help="Newest first")] = 20,
+) -> None:
+    """List sessions (the same rows as ``GET /admin/sessions``), newest first."""
+
+    async def op(db: AsyncSession) -> list[AdminSessionOut]:
+        return await session_service.list_all(db, status=status, limit=limit)
+
+    rows = _run(op)
+    if not rows:
+        typer.echo("no sessions")
+        return
+    typer.echo(f"{'id':36}  {'status':10}  {'guest -> host':40}  {'ended':22}  reason")
+    for row in rows:
+        pair = f"{row.guest_display_name}/{row.guest_device_name}"
+        pair += f" -> {row.host_display_name}/{row.host_device_name}"
+        ended = row.ended_at.isoformat() if row.ended_at else "-"
+        typer.echo(
+            f"{row.id!s:36}  {row.status:10}  {pair:40.40}  {ended:22}  {row.end_reason or '-'}"
+        )
+
+
+@cli.command("end-session")
+def end_session(
+    session_id: Annotated[uuid.UUID, typer.Argument(help="Session id to terminate")],
+) -> None:
+    """Terminate a session centrally: mark it ended, delete its ``session_keys`` secret and
+    write the audit row - the same path as ``POST /admin/sessions/{id}/terminate``.
+
+    Note: this runs outside the API process, so the two clients are **not** sent
+    ``session.terminate`` here. Prefer the admin endpoint while the server is up; use this when
+    it is not, or to be certain the key is gone."""
+
+    async def op(db: AsyncSession) -> str:
+        event = await session_service.admin_terminate(
+            db, session_id, admin_user_id=None, admin_device_id=None, ip=None
+        )
+        return event.reason
+
+    reason = _run(op)
+    typer.echo(f"session {session_id} ended ({reason}); session key deleted")
+    typer.secho(
+        "the connected clients were not notified from here; "
+        "use POST /admin/sessions/{id}/terminate while the server is running",
+        fg=typer.colors.YELLOW,
+        err=True,
+    )
 
 
 def main() -> None:

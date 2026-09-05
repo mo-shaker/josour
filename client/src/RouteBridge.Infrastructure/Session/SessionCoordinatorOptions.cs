@@ -41,4 +41,11 @@ public sealed record SessionCoordinatorOptions
 
     /// <summary>Timeout of the <c>request.create</c> round-trip.</summary>
     public TimeSpan RequestReplyTimeout { get; init; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// A local clock this far from <c>hello.ack.server_time</c> is logged as a warning. It does not change the countdown —
+    /// that is anchored on server time and counted monotonically — but it explains TLS validity failures and log lines
+    /// that do not line up with the server's.
+    /// </summary>
+    public TimeSpan ClockSkewWarning { get; init; } = TimeSpan.FromMinutes(1);
 }

@@ -9,6 +9,9 @@
                  mc:Ignorable="d"
                  d:DataContext="{d:DesignInstance Type=vm:LoginViewModel, IsDesignTimeCreatable=False}"
                  Title="{x:Static app:Strings.LoginWindowTitle}"
+                 FlowDirection="{x:Static app:UiFlow.Direction}"
+                 Language="{x:Static app:UiFlow.Language}"
+                 NumberSubstitution.Substitution="European"
                  Icon="pack://application:,,,/Assets/routebridge.ico"
                  Width="440" SizeToContent="Height" MinHeight="420"
                  ResizeMode="NoResize"
@@ -30,18 +33,22 @@
                           Text="{x:Static app:Strings.LoginDescription}" />
 
             <ui:TextBlock Appearance="Secondary" FontTypography="Caption" Text="{x:Static app:Strings.LoginServerUrlLabel}" />
+            <!-- A URL, an address and a password are typed left to right whatever the interface language is. -->
             <ui:TextBox Margin="0,4,0,12"
+                        FlowDirection="{x:Static app:UiFlow.Technical}"
                         Text="{Binding ServerUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                         PlaceholderText="{x:Static app:Strings.LoginServerUrlPlaceholder}"
                         Icon="{ui:SymbolIcon Globe24}" />
 
             <ui:TextBlock Appearance="Secondary" FontTypography="Caption" Text="{x:Static app:Strings.LoginEmailLabel}" />
             <ui:TextBox Margin="0,4,0,12"
+                        FlowDirection="{x:Static app:UiFlow.Technical}"
                         Text="{Binding Email, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                         Icon="{ui:SymbolIcon Mail24}" />
 
             <ui:TextBlock Appearance="Secondary" FontTypography="Caption" Text="{x:Static app:Strings.LoginPasswordLabel}" />
             <ui:PasswordBox Margin="0,4,0,4"
+                            FlowDirection="{x:Static app:UiFlow.Technical}"
                             Password="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                             Icon="{ui:SymbolIcon Key24}" />
 

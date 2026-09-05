@@ -12,34 +12,48 @@ internal sealed class MuxPair : IAsyncDisposable
 {
     private readonly SessionCertificate _cert;
 
-    private MuxPair(NerdbankMux guest, NerdbankMux host, SessionCertificate cert, BlackholeStream? guestRaw)
+    private MuxPair(NerdbankMux guest, NerdbankMux host, SessionCertificate cert, BlackholeStream? guestRaw, string tlsVersion)
     {
         Guest = guest;
         Host = host;
         _cert = cert;
         GuestRaw = guestRaw;
+        TlsVersion = tlsVersion;
     }
 
     public NerdbankMux Guest { get; }
     public NerdbankMux Host { get; }
+    /// <summary>الإصدار المتفاوَض عليه ("1.2"/"1.3")؛ يُسجَّل مع أرقام الأداء.</summary>
+    public string TlsVersion { get; }
     /// <summary>الـ stream الخام لجانب Guest (قبل TLS) إن طُلب التحكم به.</summary>
     public BlackholeStream? GuestRaw { get; }
 
-    public static async Task<MuxPair> CreateAsync(MuxOptions? guestOptions = null, MuxOptions? hostOptions = null, bool blackholeGuest = false)
+    /// <param name="wrapGuest">غلاف اختياري على النقل الخام لجانب Guest قبل TLS (محاكي الوصلة في اختبارات الأداء).</param>
+    /// <param name="wrapHost">مثله لجانب Host.</param>
+    /// <param name="handshakeTimeout">مهلة مصافحة TLS؛ ترتفع عند وجود RTT مُحاكى.</param>
+    public static async Task<MuxPair> CreateAsync(
+        MuxOptions? guestOptions = null,
+        MuxOptions? hostOptions = null,
+        bool blackholeGuest = false,
+        Func<Stream, Stream>? wrapGuest = null,
+        Func<Stream, Stream>? wrapHost = null,
+        TimeSpan? handshakeTimeout = null)
     {
         var cert = SessionCertificate.Create(DateTimeOffset.UtcNow.AddMinutes(30));
         var (a, b) = await Loopback.CreatePairAsync();
         BlackholeStream? guestRaw = null;
         Stream guestSide = a;
         if (blackholeGuest) guestSide = guestRaw = new BlackholeStream(a);
-        var timeout = TimeSpan.FromSeconds(10);
+        if (wrapGuest is not null) guestSide = wrapGuest(guestSide);
+        if (wrapHost is not null) b = wrapHost(b);
+        var timeout = handshakeTimeout ?? TimeSpan.FromSeconds(10);
         var serverTask = TlsChannel.AuthenticateAsServerAsync(b, cert.Certificate, timeout, CancellationToken.None);
         var clientTask = TlsChannel.AuthenticateAsClientAsync(guestSide, cert.FingerprintSha256, timeout, CancellationToken.None);
         var server = await serverTask;
         var client = await clientTask;
         var guest = NerdbankMux.Create(client.Stream, TunnelRole.Guest, guestOptions ?? new MuxOptions { EnableLiveness = false });
         var host = NerdbankMux.Create(server.Stream, TunnelRole.Host, hostOptions ?? new MuxOptions { EnableLiveness = false });
-        return new MuxPair(guest, host, cert, guestRaw);
+        return new MuxPair(guest, host, cert, guestRaw, server.TlsVersion);
     }
 
     public async ValueTask DisposeAsync()
@@ -69,6 +83,8 @@ internal sealed class TestTarget : Stream, IHalfClosable
 
     public TaskCompletionSource? Gate { get; }
     public long Received => Volatile.Read(ref _received);
+    /// <summary>ما سلّمته للقراءة فعلًا (يتوقف عند نافذة استقبال الطرف الآخر إن لم يقرأ).</summary>
+    public long Produced => Volatile.Read(ref _produced);
     public bool PeerHalfClosed { get; private set; }
     public bool Disposed { get; private set; }
     public TaskCompletionSource DisposedSignal { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);

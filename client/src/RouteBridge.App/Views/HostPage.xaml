@@ -34,6 +34,12 @@
                     Title="{x:Static app:Strings.HostNotConnectedTitle}"
                     Message="{x:Static app:Strings.HostNotConnectedHint}" />
 
+        <!-- Plan 8.3 step 2: no inbound rule means the other device may never reach this one. -->
+        <ui:InfoBar Margin="0,12,0,0" IsClosable="False" Severity="Warning"
+                    IsOpen="{Binding IsFirewallRuleMissing, Mode=OneWay}"
+                    Title="{x:Static app:Strings.HostFirewallWarningTitle}"
+                    Message="{x:Static app:Strings.HostFirewallWarningMessage}" />
+
         <ui:InfoBar Margin="0,12,0,0" IsClosable="False" Severity="Informational"
                     IsOpen="{Binding IsSimulatedServer, Mode=OneWay}"
                     Title="{x:Static app:Strings.HostSimulatedServerTitle}"

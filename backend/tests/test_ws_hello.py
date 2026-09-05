@@ -1,5 +1,6 @@
 """``/ws`` handshake, heartbeat and envelope handling (docs/ws-protocol.md sections 1-3, 7)."""
 
+import logging
 import uuid
 from typing import Any
 
@@ -250,3 +251,60 @@ async def test_revoking_a_device_drops_its_control_channel(
     db.expire_all()
     presence = await db.get(Presence, device_id)
     assert presence is not None and presence.connected is False
+
+
+async def test_a_flood_of_frames_is_rate_limited_without_dropping_the_connection(
+    ws_connect: WsFactory, make_actor: ActorFactory
+) -> None:
+    """Product document section 14 ("تحديد معدل الطلبات"): authentication is not a licence to
+    spin the single worker's loop. The budget is per connection and answers ``rate_limited``
+    (docs/ws-protocol.md section 2); it must never disconnect a client."""
+    from app.ws.connection_manager import FRAME_BUDGET
+
+    ws = await ws_connect(await make_actor("flood@example.com"))
+    await ws.drain(timeout=0.1)
+
+    for _ in range(FRAME_BUDGET):
+        await ws.send({"type": "ping"})
+    await ws.send({"type": "ping"})
+
+    frames = await ws.drain(timeout=0.5)
+    limited = [f for f in frames if f["type"] == "error"]
+    assert [f["code"] for f in limited] == ["rate_limited"], "exactly the overflow frame"
+    assert len([f for f in frames if f["type"] == "pong"]) == FRAME_BUDGET
+
+    # The connection is still usable once the bucket refills.
+    await ws.send({"type": "ping"})
+    assert (await ws.expect("pong", timeout=2.0))["type"] == "pong"
+
+
+async def test_the_frame_budget_is_per_connection(
+    ws_connect: WsFactory, make_actor: ActorFactory
+) -> None:
+    """One noisy device must not spend another device's allowance."""
+    from app.ws.connection_manager import FRAME_BUDGET
+
+    noisy = await ws_connect(await make_actor("noisy@example.com"))
+    quiet = await ws_connect(await make_actor("quiet@example.com", device_name="QUIET-PC"))
+    await quiet.drain(timeout=0.1)
+    for _ in range(FRAME_BUDGET + 5):
+        await noisy.send({"type": "ping"})
+    await noisy.drain(timeout=0.5)
+
+    await quiet.send({"type": "ping"})
+    assert await quiet.expect("pong") == {"type": "pong"}
+
+
+async def test_a_frame_flood_is_logged_once_not_once_per_frame(
+    ws_connect: WsFactory, make_actor: ActorFactory, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A frame flood must not become a log flood."""
+    from app.ws.connection_manager import FRAME_BUDGET
+
+    ws = await ws_connect(await make_actor("loud@example.com"))
+    with caplog.at_level(logging.WARNING, logger="app.ws.router"):
+        for _ in range(FRAME_BUDGET + 20):
+            await ws.send({"type": "ping"})
+        await ws.drain(timeout=0.5)
+    warnings = [r for r in caplog.records if r.message == "ws frame budget exceeded"]
+    assert len(warnings) == 1

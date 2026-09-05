@@ -56,13 +56,17 @@ internal sealed class InProcessTunnelPair : IAsyncDisposable
     /// </param>
     /// <param name="guestAddressBlocker">مثله على المسار المباشر للضيف.</param>
     /// <param name="extraHostNames">أسماء إضافية في محللَي الطرفين: الاسم ← العناوين.</param>
+    /// <param name="guestSystemProxy">
+    /// Proxy النظام على مسار الضيف المباشر (الخطة 8.5). null = لا Proxy: الاختبار لا يتأثر بإعدادات جهاز المطوّر.
+    /// </param>
     public static async Task<InProcessTunnelPair> CreateAsync(
         IEnumerable<string>? hostAllowlistOverride = null,
         TimeSpan? timeout = null,
         IEnumerable<string>? extraEntries = null,
         Func<IPAddress, bool>? hostAddressBlocker = null,
         Func<IPAddress, bool>? guestAddressBlocker = null,
-        IReadOnlyDictionary<string, string[]>? extraHostNames = null)
+        IReadOnlyDictionary<string, string[]>? extraHostNames = null,
+        ISystemProxyResolver? guestSystemProxy = null)
     {
         var origin = new HttpOrigin();
         try
@@ -125,7 +129,8 @@ internal sealed class InProcessTunnelPair : IAsyncDisposable
                     CandidateSource = () => new LoopbackCandidateSource(),
                     GuestProxy = context =>
                     {
-                        var adapter = (ProxyTunnelAdapter)ProxyTunnelAdapter.Create(context, null, null, guestBlocker);
+                        // بلا Proxy نظام افتراضيًا: الاختبار داخل العملية لا يتأثر بإعدادات جهاز المطوّر.
+                        var adapter = (ProxyTunnelAdapter)ProxyTunnelAdapter.Create(context, null, null, guestBlocker, guestSystemProxy ?? NoSystemProxy.Instance);
                         proxyServer = adapter.Server;
                         return adapter;
                     },

@@ -258,6 +258,143 @@ public class NerdbankMuxTests
         await Assert.ThrowsAsync<ArgumentException>(() => pair.Guest.OpenStreamAsync("::1", 443, CancellationToken.None));
     }
 
+    // ---------- النافذة وحد الـ streams (docs/protocol.md القسم 5 بعد تعديل الأسبوع 5) ----------
+
+    [Fact]
+    public async Task Window_WithoutDerivation_IsTheContractDefault()
+    {
+        await using var pair = await MuxPair.CreateAsync();
+        Assert.Equal(1024 * 1024, pair.Guest.Window.ReceiveWindow);
+        Assert.Equal(256, pair.Guest.Window.MaxConcurrentStreams);
+    }
+
+    [Fact]
+    public async Task Window_WithExplicitOverride_DropsTheStreamLimitWithIt()
+    {
+        var options = new MuxOptions { EnableLiveness = false, ReceiveWindow = 4 * 1024 * 1024 };
+        await using var pair = await MuxPair.CreateAsync(options, options);
+        Assert.Equal(4 * 1024 * 1024, pair.Guest.Window.ReceiveWindow);
+        Assert.Equal(64, pair.Guest.Window.MaxConcurrentStreams);
+        Assert.Equal(MuxWindow.MemoryBudget, pair.Guest.Window.WorstCaseBytes);
+    }
+
+    /// <summary>
+    /// حجز مكان الـ stream عند الضيف قبل العرض: ما يتجاوز الحد يُرد فورًا بـ limit ولا يزعج المضيف،
+    /// والمكان يعود عند التخلص من الـ stream. (حد المضيف على السلك يفرضه StreamLimiter في Egress.)
+    /// </summary>
+    [Fact]
+    public async Task Open_BeyondTheStreamLimit_IsRejectedLocally_AndRecoversAfterClose()
+    {
+        var guestOptions = new MuxOptions { EnableLiveness = false, MaxConcurrentStreams = 2 };
+        await using var pair = await MuxPair.CreateAsync(guestOptions);
+        var reachedHost = 0;
+        pair.Host.OpenRequested = (_, _) =>
+        {
+            Interlocked.Increment(ref reachedHost);
+            return Task.FromResult(MuxOpenDecision.Ok(new TestTarget()));
+        };
+
+        var first = await pair.Guest.OpenStreamAsync("a.test", 443, CancellationToken.None).WaitAsync(Timeout);
+        var second = await pair.Guest.OpenStreamAsync("b.test", 443, CancellationToken.None).WaitAsync(Timeout);
+        var third = await pair.Guest.OpenStreamAsync("c.test", 443, CancellationToken.None).WaitAsync(Timeout);
+
+        Assert.True(first.IsOpen);
+        Assert.True(second.IsOpen);
+        Assert.False(third.IsOpen);
+        Assert.Equal(OpenFailReason.Limit, third.Reason);
+        Assert.Equal(2, Volatile.Read(ref reachedHost)); // الثالث لم يصل إلى المضيف أصلًا
+        Assert.Equal(2, pair.Guest.Stats.OpenStreams);
+
+        await first.Stream!.DisposeAsync();
+        var afterClose = await pair.Guest.OpenStreamAsync("d.test", 443, CancellationToken.None).WaitAsync(Timeout);
+        Assert.True(afterClose.IsOpen);
+
+        await second.Stream!.DisposeAsync();
+        await afterClose.Stream!.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Open_RejectedByHost_DoesNotLeakTheReservation()
+    {
+        var guestOptions = new MuxOptions { EnableLiveness = false, MaxConcurrentStreams = 1 };
+        await using var pair = await MuxPair.CreateAsync(guestOptions);
+        pair.Host.OpenRequested = (_, _) => Task.FromResult(MuxOpenDecision.Fail(OpenFailReason.NotAllowed));
+
+        for (var i = 0; i < 5; i++)
+        {
+            var open = await pair.Guest.OpenStreamAsync("blocked.test", 443, CancellationToken.None).WaitAsync(Timeout);
+            Assert.Equal(OpenFailReason.NotAllowed, open.Reason); // لا limit: الحجز يعود في كل مرة
+        }
+        Assert.Equal(0, pair.Guest.Stats.OpenStreams);
+    }
+
+    /// <summary>
+    /// الأساس الذي يسمح لكل طرف باشتقاق نافذته من قياسه هو: نافذة الاستقبال في بروتوكول Nerdbank 3 خاصية
+    /// <b>المستقبل</b> وتُعلَن في إطار العرض/القبول، فالضغط العكسي في كل اتجاه يتبع نافذة مستقبله لا نافذة مرسله.
+    /// هنا الشريحتان مختلفتان عمدًا: الضيف 1 MiB والمضيف 4 MiB.
+    /// </summary>
+    [Fact]
+    public async Task Windows_AreAdvertisedPerReceiver_SoTheTwoSidesMayDiffer()
+    {
+        const int guestWindow = 1024 * 1024;
+        const int hostWindow = 4 * 1024 * 1024;
+        await using var pair = await MuxPair.CreateAsync(
+            new MuxOptions { EnableLiveness = false, ReceiveWindow = guestWindow },
+            new MuxOptions { EnableLiveness = false, ReceiveWindow = hostWindow });
+
+        // القناة المزروعة (PING/PONG/GOAWAY) تعمل في الاتجاهين رغم اختلاف الشريحتين.
+        await pair.Guest.PingAsync(CancellationToken.None).WaitAsync(Timeout);
+        await pair.Host.PingAsync(CancellationToken.None).WaitAsync(Timeout);
+
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var target = new TestTarget(produce: 32 * 1024 * 1024, gate: gate); // مستهلك متوقف + منتج بلا توقف
+        pair.Host.OpenRequested = (_, _) => Task.FromResult(MuxOpenDecision.Ok(target));
+        var open = await pair.Guest.OpenStreamAsync("both.test", 443, CancellationToken.None).WaitAsync(Timeout);
+        var stream = open.Stream!;
+
+        long written = 0;
+        var writer = Task.Run(async () =>
+        {
+            var chunk = new byte[64 * 1024];
+            for (var i = 0; i < 32 * 16; i++)
+            {
+                await stream.WriteAsync(chunk);
+                Interlocked.Add(ref written, chunk.Length);
+            }
+        });
+
+        // الاتجاهان يتوقفان عند نافذة مستقبلهما؛ ننتظر استقرار الرقمين معًا (ولا نقرأ نحن شيئًا).
+        var guestToHost = await Plateau(() => Volatile.Read(ref written));
+        var hostToGuest = await Plateau(() => target.Produced);
+
+        // Guest → Host محكوم بنافذة المضيف (4 MiB) لا بنافذة الضيف (1 MiB).
+        Assert.InRange(guestToHost, 3 * 1024L * 1024, 8 * 1024L * 1024);
+        // Host → Guest محكوم بنافذة الضيف (1 MiB) لا بنافذة المضيف.
+        Assert.InRange(hostToGuest, 1024L * 1024, 3 * 1024L * 1024);
+        Assert.True(guestToHost > hostToGuest, $"{guestToHost} vs {hostToGuest}");
+
+        gate.SetResult();
+        await stream.DisposeAsync();
+        await Task.WhenAny(writer, Task.Delay(Timeout));
+    }
+
+    /// <summary>ينتظر توقف عدّاد عن النمو (نقطة الضغط العكسي) ثم يعيد قيمته.</summary>
+    private static async Task<long> Plateau(Func<long> counter)
+    {
+        var last = counter();
+        var stable = 0;
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        while (DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(100);
+            var now = counter();
+            stable = now == last ? stable + 1 : 0;
+            last = now;
+            if (stable >= 4) return now; // 400 ms بلا حركة = وقف تام
+        }
+        return last;
+    }
+
     [Fact]
     public void Wire_Names_MatchProtocol()
     {

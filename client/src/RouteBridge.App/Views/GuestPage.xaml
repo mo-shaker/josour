@@ -50,7 +50,8 @@
                         <ui:SymbolIcon Grid.Column="0" Symbol="Desktop24" FontSize="22" VerticalAlignment="Center" Margin="0,0,12,0" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <ui:TextBlock FontTypography="BodyStrong" Text="{Binding UserDisplayName}" />
-                            <ui:TextBlock Appearance="Secondary" Text="{Binding DeviceName}" />
+                            <!-- Device name: a technical identifier, bidi-isolated by the item so it never reorders. -->
+                            <ui:TextBlock Appearance="Secondary" Text="{Binding DeviceNameText}" />
                         </StackPanel>
                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                             <Ellipse Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,6,0"
@@ -97,7 +98,10 @@
                            Content="{x:Static app:Strings.GuestRequestConnection}"
                            Command="{Binding RequestConnectionCommand}">
                     <ui:Button.Icon>
-                        <ui:SymbolIcon Symbol="Send24" />
+                        <!-- WPF mirrors layout, not glyphs: an arrow has to be flipped by hand in a right-to-left UI. -->
+                        <ui:SymbolIcon Symbol="Send24"
+                                       RenderTransformOrigin="0.5,0.5"
+                                       RenderTransform="{x:Static app:UiFlow.GlyphMirror}" />
                     </ui:Button.Icon>
                 </ui:Button>
             </Grid>

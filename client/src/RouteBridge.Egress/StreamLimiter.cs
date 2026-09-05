@@ -1,10 +1,17 @@
 namespace RouteBridge.Egress;
 
 /// <summary>
-/// حدود المضيف (docs/protocol.md القسم 5): 256 stream متزامن و50 OPEN في الثانية (نافذة منزلقة). التجاوز = OPEN_FAIL(limit).
+/// حدود المضيف (docs/protocol.md القسم 5): streams متزامنة بحسب شريحة النافذة و50 OPEN في الثانية (نافذة منزلقة).
+/// التجاوز = OPEN_FAIL(limit).
+///
+/// <b>الحد المتزامن يتبع النافذة</b> بعد تعديل الأسبوع 5: 256 عند 1 MiB، 128 عند 2 MiB، 64 عند 4 MiB — أي
+/// النافذة × الحد = 256 MiB في كل شريحة. من يمرره هو <c>EgressTunnelAdapter.Create</c> من
+/// <c>TunnelEgressContext.MaxConcurrentStreams</c> الذي تشتقه <c>TunnelSession</c> من الـ RTT.
+/// حد الفتحات في الثانية لا علاقة له بالنافذة فلم يتغير.
 /// </summary>
 public sealed class StreamLimiter
 {
+    /// <summary>الحد عند النافذة الدنيا (1 MiB)؛ قيمة العقد قبل التعديل وسقفه بعده.</summary>
     public const int DefaultMaxConcurrent = 256;
     public const int DefaultMaxOpensPerSecond = 50;
 

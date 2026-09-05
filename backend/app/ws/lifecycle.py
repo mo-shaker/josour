@@ -12,6 +12,7 @@ from app.services import presence, session_flow
 from app.services import sessions as session_service
 from app.services.events import event_bus
 from app.services.session_timer import scheduler
+from app.ws import notify
 from app.ws.connection_manager import connection_manager
 from app.ws.protocol import CloseCode
 
@@ -21,6 +22,7 @@ log = logging.getLogger(__name__)
 async def on_startup() -> None:
     scheduler.cancel_all()
     connection_manager.reset()
+    notify.reset_broadcast_state()
     async with session_scope() as db:
         rows = await presence.reset_all(db)
         events = await session_service.end_dangling_sessions(db)
@@ -40,5 +42,6 @@ async def on_startup() -> None:
 async def on_shutdown() -> None:
     closed = await connection_manager.close_all(CloseCode.SERVER_RESTART)
     connection_manager.reset()
+    notify.reset_broadcast_state()
     timers = scheduler.cancel_all()
     log.info("ws shutdown", extra={"connections": closed, "timers": timers})

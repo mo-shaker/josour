@@ -7,6 +7,7 @@ using RouteBridge.Core.Control;
 using RouteBridge.Core.Session;
 using RouteBridge.Infrastructure.Api;
 using RouteBridge.Infrastructure.Control.Mock;
+using RouteBridge.Infrastructure.Diagnostics;
 using RouteBridge.Infrastructure.Session;
 
 namespace RouteBridge.App.ViewModels;
@@ -21,9 +22,12 @@ public sealed partial class HostViewModel : ObservableObject
     private readonly IControlChannel _controlChannel;
     private readonly SessionCoordinator _sessions;
     private readonly IIncomingRequestPresenter _presenter;
+    private readonly IAllowlistDisclosure _allowlist;
+    private readonly HostDiagnosticsProbe _diagnostics;
     private readonly IAuthSession _auth;
     private readonly ILogger<HostViewModel> _logger;
     private bool _suppressPublish;
+    private bool _firewallChecked;
 
     [ObservableProperty]
     private bool _isAvailable;
@@ -42,16 +46,24 @@ public sealed partial class HostViewModel : ObservableObject
     [ObservableProperty]
     private bool _isAnnounced;
 
+    /// <summary>Windows Firewall has no inbound rule for RouteBridge, so the other device may never reach this one.</summary>
+    [ObservableProperty]
+    private bool _isFirewallRuleMissing;
+
     public HostViewModel(
         IControlChannel controlChannel,
         SessionCoordinator sessions,
         IIncomingRequestPresenter presenter,
+        IAllowlistDisclosure allowlist,
+        HostDiagnosticsProbe diagnostics,
         IAuthSession auth,
         ILogger<HostViewModel> logger)
     {
         _controlChannel = controlChannel;
         _sessions = sessions;
         _presenter = presenter;
+        _allowlist = allowlist;
+        _diagnostics = diagnostics;
         _auth = auth;
         _logger = logger;
 
@@ -78,7 +90,51 @@ public sealed partial class HostViewModel : ObservableObject
         }
 
         _logger.LogInformation("Host availability set to {Available} (control channel {State})", value, _controlChannel.State);
+        if (value)
+        {
+            _ = CheckFirewallAsync();
+        }
+
         _ = PublishAvailabilityAsync(value);
+    }
+
+    /// <summary>
+    /// Plan 8.3 step 2: check the inbound firewall rule when the host makes itself available and warn about it, because a
+    /// blocked listener looks exactly like a NAT failure later. Runs once per process, off the UI thread, and never
+    /// blocks the announcement — the answer is advisory.
+    /// <para>
+    /// WEEK 6 SEAM: the VPN-adapter half of that step waits for Track B's typed detection (<c>Core.Net.VpnDetector</c>), and the UPnP
+    /// warm-up belongs to the tunnel's <c>CandidateGatherer</c>; neither is duplicated here.
+    /// </para>
+    /// </summary>
+    private async Task CheckFirewallAsync()
+    {
+        if (_firewallChecked)
+        {
+            return;
+        }
+
+        _firewallChecked = true;
+        try
+        {
+            var collected = await Task.Run(() => _diagnostics.ProbeAsync(CancellationToken.None)).ConfigureAwait(false);
+            if (collected.FirewallRulePresent is false)
+            {
+                _logger.LogWarning(
+                    "No inbound firewall rule named '{RuleName}' (profile {Profile}): incoming tunnel connections may be blocked",
+                    HostDiagnosticsProbe.FirewallRuleName,
+                    collected.FirewallProfile ?? HostDiagnosticsProbe.UnknownProfile);
+                UiThread.Post(() => IsFirewallRuleMissing = true);
+            }
+            else
+            {
+                UiThread.Post(() => IsFirewallRuleMissing = false);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "The firewall check before announcing availability failed");
+        }
     }
 
     partial void OnIsAnnouncedChanged(bool value) => UpdateStatusText();
@@ -94,8 +150,6 @@ public sealed partial class HostViewModel : ObservableObject
 
         try
         {
-            // WEEK 5: FirewallRuleChecker + VpnAdapterDetector warnings before announcing; UPnP warm-up.
-            //
             // No listen_port on the idle announcement, on purpose: the tunnel listener only exists between session.created and
             // session.connected (docs/protocol.md section 2), so an idle host has no port to advertise. The server therefore
             // leaves presence.reachable at null (docs/ws-protocol.md section 8) until it asks for a probe some other way.
@@ -169,9 +223,7 @@ public sealed partial class HostViewModel : ObservableObject
                 break;
 
             case RequestIncomingMessage incoming:
-                // WEEK 5: resolve the allow-list text for incoming.AllowlistVersion via GET /domains?version=N.
-                var request = IncomingRequest.FromMessage(incoming, Strings.AllowedSitesPlaceholder);
-                UiThread.Post(() => _ = HandleIncomingRequestAsync(request, CancellationToken.None));
+                UiThread.Post(() => _ = ReceiveIncomingRequestAsync(incoming, CancellationToken.None));
                 break;
 
             case RequestExpiredMessage expired:
@@ -181,6 +233,28 @@ public sealed partial class HostViewModel : ObservableObject
             default:
                 break;
         }
+    }
+
+    /// <summary>
+    /// <c>request.incoming</c> → the pre-accept disclosure the product document (section 15) requires. The sites the
+    /// request's own <c>allowlist_version</c> permits are fetched first (<c>GET /domains?version=N</c>, a few seconds at
+    /// most out of the request's 60), because the host cannot judge a request without seeing what it grants. A fetch that
+    /// fails does not block the prompt: it opens saying the list could not be loaded, which is not the same thing as an
+    /// empty list.
+    /// </summary>
+    public async Task ReceiveIncomingRequestAsync(RequestIncomingMessage incoming, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(incoming);
+        var allowlist = await _allowlist.DescribeAsync(incoming.AllowlistVersion, ct).ConfigureAwait(true);
+        if (!allowlist.Loaded)
+        {
+            _logger.LogWarning(
+                "Showing request {RequestId} without its allow-list: version {Version} could not be loaded",
+                incoming.RequestId,
+                incoming.AllowlistVersion);
+        }
+
+        await HandleIncomingRequestAsync(IncomingRequest.FromMessage(incoming, allowlist), ct).ConfigureAwait(true);
     }
 
     /// <summary>Presents the request to the host and answers the server.</summary>
@@ -252,7 +326,7 @@ public sealed partial class HostViewModel : ObservableObject
             Strings.DebugSampleGuestDevice,
             DurationMinutes: 30,
             ExpiresAt: DateTimeOffset.UtcNow.AddSeconds(60),
-            Strings.AllowedSitesPlaceholder);
+            new AllowlistDisclosure(1, new[] { "example.com", "=exact.com", "portal.corp:8443" }, Loaded: true));
 
         return HandleIncomingRequestAsync(request, CancellationToken.None);
     }

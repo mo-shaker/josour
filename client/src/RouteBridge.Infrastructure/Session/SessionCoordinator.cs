@@ -300,6 +300,17 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
             case HelloAckMessage m:
                 _hello = m;
                 _serverClockOffset = m.ServerTime - _time.GetUtcNow();
+                if (_serverClockOffset.Duration() > _options.ClockSkewWarning)
+                {
+                    // The countdown is immune to this (it is anchored on server time and then counted monotonically —
+                    // plan 8.5 "الوقت"), but a clock this far out breaks TLS validity windows and makes every log line
+                    // on this machine hard to line up with the server's, so it is worth saying out loud once per connect.
+                    _logger.LogWarning(
+                        "This machine's clock is {OffsetSeconds:0.#} s away from the server's ({ServerTime:O}); the session countdown follows the server, but check the system clock",
+                        _serverClockOffset.TotalSeconds,
+                        m.ServerTime);
+                }
+
                 _logger.LogDebug(
                     "hello.ack: max_session_minutes={MaxMinutes} allowed_ports={AllowedPorts} log_domains={LogDomains} allowlist_version={AllowlistVersion} clock_offset={OffsetMs} ms",
                     m.Settings.MaxSessionMinutes,

@@ -145,4 +145,6 @@ async def test_session_terminate_for_an_unknown_device_is_harmless(
         )
     )
     assert delivered == 1
-    assert [frame["type"] for frame in await ws.drain(timeout=0.1)] == ["hosts.update"]
+    # The end of a session nobody was part of leaves the host list exactly as it was, and an
+    # unchanged list is not re-broadcast (see app/ws/notify.py; week 5).
+    assert [frame["type"] for frame in await ws.drain(timeout=0.1)] == []

@@ -22,12 +22,24 @@ from app.services.events import AllowlistPublished
 
 _LABEL_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 
+LOOPBACK_NAME = "localhost"
+"""RFC 6761 section 6.3: ``localhost`` and anything under it always resolve to loopback.
+
+Product document section 14 forbids reaching the host's localhost, LAN and internal addresses.
+The client is what enforces that, after DNS resolution (``IpRangePolicy``), because any public
+name can still point at a private address. This is the server's narrow half: the allow-list it
+publishes must not *invite* the client to the one name that is loopback by definition. Other
+locally-resolving names are deliberately still accepted - ``docs/api.md`` documents
+``portal.corp:8443`` as a valid entry, so refusing them would change the REST contract; see
+docs/security-review-server.md."""
+
 
 def validate_entry(raw: str) -> str:
     """Validate one allowlist entry per docs/protocol.md section 6 rule 3.
 
     Accepted forms: ``example.com`` (with subdomains), ``=exact.com``, either with an optional
-    ``:port`` (1-65535). Entries must be lowercase, without ``*``, ``/`` or whitespace."""
+    ``:port`` (1-65535). Entries must be lowercase, without ``*``, ``/`` or whitespace, must not
+    be an IP address, and must not be :data:`LOOPBACK_NAME` or a name under it."""
     entry = raw.strip()
     if not entry:
         raise ValidationFailed("entry must not be empty")
@@ -55,8 +67,11 @@ def validate_entry(raw: str) -> str:
         pass
     else:
         raise ValidationFailed("host must be a domain name, not an IP address")
-    if not all(_LABEL_RE.match(label) for label in host.split(".")):
+    labels = host.split(".")
+    if not all(_LABEL_RE.match(label) for label in labels):
         raise ValidationFailed("host must be a valid domain name")
+    if labels[-1] == LOOPBACK_NAME:
+        raise ValidationFailed("'localhost' always resolves to the host's own machine")
     return entry
 
 

@@ -18,10 +18,18 @@ public sealed class WorkBrowserProvider : IWorkBrowserProvider
 
     private readonly IRegistryReader _registry;
     private readonly BrowserLocator _locator;
+    private readonly IWorkBrowserRunMarkerStore _markers;
+    private readonly IProcessController _processes;
     private readonly ILogger<WorkBrowserProvider> _logger;
 
-    public WorkBrowserProvider(ILogger<WorkBrowserProvider> logger, IRegistryReader? registry = null)
+    public WorkBrowserProvider(
+        IWorkBrowserRunMarkerStore markers,
+        IProcessController processes,
+        ILogger<WorkBrowserProvider> logger,
+        IRegistryReader? registry = null)
     {
+        _markers = markers;
+        _processes = processes;
         _logger = logger;
         _registry = registry ?? (OperatingSystem.IsWindows() ? WindowsRegistryReader.Instance : NullRegistryReader.Instance);
         _locator = new BrowserLocator(_registry);
@@ -62,5 +70,10 @@ public sealed class WorkBrowserProvider : IWorkBrowserProvider
         return preference;
     }
 
-    public IBrowserSession Create(BrowserKind kind) => new BrowserLauncher(_registry, _locator);
+    /// <summary>
+    /// A launcher wrapped in <see cref="MarkedBrowserSession"/>, so a browser that outlives an unclean exit is written
+    /// down and closed at the next start-up (plan 8.5).
+    /// </summary>
+    public IBrowserSession Create(BrowserKind kind) =>
+        new MarkedBrowserSession(new BrowserLauncher(_registry, _locator), _markers, _processes, ProfileDirectory, _logger);
 }

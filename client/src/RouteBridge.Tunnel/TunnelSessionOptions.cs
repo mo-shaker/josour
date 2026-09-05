@@ -24,12 +24,17 @@ public interface ICandidateSource : IAsyncDisposable
 
 /// <summary>ما تحتاجه سياسة الخروج على المضيف. <see cref="TunnelSession"/> يبنيه ويمرره إلى مصنع الخروج.</summary>
 /// <param name="BlockedLocalAddresses">عناوين واجهات المضيف وبواباته وعنوانه العام كما يراه الخادم (docs/protocol.md القسم 6 القاعدة 6).</param>
+/// <param name="MaxConcurrentStreams">
+/// حد الـ streams المتزامنة المرافق للنافذة المشتقة من الـ RTT (docs/protocol.md القسم 5: 256 عند 1 MiB،
+/// 128 عند 2 MiB، 64 عند 4 MiB). الافتراضي 256 لمن يبني السياق يدويًا بلا اشتقاق. حد الـ 50 فتحة/ثانية لا يتغير.
+/// </param>
 public sealed record TunnelEgressContext(
     IAllowlist Allowlist,
     IReadOnlyList<int> AllowedPorts,
     IHostResolver Resolver,
     IReadOnlyList<IPAddress> BlockedLocalAddresses,
-    IMuxAcceptor Acceptor);
+    IMuxAcceptor Acceptor,
+    int MaxConcurrentStreams = MuxWindow.DefaultMaxConcurrentStreams);
 
 /// <summary>ما يحتاجه الـ Proxy المحلي على جانب Guest. <see cref="TunnelSession"/> يبنيه ويمرره إلى مصنع الـ Proxy.</summary>
 /// <param name="PeerPublicIp">IP المضيف العام كما يراه الخادم؛ يظهر في صفحة الفحص.</param>

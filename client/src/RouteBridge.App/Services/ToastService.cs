@@ -1,4 +1,3 @@
-using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Toolkit.Uwp.Notifications;
 
@@ -10,7 +9,7 @@ namespace RouteBridge.App.Services;
 /// <c>HKCU\Software\Classes</c>: an AppUserModelId (derived from the exe path, with DisplayName/IconUri) and a COM
 /// <c>LocalServer32</c> activator CLSID pointing at this exe. That lets Windows COM-activate the running process (or relaunch it
 /// with <c>-ToastActivated</c>) when a toast button is clicked. <see cref="ToastNotificationManagerCompat.Uninstall"/> removes both;
-/// the installer should invoke it on uninstall (WEEK 2: add a <c>--uninstall-notifications</c> switch for RouteBridge.iss).
+/// the installer invokes it on uninstall through the <c>--uninstall-notifications</c> switch (installer/RouteBridge.iss).
 /// </summary>
 public sealed class ToastService : IToastService, IDisposable
 {
@@ -75,7 +74,7 @@ public sealed class ToastService : IToastService, IDisposable
                 .AddArgument(ActionKey, ActionOpen)
                 .AddArgument(RequestIdKey, id)
                 .AddText(Strings.ToastIncomingRequestTitle)
-                .AddText(string.Format(CultureInfo.CurrentCulture, Strings.ToastIncomingRequestBodyFormat, guestName, deviceName, durationMin))
+                .AddText(string.Format(UiFlow.Culture, Strings.ToastIncomingRequestBodyFormat, guestName, UiFlow.Ltr(deviceName), durationMin))
                 .AddText(Strings.IncomingRequestWarning)
                 .AddButton(new ToastButton()
                     .SetContent(Strings.Accept)

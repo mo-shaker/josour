@@ -170,3 +170,65 @@ async def test_hosts_exclude_your_own_devices(
     assert [row["device_name"] for row in listed] == ["LAPTOP"]
     assert (await other_ws.expect("hosts.update", skip=frozenset()))["hosts"] == listed
     assert second_device.id != actor.device.id
+
+
+# ---------------------------------------------------------------- fan-out cost (week 5)
+
+
+async def test_a_connect_that_changes_nothing_broadcasts_nothing(
+    ws_connect: WsFactory, make_actor: ActorFactory
+) -> None:
+    """A client joining or leaving does not change who is an available host, and the contract
+    only asks for ``hosts.update`` "on any change" - so no frame is owed.
+
+    This is what stops N clients connecting from costing N broadcasts to N recipients; the
+    week 5 load test measured that storm at 1.3 s median handshake with 500 connections."""
+    watcher = await ws_connect(await make_actor("watcher@example.com"))
+    await watcher.drain(timeout=0.1)
+
+    joiner = await ws_connect(await make_actor("joiner@example.com", device_name="JOINER"))
+    await joiner.drain(timeout=0.1)
+    assert await watcher.drain(timeout=0.1) == [], "a plain connect changed no host list"
+
+    await joiner.disconnect()
+    assert await watcher.drain(timeout=0.1) == [], "a plain disconnect changed no host list"
+
+
+async def test_repeating_the_same_availability_does_not_rebroadcast(
+    ws_connect: WsFactory, make_actor: ActorFactory
+) -> None:
+    """``host.available`` with the state it already had is not a change."""
+    watcher = await ws_connect(await make_actor("w2@example.com"))
+    host = await ws_connect(await make_actor("h2@example.com", device_name="OFFICE-PC"))
+    await watcher.drain(timeout=0.1)
+
+    await host.send({"type": "host.available", "available": True})
+    assert len((await watcher.expect("hosts.update", skip=frozenset()))["hosts"]) == 1
+    await watcher.drain(timeout=0.1)
+
+    await host.send({"type": "host.available", "available": True})
+    assert await watcher.drain(timeout=0.2) == []
+
+
+async def test_every_recipient_still_gets_its_own_view_of_the_same_broadcast(
+    ws_connect: WsFactory, make_actor: ActorFactory
+) -> None:
+    """One rendering is shared by everyone who owns no advertised device; the two hosts each
+    get a body of their own. All three must match ``GET /hosts`` exactly (section 8)."""
+    guest = await ws_connect(await make_actor("g3@example.com", display_name="G"))
+    first = await ws_connect(
+        await make_actor("h3a@example.com", display_name="Alpha", device_name="A-PC")
+    )
+    second = await ws_connect(
+        await make_actor("h3b@example.com", display_name="Beta", device_name="B-PC")
+    )
+    await first.send({"type": "host.available", "available": True})
+    await second.send({"type": "host.available", "available": True})
+
+    async def latest(ws: Any) -> list[dict[str, Any]]:
+        frames = [f for f in await ws.drain(timeout=0.3) if f["type"] == "hosts.update"]
+        return frames[-1]["hosts"]
+
+    assert [row["device_name"] for row in await latest(guest)] == ["A-PC", "B-PC"]
+    assert [row["device_name"] for row in await latest(first)] == ["B-PC"]
+    assert [row["device_name"] for row in await latest(second)] == ["A-PC"]

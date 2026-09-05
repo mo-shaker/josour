@@ -1,5 +1,6 @@
 using System.Net;
 using RouteBridge.Core.Browser;
+using RouteBridge.Core.Net;
 using RouteBridge.Tunnel;
 
 namespace RouteBridge.Proxy;
@@ -31,11 +32,16 @@ public sealed class ProxyTunnelAdapter : ITunnelProxy
     /// استبدال فحص حظر العناوين على المسار المباشر؛ لاختبارات داخل العملية فقط (للسماح بـ 127.0.0.1).
     /// null = سياسة <c>IpRangePolicy</c> (نظير <c>EgressTunnelAdapter.Create</c> على المضيف).
     /// </param>
+    /// <param name="systemProxy">
+    /// Proxy النظام للمسار المباشر (الخطة 8.5). null = إعدادات الجهاز الحقيقية.
+    /// الاختبارات داخل العملية تمرر <see cref="NoSystemProxy.Instance"/> كي لا تتأثر بإعدادات جهاز المطوّر.
+    /// </param>
     public static ITunnelProxy Create(
         TunnelProxyContext context,
         IBrowserSession? browser,
         IOwnerPidChecker? ownerPidChecker = null,
-        Func<IPAddress, bool>? addressBlocker = null)
+        Func<IPAddress, bool>? addressBlocker = null,
+        ISystemProxyResolver? systemProxy = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         var options = new ConnectProxyOptions
@@ -48,6 +54,7 @@ public sealed class ProxyTunnelAdapter : ITunnelProxy
             Browser = browser,
             OwnerPidChecker = ownerPidChecker ?? PermissiveOwnerPidChecker.Instance,
             AddressBlocker = addressBlocker,
+            SystemProxy = systemProxy ?? SystemProxyResolver.Default,
         };
         return new ProxyTunnelAdapter(new ConnectProxyServer(options));
     }

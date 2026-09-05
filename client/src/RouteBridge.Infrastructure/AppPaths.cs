@@ -22,4 +22,10 @@ public static class AppPaths
 
     /// <summary><c>%LOCALAPPDATA%\RouteBridge\settings.json</c> (see <c>Settings.AppSettingsStore</c>).</summary>
     public static string SettingsFile => Path.Combine(LocalAppDataRoot, "settings.json");
+
+    /// <summary>
+    /// <c>%LOCALAPPDATA%\RouteBridge\work-browser.json</c>: the note that says a work browser is running, so a start-up
+    /// after a crash can close it (see <c>Session.StaleWorkBrowserGuard</c>). Present only while a browser is up.
+    /// </summary>
+    public static string WorkBrowserMarkerFile => Path.Combine(LocalAppDataRoot, "work-browser.json");
 }

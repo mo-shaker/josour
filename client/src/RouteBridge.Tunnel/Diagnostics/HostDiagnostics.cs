@@ -1,6 +1,6 @@
 using System.Diagnostics;
-using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
+using RouteBridge.Core.Net;
 using RouteBridge.Tunnel.Candidates;
 
 namespace RouteBridge.Tunnel.Diagnostics;
@@ -14,7 +14,6 @@ public static class HostDiagnostics
 {
     public const string FirewallRuleName = "RouteBridge Tunnel";
     private static readonly TimeSpan ProcessTimeout = TimeSpan.FromSeconds(3);
-    private static readonly string[] VpnMarkers = { "VPN", "WireGuard", "Tailscale" };
 
     public static async Task<Dictionary<string, object?>> CollectAsync(CancellationToken ct)
     {
@@ -28,12 +27,19 @@ public static class HostDiagnostics
             firewallProfile = await FirewallProfileAsync(ct).ConfigureAwait(false);
             systemProxy = SystemProxyPresent();
         }
+        else
+        {
+            // خارج Windows: متغيرات البيئة (http_proxy وأخواتها) عبر نفس المُحلّل الذي يستعمله المسار المباشر.
+            // لا يُستعمل على Windows لأن WinHTTP قد يجلب ملف PAC عبر الشبكة، والتشخيص لا يحتمل انتظارًا.
+            systemProxy = EnvironmentProxyPresent();
+        }
 
         return new Dictionary<string, object?>
         {
             ["firewall_rule_present"] = firewallRule,
             ["firewall_profile"] = firewallProfile,
-            ["vpn_adapter"] = VpnAdapterPresent(),
+            // مفاتيح hello.diagnostics مجمَّدة في docs/ws-protocol.md، فتبقى bool؛ التصنيف الكامل عبر DetectVpn().
+            ["vpn_adapter"] = DetectVpn().IsVpn,
             ["system_proxy_present"] = systemProxy,
             ["os_build"] = OsBuild(),
             ["ipv6_global"] = SafeBool(LocalNetwork.HasGlobalIPv6),
@@ -46,26 +52,22 @@ public static class HostDiagnostics
         catch { return Environment.OSVersion.VersionString; }
     }
 
-    /// <summary>واجهة من نوع Tunnel أو يحتوي اسمها/وصفها VPN أو WireGuard أو Tailscale، وهي عاملة.</summary>
-    public static bool VpnAdapterPresent()
+    /// <summary>
+    /// الكشف المصنَّف عن الـ VPN (الخطة 8.5): أي واجهة، وبأي ثقة، وهل تحمل مسار الخروج.
+    /// هذا ما يستهلكه المسار C للتحذير: <c>ShouldWarn</c> صحيح للثقة العالية وحدها.
+    /// القواعد والاستثناءات في <see cref="VpnDetector"/>. لا يرمي أبدًا.
+    /// </summary>
+    public static VpnDetectionResult DetectVpn() => DetectVpn(SystemNetworkAdapterSource.Instance);
+
+    /// <inheritdoc cref="DetectVpn()"/>
+    public static VpnDetectionResult DetectVpn(INetworkAdapterSource source)
     {
-        try
-        {
-            foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
-            {
-                try
-                {
-                    if (nic.OperationalStatus != OperationalStatus.Up) continue;
-                    if (nic.NetworkInterfaceType == NetworkInterfaceType.Tunnel) return true;
-                    if (VpnMarkers.Any(m => nic.Description.Contains(m, StringComparison.OrdinalIgnoreCase) || nic.Name.Contains(m, StringComparison.OrdinalIgnoreCase)))
-                        return true;
-                }
-                catch { /* واجهة واحدة */ }
-            }
-        }
-        catch { /* تعداد */ }
-        return false;
+        try { return VpnDetector.Detect(source); }
+        catch { return VpnDetectionResult.NotDetected; }
     }
+
+    /// <summary>مفتاح <c>vpn_adapter</c> في hello.diagnostics: هل هناك واجهة VPN عاملة (بأي ثقة).</summary>
+    public static bool VpnAdapterPresent() => DetectVpn().IsVpn;
 
     // WINDOWS-ONLY: يُنفَّذ netsh ويُفسَّر نصه؛ لم يُشغَّل على Windows بعد. النص مترجَم على أنظمة غير إنجليزية،
     // لذا نعتمد على رمز الخروج (0 = وُجدت قاعدة) أكثر من النص.
@@ -112,6 +114,13 @@ public static class HostDiagnostics
         {
             return null;
         }
+    }
+
+    /// <summary>خارج Windows: متغيرات البيئة فقط (بلا شبكة). null إن تعذّر القرار.</summary>
+    private static bool? EnvironmentProxyPresent()
+    {
+        try { return SystemProxyResolver.Default.IsConfigured; }
+        catch { return null; }
     }
 
     private static async Task<(int? ExitCode, string Output)> RunAsync(string fileName, string arguments, CancellationToken ct)

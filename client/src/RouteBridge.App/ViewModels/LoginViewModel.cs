@@ -104,7 +104,7 @@ public sealed partial class LoginViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger.LogError(ex, "Sign-in failed unexpectedly");
-            ErrorText = string.Format(CultureInfo.CurrentCulture, Strings.LoginErrorGenericFormat, ex.Message);
+            ErrorText = string.Format(UiFlow.Culture, Strings.LoginErrorGenericFormat, ex.Message);
         }
         finally
         {
@@ -125,8 +125,8 @@ public sealed partial class LoginViewModel : ObservableObject
             ApiErrorCodes.DeviceRevoked => Strings.LoginErrorDeviceRevoked,
             ApiErrorCodes.Unauthorized => Strings.LoginErrorDeviceRejected, // 401 on login = the stored device secret was refused
             ApiErrorCodes.RateLimited => Strings.LoginErrorRateLimited,
-            ApiErrorCodes.ValidationError => string.Format(CultureInfo.CurrentCulture, Strings.LoginErrorValidationFormat, ex.Message),
-            _ => string.Format(CultureInfo.CurrentCulture, Strings.LoginErrorGenericFormat, ex.Code),
+            ApiErrorCodes.ValidationError => string.Format(UiFlow.Culture, Strings.LoginErrorValidationFormat, ex.Message),
+            _ => string.Format(UiFlow.Culture, Strings.LoginErrorGenericFormat, ex.Code),
         };
     }
 }

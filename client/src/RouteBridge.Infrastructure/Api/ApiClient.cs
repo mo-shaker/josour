@@ -124,6 +124,12 @@ public sealed class ApiClient : IApiClient
         return DomainsResult.From(domains, response.Headers.ETag?.Tag);
     }
 
+    public Task<DomainsDto> GetDomainsVersionAsync(int version, CancellationToken ct)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(version, 1);
+        return GetAsync<DomainsDto>("domains?version=" + version.ToString(CultureInfo.InvariantCulture), ct);
+    }
+
     public Task<ProbeResult> ProbeAsync(string ip, int port, CancellationToken ct)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(ip);

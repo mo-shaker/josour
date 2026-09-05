@@ -12,10 +12,10 @@ from app.core.security import (
     create_access_token,
     generate_opaque_secret,
     hash_opaque_secret,
-    hash_password,
+    hash_password_async,
     password_needs_rehash,
     verify_opaque_secret,
-    verify_password,
+    verify_password_async,
 )
 from app.models import Device, User
 from app.models.enums import DeviceStatus, SecurityEventType
@@ -122,7 +122,8 @@ async def login(
     now = utcnow()
     user = await get_user_by_email(db, payload.email)
     if user is None:
-        verify_password(None, payload.password)  # equalise timing with a real verify
+        # Equalise timing with a real verify, and off the loop like the real one.
+        await verify_password_async(None, payload.password)
         record_event(
             db,
             SecurityEventType.LOGIN_FAILED,
@@ -147,7 +148,7 @@ async def login(
         user.locked_until = None
         user.failed_logins = 0
 
-    if not verify_password(user.password_hash, payload.password):
+    if not await verify_password_async(user.password_hash, payload.password):
         user.failed_logins += 1
         if user.failed_logins >= MAX_FAILED_LOGINS:
             user.locked_until = now + LOCKOUT_DURATION
@@ -186,7 +187,7 @@ async def login(
     user.failed_logins = 0
     user.locked_until = None
     if password_needs_rehash(user.password_hash):
-        user.password_hash = hash_password(payload.password)
+        user.password_hash = await hash_password_async(payload.password)
     device.name = payload.device.name
     device.os_version = payload.device.os_version
     device.os_build = payload.device.os_build

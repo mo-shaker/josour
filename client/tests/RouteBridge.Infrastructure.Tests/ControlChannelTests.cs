@@ -395,6 +395,106 @@ public sealed class ControlChannelTests
         Assert.Equal(TimeSpan.FromSeconds(1), h.Backoffs[0]);
     }
 
+    [Fact]
+    public async Task Close4401_MidSession_RefreshesTheTokenOnceAndComesBackConnected()
+    {
+        // plan 8.5 "انتهاء access token": the token expires while the channel is up, so the server closes with 4401 on a
+        // live connection rather than during the first handshake. One refresh, one reconnect, and the new token on the wire.
+        await using var h = await Harness.StartAsync();
+        var attempt = 0;
+        h.Server.OnHello = async (connection, hello) =>
+        {
+            if (Interlocked.Increment(ref attempt) == 1)
+            {
+                await connection.CloseAsync(ControlCloseCodes.Unauthorized, "token expired");
+                return;
+            }
+
+            await connection.SendAsync(h.Server.Ack);
+        };
+
+        await h.Connection.CloseAsync(ControlCloseCodes.Unauthorized, "token expired mid-session");
+
+        await h.Messages.NextAsync<HelloAckMessage>(timeout: TimeSpan.FromSeconds(10));
+        Assert.Equal(ControlChannelState.Connected, h.Channel.State);
+        Assert.Equal(1, h.Tokens.RefreshCount);
+        Assert.Equal("at-1", Assert.Single(h.Tokens.RejectedTokens));
+
+        // The reconnect carried the refreshed token, and the channel never reported a terminal close.
+        var hellos = h.Server.Connections.SelectMany(c => c.Received).OfType<HelloMessage>().ToList();
+        Assert.Equal("at-2", hellos[^1].Token);
+        Assert.Empty(h.Closes);
+    }
+
+    [Fact]
+    public async Task Close4401_MidSession_ThatARefreshCannotFix_StopsCleanly()
+    {
+        // The refresh itself failed (the refresh token is gone too): the channel stops instead of looping, and says why,
+        // so the app can sign out and the live session is torn down rather than left half-connected.
+        await using var h = await Harness.StartAsync();
+        h.Tokens.RefreshedToken = null;
+        h.Server.OnHello = (connection, _) => connection.CloseAsync(ControlCloseCodes.Unauthorized, "nope");
+
+        await h.Connection.CloseAsync(ControlCloseCodes.Unauthorized, "token expired mid-session");
+
+        var closed = await h.NextCloseAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(ControlCloseReason.Unauthorized, closed.Reason);
+        Assert.Equal(ControlChannelState.Disconnected, h.Channel.State);
+        Assert.Equal(1, h.Tokens.RefreshCount);
+    }
+
+    // ---------- resume / network change (plan 8.5) ----------
+
+    [Fact]
+    public async Task ReconnectNow_CutsShortABackoffThatWouldOtherwiseRunForHalfAMinute()
+    {
+        // The real backoff is used here (no BackoffDelay hook), so the test proves the wait itself is interruptible:
+        // without ReconnectNow the second connection would arrive 30 s from now and the test would time out.
+        await using var h = await Harness.StartAsync(o => o with
+        {
+            BackoffSteps = new[] { TimeSpan.FromSeconds(30) },
+            BackoffDelay = (delay, ct) => Task.Delay(delay, ct),
+        });
+
+        h.Connection.Drop();
+        await Task.Delay(100); // let the supervisor notice and enter the backoff
+
+        h.Channel.ReconnectNow("the machine resumed from sleep");
+
+        var second = await h.Server.NextConnectionAsync(TimeSpan.FromSeconds(5));
+        await second.NextAsync<HelloMessage>();
+        await h.Messages.NextAsync<HelloAckMessage>(timeout: TimeSpan.FromSeconds(5));
+        Assert.Equal(ControlChannelState.Connected, h.Channel.State);
+    }
+
+    [Fact]
+    public async Task ReconnectNow_OnALiveConnection_PingsAtOnceInsteadOfWaitingOutTheInterval()
+    {
+        // A socket that did not survive the sleep only fails when something is sent on it: the wake makes that happen now.
+        await using var h = await Harness.StartAsync(o => o with { PingInterval = TimeSpan.FromMinutes(5) });
+
+        h.Channel.ReconnectNow("a network address changed");
+
+        var ping = await h.Connection.NextAsync<PingMessage>(timeout: TimeSpan.FromSeconds(5));
+        Assert.NotNull(ping);
+        Assert.Equal(ControlChannelState.Connected, h.Channel.State);
+    }
+
+    [Fact]
+    public void ReconnectNow_WhileNothingIsRunning_IsHarmless()
+    {
+        var channel = new ControlChannel(
+            new InMemoryAppSettingsStore("https://server.test"),
+            new FakeAccessTokenSource(),
+            new FakeDeviceInfoProvider(),
+            new ControlChannelOptions { UseSystemProxy = false });
+
+        channel.ReconnectNow("the machine resumed from sleep");
+        channel.ReconnectNow("a network address changed");
+
+        Assert.Equal(ControlChannelState.Disconnected, channel.State);
+    }
+
     // ---------- shutdown ----------
 
     [Fact]

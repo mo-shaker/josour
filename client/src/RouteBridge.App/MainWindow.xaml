@@ -10,6 +10,9 @@
                  mc:Ignorable="d"
                  d:DataContext="{d:DesignInstance Type=vm:MainViewModel, IsDesignTimeCreatable=False}"
                  Title="{x:Static app:Strings.AppName}"
+                 FlowDirection="{x:Static app:UiFlow.Direction}"
+                 Language="{x:Static app:UiFlow.Language}"
+                 NumberSubstitution.Substitution="European"
                  Icon="pack://application:,,,/Assets/routebridge.ico"
                  Width="460" Height="560" MinWidth="420" MinHeight="480"
                  WindowStartupLocation="CenterScreen"
@@ -47,6 +50,7 @@
             </Grid.ColumnDefinitions>
             <ui:TextBlock Grid.Column="0" FontTypography="Caption" Appearance="Secondary"
                           Text="{Binding StatusText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            <!-- VersionText is bidi-isolated by the ViewModel, so "v0.1.0" reads left to right in either language. -->
             <ui:TextBlock Grid.Column="1" FontTypography="Caption" Appearance="Tertiary"
                           Text="{Binding VersionText}" VerticalAlignment="Center" Margin="12,0,0,0" />
         </Grid>

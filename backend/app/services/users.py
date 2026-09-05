@@ -6,7 +6,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import Conflict, ValidationFailed
-from app.core.security import hash_password
+from app.core.security import hash_password_async
 from app.models import User
 from app.models.enums import UserRole
 from app.schemas.admin import AdminUserPatch
@@ -50,7 +50,7 @@ async def update_user(db: AsyncSession, user: User, patch: AdminUserPatch) -> Us
         user.display_name = changes["display_name"]
     if changes.get("password") is not None:
         validate_password(changes["password"])
-        user.password_hash = hash_password(changes["password"])
+        user.password_hash = await hash_password_async(changes["password"])
         await revoke_user_tokens(db, user.id)
     if changes.get("is_active") is not None and changes["is_active"] != user.is_active:
         user.is_active = changes["is_active"]
@@ -89,7 +89,7 @@ async def create_user(
         raise Conflict("a user with this email already exists")
     user = User(
         email=email,
-        password_hash=hash_password(password),
+        password_hash=await hash_password_async(password),
         display_name=display_name.strip(),
         role=UserRole(role),
     )

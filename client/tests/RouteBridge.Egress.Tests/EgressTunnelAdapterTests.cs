@@ -19,8 +19,11 @@ public class EgressTunnelAdapterTests
         string[] entries,
         IHostResolver resolver,
         int[]? allowedPorts = null,
-        IReadOnlyList<IPAddress>? blockedLocals = null)
-        => new(AllowlistMatcher.Parse(1, entries), allowedPorts ?? new[] { 80, 443 }, resolver, blockedLocals ?? Array.Empty<IPAddress>(), acceptor);
+        IReadOnlyList<IPAddress>? blockedLocals = null,
+        int? maxConcurrentStreams = null)
+        => maxConcurrentStreams is int max
+            ? new(AllowlistMatcher.Parse(1, entries), allowedPorts ?? new[] { 80, 443 }, resolver, blockedLocals ?? Array.Empty<IPAddress>(), acceptor, max)
+            : new(AllowlistMatcher.Parse(1, entries), allowedPorts ?? new[] { 80, 443 }, resolver, blockedLocals ?? Array.Empty<IPAddress>(), acceptor);
 
     [Fact]
     public async Task Attach_WiresTheAcceptor_AndAllowedOpenCountsBytesAndCollectsTheDomain()
@@ -122,6 +125,36 @@ public class EgressTunnelAdapterTests
         var second = await acceptor.OpenRequested!(new MuxOpenRequest("site.test", origin.Port), CancellationToken.None).WaitAsync(Timeout);
         Assert.Equal(OpenFailReason.Limit, second.Reason);
         await first.Target!.DisposeAsync();
+    }
+
+    /// <summary>
+    /// حد الـ streams المتزامنة يأتي من شريحة النافذة التي اشتقتها الجلسة (docs/protocol.md القسم 5:
+    /// 256 عند 1 MiB، 128 عند 2 MiB، 64 عند 4 MiB) ولم يعد 256 مثبتًا. حد الـ 50 فتحة/ثانية لا يتغير.
+    /// </summary>
+    [Theory]
+    [InlineData(256)]
+    [InlineData(128)]
+    [InlineData(64)]
+    public void Create_TakesTheStreamLimitFromTheSessionContext(int maxConcurrent)
+    {
+        var acceptor = new FakeAcceptor();
+        var adapter = (EgressTunnelAdapter)EgressTunnelAdapter.Create(
+            Context(acceptor, new[] { "site.test" }, new StubResolver(), maxConcurrentStreams: maxConcurrent),
+            Policies.AllowLoopbackOnly);
+
+        Assert.Equal(maxConcurrent, adapter.Handler.Limiter.MaxConcurrent);
+        Assert.Equal(StreamLimiter.DefaultMaxOpensPerSecond, adapter.Handler.Limiter.MaxOpensPerSecond);
+        Assert.Equal(50, adapter.Handler.Limiter.MaxOpensPerSecond);
+    }
+
+    [Fact]
+    public void Create_WithoutADerivedLimit_KeepsTheContractDefault()
+    {
+        var acceptor = new FakeAcceptor();
+        var adapter = (EgressTunnelAdapter)EgressTunnelAdapter.Create(Context(acceptor, new[] { "site.test" }, new StubResolver()));
+
+        Assert.Equal(256, adapter.Handler.Limiter.MaxConcurrent);
+        Assert.Equal(50, adapter.Handler.Limiter.MaxOpensPerSecond);
     }
 }
 

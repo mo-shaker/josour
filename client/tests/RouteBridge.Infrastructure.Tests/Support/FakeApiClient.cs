@@ -4,8 +4,9 @@ using RouteBridge.Infrastructure.Api;
 namespace RouteBridge.Infrastructure.Tests.Support;
 
 /// <summary>
-/// An <see cref="IApiClient"/> for the session tests: only <c>GET /domains</c> is scripted (that is all the coordinator calls),
-/// every other endpoint throws so an accidental call is loud rather than silent.
+/// An <see cref="IApiClient"/> for the session and disclosure tests: only the two <c>GET /domains</c> shapes are scripted
+/// (that is all the coordinator and the host's disclosure call), every other endpoint throws so an accidental call is loud
+/// rather than silent.
 /// </summary>
 public sealed class FakeApiClient : IApiClient
 {
@@ -18,6 +19,34 @@ public sealed class FakeApiClient : IApiClient
 
     /// <summary>Every <c>knownVersion</c> the coordinator sent (null on the first call): proves the version cache.</summary>
     public List<int?> DomainsCalls { get; } = new();
+
+    /// <summary>Every version asked for through <c>GET /domains?version=N</c>.</summary>
+    public List<int> DomainsVersionCalls { get; } = new();
+
+    /// <summary>Set to make the versioned fetch fail (unreachable server, 404 for a version the server dropped, …).</summary>
+    public Exception? DomainsVersionError { get; set; }
+
+    /// <summary>Delays the versioned fetch, so a test can drive the disclosure's own timeout.</summary>
+    public TimeSpan DomainsVersionDelay { get; set; }
+
+    /// <summary>Answers with this version instead of the one asked for (the server contradicting itself).</summary>
+    public int? DomainsVersionOverride { get; set; }
+
+    public async Task<DomainsDto> GetDomainsVersionAsync(int version, CancellationToken ct)
+    {
+        DomainsVersionCalls.Add(version);
+        if (DomainsVersionDelay > TimeSpan.Zero)
+        {
+            await Task.Delay(DomainsVersionDelay, ct);
+        }
+
+        if (DomainsVersionError is { } error)
+        {
+            throw error;
+        }
+
+        return new DomainsDto(DomainsVersionOverride ?? version, DomainEntries.ToList());
+    }
 
     public Task<DomainsResult> GetDomainsAsync(int? knownVersion, CancellationToken ct)
     {

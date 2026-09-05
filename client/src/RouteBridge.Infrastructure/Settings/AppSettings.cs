@@ -33,4 +33,11 @@ public sealed record AppSettings
 
     /// <summary>Start hidden in the tray (mirrors the <c>--minimized</c> switch for launches without it).</summary>
     public bool StartMinimized { get; init; }
+
+    /// <summary>
+    /// Interface language: <c>ar</c> (the default) or <c>en</c>. Empty — the shipped state — means Arabic, so an existing
+    /// settings file needs no migration. Anything unrecognised also falls back to Arabic, and the <c>--lang</c> switch
+    /// wins over this value for a single run (see <c>Localization.UiLanguages.TryParse</c>).
+    /// </summary>
+    public string Language { get; init; } = string.Empty;
 }

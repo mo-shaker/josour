@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -31,11 +32,18 @@ public sealed class ConnectProxyOptions
     public bool? RejectUnknownOwner { get; init; }
     public TimeSpan DirectConnectTimeout { get; init; } = TimeSpan.FromSeconds(5);
     public TimeSpan RequestHeadTimeout { get; init; } = TimeSpan.FromSeconds(30);
+    /// <summary>
+    /// Proxy النظام للمسار **المباشر** فقط (الخطة 8.5). الافتراضي إعدادات الجهاز:
+    /// WinHTTP/WinINET على Windows ومتغيرات البيئة على غيرها، بقائمة تجاوزها.
+    /// المسار المسموح به لا يمر من هنا أبدًا — يذهب عبر الـ mux إلى المضيف.
+    /// تُحقن <see cref="NoSystemProxy.Instance"/> في الاختبارات كي لا تعتمد على إعدادات الجهاز.
+    /// </summary>
+    public ISystemProxyResolver SystemProxy { get; init; } = SystemProxyResolver.Default;
 }
 
 public sealed class ProxyCounters
 {
-    private long _accepted, _rejectedOwner, _tunneled, _direct, _directHttp, _rejected, _probeHits, _errors;
+    private long _accepted, _rejectedOwner, _tunneled, _direct, _directHttp, _rejected, _probeHits, _errors, _viaSystemProxy;
     public long Accepted => Volatile.Read(ref _accepted);
     public long RejectedByOwner => Volatile.Read(ref _rejectedOwner);
     public long Tunneled => Volatile.Read(ref _tunneled);
@@ -44,6 +52,9 @@ public sealed class ProxyCounters
     public long Rejected => Volatile.Read(ref _rejected);
     public long ProbeHits => Volatile.Read(ref _probeHits);
     public long Errors => Volatile.Read(ref _errors);
+    /// <summary>كم طلبًا مباشرًا مرّ عبر Proxy النظام بدل مقبس خام (تشخيص شبكات الشركات).</summary>
+    public long ViaSystemProxy => Volatile.Read(ref _viaSystemProxy);
+    internal void SystemProxyUsed() => Interlocked.Increment(ref _viaSystemProxy);
     internal void Accept() => Interlocked.Increment(ref _accepted);
     internal void RejectOwner() => Interlocked.Increment(ref _rejectedOwner);
     internal void Tunnel() => Interlocked.Increment(ref _tunneled);
@@ -258,6 +269,13 @@ public sealed class ConnectProxyServer : IAsyncDisposable
             // not_allowed أثناء نافذة تباين إصدار القائمة: المضيف يعرف الأحدث؛ نسقط إلى المباشر (ADR-0004).
         }
 
+        // شبكة شركة بـ Proxy إجباري: المسار المباشر يمرر CONNECT إلى Proxy النظام (الخطة 8.5).
+        if (ResolveSystemProxy(route.Host, route.Port, secure: true) is { } upstreamProxy)
+        {
+            await ConnectViaSystemProxyAsync(client, request, upstreamProxy, route.Host, route.Port, ct).ConfigureAwait(false);
+            return;
+        }
+
         var (origin, failure) = await DirectConnectAsync(route.Host, route.Port, ct).ConfigureAwait(false);
         if (origin is null)
         {
@@ -270,6 +288,63 @@ public sealed class ConnectProxyServer : IAsyncDisposable
             Counters.Direct();
             await WriteConnectEstablishedAsync(client, ct).ConfigureAwait(false);
             await PumpAsync(client, origin, request.Remainder, ct).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// CONNECT عبر Proxy النظام. 2xx → 200 للمتصفح وضخ؛ 407 → يُنقل للمتصفح مع <c>Proxy-Authenticate</c>
+    /// ليعيد المحاولة بـ <c>Proxy-Authorization</c> (Basic/Digest بجولة واحدة)؛ غير ذلك → 502 صادق.
+    /// </summary>
+    private async Task ConnectViaSystemProxyAsync(SocketStream client, ProxyRequest request, SystemProxyEndpoint proxy, string host, int port, CancellationToken ct)
+    {
+        var upstream = await UpstreamProxyClient.DialAsync(proxy, _options.Resolver, _options.DirectConnectTimeout, ct).ConfigureAwait(false);
+        if (upstream is null)
+        {
+            await TryRespondAsync(client, 502, ct).ConfigureAwait(false);
+            return;
+        }
+
+        var result = await UpstreamProxyClient.ConnectAsync(
+            upstream, host, port, request.Header("Proxy-Authorization"), _options.RequestHeadTimeout, ct).ConfigureAwait(false);
+
+        if (!result.IsEstablished)
+        {
+            if (result.Status == 407)
+            {
+                var headers = result.ProxyAuthenticate.Select(v => ("Proxy-Authenticate", v)).ToArray();
+                await TryRespondAsync(client, 407, ct, headers).ConfigureAwait(false);
+                return;
+            }
+            await TryRespondAsync(client, 502, ct).ConfigureAwait(false);
+            return;
+        }
+
+        await using var tunnel = result.Stream!;
+        Counters.Direct();
+        Counters.SystemProxyUsed();
+        await WriteConnectEstablishedAsync(client, ct).ConfigureAwait(false);
+        // بايتات وصلت بعد رأس رد الـ Proxy تخص النفق نفسه ويجب أن تصل المتصفح.
+        if (result.Remainder.Length > 0)
+        {
+            await client.WriteAsync(result.Remainder, ct).ConfigureAwait(false);
+            await client.FlushAsync(ct).ConfigureAwait(false);
+        }
+        await PumpAsync(client, tunnel, request.Remainder, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Proxy النظام لهذه الوجهة، أو null إن لم يُضبط أو كانت ضمن قائمة التجاوز. لا يرمي.</summary>
+    private SystemProxyEndpoint? ResolveSystemProxy(string host, int port, bool secure)
+    {
+        var resolver = _options.SystemProxy;
+        if (resolver is null) return null;
+        try
+        {
+            var builder = new UriBuilder(secure ? Uri.UriSchemeHttps : Uri.UriSchemeHttp, host, port);
+            return resolver.Resolve(builder.Uri);
+        }
+        catch (Exception)
+        {
+            return null; // اسم لا يصلح لبناء Uri: نكمل مباشرةً
         }
     }
 
@@ -317,7 +392,27 @@ public sealed class ConnectProxyServer : IAsyncDisposable
             return;
         }
 
-        // TODO(week 3+): احترام Proxy النظام على المسار المباشر (إرسال الطلب/CONNECT إلى Proxy النظام إن وُجد؛ خطة 8.5).
+        // شبكة شركة بـ Proxy إجباري: الطلب يذهب إلى Proxy النظام بصيغة absolute-URI (الخطة 8.5).
+        if (ResolveSystemProxy(route.Host, port, secure: false) is { } upstreamProxy)
+        {
+            var upstream = await UpstreamProxyClient.DialAsync(upstreamProxy, _options.Resolver, _options.DirectConnectTimeout, ct).ConfigureAwait(false);
+            if (upstream is null)
+            {
+                await TryRespondAsync(client, 502, ct).ConfigureAwait(false);
+                return;
+            }
+            await using (upstream)
+            {
+                Counters.DirectHttp();
+                Counters.SystemProxyUsed();
+                var proxyHead = BuildProxyFormHead(request, route.Host, port, path);
+                await upstream.WriteAsync(proxyHead, ct).ConfigureAwait(false);
+                // رد الـ Proxy يُنقل كما هو (بما فيه 407): المتصفح هو من يملك بيانات الاعتماد.
+                await PumpUntilOriginClosesAsync(client, upstream, request.Remainder, ct).ConfigureAwait(false);
+            }
+            return;
+        }
+
         var (origin, failure) = await DirectConnectAsync(route.Host, port, ct).ConfigureAwait(false);
         if (origin is null)
         {
@@ -333,6 +428,29 @@ public sealed class ConnectProxyServer : IAsyncDisposable
             // طلب واحد لكل اتصال: نضخ الجسم إن وُجد ونعيد الرد حتى يغلق الأصل، ثم نغلق نحو المتصفح.
             await PumpUntilOriginClosesAsync(client, origin, request.Remainder, ct).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// رأس موجَّه إلى Proxy أعلى: هدف absolute-URI مبني من الاسم المطبَّع (لا من نص الطلب كما وصل)،
+    /// وحذف Proxy-Connection/Keep-Alive/Connection، مع **الإبقاء على Proxy-Authorization** لأنها موجهة
+    /// إلى الـ Proxy الأعلى نفسه (على المسار المباشر بلا Proxy تُحذف؛ هناك لا مُخاطَب لها).
+    /// </summary>
+    public static byte[] BuildProxyFormHead(ProxyRequest request, string host, int port, string path)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var authority = port == 80 ? host : host + ":" + port.ToString(CultureInfo.InvariantCulture);
+        var target = "http://" + authority + (string.IsNullOrEmpty(path) ? "/" : path);
+        var sb = new StringBuilder();
+        sb.Append(request.Method).Append(' ').Append(target).Append(' ').Append(request.Version).Append("\r\n");
+        foreach (var (name, value) in request.Headers)
+        {
+            if (name.Equals("Proxy-Connection", StringComparison.OrdinalIgnoreCase)) continue;
+            if (name.Equals("Connection", StringComparison.OrdinalIgnoreCase)) continue;
+            if (name.Equals("Keep-Alive", StringComparison.OrdinalIgnoreCase)) continue;
+            sb.Append(name).Append(": ").Append(value).Append("\r\n");
+        }
+        sb.Append("Connection: close\r\n\r\n");
+        return Encoding.Latin1.GetBytes(sb.ToString());
     }
 
     /// <summary>absolute-URI → origin-form؛ حذف Proxy-Connection/Proxy-Authorization/Keep-Alive؛ Connection: close.</summary>

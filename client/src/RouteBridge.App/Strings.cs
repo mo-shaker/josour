@@ -1,178 +1,196 @@
+using RouteBridge.Infrastructure.Localization;
+
 namespace RouteBridge.App;
 
 /// <summary>
-/// Every user-facing string of the app. English for now; Arabic localization (and RTL flow) is a later week,
-/// so keep ALL UI text here and bind XAML with <c>{x:Static app:Strings.X}</c> so it can be swapped in one place.
+/// Every user-facing string of the app, resolved from the language chosen at start-up
+/// (<see cref="LocalizedStrings.Current"/>: Arabic by default, English with <c>--lang en</c> or the <c>language</c> setting).
+/// <para>
+/// The members stayed properties with the same names the whole UI already binds to with
+/// <c>{x:Static app:Strings.X}</c>, so switching from constants to resources changed no call site. The text itself lives in
+/// <c>RouteBridge.Infrastructure/Localization/StringsAr.resx</c> and <c>StringsEn.resx</c>; keep NEW strings there and add
+/// the key to <see cref="UiStringKeys"/> — never a literal in XAML or code-behind.
+/// </para>
+/// <para>
+/// The language is fixed before the first window is created and never changes while the app runs, so a static property that
+/// reads the current pack is enough (WPF evaluates <c>x:Static</c> once, at load time).
+/// </para>
 /// </summary>
 public static class Strings
 {
     // ---- product ----
-    public const string AppName = "RouteBridge";
-    public const string VersionFormat = "v{0}";
+    public static string AppName => LocalizedStrings.Current[UiStringKeys.AppName];
+    public static string VersionFormat => LocalizedStrings.Current[UiStringKeys.VersionFormat];
 
     // ---- tray ----
-    public const string TrayTooltip = "RouteBridge";
-    public const string TrayShowWindow = "Show window";
-    public const string TrayAvailableForRequests = "Available for requests";
-    public const string TrayStartWithWindows = "Start with Windows";
-    public const string TrayDebug = "Debug";
-    public const string TraySimulateIncomingRequest = "Simulate incoming request";
-    public const string TraySignOut = "Sign out";
-    public const string TrayExit = "Exit";
-    public const string TrayTooltipSignedInFormat = "RouteBridge — {0} · {1}";
-    public const string TrayTooltipNotSignedIn = "RouteBridge — not signed in";
+    public static string TrayTooltip => LocalizedStrings.Current[UiStringKeys.TrayTooltip];
+    public static string TrayShowWindow => LocalizedStrings.Current[UiStringKeys.TrayShowWindow];
+    public static string TrayAvailableForRequests => LocalizedStrings.Current[UiStringKeys.TrayAvailableForRequests];
+    public static string TrayStartWithWindows => LocalizedStrings.Current[UiStringKeys.TrayStartWithWindows];
+    public static string TrayDebug => LocalizedStrings.Current[UiStringKeys.TrayDebug];
+    public static string TraySimulateIncomingRequest => LocalizedStrings.Current[UiStringKeys.TraySimulateIncomingRequest];
+    public static string TraySignOut => LocalizedStrings.Current[UiStringKeys.TraySignOut];
+    public static string TrayExit => LocalizedStrings.Current[UiStringKeys.TrayExit];
+    public static string TrayTooltipSignedInFormat => LocalizedStrings.Current[UiStringKeys.TrayTooltipSignedInFormat];
+    public static string TrayTooltipNotSignedIn => LocalizedStrings.Current[UiStringKeys.TrayTooltipNotSignedIn];
 
     // ---- main window ----
-    public const string HostTab = "Host";
-    public const string GuestTab = "Guest";
-    public const string StatusNotSignedIn = "Not signed in";
-    public const string StatusSignedInFormat = "{0} · {1}";
-    public const string StatusOffline = "Offline";
-    public const string StatusConnecting = "Connecting…";
-    public const string StatusConnected = "Connected";
-    public const string StatusReconnecting = "Reconnecting…";
-    public const string StatusReplacedElsewhere = "Connected on another window";
-    public const string StatusSignInExpired = "Sign-in expired";
-    public const string StatusNoServer = "No server address";
+    public static string HostTab => LocalizedStrings.Current[UiStringKeys.HostTab];
+    public static string GuestTab => LocalizedStrings.Current[UiStringKeys.GuestTab];
+    public static string StatusNotSignedIn => LocalizedStrings.Current[UiStringKeys.StatusNotSignedIn];
+    public static string StatusSignedInFormat => LocalizedStrings.Current[UiStringKeys.StatusSignedInFormat];
+    public static string StatusOffline => LocalizedStrings.Current[UiStringKeys.StatusOffline];
+    public static string StatusConnecting => LocalizedStrings.Current[UiStringKeys.StatusConnecting];
+    public static string StatusConnected => LocalizedStrings.Current[UiStringKeys.StatusConnected];
+    public static string StatusReconnecting => LocalizedStrings.Current[UiStringKeys.StatusReconnecting];
+    public static string StatusReplacedElsewhere => LocalizedStrings.Current[UiStringKeys.StatusReplacedElsewhere];
+    public static string StatusSignInExpired => LocalizedStrings.Current[UiStringKeys.StatusSignInExpired];
+    public static string StatusNoServer => LocalizedStrings.Current[UiStringKeys.StatusNoServer];
 
     // ---- host page ----
-    public const string HostPageTitle = "Share your connection";
-    public const string HostPageDescription = "When you are available, colleagues can ask to browse the company's allowed sites through your internet connection.";
-    public const string HostAvailableToggle = "Available for requests";
-    public const string HostStatusAvailable = "Available — waiting for requests";
-    public const string HostStatusNotAvailable = "Not available";
-    public const string HostStatusAnnouncing = "Telling the server you are available…";
-    public const string HostStatusAvailabilityFailed = "The server did not accept the change. Try again.";
-    public const string HostNotConnectedTitle = "Not connected";
-    public const string HostNotConnectedHint = "Requests only arrive while RouteBridge is connected to the server.";
-    public const string HostSimulatedServerTitle = "Simulated server";
-    public const string HostSimulatedServerHint = "This build talks to a built-in simulated server: hosts, requests and sessions are scripted. Real connections arrive in a later build.";
+    public static string HostPageTitle => LocalizedStrings.Current[UiStringKeys.HostPageTitle];
+    public static string HostPageDescription => LocalizedStrings.Current[UiStringKeys.HostPageDescription];
+    public static string HostAvailableToggle => LocalizedStrings.Current[UiStringKeys.HostAvailableToggle];
+    public static string HostStatusAvailable => LocalizedStrings.Current[UiStringKeys.HostStatusAvailable];
+    public static string HostStatusNotAvailable => LocalizedStrings.Current[UiStringKeys.HostStatusNotAvailable];
+    public static string HostStatusAnnouncing => LocalizedStrings.Current[UiStringKeys.HostStatusAnnouncing];
+    public static string HostStatusAvailabilityFailed => LocalizedStrings.Current[UiStringKeys.HostStatusAvailabilityFailed];
+    public static string HostNotConnectedTitle => LocalizedStrings.Current[UiStringKeys.HostNotConnectedTitle];
+    public static string HostNotConnectedHint => LocalizedStrings.Current[UiStringKeys.HostNotConnectedHint];
+    public static string HostFirewallWarningTitle => LocalizedStrings.Current[UiStringKeys.HostFirewallWarningTitle];
+    public static string HostFirewallWarningMessage => LocalizedStrings.Current[UiStringKeys.HostFirewallWarningMessage];
+    public static string HostSimulatedServerTitle => LocalizedStrings.Current[UiStringKeys.HostSimulatedServerTitle];
+    public static string HostSimulatedServerHint => LocalizedStrings.Current[UiStringKeys.HostSimulatedServerHint];
 
     // ---- guest page ----
-    public const string GuestPageTitle = "Browse through a host";
-    public const string GuestPageDescription = "Pick an available host to open a work browser that routes allowed sites through their connection.";
-    public const string GuestRefresh = "Refresh";
-    public const string GuestNoHostsTitle = "No hosts available";
-    public const string GuestNoHostsText = "Hosts appear here when a colleague turns on \"Available for requests\".";
-    public const string HostReachable = "Reachable";
-    public const string HostUnreachable = "Not reachable";
-    public const string HostReachabilityUnknown = "Checking…";
-    public const string GuestHostsUnavailableTitle = "Could not load hosts";
-    public const string GuestHostsUnavailableText = "The server cannot be reached. Check your connection and try again.";
-    public const string GuestHostsErrorFormat = "The server answered: {0}";
-    public const string GuestNotSignedInText = "Sign in to see available hosts.";
-    public const string GuestDurationLabel = "Session length";
-    public const string GuestRequestConnection = "Request connection";
-    public const string GuestWaitingTitle = "Waiting for an answer";
-    public const string GuestWaitingTextFormat = "{0} has one minute to accept your request.";
-    public const string GuestCancelRequest = "Cancel request";
-    public const string GuestRequestSentFormat = "Request sent to {0} for {1} minutes.";
-    public const string GuestRequestAccepted = "Accepted — preparing the session…";
-    public const string GuestRequestRejected = "The host declined the request.";
-    public const string GuestRequestExpiredText = "The host did not answer in time.";
-    public const string GuestRequestCancelled = "Request cancelled.";
-    public const string GuestRequestDisconnected = "The connection to the server was lost before the host answered.";
-    public const string GuestErrorHostUnavailable = "That host is not available any more.";
-    public const string GuestErrorSessionExists = "A session is already in progress.";
-    public const string GuestErrorRequestPending = "A request is already pending.";
-    public const string GuestErrorRateLimited = "Too many requests. Wait a moment and try again.";
-    public const string GuestErrorNotConnected = "Not connected to the server.";
-    public const string GuestErrorGenericFormat = "The server refused the request ({0}).";
+    public static string GuestPageTitle => LocalizedStrings.Current[UiStringKeys.GuestPageTitle];
+    public static string GuestPageDescription => LocalizedStrings.Current[UiStringKeys.GuestPageDescription];
+    public static string GuestRefresh => LocalizedStrings.Current[UiStringKeys.GuestRefresh];
+    public static string GuestNoHostsTitle => LocalizedStrings.Current[UiStringKeys.GuestNoHostsTitle];
+    public static string GuestNoHostsText => LocalizedStrings.Current[UiStringKeys.GuestNoHostsText];
+    public static string HostReachable => LocalizedStrings.Current[UiStringKeys.HostReachable];
+    public static string HostUnreachable => LocalizedStrings.Current[UiStringKeys.HostUnreachable];
+    public static string HostReachabilityUnknown => LocalizedStrings.Current[UiStringKeys.HostReachabilityUnknown];
+    public static string GuestHostsUnavailableTitle => LocalizedStrings.Current[UiStringKeys.GuestHostsUnavailableTitle];
+    public static string GuestHostsUnavailableText => LocalizedStrings.Current[UiStringKeys.GuestHostsUnavailableText];
+    public static string GuestHostsErrorFormat => LocalizedStrings.Current[UiStringKeys.GuestHostsErrorFormat];
+    public static string GuestNotSignedInText => LocalizedStrings.Current[UiStringKeys.GuestNotSignedInText];
+    public static string GuestDurationLabel => LocalizedStrings.Current[UiStringKeys.GuestDurationLabel];
+    public static string GuestRequestConnection => LocalizedStrings.Current[UiStringKeys.GuestRequestConnection];
+    public static string GuestWaitingTitle => LocalizedStrings.Current[UiStringKeys.GuestWaitingTitle];
+    public static string GuestWaitingTextFormat => LocalizedStrings.Current[UiStringKeys.GuestWaitingTextFormat];
+    public static string GuestCancelRequest => LocalizedStrings.Current[UiStringKeys.GuestCancelRequest];
+    public static string GuestRequestSentFormat => LocalizedStrings.Current[UiStringKeys.GuestRequestSentFormat];
+    public static string GuestRequestAccepted => LocalizedStrings.Current[UiStringKeys.GuestRequestAccepted];
+    public static string GuestRequestRejected => LocalizedStrings.Current[UiStringKeys.GuestRequestRejected];
+    public static string GuestRequestExpiredText => LocalizedStrings.Current[UiStringKeys.GuestRequestExpiredText];
+    public static string GuestRequestCancelled => LocalizedStrings.Current[UiStringKeys.GuestRequestCancelled];
+    public static string GuestRequestDisconnected => LocalizedStrings.Current[UiStringKeys.GuestRequestDisconnected];
+    public static string GuestErrorHostUnavailable => LocalizedStrings.Current[UiStringKeys.GuestErrorHostUnavailable];
+    public static string GuestErrorSessionExists => LocalizedStrings.Current[UiStringKeys.GuestErrorSessionExists];
+    public static string GuestErrorRequestPending => LocalizedStrings.Current[UiStringKeys.GuestErrorRequestPending];
+    public static string GuestErrorRateLimited => LocalizedStrings.Current[UiStringKeys.GuestErrorRateLimited];
+    public static string GuestErrorNotConnected => LocalizedStrings.Current[UiStringKeys.GuestErrorNotConnected];
+    public static string GuestErrorGenericFormat => LocalizedStrings.Current[UiStringKeys.GuestErrorGenericFormat];
 
     // ---- session panel ----
-    public const string SessionPanelTitle = "Session";
-    public const string SessionPeerFormat = "{0} · {1}";
-    public const string SessionRoleHost = "You are sharing your connection";
-    public const string SessionRoleGuest = "You are browsing through the host";
-    public const string SessionPhasePreparing = "Preparing…";
-    public const string SessionPhaseConnecting = "Connecting to the other device…";
-    public const string SessionPhaseActive = "Connected";
-    public const string SessionPhaseEnding = "Closing the session…";
-    public const string SessionPhaseEnded = "Session ended";
-    public const string SessionTimeRemainingFormat = "{0} left";
-    public const string SessionTimeUp = "Time is up";
-    public const string SessionDataUsedFormat = "About {0} sent · {1} received";
-    public const string SessionDisconnect = "Disconnect";
-    public const string SessionReopenBrowser = "Reopen work browser";
-    public const string SessionDismiss = "Dismiss";
-    public const string SessionSummaryFormat = "{0} · {1}";
-    public const string BytesFormat = "{0:0.#} {1}";
-    public const string BytesUnitB = "B";
-    public const string BytesUnitKb = "KB";
-    public const string BytesUnitMb = "MB";
-    public const string BytesUnitGb = "GB";
+    public static string SessionPanelTitle => LocalizedStrings.Current[UiStringKeys.SessionPanelTitle];
+    public static string SessionPeerFormat => LocalizedStrings.Current[UiStringKeys.SessionPeerFormat];
+    public static string SessionRoleHost => LocalizedStrings.Current[UiStringKeys.SessionRoleHost];
+    public static string SessionRoleGuest => LocalizedStrings.Current[UiStringKeys.SessionRoleGuest];
+    public static string SessionPhasePreparing => LocalizedStrings.Current[UiStringKeys.SessionPhasePreparing];
+    public static string SessionPhaseConnecting => LocalizedStrings.Current[UiStringKeys.SessionPhaseConnecting];
+    public static string SessionPhaseActive => LocalizedStrings.Current[UiStringKeys.SessionPhaseActive];
+    public static string SessionPhaseEnding => LocalizedStrings.Current[UiStringKeys.SessionPhaseEnding];
+    public static string SessionPhaseEnded => LocalizedStrings.Current[UiStringKeys.SessionPhaseEnded];
+    public static string SessionTimeRemainingFormat => LocalizedStrings.Current[UiStringKeys.SessionTimeRemainingFormat];
+    public static string SessionTimeUp => LocalizedStrings.Current[UiStringKeys.SessionTimeUp];
+    public static string SessionDataUsedFormat => LocalizedStrings.Current[UiStringKeys.SessionDataUsedFormat];
+    public static string SessionDisconnect => LocalizedStrings.Current[UiStringKeys.SessionDisconnect];
+    public static string SessionReopenBrowser => LocalizedStrings.Current[UiStringKeys.SessionReopenBrowser];
+    public static string SessionDismiss => LocalizedStrings.Current[UiStringKeys.SessionDismiss];
+    public static string SessionSummaryFormat => LocalizedStrings.Current[UiStringKeys.SessionSummaryFormat];
+    public static string BytesFormat => LocalizedStrings.Current[UiStringKeys.BytesFormat];
+    public static string BytesUnitB => LocalizedStrings.Current[UiStringKeys.BytesUnitB];
+    public static string BytesUnitKb => LocalizedStrings.Current[UiStringKeys.BytesUnitKb];
+    public static string BytesUnitMb => LocalizedStrings.Current[UiStringKeys.BytesUnitMb];
+    public static string BytesUnitGb => LocalizedStrings.Current[UiStringKeys.BytesUnitGb];
 
     // ---- session end reasons (docs/ws-protocol.md section 5) ----
-    public const string SessionEndedByYou = "You ended the session.";
-    public const string SessionEndedByPeer = "The other side ended the session.";
-    public const string SessionEndedExpired = "The session reached its time limit.";
-    public const string SessionEndedPeerDisconnected = "The other device lost its connection.";
-    public const string SessionEndedYouDisconnected = "This device lost its connection to the server.";
-    public const string SessionEndedConnectFailed = "The two devices could not reach each other.";
-    public const string SessionEndedAdminTerminated = "An administrator ended the session.";
-    public const string SessionEndedBrowserNotProxied = "The work browser did not go through RouteBridge, so the session was stopped.";
-    public const string SessionEndedProtocolError = "The session stopped because the two devices did not understand each other.";
-    public const string SessionEndedUnknownFormat = "The session ended ({0}).";
+    public static string SessionEndedByYou => LocalizedStrings.Current[UiStringKeys.SessionEndedByYou];
+    public static string SessionEndedByPeer => LocalizedStrings.Current[UiStringKeys.SessionEndedByPeer];
+    public static string SessionEndedExpired => LocalizedStrings.Current[UiStringKeys.SessionEndedExpired];
+    public static string SessionEndedPeerDisconnected => LocalizedStrings.Current[UiStringKeys.SessionEndedPeerDisconnected];
+    public static string SessionEndedYouDisconnected => LocalizedStrings.Current[UiStringKeys.SessionEndedYouDisconnected];
+    public static string SessionEndedConnectFailed => LocalizedStrings.Current[UiStringKeys.SessionEndedConnectFailed];
+    public static string SessionEndedAdminTerminated => LocalizedStrings.Current[UiStringKeys.SessionEndedAdminTerminated];
+    public static string SessionEndedBrowserNotProxied => LocalizedStrings.Current[UiStringKeys.SessionEndedBrowserNotProxied];
+    public static string SessionEndedProtocolError => LocalizedStrings.Current[UiStringKeys.SessionEndedProtocolError];
+    public static string SessionEndedUnknownFormat => LocalizedStrings.Current[UiStringKeys.SessionEndedUnknownFormat];
 
     // ---- work browser ----
-    public const string BrowserErrorNotFound = "Google Chrome or Microsoft Edge must be installed to open the work browser.";
-    public const string BrowserErrorManagedByPolicy = "Your organisation's browser policy overrides the proxy setting, so the work browser cannot use this session.";
-    public const string BrowserErrorInstanceHandoff = "Another RouteBridge browser window is still open. Close it and start the session again.";
-    public const string BrowserErrorProbeTimeout = "The work browser did not send its traffic through RouteBridge.";
-    public const string BrowserErrorOther = "The work browser could not be started.";
+    public static string BrowserErrorNotFound => LocalizedStrings.Current[UiStringKeys.BrowserErrorNotFound];
+    public static string BrowserErrorManagedByPolicy => LocalizedStrings.Current[UiStringKeys.BrowserErrorManagedByPolicy];
+    public static string BrowserErrorInstanceHandoff => LocalizedStrings.Current[UiStringKeys.BrowserErrorInstanceHandoff];
+    public static string BrowserErrorProbeTimeout => LocalizedStrings.Current[UiStringKeys.BrowserErrorProbeTimeout];
+    public static string BrowserErrorOther => LocalizedStrings.Current[UiStringKeys.BrowserErrorOther];
 
-    // ---- incoming request ----
-    public const string IncomingRequestWindowTitle = "Incoming request";
-    public const string IncomingRequestHeadingFormat = "{0} wants to browse through your connection";
-    public const string IncomingRequestDeviceLabel = "Device";
-    public const string IncomingRequestDurationLabel = "Duration";
-    public const string IncomingRequestAllowedSitesLabel = "Allowed sites";
-    public const string DurationMinutesFormat = "{0} minutes";
-    public const string AllowedSitesPlaceholder = "Only sites on the company allow-list can be reached through you. The current list will be shown here.";
-    public const string IncomingRequestWarningTitle = "Privacy notice";
-    public const string IncomingRequestWarning = "Sites will see your public IP address.";
-    public const string IncomingRequestDisconnectHint = "You can disconnect the session at any time.";
-    public const string CountdownFormat = "Expires in {0} s";
-    public const string RequestExpired = "Request expired";
-    public const string Accept = "Accept";
-    public const string Reject = "Reject";
+    // ---- incoming request: the pre-accept disclosure (product document section 15) ----
+    public static string IncomingRequestWindowTitle => LocalizedStrings.Current[UiStringKeys.IncomingRequestWindowTitle];
+    public static string IncomingRequestHeadingFormat => LocalizedStrings.Current[UiStringKeys.IncomingRequestHeadingFormat];
+    public static string IncomingRequestRequesterLabel => LocalizedStrings.Current[UiStringKeys.IncomingRequestRequesterLabel];
+    public static string IncomingRequestDeviceLabel => LocalizedStrings.Current[UiStringKeys.IncomingRequestDeviceLabel];
+    public static string IncomingRequestDurationLabel => LocalizedStrings.Current[UiStringKeys.IncomingRequestDurationLabel];
+    public static string IncomingRequestAllowedSitesLabel => LocalizedStrings.Current[UiStringKeys.IncomingRequestAllowedSitesLabel];
+    public static string DurationMinutesFormat => LocalizedStrings.Current[UiStringKeys.DurationMinutesFormat];
+    public static string AllowedSitesNote => LocalizedStrings.Current[UiStringKeys.AllowedSitesNote];
+    public static string AllowedSitesSummaryFormat => LocalizedStrings.Current[UiStringKeys.AllowedSitesSummaryFormat];
+    public static string AllowedSitesUnavailable => LocalizedStrings.Current[UiStringKeys.AllowedSitesUnavailable];
+    public static string AllowedSitesEmpty => LocalizedStrings.Current[UiStringKeys.AllowedSitesEmpty];
+    public static string IncomingRequestWarningTitle => LocalizedStrings.Current[UiStringKeys.IncomingRequestWarningTitle];
+    public static string IncomingRequestWarning => LocalizedStrings.Current[UiStringKeys.IncomingRequestWarning];
+    public static string IncomingRequestDisconnectHint => LocalizedStrings.Current[UiStringKeys.IncomingRequestDisconnectHint];
+    public static string CountdownFormat => LocalizedStrings.Current[UiStringKeys.CountdownFormat];
+    public static string RequestExpired => LocalizedStrings.Current[UiStringKeys.RequestExpired];
+    public static string Accept => LocalizedStrings.Current[UiStringKeys.Accept];
+    public static string Reject => LocalizedStrings.Current[UiStringKeys.Reject];
 
     // ---- toasts ----
-    public const string ToastIncomingRequestTitle = "Incoming browsing request";
-    public const string ToastIncomingRequestBodyFormat = "{0} ({1}) asks to browse through your connection for {2} minutes.";
+    public static string ToastIncomingRequestTitle => LocalizedStrings.Current[UiStringKeys.ToastIncomingRequestTitle];
+    public static string ToastIncomingRequestBodyFormat => LocalizedStrings.Current[UiStringKeys.ToastIncomingRequestBodyFormat];
 
     // ---- debug ----
-    public const string DebugSampleGuestName = "Sara Ahmed";
-    public const string DebugSampleGuestDevice = "SARA-LAPTOP";
+    public static string DebugSampleGuestName => LocalizedStrings.Current[UiStringKeys.DebugSampleGuestName];
+    public static string DebugSampleGuestDevice => LocalizedStrings.Current[UiStringKeys.DebugSampleGuestDevice];
 
     // ---- login ----
-    public const string LoginWindowTitle = "Sign in";
-    public const string LoginHeading = "Sign in to RouteBridge";
-    public const string LoginDescription = "Use the account your administrator created for you.";
-    public const string LoginServerUrlLabel = "Server address";
-    public const string LoginServerUrlPlaceholder = "https://routebridge.example.com";
-    public const string LoginEmailLabel = "Email";
-    public const string LoginPasswordLabel = "Password";
-    public const string LoginSignIn = "Sign in";
-    public const string LoginSigningIn = "Signing in…";
-    public const string LoginErrorServerUrl = "Enter the server address as https://… (http:// is only accepted for localhost).";
-    public const string LoginErrorInvalidCredentials = "Wrong email or password.";
-    public const string LoginErrorAccountLocked = "Too many failed attempts. The account is locked for 15 minutes.";
-    public const string LoginErrorAccountDisabled = "This account is disabled. Contact your administrator.";
-    public const string LoginErrorDeviceRevoked = "An administrator removed this device. Sign in again to register it anew.";
-    public const string LoginErrorDeviceRejected = "This device could not be verified. Sign in again to register it anew.";
-    public const string LoginErrorRateLimited = "Too many sign-in attempts. Wait a minute and try again.";
-    public const string LoginErrorUnavailable = "The server cannot be reached. Check the address and your connection.";
-    public const string LoginErrorValidationFormat = "The server rejected the request: {0}";
-    public const string LoginErrorGenericFormat = "Sign-in failed ({0}).";
+    public static string LoginWindowTitle => LocalizedStrings.Current[UiStringKeys.LoginWindowTitle];
+    public static string LoginHeading => LocalizedStrings.Current[UiStringKeys.LoginHeading];
+    public static string LoginDescription => LocalizedStrings.Current[UiStringKeys.LoginDescription];
+    public static string LoginServerUrlLabel => LocalizedStrings.Current[UiStringKeys.LoginServerUrlLabel];
+    public static string LoginServerUrlPlaceholder => LocalizedStrings.Current[UiStringKeys.LoginServerUrlPlaceholder];
+    public static string LoginEmailLabel => LocalizedStrings.Current[UiStringKeys.LoginEmailLabel];
+    public static string LoginPasswordLabel => LocalizedStrings.Current[UiStringKeys.LoginPasswordLabel];
+    public static string LoginSignIn => LocalizedStrings.Current[UiStringKeys.LoginSignIn];
+    public static string LoginSigningIn => LocalizedStrings.Current[UiStringKeys.LoginSigningIn];
+    public static string LoginErrorServerUrl => LocalizedStrings.Current[UiStringKeys.LoginErrorServerUrl];
+    public static string LoginErrorInvalidCredentials => LocalizedStrings.Current[UiStringKeys.LoginErrorInvalidCredentials];
+    public static string LoginErrorAccountLocked => LocalizedStrings.Current[UiStringKeys.LoginErrorAccountLocked];
+    public static string LoginErrorAccountDisabled => LocalizedStrings.Current[UiStringKeys.LoginErrorAccountDisabled];
+    public static string LoginErrorDeviceRevoked => LocalizedStrings.Current[UiStringKeys.LoginErrorDeviceRevoked];
+    public static string LoginErrorDeviceRejected => LocalizedStrings.Current[UiStringKeys.LoginErrorDeviceRejected];
+    public static string LoginErrorRateLimited => LocalizedStrings.Current[UiStringKeys.LoginErrorRateLimited];
+    public static string LoginErrorUnavailable => LocalizedStrings.Current[UiStringKeys.LoginErrorUnavailable];
+    public static string LoginErrorValidationFormat => LocalizedStrings.Current[UiStringKeys.LoginErrorValidationFormat];
+    public static string LoginErrorGenericFormat => LocalizedStrings.Current[UiStringKeys.LoginErrorGenericFormat];
 
     // ---- signed out notices ----
-    public const string SignedOutTitle = "Signed out of RouteBridge";
-    public const string SignedOutSessionExpired = "Your session expired. Please sign in again.";
-    public const string SignedOutDeviceRevoked = "An administrator removed this device.";
-    public const string SignedOutAccountDisabled = "Your account was disabled.";
+    public static string SignedOutTitle => LocalizedStrings.Current[UiStringKeys.SignedOutTitle];
+    public static string SignedOutSessionExpired => LocalizedStrings.Current[UiStringKeys.SignedOutSessionExpired];
+    public static string SignedOutDeviceRevoked => LocalizedStrings.Current[UiStringKeys.SignedOutDeviceRevoked];
+    public static string SignedOutAccountDisabled => LocalizedStrings.Current[UiStringKeys.SignedOutAccountDisabled];
 
     // ---- errors ----
-    public const string StartupFailedTitle = "RouteBridge could not start";
-    public const string StartupFailedMessageFormat = "RouteBridge could not start.\n\n{0}\n\nSee the log folder %LOCALAPPDATA%\\RouteBridge\\logs for details.";
+    public static string StartupFailedTitle => LocalizedStrings.Current[UiStringKeys.StartupFailedTitle];
+    public static string StartupFailedMessageFormat => LocalizedStrings.Current[UiStringKeys.StartupFailedMessageFormat];
 }

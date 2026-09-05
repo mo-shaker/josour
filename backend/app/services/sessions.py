@@ -229,11 +229,15 @@ async def admin_terminate(
     db: AsyncSession,
     session_id: uuid.UUID,
     *,
-    admin_user_id: uuid.UUID,
+    admin_user_id: uuid.UUID | None,
     admin_device_id: uuid.UUID | None,
     ip: str | None,
 ) -> SessionEnded:
-    """``POST /admin/sessions/{id}/terminate``: 404 unknown, 409 already ended."""
+    """Central session termination: ``POST /admin/sessions/{id}/terminate`` and the
+    ``end-session`` CLI command. 404 unknown, 409 already ended.
+
+    ``admin_user_id`` is ``None`` for the CLI, which runs on the server host with database
+    credentials rather than as a logged-in user; the audit row then records ``via`` instead."""
     session = await db.get(Session, session_id)
     if session is None:
         raise NotFound("Session not found")
@@ -247,6 +251,7 @@ async def admin_terminate(
         device_id=admin_device_id,
         ip=ip,
         details={
+            "via": "api" if admin_user_id is not None else "cli",
             "session_id": str(session.id),
             "guest_user_id": str(session.guest_user_id),
             "host_user_id": str(session.host_user_id),

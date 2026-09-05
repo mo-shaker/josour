@@ -26,6 +26,11 @@
 
 
   <ItemGroup>
+    <!-- Proxy أعلى ملفَّق مشترك مع RouteBridge.Proxy.Tests: سلوك واحد لا نسختان تتباعدان -->
+    <Compile Include="../RouteBridge.Proxy.Tests/FakeUpstreamProxy.cs" Link="Shared/FakeUpstreamProxy.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- اختبارات تربط مقابس حقيقية وتعتمد مؤقتات: التوازي داخل التجميعة يجعلها متقطعة -->
     <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

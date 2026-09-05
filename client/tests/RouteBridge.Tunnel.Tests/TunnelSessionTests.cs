@@ -302,7 +302,9 @@ public class TunnelSessionTests
         pair.HostTransport.KillAll();
 
         Assert.True(await Wait.UntilAsync(() => hostReason is not null && guestReason is not null, Timeout),
-            $"host={hostReason} guest={guestReason}");
+            $"host={hostReason} guest={guestReason} | guest connected={pair.GuestResult.Connected} ({pair.GuestResult.FailureReason}) " +
+            $"state={pair.Guest.State} mux_completion={pair.Guest.Diagnostics.GetValueOrDefault("mux_completion")} " +
+            $"death={pair.Guest.Diagnostics.GetValueOrDefault("death")} window={pair.Guest.Diagnostics.GetValueOrDefault("mux_window")}");
         // كل طرف يسمّي من اختفى: المضيف يرى الضيف انقطع، والضيف يرى المضيف انقطع.
         Assert.Equal(TunnelEndReason.GuestDisconnected, hostReason);
         Assert.Equal(TunnelEndReason.HostDisconnected, guestReason);
@@ -382,5 +384,82 @@ public class TunnelSessionTests
         var open = await pair.GuestMux!.OpenStreamAsync("blocked.test", 443, CancellationToken.None).WaitAsync(Timeout);
         Assert.False(open.IsOpen);
         Assert.Equal(OpenFailReason.NotAllowed, open.Reason);
+    }
+
+    // ---------- النافذة المشتقة من الـ RTT (docs/protocol.md القسم 5) ----------
+
+    /// <summary>
+    /// وصلة بطيئة (200 ms داخل نافذة قياس connect_ms) ⇒ الشريحة العليا: نافذة 4 MiB وحد 64 stream،
+    /// والحد يصل إلى سياسة الخروج في سياق المضيف لا يبقى 256 مثبتًا.
+    /// </summary>
+    [Fact]
+    public async Task Pair_OnASlowLink_DerivesTheLargeWindow_AndTheMatchingStreamLimit()
+    {
+        await using var pair = await TunnelSessionPair.CreateAsync(connectDelay: TimeSpan.FromMilliseconds(200));
+
+        Assert.True(pair.HostResult.Connected, pair.HostResult.FailureReason);
+        Assert.InRange(pair.HostResult.ConnectMs, 151, 5000); // القياس فعلًا في مدى الشريحة العليا
+        Assert.Equal(4 * 1024 * 1024, pair.Host.Diagnostics["mux_window"]);
+        Assert.Equal(64, pair.Host.Diagnostics["mux_max_streams"]);
+        Assert.Equal(64, pair.EgressContext!.MaxConcurrentStreams);
+
+        // الطرفان يقيسان الرقم نفسه تقريبًا فيقعان في الشريحة نفسها (وكل طرف يحجّم نافذة استقباله وحده).
+        Assert.Equal(4 * 1024 * 1024, pair.Guest.Diagnostics["mux_window"]);
+        Assert.Equal(64, pair.Guest.Diagnostics["mux_max_streams"]);
+        Assert.Contains("> 150 ms", (string)pair.Host.Diagnostics["mux_window_reason"]!);
+    }
+
+    /// <summary>
+    /// وصلة قريبة (20 ms) ⇒ الشريحة الدنيا: 1 MiB و256 stream كما كان العقد قبل التعديل.
+    /// إن فشل هذا على جهاز محمّل فانظر connect_ms المطبوع: مصافحة loopback أبطأ من 40 ms تخرج من الشريحة.
+    /// </summary>
+    [Fact]
+    public async Task Pair_OnANearLink_KeepsTheOneMiBWindow_And256Streams()
+    {
+        await using var pair = await TunnelSessionPair.CreateAsync(connectDelay: TimeSpan.FromMilliseconds(20));
+
+        Assert.True(pair.HostResult.Connected, pair.HostResult.FailureReason);
+        Assert.InRange(pair.HostResult.ConnectMs, 20, 60);
+        Assert.Equal(1024 * 1024, pair.Host.Diagnostics["mux_window"]);
+        Assert.Equal(256, pair.Host.Diagnostics["mux_max_streams"]);
+        Assert.Equal(256, pair.EgressContext!.MaxConcurrentStreams);
+    }
+
+    /// <summary>التجاوز الصريح (اختبارات، أداة Spike) يفوز على الاشتقاق، والحد يتبع النافذة المفروضة.</summary>
+    [Fact]
+    public async Task Pair_ExplicitWindowOverride_BeatsTheDerivation()
+    {
+        await using var pair = await TunnelSessionPair.CreateAsync(
+            connectDelay: TimeSpan.FromMilliseconds(200),
+            muxOverride: new MuxOptions { ReceiveWindow = 1024 * 1024, PingInterval = TimeSpan.FromSeconds(2), DeadAfter = TimeSpan.FromSeconds(8) });
+
+        Assert.Equal(1024 * 1024, pair.Host.Diagnostics["mux_window"]);
+        Assert.Equal(256, pair.Host.Diagnostics["mux_max_streams"]);
+        Assert.Equal(256, pair.EgressContext!.MaxConcurrentStreams);
+        Assert.Contains("explicit", (string)pair.Host.Diagnostics["mux_window_reason"]!);
+    }
+
+    /// <summary>loopback بلا تأخير يعطي connect_ms ≈ 0 وهو ما يعدّه العقد قياسًا فاسدًا: الشريحة الوسطى وسبب مكتوب.</summary>
+    [Fact]
+    public async Task Pair_WithAnImplausibleMeasurement_FallsBackToTheMiddleTier()
+    {
+        await using var pair = await TunnelSessionPair.CreateAsync();
+
+        var window = (int)pair.Host.Diagnostics["mux_window"]!;
+        var streams = (int)pair.Host.Diagnostics["mux_max_streams"]!;
+        var reason = (string)pair.Host.Diagnostics["mux_window_reason"]!;
+        if (pair.HostResult.ConnectMs == 0)
+        {
+            Assert.Equal(2 * 1024 * 1024, window);
+            Assert.Equal(128, streams);
+            Assert.Contains("not plausible", reason);
+        }
+        else
+        {
+            // مصافحة loopback قد تستغرق مللي ثانية أو اثنتين: شريحة صحيحة لا ملاذ.
+            Assert.Equal(1024 * 1024, window);
+            Assert.Equal(256, streams);
+        }
+        Assert.Equal(MuxWindow.MemoryBudget, (long)window * streams);
     }
 }

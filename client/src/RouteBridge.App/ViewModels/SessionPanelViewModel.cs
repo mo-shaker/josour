@@ -87,9 +87,10 @@ public sealed partial class SessionPanelViewModel : ObservableObject, IDisposabl
         IsEnded = phase == SessionPhase.Ended;
         CanDisconnect = phase is SessionPhase.Preparing or SessionPhase.Connecting or SessionPhase.Active;
 
+        // The device name is a technical identifier: isolated so it does not reorder inside right-to-left prose.
         PeerText = session is null
             ? string.Empty
-            : string.Format(CultureInfo.CurrentCulture, Strings.SessionPeerFormat, session.PeerUserDisplayName, session.PeerDeviceName);
+            : string.Format(UiFlow.Culture, Strings.SessionPeerFormat, session.PeerUserDisplayName, UiFlow.Ltr(session.PeerDeviceName));
         RoleText = session is null ? string.Empty : session.IsHost ? Strings.SessionRoleHost : Strings.SessionRoleGuest;
         PhaseText = DescribePhase(phase);
 
@@ -99,10 +100,11 @@ public sealed partial class SessionPanelViewModel : ObservableObject, IDisposabl
             ? string.Empty
             : remaining.Value <= TimeSpan.Zero
                 ? Strings.SessionTimeUp
-                : string.Format(CultureInfo.CurrentCulture, Strings.SessionTimeRemainingFormat, FormatDuration(remaining.Value));
+                // "29:59" is a colon-separated technical value; without the isolate it reorders in Arabic.
+                : string.Format(UiFlow.Culture, Strings.SessionTimeRemainingFormat, UiFlow.Ltr(FormatDuration(remaining.Value)));
 
         DataUsedText = string.Format(
-            CultureInfo.CurrentCulture,
+            UiFlow.Culture,
             Strings.SessionDataUsedFormat,
             FormatBytes(_sessions.BytesUp),
             FormatBytes(_sessions.BytesDown));
@@ -114,7 +116,7 @@ public sealed partial class SessionPanelViewModel : ObservableObject, IDisposabl
         BrowserMessage = browser ?? string.Empty;
 
         EndedText = IsEnded
-            ? string.Format(CultureInfo.CurrentCulture, Strings.SessionSummaryFormat, DescribeEndReason(_sessions.LastEndReason, session?.IsHost ?? false), DataUsedText)
+            ? string.Format(UiFlow.Culture, Strings.SessionSummaryFormat, DescribeEndReason(_sessions.LastEndReason, session?.IsHost ?? false), DataUsedText)
             : string.Empty;
     }
 
@@ -170,7 +172,7 @@ public sealed partial class SessionPanelViewModel : ObservableObject, IDisposabl
         SessionEndReasonNames.AdminTerminated => Strings.SessionEndedAdminTerminated,
         SessionEndReasonNames.BrowserNotProxied => Strings.SessionEndedBrowserNotProxied,
         SessionEndReasonNames.ProtocolError => Strings.SessionEndedProtocolError,
-        _ => string.Format(CultureInfo.CurrentCulture, Strings.SessionEndedUnknownFormat, reason),
+        _ => string.Format(UiFlow.Culture, Strings.SessionEndedUnknownFormat, reason),
     };
 
     /// <summary>Why the work browser is unusable, naming the cause the launch result reported.</summary>
@@ -193,8 +195,8 @@ public sealed partial class SessionPanelViewModel : ObservableObject, IDisposabl
         }
 
         return value >= TimeSpan.FromHours(1)
-            ? value.ToString(@"h\:mm\:ss", CultureInfo.CurrentCulture)
-            : value.ToString(@"m\:ss", CultureInfo.CurrentCulture);
+            ? value.ToString(@"h\:mm\:ss", UiFlow.Culture)
+            : value.ToString(@"m\:ss", UiFlow.Culture);
     }
 
     /// <summary>Approximate size for the panel: one decimal, the largest unit that keeps the number readable.</summary>
@@ -217,7 +219,7 @@ public sealed partial class SessionPanelViewModel : ObservableObject, IDisposabl
             _ => (bytes / Gb, Strings.BytesUnitGb),
         };
 
-        return string.Format(CultureInfo.CurrentCulture, Strings.BytesFormat, value, unit);
+        return string.Format(UiFlow.Culture, Strings.BytesFormat, value, unit);
     }
 
     public void Dispose() => _sessions.PropertyChanged -= OnSessionsPropertyChanged;

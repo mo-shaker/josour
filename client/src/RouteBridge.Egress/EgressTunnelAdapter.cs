@@ -24,7 +24,10 @@ public sealed class EgressTunnelAdapter : ITunnelEgress
     /// <param name="addressBlocker">
     /// استبدال فحص الحظر لعنوان واحد؛ لاختبارات E2E داخل العملية فقط (للسماح بـ 127.0.0.1). null = سياسة IpRangePolicy.
     /// </param>
-    /// <param name="limiter">حدود streams مخصّصة؛ null = 256 متزامنًا و50 فتحًا في الثانية.</param>
+    /// <param name="limiter">
+    /// حدود streams مخصّصة؛ null = <see cref="TunnelEgressContext.MaxConcurrentStreams"/> (المرافق للنافذة
+    /// المشتقة من الـ RTT: 256 أو 128 أو 64) و50 فتحًا في الثانية كما هي في العقد.
+    /// </param>
     public static ITunnelEgress Create(TunnelEgressContext context, Func<IPAddress, bool>? addressBlocker, StreamLimiter? limiter = null)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -35,7 +38,7 @@ public sealed class EgressTunnelAdapter : ITunnelEgress
             LocalAddresses = context.BlockedLocalAddresses,
             AddressBlocker = addressBlocker,
         });
-        return new EgressTunnelAdapter(new OpenHandler(policy, limiter));
+        return new EgressTunnelAdapter(new OpenHandler(policy, limiter ?? new StreamLimiter(context.MaxConcurrentStreams)));
     }
 
     /// <summary>المعالج الأصلي (عدّادات الفتح الناجح والفاشل، الحدود) لمن يحتاج تفصيلًا أدق من الواجهة.</summary>

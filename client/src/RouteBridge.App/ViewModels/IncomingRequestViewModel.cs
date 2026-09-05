@@ -1,16 +1,21 @@
-using System.Globalization;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using RouteBridge.App.Models;
+using RouteBridge.Infrastructure.Session;
 
 namespace RouteBridge.App.ViewModels;
 
 /// <summary>
-/// Drives <see cref="Views.IncomingRequestWindow"/>: request details, the 60 s countdown (from the request's <c>expires_at</c>)
-/// and Accept/Reject. Create it on the UI thread — it owns a <see cref="DispatcherTimer"/>; decisions arriving from other threads
-/// (toast buttons) are marshalled back to that thread.
+/// Drives <see cref="Views.IncomingRequestWindow"/>: the pre-accept disclosure of the product document section 15
+/// (requester, device, requested duration, the sites that request's allow-list version permits, the public-IP notice and
+/// the reminder that the host can disconnect at any time), the 60 s countdown from the request's <c>expires_at</c>, and
+/// Accept/Reject.
+/// <para>
+/// Create it on the UI thread — it owns a <see cref="DispatcherTimer"/>; decisions arriving from other threads (toast
+/// buttons) are marshalled back to that thread.
+/// </para>
 /// </summary>
 public sealed partial class IncomingRequestViewModel : ObservableObject, IDisposable
 {
@@ -36,8 +41,16 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
         _logger = logger;
         _dispatcher = Dispatcher.CurrentDispatcher;
 
-        Heading = string.Format(CultureInfo.CurrentCulture, Strings.IncomingRequestHeadingFormat, request.GuestName);
-        DurationText = string.Format(CultureInfo.CurrentCulture, Strings.DurationMinutesFormat, request.DurationMinutes);
+        Heading = string.Format(UiFlow.Culture, Strings.IncomingRequestHeadingFormat, request.GuestName);
+        DurationText = string.Format(UiFlow.Culture, Strings.DurationMinutesFormat, request.DurationMinutes);
+
+        // Device names and allow-list entries are technical values: keep them left to right inside the Arabic window.
+        GuestDevice = UiFlow.Ltr(request.GuestDevice);
+        AllowedSites = request.Allowlist.Sites.Select(UiFlow.Ltr).ToArray();
+        AllowedSitesSummary = request.Allowlist.Loaded
+            ? string.Format(UiFlow.Culture, Strings.AllowedSitesSummaryFormat, request.Allowlist.Sites.Count, request.Allowlist.Version)
+            : string.Empty;
+        AllowedSitesMessage = DescribeAllowlist(request.Allowlist);
 
         _timer = new DispatcherTimer(DispatcherPriority.Normal, _dispatcher) { Interval = TimeSpan.FromMilliseconds(250) };
         _timer.Tick += (_, _) => Tick();
@@ -49,7 +62,8 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
 
     public string GuestName => _request.GuestName;
 
-    public string GuestDevice => _request.GuestDevice;
+    /// <summary>The requester's device name, kept left to right.</summary>
+    public string GuestDevice { get; }
 
     public int DurationMinutes => _request.DurationMinutes;
 
@@ -59,7 +73,24 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
 
     public string DurationText { get; }
 
-    public string AllowedSitesText => _request.AllowedSitesSummary;
+    /// <summary>The sites that this request's allow-list version permits; empty when it could not be loaded.</summary>
+    public IReadOnlyList<string> AllowedSites { get; }
+
+    public bool HasAllowedSites => AllowedSites.Count > 0;
+
+    /// <summary>"N entries · allow-list version V"; empty when the list could not be loaded.</summary>
+    public string AllowedSitesSummary { get; }
+
+    /// <summary>
+    /// Why there is no list to look at: "could not be loaded" or "this version allows nothing". Empty when the list is
+    /// shown. The two are deliberately different sentences — an empty list would otherwise read as a harmless request.
+    /// </summary>
+    public string AllowedSitesMessage { get; }
+
+    public bool HasAllowedSitesMessage => AllowedSitesMessage.Length > 0;
+
+    /// <summary>True when the allow-list could not be fetched at all (the window says so, in a warning).</summary>
+    public bool IsAllowlistUnavailable => !_request.Allowlist.Loaded;
 
     public IncomingRequestDecision? Decision { get; private set; }
 
@@ -68,6 +99,18 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
 
     /// <summary>Raised on the UI thread once a decision exists; the window closes itself on it.</summary>
     public event EventHandler? Completed;
+
+    /// <summary>The disclosure's failure sentence, or empty when the list itself is on screen.</summary>
+    public static string DescribeAllowlist(AllowlistDisclosure allowlist)
+    {
+        ArgumentNullException.ThrowIfNull(allowlist);
+        if (!allowlist.Loaded)
+        {
+            return Strings.AllowedSitesUnavailable;
+        }
+
+        return allowlist.IsEmpty ? Strings.AllowedSitesEmpty : string.Empty;
+    }
 
     private bool CanDecide() => !IsCompleted;
 
@@ -90,7 +133,7 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
         if (seconds != SecondsRemaining || CountdownText.Length == 0)
         {
             SecondsRemaining = seconds;
-            CountdownText = string.Format(CultureInfo.CurrentCulture, Strings.CountdownFormat, seconds);
+            CountdownText = string.Format(UiFlow.Culture, Strings.CountdownFormat, seconds);
         }
 
         if (seconds == 0)

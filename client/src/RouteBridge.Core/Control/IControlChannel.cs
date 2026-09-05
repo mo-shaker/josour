@@ -52,3 +52,25 @@ public interface IControlChannel : IAsyncDisposable
     /// </summary>
     Task<ControlMessage> RequestAsync(ControlMessage message, TimeSpan timeout, CancellationToken ct);
 }
+
+/// <summary>
+/// A control channel that can be told to stop waiting and look at its connection right now.
+/// <para>
+/// The backoff ladder (1, 2, 4 … 30 s) is the right answer to a server that is down, and the wrong one to a laptop that
+/// just woke up or a machine that just changed networks: the reason the connection failed is gone, and waiting out the
+/// remaining 30 s is pure dead time in front of the user. <c>ConnectivityWatcher</c> turns those two operating-system
+/// events into a call here. It is a separate interface, not a member of <see cref="IControlChannel"/>, so a decorator or
+/// a stand-in that has nothing to wake keeps compiling untouched; a caller that holds only an
+/// <see cref="IControlChannel"/> tests for it.
+/// </para>
+/// </summary>
+public interface IReconnectNow
+{
+    /// <summary>
+    /// Cuts short the current reconnect wait (the next attempt starts at once and the ladder restarts) and, on a channel
+    /// that still believes it is connected, sends a heart-beat immediately so a socket that died while the machine slept
+    /// is discovered now rather than at the next interval. Safe to call at any time, from any thread, and never throws.
+    /// </summary>
+    /// <param name="reason">What woke it, for the log: "power resumed", "network address changed", …</param>
+    void ReconnectNow(string reason);
+}

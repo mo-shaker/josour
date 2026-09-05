@@ -871,3 +871,32 @@ async def test_server_verdicts_are_refused_from_clients(
     await live.guest_ws.send(_end(live.session_id, reason))
     error = await live.guest_ws.expect("error")
     assert error["code"] == "bad_request"
+
+
+async def test_every_session_gets_a_fresh_key_and_none_survives_the_end(
+    ws_connect: WsFactory, make_actor: ActorFactory, db: AsyncSession
+) -> None:
+    """Product document section 14: session keys are never reused, and are revoked at the end.
+
+    Two sessions in a row between the same two devices must not share key material, and neither
+    ``session_keys`` row may outlive its session."""
+    secrets_seen: list[str] = []
+    for round_number in (1, 2):
+        live = await _connecting(
+            ws_connect,
+            make_actor,
+            guest_email=f"g{round_number}@example.com",
+            host_email=f"h{round_number}@example.com",
+        )
+        stored = await db.get(SessionKey, live.uuid)
+        assert stored is not None
+        assert len(stored.secret) == 32, "32 raw bytes (docs/ws-protocol.md section 4)"
+        secrets_seen.append(stored.secret.hex())
+
+        await live.guest_ws.send(_end(live.session_id, "guest_ended"))
+        await live.guest_ws.expect("session.terminate")
+        db.expire_all()
+        assert await db.get(SessionKey, live.uuid) is None
+
+    assert secrets_seen[0] != secrets_seen[1], "a session key must never be reused"
+    assert await db.scalar(select(func.count()).select_from(SessionKey)) == 0

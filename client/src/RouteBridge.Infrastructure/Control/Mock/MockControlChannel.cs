@@ -20,7 +20,7 @@ namespace RouteBridge.Infrastructure.Control.Mock;
 /// raised on <see cref="MessageReceived"/>. <see cref="DisposeAsync"/> disconnects; the instance can connect again.
 /// </para>
 /// </summary>
-public sealed class MockControlChannel : IControlChannel
+public sealed class MockControlChannel : IControlChannel, IReconnectNow
 {
     private sealed record OutgoingRequest(string Ref, Guid RequestId, HostInfoDto Host, int DurationMin, CancellationTokenSource Timer);
 
@@ -95,6 +95,14 @@ public sealed class MockControlChannel : IControlChannel
             }
         }
     }
+
+    /// <summary>
+    /// Nothing to wake: the fake server is in this process, never drops and has no backoff to cut short. Implemented so a
+    /// <c>--mock</c> run takes the same code path as a real one (<c>ConnectivityWatcher</c> finds the capability and logs
+    /// the resume / network change) instead of a different one.
+    /// </summary>
+    public void ReconnectNow(string reason) =>
+        _logger.LogInformation("Mock control channel asked to re-evaluate its connection ({Reason}); nothing to do", reason);
 
     // ---------- IControlChannel ----------
 

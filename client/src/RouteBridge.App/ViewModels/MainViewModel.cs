@@ -62,7 +62,8 @@ public sealed partial class MainViewModel : ObservableObject
         _authFlow = authFlow;
         _logger = logger;
 
-        VersionText = string.Format(CultureInfo.CurrentCulture, Strings.VersionFormat, deviceInfo.AppVersion);
+        // "v0.1.0" is a technical value: kept left to right even in the mirrored window.
+        VersionText = UiFlow.Ltr(string.Format(UiFlow.Culture, Strings.VersionFormat, deviceInfo.AppVersion));
         IsDebugMenuVisible = options.DebugMenu;
 
         Host.PropertyChanged += OnHostPropertyChanged;
@@ -134,10 +135,10 @@ public sealed partial class MainViewModel : ObservableObject
         var connection = DescribeConnection();
         StatusText = user is null
             ? Strings.StatusNotSignedIn
-            : string.Format(CultureInfo.CurrentCulture, Strings.StatusSignedInFormat, user.DisplayName, connection);
+            : string.Format(UiFlow.Culture, Strings.StatusSignedInFormat, user.DisplayName, connection);
         TrayTooltip = user is null
             ? Strings.TrayTooltipNotSignedIn
-            : string.Format(CultureInfo.CurrentCulture, Strings.TrayTooltipSignedInFormat, user.DisplayName, connection);
+            : string.Format(UiFlow.Culture, Strings.TrayTooltipSignedInFormat, user.DisplayName, connection);
     }
 
     /// <summary>The connection half of the status line and the tray tooltip: live state first, then why it stopped for good.</summary>

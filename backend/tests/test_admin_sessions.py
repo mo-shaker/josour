@@ -152,6 +152,8 @@ async def test_terminate_session(
     )
     assert event is not None and event.user_id == ids["admin"] and event.ip == "127.0.0.1"
     assert event.details == {
+        # ``via`` distinguishes this from the ``end-session`` CLI, which has no admin user.
+        "via": "api",
         "session_id": str(ids["session"]),
         "guest_user_id": str(ids["guest"]),
         "host_user_id": str(ids["host"]),

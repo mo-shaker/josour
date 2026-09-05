@@ -1,8 +1,18 @@
 """Password hashing (argon2id), opaque secrets (device secret / refresh token) and access JWTs.
 
 Nothing in this module logs; callers must never log the plaintext values handled here.
+
+argon2id is deliberately expensive: with the library's recommended parameters one hash costs
+~35 ms and 64 MiB here, and roughly four times that on the single-core VPS the product targets,
+because the four lanes cannot run in parallel there. The server is one uvicorn worker
+(docs/RouteBridge-MVP-Implementation-Plan.md section 2), so a hash computed on the event loop
+stops *every* live control channel for that long - heartbeats, ``hosts.update``, session frames
+and all. :func:`hash_password_async` and :func:`verify_password_async` therefore run the KDF on
+a worker thread (argon2 releases the GIL), which is what every ``await``-ing caller must use;
+the synchronous forms remain for start-up and tests.
 """
 
+import asyncio
 import hashlib
 import hmac
 import secrets
@@ -33,6 +43,30 @@ def verify_password(password_hash: str | None, password: str) -> bool:
         return _hasher.verify(password_hash or _DUMMY_HASH, password)
     except (VerifyMismatchError, VerificationError, InvalidHashError):
         return False
+
+
+MAX_CONCURRENT_KDF = 2
+"""How many argon2 operations may run at once.
+
+Each one holds ``memory_cost`` (64 MiB with the library's recommended parameters) for its whole
+duration, and the target host is 1 vCPU / 2 GB (plan section 10), where extra parallel hashes buy
+no throughput and only multiply the peak. Two slots cap the KDF at ~128 MiB; callers queue on the
+semaphore without blocking the event loop, so a login burst becomes back-pressure on logins
+rather than memory pressure on the box."""
+
+_kdf_slots = asyncio.Semaphore(MAX_CONCURRENT_KDF)
+
+
+async def hash_password_async(password: str) -> str:
+    """:func:`hash_password` off the event loop; use this from any async caller."""
+    async with _kdf_slots:
+        return await asyncio.to_thread(hash_password, password)
+
+
+async def verify_password_async(password_hash: str | None, password: str) -> bool:
+    """:func:`verify_password` off the event loop; use this from any async caller."""
+    async with _kdf_slots:
+        return await asyncio.to_thread(verify_password, password_hash, password)
 
 
 def password_needs_rehash(password_hash: str) -> bool:

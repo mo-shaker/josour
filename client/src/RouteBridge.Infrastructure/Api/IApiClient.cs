@@ -36,6 +36,14 @@ public interface IApiClient
     /// <summary><c>GET /domains</c>; sends <c>If-None-Match: "&lt;knownVersion&gt;"</c> and maps 304 to <see cref="DomainsResult.NotModified"/>.</summary>
     Task<DomainsResult> GetDomainsAsync(int? knownVersion, CancellationToken ct);
 
+    /// <summary>
+    /// <c>GET /domains?version=N</c>: exactly that version of the allow-list, whatever the current one is (docs/api.md).
+    /// The host's pre-accept disclosure needs it, because <c>request.incoming</c> names the version the guest's session
+    /// will run under and showing a different list would be a lie. A version the server no longer has answers
+    /// <c>404</c> → <see cref="ApiException"/> with <see cref="ApiErrorCodes.NotFound"/>.
+    /// </summary>
+    Task<DomainsDto> GetDomainsVersionAsync(int version, CancellationToken ct);
+
     /// <summary><c>POST /probe</c>.</summary>
     Task<ProbeResult> ProbeAsync(string ip, int port, CancellationToken ct);
 }

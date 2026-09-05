@@ -24,7 +24,25 @@ public sealed class AppSettingsStoreTests : IDisposable
         Assert.Equal(string.Empty, store.Current.ServerUrl);
         Assert.Equal(BrowserPreference.Auto, store.Current.PreferredBrowser);
         Assert.False(store.Current.StartMinimized);
+        Assert.Equal(string.Empty, store.Current.Language); // empty means "the default language", i.e. Arabic
         Assert.False(File.Exists(FilePath));
+    }
+
+    [Fact]
+    public async Task Language_RoundTripsAsACode_AndAnOldFileWithoutItStillLoads()
+    {
+        var store = new AppSettingsStore(FilePath);
+        await store.SaveAsync(new AppSettings { ServerUrl = "https://routebridge.example.com", Language = "en" }, CancellationToken.None);
+
+        Assert.Contains("\"language\": \"en\"", await File.ReadAllTextAsync(FilePath));
+        Assert.Equal("en", new AppSettingsStore(FilePath).Current.Language);
+
+        // A settings.json written before week 5 has no "language" at all: it must load and mean "Arabic".
+        await File.WriteAllTextAsync(FilePath, """{"serverUrl":"https://routebridge.example.com","startMinimized":true}""");
+        var upgraded = new AppSettingsStore(FilePath);
+
+        Assert.Equal(string.Empty, upgraded.Current.Language);
+        Assert.True(upgraded.Current.StartMinimized);
     }
 
     [Fact]

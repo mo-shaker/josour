@@ -10,7 +10,10 @@
                  d:DataContext="{d:DesignInstance Type=vm:IncomingRequestViewModel, IsDesignTimeCreatable=False}"
                  Title="{x:Static app:Strings.IncomingRequestWindowTitle}"
                  Icon="pack://application:,,,/Assets/routebridge.ico"
-                 Width="460" SizeToContent="Height" MinHeight="360"
+                 FlowDirection="{x:Static app:UiFlow.Direction}"
+                 Language="{x:Static app:UiFlow.Language}"
+                 NumberSubstitution.Substitution="European"
+                 Width="480" SizeToContent="Height" MinHeight="420"
                  ResizeMode="NoResize"
                  Topmost="True"
                  ShowInTaskbar="True"
@@ -30,6 +33,7 @@
         <StackPanel Grid.Row="1" Margin="20,8,20,20">
             <ui:TextBlock FontTypography="Title" TextWrapping="Wrap" Text="{Binding Heading}" />
 
+            <!-- Product document section 15: who, from which device, for how long. -->
             <Grid Margin="0,16,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -42,22 +46,53 @@
                 </Grid.RowDefinitions>
 
                 <ui:TextBlock Grid.Row="0" Grid.Column="0" Appearance="Secondary" Margin="0,0,16,6"
-                              Text="{x:Static app:Strings.IncomingRequestDeviceLabel}" />
+                              Text="{x:Static app:Strings.IncomingRequestRequesterLabel}" />
                 <ui:TextBlock Grid.Row="0" Grid.Column="1" FontTypography="BodyStrong" Margin="0,0,0,6"
-                              Text="{Binding GuestDevice}" />
+                              TextTrimming="CharacterEllipsis" Text="{Binding GuestName}" />
 
                 <ui:TextBlock Grid.Row="1" Grid.Column="0" Appearance="Secondary" Margin="0,0,16,6"
-                              Text="{x:Static app:Strings.IncomingRequestDurationLabel}" />
+                              Text="{x:Static app:Strings.IncomingRequestDeviceLabel}" />
+                <!-- A device name is a technical identifier: the ViewModel isolates it so it never reorders. -->
                 <ui:TextBlock Grid.Row="1" Grid.Column="1" FontTypography="BodyStrong" Margin="0,0,0,6"
-                              Text="{Binding DurationText}" />
+                              TextTrimming="CharacterEllipsis" Text="{Binding GuestDevice}" />
 
                 <ui:TextBlock Grid.Row="2" Grid.Column="0" Appearance="Secondary" Margin="0,0,16,0"
-                              Text="{x:Static app:Strings.IncomingRequestAllowedSitesLabel}" />
-                <ui:TextBlock Grid.Row="2" Grid.Column="1" TextWrapping="Wrap"
-                              Text="{Binding AllowedSitesText}" />
+                              Text="{x:Static app:Strings.IncomingRequestDurationLabel}" />
+                <ui:TextBlock Grid.Row="2" Grid.Column="1" FontTypography="BodyStrong"
+                              Text="{Binding DurationText}" />
             </Grid>
 
-            <ui:InfoBar Margin="0,16,0,0" IsOpen="True" IsClosable="False" Severity="Warning"
+            <!-- The allow-list of THIS request's version (GET /domains?version=N), or why it is not there. -->
+            <ui:TextBlock Margin="0,16,0,0" FontTypography="BodyStrong"
+                          Text="{x:Static app:Strings.IncomingRequestAllowedSitesLabel}" />
+            <ui:TextBlock Appearance="Secondary" TextWrapping="Wrap" Margin="0,2,0,0"
+                          Text="{x:Static app:Strings.AllowedSitesNote}" />
+
+            <ui:Card Padding="12" Margin="0,8,0,0"
+                     Visibility="{Binding HasAllowedSites, Converter={StaticResource BoolToVis}}">
+                <StackPanel>
+                    <ScrollViewer MaxHeight="132" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding AllowedSites}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <!-- Each entry is bidi-isolated: "portal.corp:8443" keeps its order, while the
+                                         list itself still starts at the reading edge of the mirrored card. -->
+                                    <ui:TextBlock Margin="0,1" TextWrapping="Wrap" Text="{Binding}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <ui:TextBlock Appearance="Tertiary" FontTypography="Caption" Margin="0,8,0,0"
+                                  Text="{Binding AllowedSitesSummary}" />
+                </StackPanel>
+            </ui:Card>
+
+            <!-- "Could not be loaded" and "this version allows nothing" are different sentences, on purpose. -->
+            <ui:InfoBar Margin="0,8,0,0" IsClosable="False" Severity="Warning"
+                        IsOpen="{Binding HasAllowedSitesMessage, Mode=OneWay}"
+                        Message="{Binding AllowedSitesMessage}" />
+
+            <ui:InfoBar Margin="0,12,0,0" IsOpen="True" IsClosable="False" Severity="Warning"
                         Title="{x:Static app:Strings.IncomingRequestWarningTitle}"
                         Message="{x:Static app:Strings.IncomingRequestWarning}" />
 
@@ -72,7 +107,7 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                     <ui:SymbolIcon Symbol="Timer24" Margin="0,0,6,0" />
-                    <ui:TextBlock Appearance="Secondary" Text="{Binding CountdownText}" />
+                    <ui:TextBlock Appearance="Secondary" TextWrapping="Wrap" Text="{Binding CountdownText}" />
                 </StackPanel>
                 <ui:Button Grid.Column="1" MinWidth="110" Margin="8,0,0,0" Appearance="Primary"
                            Content="{x:Static app:Strings.Accept}" Command="{Binding AcceptCommand}" />

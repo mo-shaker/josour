@@ -55,6 +55,13 @@ internal sealed class RecordingTransport : ITunnelTransport
     private readonly ITunnelTransport _inner = new DirectTransport();
     private readonly List<Stream> _streams = new();
     private readonly object _gate = new();
+    private readonly TimeSpan _connectDelay;
+
+    /// <param name="connectDelay">
+    /// تأخير داخل نافذة قياس <c>connect_ms</c> (بعد اتصال TCP وقبل TLS): وصلة بطيئة مُحاكاة لاختبار
+    /// اشتقاق النافذة من الـ RTT. loopback وحده يعطي connect_ms ≈ 0 وهو الرقم الذي يعدّه العقد فاسدًا.
+    /// </param>
+    public RecordingTransport(TimeSpan? connectDelay = null) => _connectDelay = connectDelay ?? TimeSpan.Zero;
 
     public string Name => "recording";
     public int ConnectCount { get { lock (_gate) return _streams.Count; } }
@@ -63,6 +70,7 @@ internal sealed class RecordingTransport : ITunnelTransport
     {
         var stream = await _inner.ConnectAsync(endpoint, timeout, ct);
         lock (_gate) _streams.Add(stream);
+        if (_connectDelay > TimeSpan.Zero) await Task.Delay(_connectDelay, ct);
         return stream;
     }
 
@@ -168,12 +176,19 @@ internal sealed class TunnelSessionPair : IAsyncDisposable
     public List<string> Log { get; }
     public TunnelConnectResult HostResult { get; private set; } = null!;
     public TunnelConnectResult GuestResult { get; private set; } = null!;
+    /// <summary>السياق كما بناه المضيف لمصنع الخروج (يحمل حد الـ streams المشتق من النافذة).</summary>
+    public TunnelEgressContext? EgressContext { get; private set; }
     /// <summary>الـ Mux كما مُرِّر إلى مصنع الـ Proxy على جانب الضيف (الواجهة لا تكشفه).</summary>
     public IMuxConnection? GuestMux { get; private set; }
     public List<TunnelState> HostStates { get; } = new();
     public List<TunnelState> GuestStates { get; } = new();
 
-    public static async Task<TunnelSessionPair> CreateAsync(TimeSpan? timeout = null, Func<CancellationToken, Task>? guestCloseBrowser = null, List<string>? sharedLog = null)
+    public static async Task<TunnelSessionPair> CreateAsync(
+        TimeSpan? timeout = null,
+        Func<CancellationToken, Task>? guestCloseBrowser = null,
+        List<string>? sharedLog = null,
+        TimeSpan? connectDelay = null,
+        MuxOptions? muxOverride = null)
     {
         var log = sharedLog ?? new List<string>();
         var sessionId = Guid.NewGuid();
@@ -181,7 +196,8 @@ internal sealed class TunnelSessionPair : IAsyncDisposable
         var expires = DateTimeOffset.UtcNow.AddMinutes(30);
         var egress = new FakeEgress(log);
         var proxy = new FakeProxy(log);
-        var hostTransport = new RecordingTransport();
+        var hostTransport = new RecordingTransport(connectDelay);
+        TunnelEgressContext? egressContext = null;
 
         var host = new TunnelSession(
             new SessionMaterial(sessionId, TunnelRole.Host, (byte[])secret.Clone(), expires, true, "198.51.100.2"),
@@ -190,10 +206,10 @@ internal sealed class TunnelSessionPair : IAsyncDisposable
                 BindAddress = IPAddress.Loopback,
                 CandidateSource = () => new StaticCandidateSource(),
                 Transport = hostTransport,
-                HostEgress = _ => egress,
+                HostEgress = context => { egressContext = context; return egress; },
                 // حيوية قصيرة بدل تعطيلها: المسار الأساسي لكشف الموت هو EOF، وهذه شبكة أمان
                 // تجعل الكشف حتميًا داخل مهلة الاختبار بدل انتظار 60 ثانية الافتراضية.
-                Mux = new MuxOptions { PingInterval = TimeSpan.FromSeconds(2), DeadAfter = TimeSpan.FromSeconds(8) },
+                Mux = muxOverride ?? new MuxOptions { PingInterval = TimeSpan.FromSeconds(2), DeadAfter = TimeSpan.FromSeconds(8) },
             });
         IMuxConnection? guestMux = null;
         var guest = new TunnelSession(
@@ -206,7 +222,7 @@ internal sealed class TunnelSessionPair : IAsyncDisposable
                 CloseBrowserAsync = guestCloseBrowser,
                 // حيوية قصيرة بدل تعطيلها: المسار الأساسي لكشف الموت هو EOF، وهذه شبكة أمان
                 // تجعل الكشف حتميًا داخل مهلة الاختبار بدل انتظار 60 ثانية الافتراضية.
-                Mux = new MuxOptions { PingInterval = TimeSpan.FromSeconds(2), DeadAfter = TimeSpan.FromSeconds(8) },
+                Mux = muxOverride ?? new MuxOptions { PingInterval = TimeSpan.FromSeconds(2), DeadAfter = TimeSpan.FromSeconds(8) },
             });
 
         var pair = new TunnelSessionPair(host, guest, egress, proxy, hostTransport, log);
@@ -223,6 +239,7 @@ internal sealed class TunnelSessionPair : IAsyncDisposable
         pair.HostResult = await hostTask;
         pair.GuestResult = await guestTask;
         pair.GuestMux = guestMux;
+        pair.EgressContext = egressContext;
         return pair;
     }
 

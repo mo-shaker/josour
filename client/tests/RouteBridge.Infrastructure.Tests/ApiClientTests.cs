@@ -161,6 +161,29 @@ public sealed class ApiClientTests
     }
 
     [Fact]
+    public async Task GetDomainsVersion_AsksForThatVersion_AndSurfacesAMissingOne()
+    {
+        // The host's pre-accept disclosure needs the version the request names, not today's list (docs/api.md).
+        var (api, http, _) = Create();
+        http.On(HttpMethod.Get, "/api/v1/domains", request =>
+            request.RequestUri!.Query.Contains("version=3", StringComparison.Ordinal)
+                ? FakeHttpMessageHandler.Json(HttpStatusCode.OK, """{"version":3,"entries":["example.com","portal.corp:8443"]}""")
+                : FakeHttpMessageHandler.Error(HttpStatusCode.NotFound, "not_found", "no such allow-list version"));
+
+        var domains = await api.GetDomainsVersionAsync(3, None);
+
+        Assert.Equal(3, domains.Version);
+        Assert.Equal(new[] { "example.com", "portal.corp:8443" }, domains.Entries);
+        Assert.Equal("?version=3", http.Requests[0].Uri.Query);
+        Assert.Equal("/api/v1/domains", http.Requests[0].Uri.AbsolutePath);
+
+        var missing = await Assert.ThrowsAsync<ApiException>(() => api.GetDomainsVersionAsync(99, None));
+        Assert.Equal(ApiErrorCodes.NotFound, missing.Code);
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => api.GetDomainsVersionAsync(0, None));
+    }
+
+    [Fact]
     public async Task GetHosts_ParsesSnapshotShape_IncludingNullReachable()
     {
         var (api, http, _) = Create();
