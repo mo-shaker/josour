@@ -13,6 +13,7 @@ from app.core.security import (
     generate_opaque_secret,
     hash_opaque_secret,
     hash_password,
+    password_needs_rehash,
     verify_opaque_secret,
     verify_password,
 )
@@ -68,3 +69,35 @@ def test_ensure_utc() -> None:
     assert ensure_utc(None) is None
     naive = datetime(2026, 9, 3, 12, 0, 0)
     assert ensure_utc(naive) == datetime(2026, 9, 3, 12, 0, 0, tzinfo=UTC)
+
+
+# --- ADR-0007: معاملات argon2id (معتمد 2026-09-05) ---
+
+
+def test_argon2_uses_the_owasp_recommended_parameters() -> None:
+    """المعاملات جزء من الموقف الأمني: تغييرها يجب أن يكون قرارًا لا انزلاقًا."""
+    from app.core.security import (
+        ARGON2_MEMORY_COST_KIB,
+        ARGON2_PARALLELISM,
+        ARGON2_TIME_COST,
+        _hasher,
+    )
+
+    assert (ARGON2_MEMORY_COST_KIB, ARGON2_TIME_COST, ARGON2_PARALLELISM) == (19 * 1024, 2, 1)
+    assert _hasher.memory_cost == ARGON2_MEMORY_COST_KIB
+    assert _hasher.time_cost == ARGON2_TIME_COST
+    assert _hasher.parallelism == ARGON2_PARALLELISM
+    # والمعاملات مكتوبة داخل التجزئة، وهو ما يجعل الترقية التدريجية ممكنة أصلًا
+    assert "m=19456,t=2,p=1" in hash_password("Whatever-pass-1")
+
+
+def test_passwords_hashed_with_the_previous_parameters_still_verify_and_are_upgraded() -> None:
+    """لا يجوز أن يكسر تغيير المعاملات حساب مستخدم قائم."""
+    from argon2 import PasswordHasher
+
+    legacy = PasswordHasher(memory_cost=65536, time_cost=3, parallelism=4).hash("Existing-pass-1")
+
+    assert verify_password(legacy, "Existing-pass-1") is True
+    assert verify_password(legacy, "wrong-password") is False
+    assert password_needs_rehash(legacy) is True
+    assert password_needs_rehash(hash_password("Existing-pass-1")) is False

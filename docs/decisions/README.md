@@ -8,4 +8,4 @@
 | [0004](0004-non-allowlisted-routing.md) | المواقع غير المسموح بها تمر عبر اتصال المستخدم | معتمد 2026-09-03 |
 | [0005](0005-installer-unpackaged.md) | مثبّت موقّع غير مغلف بدل MSIX | معتمد |
 | [0006](0006-multiplexing-library.md) | مكتبة Multiplexing | معتمد 2026-09-04 (Nerdbank.Streams)، مع تصحيح النافذة في الأسبوع 5 |
-| [0007](0007-argon2-parameters.md) | معاملات argon2id مقابل سقف الـ VPS | **مفتوح**: يحتاج اعتماد صاحب المنتج |
+| [0007](0007-argon2-parameters.md) | معاملات argon2id مقابل سقف الـ VPS | معتمد 2026-09-05 (الخيار ب: m=19 MiB، t=2، p=1) |
