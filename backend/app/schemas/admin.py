@@ -99,12 +99,18 @@ class SecurityEventOut(ApiModel):
 
 
 class DiagnosticsSummary(BaseModel):
-    """Relay decision-gate summary (``GET /admin/diagnostics``). All zeros/empty without data."""
+    """Relay decision-gate summary (``GET /admin/diagnostics``). All zeros/empty without data.
+
+    Additive only: week 4 filled the connect columns with real data and added
+    ``end_reason_distribution``; no existing field was renamed or changed shape."""
 
     total_sessions: int
     sessions_with_connect_result: int
     connect_ok_ratio: float
-    """``connect_result == 'ok'`` over sessions with a non-null ``connect_result``."""
+    """``connect_result == 'ok'`` over sessions with a non-null ``connect_result``. The other
+    values are ``failed`` (the clients reported it) and ``timeout`` (the connect deadline)."""
     winner_type_distribution: dict[str, int]
     tls_version_distribution: dict[str, int]
     connect_diagnostics_count: int
+    end_reason_distribution: dict[str, int]
+    """Ended sessions per ``end_reason`` (docs/ws-protocol.md section 5)."""

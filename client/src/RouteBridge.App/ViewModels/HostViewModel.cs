@@ -7,6 +7,7 @@ using RouteBridge.Core.Control;
 using RouteBridge.Core.Session;
 using RouteBridge.Infrastructure.Api;
 using RouteBridge.Infrastructure.Control.Mock;
+using RouteBridge.Infrastructure.Session;
 
 namespace RouteBridge.App.ViewModels;
 
@@ -94,7 +95,10 @@ public sealed partial class HostViewModel : ObservableObject
         try
         {
             // WEEK 5: FirewallRuleChecker + VpnAdapterDetector warnings before announcing; UPnP warm-up.
-            // WEEK 4: listen_port from ITunnelSession.PrepareAsync so the server can run the reachability probe.
+            //
+            // No listen_port on the idle announcement, on purpose: the tunnel listener only exists between session.created and
+            // session.connected (docs/protocol.md section 2), so an idle host has no port to advertise. The server therefore
+            // leaves presence.reachable at null (docs/ws-protocol.md section 8) until it asks for a probe some other way.
             await _controlChannel.SendAsync(new HostAvailableMessage(available, ListenPort: null), CancellationToken.None);
             _logger.LogInformation("host.available={Available} sent", available);
         }

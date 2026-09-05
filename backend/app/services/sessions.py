@@ -1,9 +1,15 @@
 """Session queries (``GET /sessions/me``, ``GET /admin/sessions``) and the admin termination.
 
-Week 3/4 adds the full state machine (request accept -> connecting -> active, timers,
-disconnects) on top of this module. ``end_session`` is the single place that performs the
-``ended`` transition and deletes the ``session_keys`` row, so every end reason must go through
-it; the returned ``SessionEnded`` event is published on the bus by the caller after commit.
+The frame-driven half of the state machine (endpoint exchange, ``connecting`` -> ``active``,
+stats, client-requested ends) lives in ``app.services.session_flow``; this module owns the
+``ended`` transition itself.
+
+``end_session`` is the single place that performs it, so every reason of docs/ws-protocol.md
+section 5 - client ``session.end``, control-channel disconnect, admin termination, the connect
+deadline, the ``expires_at`` timer and the boot-time sweep - converges on the same four effects:
+the row is marked ended, its ``session_keys`` secret is deleted, its two timers are cancelled,
+and the returned ``SessionEnded`` event is published on the bus by the caller after commit
+(which is what delivers ``session.terminate`` to the peers).
 """
 
 import uuid
@@ -28,6 +34,7 @@ from app.models.enums import (
 from app.schemas.sessions import AdminSessionOut, MySessionOut
 from app.services.events import SessionEnded
 from app.services.security_events import record_event
+from app.services.session_timer import scheduler
 
 GuestUser = aliased(User, name="guest_user")
 GuestDevice = aliased(Device, name="guest_device")
@@ -119,6 +126,23 @@ async def list_all(
     ]
 
 
+def connect_timer_key(session_id: uuid.UUID) -> str:
+    """The connect deadline of docs/ws-protocol.md section 5 (30 s from ``session.created``)."""
+    return f"session-connect:{session_id}"
+
+
+def expiry_timer_key(session_id: uuid.UUID) -> str:
+    """The session's ``expires_at`` timer."""
+    return f"session-expiry:{session_id}"
+
+
+def cancel_session_timers(session_id: uuid.UUID) -> int:
+    """Drop both deadlines of a session. Called from :func:`end_session`, so no path can end a
+    session and leave a timer behind that would later fire on an ended row."""
+    keys = (connect_timer_key(session_id), expiry_timer_key(session_id))
+    return sum(scheduler.cancel(key) for key in keys)
+
+
 async def end_session(
     db: AsyncSession,
     session: Session,
@@ -126,14 +150,16 @@ async def end_session(
     *,
     now: datetime | None = None,
 ) -> SessionEnded:
-    """Transition to ``ended`` and delete the ``session_keys`` row (docs/ws-protocol.md
-    section 5). Flushes only; the caller commits and then publishes the returned event."""
+    """Transition to ``ended``, delete the ``session_keys`` row and cancel the session's timers
+    (docs/ws-protocol.md section 5). Flushes only; the caller commits and then publishes the
+    returned event, which is what sends ``session.terminate`` to the peers."""
     now = now or utcnow()
     session.status = SessionStatus.ENDED
     session.ended_at = now
     session.end_reason = reason
     await db.execute(delete(SessionKey).where(SessionKey.session_id == session.id))
     await db.flush()
+    cancel_session_timers(session.id)
     ended_at = ensure_utc(now)
     assert ended_at is not None
     return SessionEnded(
@@ -187,7 +213,14 @@ async def end_device_sessions(db: AsyncSession, device_id: uuid.UUID) -> list[Se
 
 
 async def end_dangling_sessions(db: AsyncSession) -> list[SessionEnded]:
-    """Server boot: no control channel survived the restart, so nothing can still be live."""
+    """Server boot: no control channel survived the restart, so nothing can still be live.
+
+    Invariant with the scheduler: the timers of section 5 live in memory only, so a session that
+    outlived a restart would have none. This sweep is what guarantees there is no such session -
+    it ends **every** non-ended row - and ``session_flow.reschedule_timers`` re-arms whatever it
+    left behind, so the two always agree on which sessions are live and timed. Today the second
+    call is a no-op by construction; it exists so that relaxing this sweep cannot silently
+    produce a live session that nothing will ever expire."""
     rows = await db.scalars(select(Session).where(Session.status.in_(NON_ENDED_SESSION_STATUSES)))
     return [await end_session(db, session, SessionEndReason.HOST_DISCONNECTED) for session in rows]
 

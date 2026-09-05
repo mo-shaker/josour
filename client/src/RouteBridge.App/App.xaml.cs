@@ -16,6 +16,7 @@ using RouteBridge.Infrastructure.Control.Mock;
 using RouteBridge.Infrastructure.Device;
 using RouteBridge.Infrastructure.Logging;
 using RouteBridge.Infrastructure.Security;
+using RouteBridge.Infrastructure.Session;
 using RouteBridge.Infrastructure.Settings;
 using Serilog;
 
@@ -183,7 +184,22 @@ public partial class App : Application
                 ControlChannelOptions.Default,
                 sp.GetRequiredService<ILogger<ControlChannel>>()));
         services.AddSingleton<ControlChannelConnector>();
-        services.AddSingleton<SessionCoordinator>();
+
+        // The session: the real tunnel (Track B) behind an injectable factory, and the work browser behind a provider that
+        // knows which of Chrome/Edge is installed and unmanaged. Both are the only places the App references Tunnel/Browser.
+        services.AddSingleton<ITunnelSessionFactory, TunnelSessionFactory>();
+        services.AddSingleton<IWorkBrowserProvider, WorkBrowserProvider>();
+        services.AddSingleton<IWorkBrowser>(sp => new WorkBrowserSession(
+            sp.GetRequiredService<IWorkBrowserProvider>(),
+            sp.GetRequiredService<ILogger<WorkBrowserSession>>()));
+        services.AddSingleton(sp => new SessionCoordinator(
+            sp.GetRequiredService<IControlChannel>(),
+            sp.GetRequiredService<IApiClient>(),
+            sp.GetRequiredService<ITunnelSessionFactory>(),
+            sp.GetRequiredService<IWorkBrowser>(),
+            sp.GetRequiredService<ILogger<SessionCoordinator>>(),
+            TimeProvider.System,
+            SessionCoordinatorOptions.Default with { Post = UiThread.Post }));
 
         // App services
         services.AddSingleton<IShellService, ShellService>();
@@ -199,6 +215,7 @@ public partial class App : Application
         // LoginWindow/LoginViewModel per sign-in by ShellService)
         services.AddSingleton<HostViewModel>();
         services.AddSingleton<GuestViewModel>();
+        services.AddSingleton<SessionPanelViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
         services.AddTransient<LoginViewModel>();
@@ -213,7 +230,18 @@ public partial class App : Application
             {
                 _host.Services.GetService<TrayService>()?.Dispose();
                 _host.StopAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
-                _host.Dispose();
+
+                // DisposeAsync, not Dispose: the control channel and the work browser are IAsyncDisposable, and a container
+                // torn down synchronously refuses those.
+                if (_host is IAsyncDisposable asyncHost)
+                {
+                    asyncHost.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                }
+                else
+                {
+                    _host.Dispose();
+                }
+
                 _host = null;
             }
 

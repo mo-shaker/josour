@@ -3,12 +3,16 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RouteBridge.App.Views;
 using RouteBridge.Infrastructure.Api;
+using RouteBridge.Infrastructure.Session;
 
 namespace RouteBridge.App.Services;
 
 /// <summary>Shows/hides the single MainWindow and LoginWindow and performs the real application exit. All calls are marshalled to the UI thread.</summary>
 public sealed class ShellService : IShellService
 {
+    /// <summary>How long the session cleanup may take before the app exits anyway.</summary>
+    private static readonly TimeSpan ShutdownTimeout = TimeSpan.FromSeconds(10);
+
     private readonly IServiceProvider _services; // windows are resolved lazily to avoid MainWindow -> MainViewModel -> IShellService -> MainWindow cycles
     private readonly ILogger<ShellService> _logger;
     private LoginWindow? _login;
@@ -50,6 +54,11 @@ public sealed class ShellService : IShellService
         login?.Close();
     });
 
+    /// <summary>
+    /// Tray → Exit. A live session is ended first (docs/protocol.md section 7: the work browser goes away, the tunnel sends
+    /// GOAWAY, the listener and the UPnP mapping are dropped, the secret is zeroed, <c>session.end</c> is reported) and only
+    /// then does the process shut down — the UI thread is never blocked while that happens.
+    /// </summary>
     public void Exit() => OnUiThread(() =>
     {
         if (IsExiting)
@@ -59,9 +68,22 @@ public sealed class ShellService : IShellService
 
         IsExiting = true;
         _logger.LogInformation("Exit requested from the tray menu");
-        // WEEK 5: if a session is active, SessionCoordinator.EndSessionAsync + the cleanup order (protocol.md section 7.6) before shutting down.
-        Application.Current.Shutdown();
+        _ = EndSessionThenShutdownAsync();
     });
+
+    private async Task EndSessionThenShutdownAsync()
+    {
+        try
+        {
+            await _services.GetRequiredService<SessionCoordinator>().ShutdownAsync(ShutdownTimeout);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ending the session before exit failed");
+        }
+
+        OnUiThread(() => Application.Current?.Shutdown());
+    }
 
     private void ShowLoginWindowCore()
     {

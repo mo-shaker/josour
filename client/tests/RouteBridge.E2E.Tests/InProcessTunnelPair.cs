@@ -49,15 +49,29 @@ internal sealed class InProcessTunnelPair : IAsyncDisposable
     public int OriginPort => Origin.Port;
 
     /// <param name="hostAllowlistOverride">قائمة أحدث على المضيف (نافذة تباين الإصدار، ADR-0004). null = القائمة نفسها.</param>
-    public static async Task<InProcessTunnelPair> CreateAsync(IEnumerable<string>? hostAllowlistOverride = null, TimeSpan? timeout = null)
+    /// <param name="extraEntries">مدخلات تُضاف إلى قائمتَي الطرفين (اختبارات توجّه اسمًا إضافيًا عبر النفق).</param>
+    /// <param name="hostAddressBlocker">
+    /// فحص الحظر على المضيف. null = السياسة الحقيقية عدا loopback (لأن الأصل داخل العملية يسكن 127.0.0.1).
+    /// اختبارات الوصول الذاتي تمرر <c>IpRangePolicy.IsBlocked</c> نفسها لتثبت أن loopback يُرفض فعلًا.
+    /// </param>
+    /// <param name="guestAddressBlocker">مثله على المسار المباشر للضيف.</param>
+    /// <param name="extraHostNames">أسماء إضافية في محللَي الطرفين: الاسم ← العناوين.</param>
+    public static async Task<InProcessTunnelPair> CreateAsync(
+        IEnumerable<string>? hostAllowlistOverride = null,
+        TimeSpan? timeout = null,
+        IEnumerable<string>? extraEntries = null,
+        Func<IPAddress, bool>? hostAddressBlocker = null,
+        Func<IPAddress, bool>? guestAddressBlocker = null,
+        IReadOnlyDictionary<string, string[]>? extraHostNames = null)
     {
         var origin = new HttpOrigin();
         try
         {
-            var guestAllowlist = AllowlistMatcher.Parse(1, new[] { $"site.test:{origin.Port}" });
+            var extra = extraEntries?.ToArray() ?? Array.Empty<string>();
+            var guestAllowlist = AllowlistMatcher.Parse(1, new[] { $"site.test:{origin.Port}" }.Concat(extra));
             var hostAllowlist = hostAllowlistOverride is null
                 ? guestAllowlist
-                : AllowlistMatcher.Parse(2, hostAllowlistOverride);
+                : AllowlistMatcher.Parse(2, hostAllowlistOverride.Concat(extra));
 
             var sessionId = Guid.NewGuid();
             var secret = RandomNumberGenerator.GetBytes(32);
@@ -65,6 +79,19 @@ internal sealed class InProcessTunnelPair : IAsyncDisposable
             var hostTransport = new RecordingTransport();
             OpenHandler? handler = null;
             ConnectProxyServer? proxyServer = null;
+
+            var hostResolver = new StubResolver().Map("site.test", "127.0.0.1");
+            var guestResolver = new StubResolver().Map("direct.test", "127.0.0.1").Map("site.test", "127.0.0.1");
+            foreach (var (name, addresses) in extraHostNames ?? new Dictionary<string, string[]>())
+            {
+                hostResolver.Map(name, addresses);
+                guestResolver.Map(name, addresses);
+            }
+
+            // الافتراضي: loopback مسموح (الأصل داخل العملية)، وبقية IpRangePolicy كما هي.
+            static bool ExceptLoopback(IPAddress a) => !IPAddress.IsLoopback(a) && IpRangePolicy.IsBlocked(a);
+            var blocker = hostAddressBlocker ?? ExceptLoopback;
+            var guestBlocker = guestAddressBlocker ?? ExceptLoopback;
 
             var host = new TunnelSession(
                 new SessionMaterial(sessionId, TunnelRole.Host, (byte[])secret.Clone(), expires, true, "198.51.100.2"),
@@ -74,16 +101,14 @@ internal sealed class InProcessTunnelPair : IAsyncDisposable
                     // حيوية قصيرة للاختبارات: المسار الأساسي لكشف الموت هو EOF، وهذه شبكة أمان
                     // تجعل الكشف حتميًا داخل مهلة الاختبار بدل الاعتماد على 60 ثانية الافتراضية.
                     Mux = TestMux,
-                    Resolver = new StubResolver().Map("site.test", "127.0.0.1"),
+                    Resolver = hostResolver,
                     Transport = hostTransport,
                     BindAddress = IPAddress.Loopback,
                     CandidateSource = () => new LoopbackCandidateSource(),
                     OurPublicIp = PeerPublicIp,
                     HostEgress = context =>
                     {
-                        // loopback مسموح في هذا الاختبار فقط؛ بقية سياسة IpRangePolicy كما هي.
-                        var adapter = (EgressTunnelAdapter)EgressTunnelAdapter.Create(
-                            context, a => !IPAddress.IsLoopback(a) && IpRangePolicy.IsBlocked(a));
+                        var adapter = (EgressTunnelAdapter)EgressTunnelAdapter.Create(context, blocker);
                         handler = adapter.Handler;
                         return adapter;
                     },
@@ -95,12 +120,12 @@ internal sealed class InProcessTunnelPair : IAsyncDisposable
                 {
                     Allowlist = guestAllowlist,
                     Mux = TestMux,
-                    Resolver = new StubResolver().Map("direct.test", "127.0.0.1").Map("site.test", "127.0.0.1"),
+                    Resolver = guestResolver,
                     BindAddress = IPAddress.Loopback,
                     CandidateSource = () => new LoopbackCandidateSource(),
                     GuestProxy = context =>
                     {
-                        var adapter = (ProxyTunnelAdapter)ProxyTunnelAdapter.Create(context);
+                        var adapter = (ProxyTunnelAdapter)ProxyTunnelAdapter.Create(context, null, null, guestBlocker);
                         proxyServer = adapter.Server;
                         return adapter;
                     },

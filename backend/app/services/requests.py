@@ -24,7 +24,7 @@ from app.core.clock import ensure_utc, utcnow
 from app.db.session import session_scope
 from app.models import ConnectionRequest, Device, Presence, Session, SessionKey, User
 from app.models.enums import RequestStatus, SessionRole, SessionStatus
-from app.services import allowlist
+from app.services import allowlist, session_flow
 from app.services import hosts as host_service
 from app.services import sessions as session_service
 from app.services.app_settings import settings_service
@@ -227,6 +227,7 @@ async def accept(*, request_id: uuid.UUID, device_id: uuid.UUID, ref: str) -> Se
     """``request.accept`` from the addressed host: create the session and its secret, then tell
     the guest (``request.result``) and both parties (``session.created``)."""
     async with session_scope() as db:
+        settings = await settings_service.get(db)
         request = await _load_pending(db, request_id, device_id=device_id, is_host=True, ref=ref)
         guest = await _load_party(db, request.guest_user_id, request.guest_device_id)
         host = await _load_party(db, request.host_user_id, request.host_device_id)
@@ -289,7 +290,9 @@ async def accept(*, request_id: uuid.UUID, device_id: uuid.UUID, ref: str) -> Se
     # The host is busy now, so it leaves everybody's host list.
     async with session_scope() as db:
         await notify.broadcast_hosts_update(db)
-    # TODO(week 4): schedule the 30 s connect deadline and the session expires_at timer here.
+    # Section 5: the connect deadline runs from ``session.created``, the expiry from the row's
+    # ``expires_at``. Both are cancelled by ``sessions.end_session``, whatever ends the session.
+    session_flow.schedule_timers(session, connect_timeout_seconds=settings.connect_timeout_seconds)
     return session
 
 

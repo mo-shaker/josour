@@ -11,6 +11,9 @@
     <ProjectReference Include="../../src/RouteBridge.Tunnel/RouteBridge.Tunnel.csproj" />
     <ProjectReference Include="../../src/RouteBridge.Proxy/RouteBridge.Proxy.csproj" />
     <ProjectReference Include="../../src/RouteBridge.Browser/RouteBridge.Browser.csproj" />
+    <!-- الأسبوع 4: أمر session يقود المكدّس الحقيقي، فيحتاج جانب المضيف (Egress) وطبقة الخادم (Infrastructure) -->
+    <ProjectReference Include="../../src/RouteBridge.Egress/RouteBridge.Egress.csproj" />
+    <ProjectReference Include="../../src/RouteBridge.Infrastructure/RouteBridge.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

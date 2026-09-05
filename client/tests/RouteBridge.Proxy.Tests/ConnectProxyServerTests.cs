@@ -308,11 +308,24 @@ public class ConnectProxyServerTests
     {
         var browser = new FakeBrowser();
         await using var proxy = Proxies.Start(new FakeMux(), browser: browser, checker: new FakePidChecker { Pid = null }, rejectUnknown: rejectUnknown);
-        await using var client = await ProxyClient.ConnectAsync(proxy.Port);
-        try { await client.SendAsync("GET http://check.routebridge/ HTTP/1.1\r\n\r\n"); }
-        catch (IOException) when (!served) { /* أُغلق (RST) قبل أن نكتب */ }
-        if (served) Assert.Equal(200, (await client.ReadHeadAsync()).Status);
-        else Assert.True(await client.ClosedWithoutDataAsync());
+        if (served)
+        {
+            await using var client = await ProxyClient.ConnectAsync(proxy.Port);
+            await client.SendAsync("GET http://check.routebridge/ HTTP/1.1\r\n\r\n");
+            Assert.Equal(200, (await client.ReadHeadAsync()).Status);
+            return;
+        }
+
+        // الرفض يغلق المقبس فورًا: قد يصل FIN أو RST، وقد يضرب RST عند الاتصال نفسه تحت الحمل.
+        try
+        {
+            await using var client = await ProxyClient.ConnectAsync(proxy.Port);
+            try { await client.SendAsync("GET http://check.routebridge/ HTTP/1.1\r\n\r\n"); }
+            catch (IOException) { }
+            catch (SocketException) { }
+            Assert.True(await client.ClosedWithoutDataAsync());
+        }
+        catch (SocketException) { /* أُعيد ضبط الاتصال فورًا: النتيجة نفسها */ }
     }
 
     [Fact]

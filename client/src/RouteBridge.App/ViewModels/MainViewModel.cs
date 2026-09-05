@@ -7,6 +7,7 @@ using RouteBridge.App.Services;
 using RouteBridge.Core.Control;
 using RouteBridge.Infrastructure.Api;
 using RouteBridge.Infrastructure.Device;
+using RouteBridge.Infrastructure.Session;
 
 namespace RouteBridge.App.ViewModels;
 
@@ -38,6 +39,7 @@ public sealed partial class MainViewModel : ObservableObject
         HostViewModel host,
         GuestViewModel guest,
         SessionCoordinator sessions,
+        SessionPanelViewModel session,
         IStartupRegistration startup,
         IShellService shell,
         IControlChannel controlChannel,
@@ -51,6 +53,7 @@ public sealed partial class MainViewModel : ObservableObject
         Host = host;
         Guest = guest;
         Sessions = sessions;
+        Session = session;
         _startup = startup;
         _shell = shell;
         _controlChannel = controlChannel;
@@ -73,8 +76,11 @@ public sealed partial class MainViewModel : ObservableObject
 
     public GuestViewModel Guest { get; }
 
-    /// <summary>Session phase + current session for the SessionPanel (WEEK 4).</summary>
+    /// <summary>The session lifecycle itself (phase, tunnel, work browser); the tray and the pages ask it for state.</summary>
     public SessionCoordinator Sessions { get; }
+
+    /// <summary>The live session panel that replaces the two tabs while a session runs.</summary>
+    public SessionPanelViewModel Session { get; }
 
     public string VersionText { get; }
 

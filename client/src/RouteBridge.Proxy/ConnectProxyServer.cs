@@ -21,6 +21,12 @@ public sealed class ConnectProxyOptions
     public IOwnerPidChecker OwnerPidChecker { get; init; } = PermissiveOwnerPidChecker.Instance;
     /// <summary>null = لا فحص مالك (كل اتصال محلي مقبول).</summary>
     public IBrowserSession? Browser { get; init; }
+    /// <summary>
+    /// فحص الحظر لعنوان واحد على المسار المباشر بعد حل الاسم. الافتراضي <see cref="IpRangePolicy.IsBlocked(IPAddress, IEnumerable{IPAddress}?)"/>:
+    /// اسم يحل إلى loopback أو عنوان خاص لا يُوصَل إليه، فلا يصير الـ Proxy المحلي جسرًا نحو ما يسمعه هذا الجهاز
+    /// (مستمع النفق نفسه، منفذ الـ Relay، خدمات 127.0.0.1). يُستبدل في الاختبارات داخل العملية فقط للسماح بـ loopback.
+    /// </summary>
+    public Func<IPAddress, bool>? AddressBlocker { get; init; }
     /// <summary>عند وجود Browser: هل يُرفض اتصال لا يمكن تحديد مالكه؟ الافتراضي true على Windows (fail-closed) وfalse على غيره.</summary>
     public bool? RejectUnknownOwner { get; init; }
     public TimeSpan DirectConnectTimeout { get; init; } = TimeSpan.FromSeconds(5);
@@ -59,11 +65,15 @@ public sealed class ProxyCounters
 /// </summary>
 public sealed class ConnectProxyServer : IAsyncDisposable
 {
+    /// <summary>لماذا فشل الاتصال المباشر: سياسة العناوين (403) أم تعذّر الوصول (502).</summary>
+    private enum DirectFailure { None, Blocked, Unreachable }
+
     private readonly ConnectProxyOptions _options;
     private readonly Socket _listener;
     private readonly CancellationTokenSource _cts = new();
     private readonly ConcurrentDictionary<Task, byte> _connections = new();
     private readonly bool _rejectUnknownOwner;
+    private readonly Func<IPAddress, bool> _isBlocked;
     private Task? _acceptLoop;
     private int _accepting;
     private int _stopped;
@@ -74,6 +84,7 @@ public sealed class ConnectProxyServer : IAsyncDisposable
         _options = options ?? throw new ArgumentNullException(nameof(options));
         ArgumentNullException.ThrowIfNull(options.Allowlist);
         _rejectUnknownOwner = options.RejectUnknownOwner ?? OperatingSystem.IsWindows();
+        _isBlocked = options.AddressBlocker ?? (address => IpRangePolicy.IsBlocked(address));
         _listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         _listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         _listener.Listen(64);
@@ -247,10 +258,11 @@ public sealed class ConnectProxyServer : IAsyncDisposable
             // not_allowed أثناء نافذة تباين إصدار القائمة: المضيف يعرف الأحدث؛ نسقط إلى المباشر (ADR-0004).
         }
 
-        var origin = await DirectConnectAsync(route.Host, route.Port, ct).ConfigureAwait(false);
+        var (origin, failure) = await DirectConnectAsync(route.Host, route.Port, ct).ConfigureAwait(false);
         if (origin is null)
         {
-            await TryRespondAsync(client, 502, ct).ConfigureAwait(false);
+            if (failure == DirectFailure.Blocked) Counters.Reject();
+            await TryRespondAsync(client, failure == DirectFailure.Blocked ? 403 : 502, ct).ConfigureAwait(false);
             return;
         }
         await using (origin)
@@ -306,10 +318,11 @@ public sealed class ConnectProxyServer : IAsyncDisposable
         }
 
         // TODO(week 3+): احترام Proxy النظام على المسار المباشر (إرسال الطلب/CONNECT إلى Proxy النظام إن وُجد؛ خطة 8.5).
-        var origin = await DirectConnectAsync(route.Host, port, ct).ConfigureAwait(false);
+        var (origin, failure) = await DirectConnectAsync(route.Host, port, ct).ConfigureAwait(false);
         if (origin is null)
         {
-            await TryRespondAsync(client, 502, ct).ConfigureAwait(false);
+            if (failure == DirectFailure.Blocked) Counters.Reject();
+            await TryRespondAsync(client, failure == DirectFailure.Blocked ? 403 : 502, ct).ConfigureAwait(false);
             return;
         }
         await using (origin)
@@ -351,8 +364,15 @@ public sealed class ConnectProxyServer : IAsyncDisposable
 
     // ---------- direct ----------
 
-    /// <summary>حل الاسم ثم Socket.ConnectAsync(IPAddress[], port) بمهلة 5 ثوانٍ للعملية كلها. null عند الفشل.</summary>
-    private async Task<SocketStream?> DirectConnectAsync(string host, int port, CancellationToken ct)
+    /// <summary>
+    /// حل الاسم، رفض النتيجة إن كان **أي** عنوان منها محظورًا (نفس قاعدة docs/protocol.md القسم 6 الخطوة 6 على المضيف)،
+    /// ثم Socket.ConnectAsync(IPAddress[], port) بالقائمة المفحوصة فقط وبمهلة 5 ثوانٍ للعملية كلها.
+    /// <para>
+    /// الرفض يقع **بعد** الحل و**قبل** أي اتصال: اسم يحل إلى loopback أو عنوان خاص لا يُفتح إليه مقبس أصلًا.
+    /// الاتصال بالقائمة لا بالاسم يغلق DNS rebinding بين الفحص والاتصال.
+    /// </para>
+    /// </summary>
+    private async Task<(SocketStream? Stream, DirectFailure Failure)> DirectConnectAsync(string host, int port, CancellationToken ct)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(_options.DirectConnectTimeout);
@@ -360,11 +380,12 @@ public sealed class ConnectProxyServer : IAsyncDisposable
         try
         {
             var addresses = await _options.Resolver.ResolveAsync(host, cts.Token).ConfigureAwait(false);
-            addresses = addresses.Where(a => a.AddressFamily is AddressFamily.InterNetwork or AddressFamily.InterNetworkV6).ToArray();
-            if (addresses.Length == 0) return null;
+            addresses = addresses.Where(a => a is not null && a.AddressFamily is AddressFamily.InterNetwork or AddressFamily.InterNetworkV6).ToArray();
+            if (addresses.Length == 0) return (null, DirectFailure.Unreachable);
+            if (addresses.Any(_isBlocked)) return (null, DirectFailure.Blocked);
             socket = CreateSocket(addresses);
             await socket.ConnectAsync(addresses, port, cts.Token).ConfigureAwait(false);
-            return new SocketStream(socket);
+            return (new SocketStream(socket), DirectFailure.None);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -374,7 +395,7 @@ public sealed class ConnectProxyServer : IAsyncDisposable
         catch (Exception)
         {
             socket?.Dispose();
-            return null;
+            return (null, DirectFailure.Unreachable);
         }
     }
 

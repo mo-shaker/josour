@@ -79,6 +79,48 @@ public static class Strings
     public const string GuestErrorNotConnected = "Not connected to the server.";
     public const string GuestErrorGenericFormat = "The server refused the request ({0}).";
 
+    // ---- session panel ----
+    public const string SessionPanelTitle = "Session";
+    public const string SessionPeerFormat = "{0} · {1}";
+    public const string SessionRoleHost = "You are sharing your connection";
+    public const string SessionRoleGuest = "You are browsing through the host";
+    public const string SessionPhasePreparing = "Preparing…";
+    public const string SessionPhaseConnecting = "Connecting to the other device…";
+    public const string SessionPhaseActive = "Connected";
+    public const string SessionPhaseEnding = "Closing the session…";
+    public const string SessionPhaseEnded = "Session ended";
+    public const string SessionTimeRemainingFormat = "{0} left";
+    public const string SessionTimeUp = "Time is up";
+    public const string SessionDataUsedFormat = "About {0} sent · {1} received";
+    public const string SessionDisconnect = "Disconnect";
+    public const string SessionReopenBrowser = "Reopen work browser";
+    public const string SessionDismiss = "Dismiss";
+    public const string SessionSummaryFormat = "{0} · {1}";
+    public const string BytesFormat = "{0:0.#} {1}";
+    public const string BytesUnitB = "B";
+    public const string BytesUnitKb = "KB";
+    public const string BytesUnitMb = "MB";
+    public const string BytesUnitGb = "GB";
+
+    // ---- session end reasons (docs/ws-protocol.md section 5) ----
+    public const string SessionEndedByYou = "You ended the session.";
+    public const string SessionEndedByPeer = "The other side ended the session.";
+    public const string SessionEndedExpired = "The session reached its time limit.";
+    public const string SessionEndedPeerDisconnected = "The other device lost its connection.";
+    public const string SessionEndedYouDisconnected = "This device lost its connection to the server.";
+    public const string SessionEndedConnectFailed = "The two devices could not reach each other.";
+    public const string SessionEndedAdminTerminated = "An administrator ended the session.";
+    public const string SessionEndedBrowserNotProxied = "The work browser did not go through RouteBridge, so the session was stopped.";
+    public const string SessionEndedProtocolError = "The session stopped because the two devices did not understand each other.";
+    public const string SessionEndedUnknownFormat = "The session ended ({0}).";
+
+    // ---- work browser ----
+    public const string BrowserErrorNotFound = "Google Chrome or Microsoft Edge must be installed to open the work browser.";
+    public const string BrowserErrorManagedByPolicy = "Your organisation's browser policy overrides the proxy setting, so the work browser cannot use this session.";
+    public const string BrowserErrorInstanceHandoff = "Another RouteBridge browser window is still open. Close it and start the session again.";
+    public const string BrowserErrorProbeTimeout = "The work browser did not send its traffic through RouteBridge.";
+    public const string BrowserErrorOther = "The work browser could not be started.";
+
     // ---- incoming request ----
     public const string IncomingRequestWindowTitle = "Incoming request";
     public const string IncomingRequestHeadingFormat = "{0} wants to browse through your connection";

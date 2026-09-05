@@ -8,6 +8,7 @@ using RouteBridge.App.Services;
 using RouteBridge.Core.Control;
 using RouteBridge.Core.Session;
 using RouteBridge.Infrastructure.Api;
+using RouteBridge.Infrastructure.Session;
 
 namespace RouteBridge.App.ViewModels;
 

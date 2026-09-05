@@ -22,6 +22,7 @@ public static class IpRangePolicy
     };
 
     private static readonly byte[] Nat64Prefix = IPAddress.Parse("64:ff9b::").GetAddressBytes();
+    private static readonly byte[] IPv4CompatiblePrefix = IPAddress.Parse("::").GetAddressBytes();
 
     private static (byte[] Prefix, int Bits) P(string address, int bits) => (IPAddress.Parse(address).GetAddressBytes(), bits);
 
@@ -73,7 +74,12 @@ public static class IpRangePolicy
 
     /// <summary>
     /// يعيد IPv4 المضمَّن في عنوان IPv6 مغلِّف، أو null:
-    /// ::ffff:a.b.c.d (آخر 32 بت)، 64:ff9b::/96 (آخر 32 بت)، 2002::/16 (البتات 16-47)، 2001::/32 Teredo (آخر 32 بت XOR 0xFFFFFFFF).
+    /// ::ffff:a.b.c.d (آخر 32 بت)، ::a.b.c.d المهجور (RFC 4291 §2.5.5.1، آخر 32 بت)، 64:ff9b::/96 (آخر 32 بت)،
+    /// 2002::/16 (البتات 16-47)، 2001::/32 Teredo (آخر 32 بت XOR 0xFFFFFFFF).
+    /// <para>
+    /// <c>::</c> و<c>::1</c> مستثنيان من فك <c>::/96</c> لأنهما محظوران أصلًا بقاعدتيهما الصريحتين، ولأن فكّهما
+    /// إلى <c>0.0.0.0</c> و<c>0.0.0.1</c> يجعلهما يطابقان عناوين محلية بلا معنى.
+    /// </para>
     /// </summary>
     public static IPAddress? ExtractEmbeddedIPv4(IPAddress address)
     {
@@ -84,6 +90,9 @@ public static class IpRangePolicy
 
         if (address.IsIPv4MappedToIPv6) return new IPAddress(b[12..16]);
         if (Matches(b, Nat64Prefix, 96)) return new IPAddress(b[12..16]);
+        // ::a.b.c.d المهجور: مهجور لا يعني غير قابل للطلب — محلل DNS خبيث قد يعيده ليتجاوز فحص v4.
+        if (Matches(b, IPv4CompatiblePrefix, 96) && !(b[12] == 0 && b[13] == 0 && b[14] == 0 && b[15] <= 1))
+            return new IPAddress(b[12..16]);
         if (b[0] == 0x20 && b[1] == 0x02) return new IPAddress(b[2..6]);
         if (b[0] == 0x20 && b[1] == 0x01 && b[2] == 0x00 && b[3] == 0x00)
         {

@@ -369,6 +369,7 @@ def make_session(db: AsyncSession) -> SessionFactory:
         *,
         status: SessionStatus = SessionStatus.ACTIVE,
         created_at: datetime | None = None,
+        expires_at: datetime | None = None,
         **fields: Any,
     ) -> Session:
         request = ConnectionRequest(
@@ -390,7 +391,7 @@ def make_session(db: AsyncSession) -> SessionFactory:
             host_device_id=host_device.id,
             status=status,
             created_at=created_at or utcnow(),
-            expires_at=utcnow() + timedelta(minutes=30),
+            expires_at=expires_at or (utcnow() + timedelta(minutes=30)),
             **fields,
         )
         db.add(session)

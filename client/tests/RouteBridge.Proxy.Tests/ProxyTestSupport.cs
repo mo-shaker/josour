@@ -251,7 +251,25 @@ internal static class Proxies
 
     public static readonly string[] DefaultEntries = { "allowed.example", "=exact.example", "portal.example:8443" };
 
-    public static ConnectProxyServer Start(FakeMux? mux = null, StubResolver? resolver = null, IBrowserSession? browser = null, IOwnerPidChecker? checker = null, bool? rejectUnknown = null, string[]? entries = null, int[]? allowedPorts = null)
+    /// <summary>
+    /// حظر العناوين كما في الإنتاج عدا loopback: الأصول في هذه الاختبارات تسكن 127.0.0.1، والسياسة الحقيقية
+    /// (المفحوصة في <c>ConnectProxyServerBlockedAddressTests</c>) ترفضها. نظير <c>InProcessTunnelPair</c> على المضيف.
+    /// </summary>
+    public static bool BlockedExceptLoopback(IPAddress address)
+        => !IPAddress.IsLoopback(address) && IpRangePolicy.IsBlocked(address);
+
+    /// <summary>سياسة العناوين الإنتاجية بلا أي استثناء (اختبارات الحظر بعد الحل).</summary>
+    public static readonly Func<IPAddress, bool> RealAddressPolicy = address => IpRangePolicy.IsBlocked(address);
+
+    public static ConnectProxyServer Start(
+        FakeMux? mux = null,
+        StubResolver? resolver = null,
+        IBrowserSession? browser = null,
+        IOwnerPidChecker? checker = null,
+        bool? rejectUnknown = null,
+        string[]? entries = null,
+        int[]? allowedPorts = null,
+        Func<IPAddress, bool>? addressBlocker = null)
     {
         var server = new ConnectProxyServer(new ConnectProxyOptions
         {
@@ -263,6 +281,7 @@ internal static class Proxies
             Browser = browser,
             OwnerPidChecker = checker ?? PermissiveOwnerPidChecker.Instance,
             RejectUnknownOwner = rejectUnknown,
+            AddressBlocker = addressBlocker ?? BlockedExceptLoopback,
             DirectConnectTimeout = TimeSpan.FromSeconds(3),
         });
         server.Start();

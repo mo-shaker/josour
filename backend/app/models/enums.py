@@ -50,6 +50,9 @@ class SessionRole(enum.StrEnum):
 class ConnectResult(enum.StrEnum):
     OK = "ok"
     FAILED = "failed"
+    """The clients reported ``session.connect_failed``."""
+    TIMEOUT = "timeout"
+    """The connect deadline fired while the session was still ``connecting``."""
 
 
 class CandidateType(enum.StrEnum):

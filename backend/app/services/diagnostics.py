@@ -76,4 +76,5 @@ async def summarize(db: AsyncSession) -> DiagnosticsSummary:
         winner_type_distribution=await _distribution(db, Session.winner_type),
         tls_version_distribution=await _distribution(db, Session.tls_version),
         connect_diagnostics_count=int(diagnostics),
+        end_reason_distribution=await _distribution(db, Session.end_reason),
     )

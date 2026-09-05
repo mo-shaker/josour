@@ -20,7 +20,7 @@ from app.core.security import InvalidAccessToken, decode_access_token
 from app.db.session import session_scope
 from app.models import Device, User
 from app.models.enums import DeviceStatus
-from app.services import allowlist, presence, requests
+from app.services import allowlist, presence, requests, session_flow
 from app.services import sessions as session_service
 from app.services.app_settings import settings_service
 from app.services.events import event_bus
@@ -43,6 +43,11 @@ from app.ws.protocol import (
     RequestCreate,
     RequestReject,
     ServerSettings,
+    SessionConnected,
+    SessionConnectFailed,
+    SessionEnd,
+    SessionEndpoint,
+    SessionStats,
     WsError,
     message_ref,
     parse_client_message,
@@ -235,6 +240,18 @@ async def _handle(connection: Connection, message: ClientMessage) -> None:
             await requests.reject(
                 request_id=message.request_id, device_id=connection.device_id, ref=message.ref
             )
+        case SessionEndpoint():
+            await session_flow.endpoint(device_id=connection.device_id, message=message)
+        case SessionConnected():
+            await session_flow.connected(device_id=connection.device_id, message=message)
+        case SessionConnectFailed():
+            await session_flow.connect_failed(
+                device_id=connection.device_id, user_id=connection.user_id, message=message
+            )
+        case SessionStats():
+            await session_flow.stats(device_id=connection.device_id, message=message)
+        case SessionEnd():
+            await session_flow.end(device_id=connection.device_id, message=message)
         case Hello():
             raise WsError(ErrorCode.BAD_REQUEST, "hello is only valid as the first frame")
         case _:  # pragma: no cover - the union above is exhaustive

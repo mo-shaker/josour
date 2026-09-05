@@ -1,9 +1,9 @@
 """A tiny keyed asyncio scheduler for the server-side deadlines of docs/ws-protocol.md.
 
-Week 3 uses it for the pending-request timeout (``expires_at``) and to run the reachability
-probe off the WebSocket handler. Week 4 reuses it unchanged for the 30 s connect deadline and
-the session ``expires_at``; keys are namespaced strings (``request:<uuid>``) so the different
-users cannot collide.
+Keys are namespaced strings so the different users cannot collide: ``request:<uuid>`` for the
+pending-request timeout, ``probe:<uuid>`` for the reachability probe, and
+``session-connect:<uuid>`` / ``session-expiry:<uuid>`` for the two session deadlines of section 5
+(``app.services.sessions`` builds the last two and cancels them in ``end_session``).
 
 Scheduling the same key twice cancels the first timer - the last schedule wins.
 """

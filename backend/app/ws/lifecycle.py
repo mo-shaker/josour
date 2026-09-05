@@ -8,7 +8,7 @@ reconnect. On the way out, clients are closed with 1012 so they reconnect with b
 import logging
 
 from app.db.session import session_scope
-from app.services import presence
+from app.services import presence, session_flow
 from app.services import sessions as session_service
 from app.services.events import event_bus
 from app.services.session_timer import scheduler
@@ -25,9 +25,16 @@ async def on_startup() -> None:
         rows = await presence.reset_all(db)
         events = await session_service.end_dangling_sessions(db)
         await db.commit()
+        # The sweep above ends every non-ended session, so this normally arms nothing. It is
+        # what keeps the scheduler and the sweep in agreement: a session that is live in the
+        # database is a session with timers, and there is no third possibility.
+        rearmed = await session_flow.reschedule_timers(db)
     for event in events:
         await event_bus.publish(event)
-    log.info("ws state reset", extra={"presence_rows": rows, "sessions_ended": len(events)})
+    log.info(
+        "ws state reset",
+        extra={"presence_rows": rows, "sessions_ended": len(events), "timers_rearmed": rearmed},
+    )
 
 
 async def on_shutdown() -> None:

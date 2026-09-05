@@ -11,8 +11,11 @@ from app.db.types import JSONVariant, UtcDateTime
 
 
 class SessionKey(Base):
-    """Tunnel secret and endpoint exchange material. The row is DELETED as soon as the session
-    ends (TODO week 4: session service)."""
+    """Tunnel secret and endpoint exchange material.
+
+    The candidate columns are filled by ``session.endpoint`` (app.services.session_flow), and the
+    whole row is DELETED as soon as the session ends - ``sessions.end_session`` is the only place
+    that ends one, so no reason can leave the secret behind."""
 
     __tablename__ = "session_keys"
 

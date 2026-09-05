@@ -1,6 +1,7 @@
 """Unit coverage for the WebSocket building blocks: protocol, registry and scheduler."""
 
 import asyncio
+import json
 import uuid
 from datetime import timedelta
 from typing import Any
@@ -20,6 +21,8 @@ from app.ws.protocol import (
     Ping,
     RequestCreated,
     RequestResult,
+    SessionEnd,
+    SessionEndpoint,
     WsError,
     parse_client_message,
 )
@@ -110,6 +113,98 @@ def test_parse_client_message_discriminates_on_type() -> None:
     ],
 )
 def test_invalid_frames_raise_bad_request(raw: str) -> None:
+    with pytest.raises(WsError) as excinfo:
+        parse_client_message(raw)
+    assert excinfo.value.code == ErrorCode.BAD_REQUEST
+
+
+# ---------------------------------------------------------------- session frames (section 3)
+
+SESSION_ID = "5f9d88c4-4d9e-4f0e-9f3f-2c2b0b9a0001"
+FINGERPRINT = "9f" * 32
+
+
+def _endpoint_frame(**overrides: Any) -> str:
+    payload: dict[str, Any] = {
+        "type": "session.endpoint",
+        "session_id": SESSION_ID,
+        "cert_fp_sha256": FINGERPRINT,
+        "candidates": [{"type": "lan", "ip": "10.0.0.4", "port": 40000}],
+    }
+    return json.dumps(payload | overrides)
+
+
+def _many(count: int) -> list[dict[str, Any]]:
+    return [{"type": "lan", "ip": f"10.0.0.{n}", "port": 40000} for n in range(count)]
+
+
+def test_session_frames_parse_into_their_models() -> None:
+    endpoint = parse_client_message(_endpoint_frame(candidates=_many(16)))
+    assert isinstance(endpoint, SessionEndpoint)
+    assert len(endpoint.candidates) == 16
+    assert endpoint.candidates[0].identity == ("lan", "10.0.0.0", 40000)
+
+    end = parse_client_message(
+        json.dumps(
+            {
+                "type": "session.end",
+                "session_id": SESSION_ID,
+                "reason": "host_ended",
+                "bytes_up": 10,
+                "bytes_down": 20,
+            }
+        )
+    )
+    assert isinstance(end, SessionEnd)
+    assert end.domains == [], "domains may be omitted; an end must never be refused over it"
+
+
+def test_candidate_ip_is_canonicalised() -> None:
+    frame = parse_client_message(
+        _endpoint_frame(candidates=[{"type": "v6", "ip": "2001:0DB8::0001", "port": 443}])
+    )
+    assert isinstance(frame, SessionEndpoint)
+    assert frame.candidates[0].ip == "2001:db8::1"
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        # cert_fp_sha256: exactly 64 lowercase hex characters
+        _endpoint_frame(cert_fp_sha256=FINGERPRINT.upper()),
+        _endpoint_frame(cert_fp_sha256="9f" * 31),
+        _endpoint_frame(cert_fp_sha256="zz" * 32),
+        # candidates: known type, real address, valid port, at most 16, no duplicates
+        _endpoint_frame(candidates=[{"type": "relay", "ip": "10.0.0.4", "port": 1}]),
+        _endpoint_frame(candidates=[{"type": "lan", "ip": "not-an-ip", "port": 1}]),
+        _endpoint_frame(candidates=[{"type": "lan", "ip": "example.com", "port": 1}]),
+        _endpoint_frame(candidates=[{"type": "lan", "ip": "10.0.0.4", "port": 0}]),
+        _endpoint_frame(candidates=[{"type": "lan", "ip": "10.0.0.4", "port": 65536}]),
+        _endpoint_frame(candidates=_many(17)),
+        _endpoint_frame(candidates=_many(1) + _many(1)),
+        _endpoint_frame(candidates="nope"),
+        # the whole frame
+        '{"type":"session.endpoint","session_id":"nope","cert_fp_sha256":"' + FINGERPRINT + '"}',
+        # session.connected
+        '{"type":"session.connected","session_id":"' + SESSION_ID + '","winner_type":"relay",'
+        '"connect_ms":1,"tls_version":"1.3"}',
+        '{"type":"session.connected","session_id":"' + SESSION_ID + '","winner_type":"lan",'
+        '"connect_ms":-1,"tls_version":"1.3"}',
+        '{"type":"session.connected","session_id":"' + SESSION_ID + '","winner_type":"lan",'
+        '"connect_ms":1,"tls_version":"1.1"}',
+        # session.stats / session.end
+        '{"type":"session.stats","session_id":"' + SESSION_ID + '","bytes_up":-1,"bytes_down":0}',
+        '{"type":"session.stats","session_id":"' + SESSION_ID + '","bytes_up":0}',
+        '{"type":"session.end","session_id":"' + SESSION_ID + '","reason":"expired",'
+        '"bytes_up":0,"bytes_down":0}',
+        '{"type":"session.end","session_id":"' + SESSION_ID + '","reason":"guest_ended",'
+        '"bytes_up":0,"bytes_down":-3}',
+        # session.connect_failed
+        '{"type":"session.connect_failed","session_id":"' + SESSION_ID + '"}',
+        '{"type":"session.connect_failed","session_id":"' + SESSION_ID + '","diagnostics":[]}',
+    ],
+)
+def test_invalid_session_frames_raise_bad_request(raw: str) -> None:
     with pytest.raises(WsError) as excinfo:
         parse_client_message(raw)
     assert excinfo.value.code == ErrorCode.BAD_REQUEST

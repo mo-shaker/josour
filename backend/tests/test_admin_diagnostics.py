@@ -14,6 +14,7 @@ EMPTY = {
     "winner_type_distribution": {},
     "tls_version_distribution": {},
     "connect_diagnostics_count": 0,
+    "end_reason_distribution": {},
 }
 
 
@@ -86,4 +87,5 @@ async def test_diagnostics_summary_with_data(
         "winner_type_distribution": {"lan": 2, "upnp": 1},
         "tls_version_distribution": {"1.2": 1, "1.3": 2},
         "connect_diagnostics_count": 2,
+        "end_reason_distribution": {"guest_ended": 4},
     }

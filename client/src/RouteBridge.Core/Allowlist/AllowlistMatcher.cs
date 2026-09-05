@@ -78,20 +78,74 @@ public sealed class AllowlistMatcher : IAllowlist
         return true;
     }
 
-    /// <summary>تطبيع الاسم: أحرف صغيرة، حذف النقطة الأخيرة، IDN إلى Punycode. يرمي ArgumentException للاسم غير الصالح.</summary>
+    /// <summary>أقصى طول اسم بعد Punycode (RFC 1035).</summary>
+    public const int MaxHostLength = 253;
+
+    /// <summary>أقصى طول تسمية واحدة بعد Punycode.</summary>
+    public const int MaxLabelLength = 63;
+
+    /// <summary>
+    /// تطبيع الاسم: أحرف صغيرة، حذف النقطة الأخيرة، IDN إلى Punycode، ثم فحص LDH صارم على الناتج.
+    /// يرمي ArgumentException للاسم غير الصالح، وكل المستهلكين (EgressPolicy وProxyRouter) يترجمون ذلك إلى رفض.
+    ///
+    /// <para>
+    /// لماذا الفحص الصارم بعد Punycode: <see cref="IdnMapping"/> عندنا بلا STD3، فيمرر محارف لا تجوز في اسم DNS
+    /// (NUL، ':' ، '/'، مسافات، شرطة في أول التسمية). اسم كهذا لا يطابق أي مدخل فيبدو آمنًا، لكنه يصل إلى
+    /// <c>Dns.GetHostAddressesAsync</c> وإلى ترويسة Host، حيث تختلف قراءته بين طبقة وأخرى. الفشل المغلق أرخص.
+    /// </para>
+    /// </summary>
     public static string NormalizeHost(string host)
     {
         ArgumentNullException.ThrowIfNull(host);
         var h = host.Trim().ToLowerInvariant();
+        foreach (var c in h)
+        {
+            if (c < 0x20 || c == 0x7F) throw new ArgumentException("host contains a control character", nameof(host));
+        }
+
         while (h.EndsWith('.')) h = h[..^1];
         if (h.Length == 0) throw new ArgumentException("host is empty", nameof(host));
+
+        string ascii;
         try
         {
-            return Idn.GetAscii(h).ToLowerInvariant();
+            ascii = Idn.GetAscii(h).ToLowerInvariant();
         }
         catch (ArgumentException e)
         {
             throw new ArgumentException("host is not a valid IDN/DNS name", nameof(host), e);
+        }
+
+        // GetAscii يحوّل فواصل IDN (U+3002 وأخواتها) إلى '.'، فقد تظهر نقطة أخيرة لم تكن في الأصل.
+        while (ascii.EndsWith('.')) ascii = ascii[..^1];
+        ValidateAsciiHost(ascii);
+        return ascii;
+    }
+
+    /// <summary>الاسم بعد Punycode: طول كلي ≤ 253، كل تسمية 1..63 من [a-z0-9-_] بلا شرطة في طرفيها.</summary>
+    private static void ValidateAsciiHost(string ascii)
+    {
+        if (ascii.Length == 0) throw new ArgumentException("host is empty", nameof(ascii));
+        if (ascii.Length > MaxHostLength) throw new ArgumentException($"host is longer than {MaxHostLength} characters", nameof(ascii));
+
+        var start = 0;
+        while (true)
+        {
+            var dot = ascii.IndexOf('.', start);
+            var end = dot < 0 ? ascii.Length : dot;
+            var length = end - start;
+            if (length == 0) throw new ArgumentException("host has an empty label", nameof(ascii));
+            if (length > MaxLabelLength) throw new ArgumentException($"host has a label longer than {MaxLabelLength} characters", nameof(ascii));
+            if (ascii[start] == '-' || ascii[end - 1] == '-') throw new ArgumentException("host label starts or ends with '-'", nameof(ascii));
+            for (var i = start; i < end; i++)
+            {
+                var c = ascii[i];
+                var allowed = c is >= 'a' and <= 'z' || c is >= '0' and <= '9' || c == '-' || c == '_';
+                if (!allowed) throw new ArgumentException($"host label contains '{c}'", nameof(ascii));
+            }
+
+            if (dot < 0) return;
+            start = dot + 1;
         }
     }
 
@@ -123,14 +177,17 @@ public sealed class AllowlistMatcher : IAllowlist
         return hostMatched ? AllowlistDecision.PortNotAllowed : AllowlistDecision.HostNotAllowed;
     }
 
-    /// <summary>مطابقة تامة، أو لاحقة على حدود التسميات (a.example.com يطابق example.com؛ notexample.com لا يطابق).</summary>
+    /// <summary>
+    /// مطابقة تامة، أو لاحقة على حدود التسميات (a.example.com يطابق example.com؛ notexample.com لا يطابق).
+    /// النطاق الفرعي يجب أن يحمل تسمية واحدة على الأقل، فلا يطابق ".example.com" (اسم غير مطبَّع) مدخل "example.com".
+    /// </summary>
     public static bool HostMatches(string normalizedHost, AllowlistEntry entry)
     {
         ArgumentNullException.ThrowIfNull(normalizedHost);
         ArgumentNullException.ThrowIfNull(entry);
         if (string.Equals(normalizedHost, entry.Host, StringComparison.Ordinal)) return true;
         if (entry.ExactOnly) return false;
-        return normalizedHost.Length > entry.Host.Length
+        return normalizedHost.Length > entry.Host.Length + 1
             && normalizedHost.EndsWith(entry.Host, StringComparison.Ordinal)
             && normalizedHost[normalizedHost.Length - entry.Host.Length - 1] == '.';
     }

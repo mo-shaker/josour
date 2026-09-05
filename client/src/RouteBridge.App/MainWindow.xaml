@@ -25,14 +25,20 @@
 
         <ui:TitleBar Grid.Row="0" Title="{x:Static app:Strings.AppName}" ShowMaximize="False" />
 
-        <TabControl Grid.Row="1" Margin="12,4,12,0">
-            <TabItem Header="{x:Static app:Strings.HostTab}">
-                <views:HostPage DataContext="{Binding Host}" />
-            </TabItem>
-            <TabItem Header="{x:Static app:Strings.GuestTab}">
-                <views:GuestPage DataContext="{Binding Guest}" />
-            </TabItem>
-        </TabControl>
+        <!-- The session takes over the window while it lasts (and until its summary is dismissed); otherwise the two tabs. -->
+        <Grid Grid.Row="1" Margin="12,4,12,0">
+            <TabControl Visibility="{Binding Session.IsVisible, Converter={StaticResource InverseBoolToVis}}">
+                <TabItem Header="{x:Static app:Strings.HostTab}">
+                    <views:HostPage DataContext="{Binding Host}" />
+                </TabItem>
+                <TabItem Header="{x:Static app:Strings.GuestTab}">
+                    <views:GuestPage DataContext="{Binding Guest}" />
+                </TabItem>
+            </TabControl>
+
+            <views:SessionPanel DataContext="{Binding Session}"
+                                Visibility="{Binding IsVisible, Converter={StaticResource BoolToVis}}" />
+        </Grid>
 
         <Grid Grid.Row="2" Margin="16,8,16,10">
             <Grid.ColumnDefinitions>

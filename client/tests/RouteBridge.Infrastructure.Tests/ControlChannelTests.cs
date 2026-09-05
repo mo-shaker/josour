@@ -271,10 +271,27 @@ public sealed class ControlChannelTests
         h.Connection.Drop();
         var second = await h.Server.NextConnectionAsync();
         await second.NextAsync<HelloMessage>();
-        await second.SendAsync(new AllowlistUpdatedMessage(2));
-        await h.Messages.NextAsync<AllowlistUpdatedMessage>();
 
-        Assert.DoesNotContain(second.Received, m => m is HostAvailableMessage);
+        // The barrier ("the client has processed everything up to here") must land on the connection the client actually
+        // kept: this harness reconnects with zero backoff, so a loaded machine can leave an extra short-lived connection
+        // behind. Sending to a closed one is a no-op, so the frame simply goes to all of them until the client reports it.
+        var barrier = h.Messages.NextAsync<AllowlistUpdatedMessage>(timeout: TimeSpan.FromSeconds(10));
+        for (var attempt = 0; attempt < 20 && !barrier.IsCompleted; attempt++)
+        {
+            foreach (var connection in h.Server.Connections)
+            {
+                await connection.SendAsync(new AllowlistUpdatedMessage(2));
+            }
+
+            await Task.Delay(100);
+        }
+
+        await barrier;
+
+        // no re-announcement on any connection made after the drop
+        Assert.DoesNotContain(
+            h.Server.Connections.Where(c => !ReferenceEquals(c, h.Connection)).SelectMany(c => c.Received),
+            m => m is HostAvailableMessage);
     }
 
     [Fact]

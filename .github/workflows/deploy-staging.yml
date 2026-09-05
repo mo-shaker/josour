@@ -1,0 +1,85 @@
+name: deploy-staging
+
+# نشر آلي إلى خادم الاختبار عند نجاح CI على main، أو يدويًا.
+# الأسرار المطلوبة في المستودع:
+#   STAGING_HOST      عنوان الخادم أو اسمه
+#   STAGING_USER      مستخدم SSH
+#   STAGING_SSH_KEY   مفتاح خاص (ed25519) بلا عبارة مرور
+#   STAGING_PATH      مسار المستودع على الخادم، مثل /opt/routebridge
+# الخادم يجب أن يكون مجهّزًا مسبقًا وفق docs/runbook.md وفيه deploy/.env جاهز.
+
+on:
+  workflow_run:
+    workflows: ["ci-backend"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # لا تنشر إلا إذا نجح CI فعلًا
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Check secrets are configured
+        run: |
+          for s in STAGING_HOST STAGING_USER STAGING_SSH_KEY STAGING_PATH; do
+            if [ -z "${!s}" ]; then echo "::error::Missing secret $s"; exit 1; fi
+          done
+        env:
+          STAGING_HOST: ${{ secrets.STAGING_HOST }}
+          STAGING_USER: ${{ secrets.STAGING_USER }}
+          STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          STAGING_PATH: ${{ secrets.STAGING_PATH }}
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.STAGING_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.STAGING_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Back up before deploying
+        run: |
+          ssh -i ~/.ssh/id_ed25519 "${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}" \
+            "cd ${{ secrets.STAGING_PATH }}/deploy && docker compose exec -T backup /usr/local/bin/backup.sh"
+
+      - name: Pull and rebuild
+        run: |
+          ssh -i ~/.ssh/id_ed25519 "${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}" \
+            "set -euo pipefail
+             cd ${{ secrets.STAGING_PATH }}
+             git fetch --all && git reset --hard origin/main
+             cd deploy
+             docker compose build api
+             docker compose up -d api caddy
+             docker image prune -f --filter 'until=168h' || true"
+
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -sk -o /dev/null -w '%{http_code}' "https://${{ secrets.STAGING_HOST }}/healthz" || echo 000)
+            if [ "$code" = "200" ]; then echo "healthy"; exit 0; fi
+            sleep 5
+          done
+          echo "::error::staging did not become healthy in 150 s"
+          ssh -i ~/.ssh/id_ed25519 "${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}" \
+            "cd ${{ secrets.STAGING_PATH }}/deploy && docker compose logs --tail 80 api"
+          exit 1
+
+      - name: Security checks against staging
+        run: |
+          ssh -i ~/.ssh/id_ed25519 "${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}" \
+            "cd ${{ secrets.STAGING_PATH }} && bash scripts/security/check-session-keys.sh && bash scripts/security/check-logs-clean.sh"
+
+      - name: Roll back on failure
+        if: failure()
+        run: |
+          ssh -i ~/.ssh/id_ed25519 "${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}" \
+            "cd ${{ secrets.STAGING_PATH }} && git reset --hard HEAD@{1} && cd deploy && docker compose build api && docker compose up -d api" || true
+          echo "::warning::rolled back staging to the previous commit"

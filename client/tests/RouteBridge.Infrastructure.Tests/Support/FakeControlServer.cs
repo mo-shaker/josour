@@ -79,6 +79,21 @@ public sealed class FakeControlServer : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Every connection accepted so far, in order. A reconnect with no backoff can produce more than one, so a test that
+    /// wants to talk to "the client" after a drop addresses all of them rather than guessing which one survived.
+    /// </summary>
+    public IReadOnlyList<FakeControlConnection> Connections
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _all.ToList();
+            }
+        }
+    }
+
     /// <summary>Waits for the next client connection (already past the handshake).</summary>
     public async Task<FakeControlConnection> NextConnectionAsync(TimeSpan? timeout = null)
     {
