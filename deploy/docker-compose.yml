@@ -39,6 +39,11 @@ services:
       DEVICE_RISK_WINDOW_MINUTES: ${DEVICE_RISK_WINDOW_MINUTES:-60}
       DEVICE_RISK_SECRET_FAILURES: ${DEVICE_RISK_SECRET_FAILURES:-10}
       DEVICE_RISK_REFRESH_REUSE: ${DEVICE_RISK_REFRESH_REUSE:-3}
+      # Relay (ADR-0009). Leave RELAY_HOST empty to run direct-only; setting one of the two
+      # without the other stops the API at boot rather than degrading every session in silence.
+      RELAY_HOST: ${RELAY_HOST:-}
+      RELAY_PORT: ${RELAY_PORT:-443}
+      RELAY_SECRET: ${RELAY_SECRET:-}
     expose:
       - "8000"
     depends_on:

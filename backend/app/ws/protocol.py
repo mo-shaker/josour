@@ -115,6 +115,11 @@ CertFingerprint = Annotated[str, AfterValidator(_cert_fingerprint)]
 type CandidateType = Literal["lan", "upnp", "public", "v6"]
 """Section 3; the C# mirror is ``Josour.Core.Tunnel.CandidateTypeNames``."""
 
+type WinnerType = Literal["lan", "upnp", "public", "v6", "relay"]
+"""What actually carried the session (section 5). A superset of :data:`CandidateType`: ``relay``
+is never a dialable candidate in ``session.endpoint`` - it is the transport the client reaches
+over ``session.created.relay`` - but it is a legitimate answer to "what won" (ADR-0009)."""
+
 
 class Candidate(BaseModel):
     """One address the peer may dial. Also the element type of ``session.peer_endpoint``, which
@@ -216,7 +221,7 @@ class SessionConnected(_ClientFrame):
 
     type: Literal["session.connected"]
     session_id: uuid.UUID
-    winner_type: CandidateType
+    winner_type: WinnerType
     connect_ms: int = Field(ge=0, le=MAX_CONNECT_MS)
     tls_version: Literal["1.2", "1.3"]
 
@@ -368,6 +373,19 @@ class Peer(BaseModel):
     device_name: str
 
 
+class Relay(BaseModel):
+    """Where to reach the relay, and the token that admits this party to this session.
+
+    Present whenever the deployment has a relay configured (ADR-0009). Absent means direct-only,
+    which still works wherever one side is reachable and is what every deployment did before."""
+
+    address: str
+    port: int = Field(ge=1, le=65535)
+    token: str
+    """Signed by :mod:`app.services.relay_tokens`, bound to this session **and** this role, and
+    short-lived. Never logged: it is a bearer credential until it expires."""
+
+
 class SessionCreated(ServerMessage):
     type: Literal["session.created"] = "session.created"
     session_id: uuid.UUID
@@ -378,6 +396,7 @@ class SessionCreated(ServerMessage):
     peer_public_ip: str
     same_public_ip: bool
     peer: Peer
+    relay: Relay | None = None
 
 
 class SessionPeerEndpoint(ServerMessage):

@@ -18,6 +18,9 @@ public sealed record AuthenticatedConnection(Stream Stream, CandidateType Winner
 
 public sealed record SymmetricConnectOutcome(TunnelConnectResult Result, AuthenticatedConnection? Connection, IReadOnlyDictionary<string, object?> Diagnostics);
 
+/// <summary>مسار الـ Relay: النقل الذي يتكلم بروتوكوله والعنوان الذي وصل في session.created.relay (ADR-0009).</summary>
+public sealed record RelayLeg(ITunnelTransport Transport, CandidateEndpoint Endpoint);
+
 /// <summary>
 /// تنسيق docs/protocol.md القسم 2 الخطوات 3-6 لكلا الدورين: قبول الاتصالات الواردة (TLS Server بشهادتنا) والاتصال بكل مرشحي
 /// الطرف الآخر بالتوازي (TLS Client مثبّت على بصمته)، ثم المصادقة حسب الدور المنطقي. أول اتصال يجتاز المصادقة يفوز؛
@@ -46,6 +49,7 @@ public sealed class SymmetricConnector
     private readonly TunnelListener _listener;
     private readonly ITunnelTransport _transport;
     private readonly IReadOnlyList<CandidateEndpoint> _ourCandidates;
+    private readonly RelayLeg? _relay;
 
     private readonly List<Attempt> _attempts = new();
     private readonly object _gate = new();
@@ -56,8 +60,9 @@ public sealed class SymmetricConnector
     /// <summary>رُفع مرة واحدة عند أول اتصال يجتاز المصادقة، ولا يعود. انظر <see cref="IsUnauthenticatedProbe"/>.</summary>
     private int _authenticatedAny;
 
-    public SymmetricConnector(SessionMaterial material, SessionCertificate ourCertificate, TunnelListener listener, ITunnelTransport transport, IReadOnlyList<CandidateEndpoint>? ourCandidates = null)
+    public SymmetricConnector(SessionMaterial material, SessionCertificate ourCertificate, TunnelListener listener, ITunnelTransport transport, IReadOnlyList<CandidateEndpoint>? ourCandidates = null, RelayLeg? relay = null)
     {
+        _relay = relay;
         _material = material ?? throw new ArgumentNullException(nameof(material));
         _certificate = ourCertificate ?? throw new ArgumentNullException(nameof(ourCertificate));
         _listener = listener ?? throw new ArgumentNullException(nameof(listener));
@@ -89,7 +94,11 @@ public sealed class SymmetricConnector
         cts.CancelAfter(timeout);
 
         await _listener.StartAsync((socket, lct) => HandleInboundAsync(socket, peerFp, ourFp, winner, clock, lct), cts.Token).ConfigureAwait(false);
-        var dials = peer.Candidates.Select(c => DialAsync(c, peerFp, ourFp, winner, clock, cts.Token)).ToArray();
+        // ADR-0009: الـ Relay يُجرَّب بالتوازي مع المباشر لا بعده. المباشر أسرع حين ينجح، والـ Relay يعمل دائمًا،
+        // فالسباق يعطي الأفضل المتاح بلا انتظار فشل أحدهما.
+        var dials = peer.Candidates.Select(c => DialAsync(c, peerFp, ourFp, winner, clock, cts.Token))
+            .Append(_relay is null ? Task.CompletedTask : DialRelayAsync(_relay, timeout, peerFp, ourFp, winner, clock, cts.Token))
+            .ToArray();
 
         try
         {
@@ -132,7 +141,7 @@ public sealed class SymmetricConnector
             Stream raw;
             try { raw = new NetworkStream(socket, ownsSocket: true); }
             catch { socket.Dispose(); throw; }
-            await AuthenticateAsync(raw, inbound: true, attempt, peerFp, ourFp, winner, clock, ct).ConfigureAwait(false);
+            await AuthenticateAsync(raw, inbound: true, tlsServer: true, attempt, peerFp, ourFp, winner, clock, ct).ConfigureAwait(false);
         }
         catch (Exception e)
         {
@@ -178,7 +187,31 @@ public sealed class SymmetricConnector
         try
         {
             var raw = await _transport.ConnectAsync(candidate, DialTimeout, ct).ConfigureAwait(false);
-            await AuthenticateAsync(raw, inbound: false, attempt, peerFp, ourFp, winner, clock, ct).ConfigureAwait(false);
+            await AuthenticateAsync(raw, inbound: false, tlsServer: false, attempt, peerFp, ourFp, winner, clock, ct).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            attempt.Error = Describe(e);
+        }
+        finally
+        {
+            attempt.Ms = sw.ElapsedMilliseconds;
+        }
+    }
+
+    /// <summary>محاولة الاتصال عبر الـ Relay: نقل واحد وعنوان واحد، بلا مرشحين ولا مستمع.</summary>
+    private async Task DialRelayAsync(RelayLeg relay, TimeSpan timeout, byte[] peerFp, byte[] ourFp, TaskCompletionSource<(AuthenticatedConnection, long)> winner, Stopwatch clock, CancellationToken ct)
+    {
+        var sw = Stopwatch.StartNew();
+        var attempt = new Attempt("relay", CandidateType.Relay, relay.Endpoint.Ip, relay.Endpoint.Port) { Stage = "connect" };
+        Record(attempt);
+        try
+        {
+            // المهلة الكاملة لا DialTimeout: رد الـ Relay لا يصل حتى يصل النظير أيضًا، وقد يتأخر بقدر نافذة
+            // الاتصال كلها. قصرها على خمس ثوانٍ كان سيُسقط كل جلسة لا يتزامن طرفاها.
+            var raw = await relay.Transport.ConnectAsync(relay.Endpoint, timeout, ct).ConfigureAwait(false);
+            // docs/protocol.md القسم 3: لا مستمع هنا، فالمضيف هو TLS Server دائمًا على هذا المسار.
+            await AuthenticateAsync(raw, inbound: false, tlsServer: _material.Role == TunnelRole.Host, attempt, peerFp, ourFp, winner, clock, ct).ConfigureAwait(false);
         }
         catch (Exception e)
         {
@@ -192,15 +225,20 @@ public sealed class SymmetricConnector
 
     // ---------- shared ----------
 
-    private async Task AuthenticateAsync(Stream raw, bool inbound, Attempt attempt, byte[] peerFp, byte[] ourFp, TaskCompletionSource<(AuthenticatedConnection, long)> winner, Stopwatch clock, CancellationToken ct)
+    /// <summary>
+    /// <paramref name="tlsServer"/> مفصول عن <paramref name="inbound"/> عمدًا. على المسار المباشر هما الشيء نفسه
+    /// (المستمع هو Server)، أما فوق الـ Relay فلا مستمع: الطرفان يتصلان خارجًا، فلو بقيت القاعدة مشتقة من
+    /// «من اتصل» لانتظر كلاهما مصافحة الآخر إلى الأبد. القاعدة هناك: المضيف Server دائمًا (docs/protocol.md القسم 3).
+    /// </summary>
+    private async Task AuthenticateAsync(Stream raw, bool inbound, bool tlsServer, Attempt attempt, byte[] peerFp, byte[] ourFp, TaskCompletionSource<(AuthenticatedConnection, long)> winner, Stopwatch clock, CancellationToken ct)
     {
         Stage(attempt, "tls");
-        var tls = inbound
+        var tls = tlsServer
             ? await TlsChannel.AuthenticateAsServerAsync(raw, _certificate.Certificate, TlsTimeout, ct).ConfigureAwait(false)
             : await TlsChannel.AuthenticateAsClientAsync(raw, peerFp, TlsTimeout, ct).ConfigureAwait(false);
 
-        // listener_cert_fp = شهادة من يعمل TLS Server في هذا الاتصال: نحن عند القبول، والطرف الآخر عند الاتصال.
-        var listenerFp = inbound ? ourFp : peerFp;
+        // listener_cert_fp = شهادة من يعمل TLS Server في هذا الاتصال، أيًا كان من فتح المقبس.
+        var listenerFp = tlsServer ? ourFp : peerFp;
         Stage(attempt, "auth");
         try
         {

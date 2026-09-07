@@ -452,6 +452,22 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
         }
     }
 
+    /// <summary>
+    /// <c>session.created.relay</c> (ADR-0009), or null when the deployment runs direct-only. A malformed
+    /// object is dropped rather than failing the session: losing the relay costs a transport, and the
+    /// direct path may still connect - failing here would turn a degraded session into no session.
+    /// </summary>
+    private RelayEndpointInfo? ToRelay(RelayDto? relay)
+    {
+        if (relay is null) return null;
+        if (string.IsNullOrWhiteSpace(relay.Address) || relay.Port is < 1 or > 65535 || string.IsNullOrEmpty(relay.Token))
+        {
+            _logger.LogWarning("session.created carried an unusable relay object; continuing with direct only");
+            return null;
+        }
+        return new RelayEndpointInfo(relay.Address, relay.Port, relay.Token);
+    }
+
     private async Task PrepareRunAsync(SessionRun run, SessionCreatedMessage message)
     {
         byte[]? secret = null;
@@ -481,7 +497,8 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
                     _hello?.Settings.AllowedPorts ?? DefaultAllowedPorts,
                     _hello?.PublicIp,
                     _browser,
-                    CloseBrowserAsync));
+                    CloseBrowserAsync,
+                    ToRelay(message.Relay)));
             }
             catch
             {

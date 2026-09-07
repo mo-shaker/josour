@@ -102,8 +102,15 @@ public sealed record TunnelSessionOptions
 
     public IHostResolver Resolver { get; init; } = DnsHostResolver.Instance;
 
-    /// <summary>النقل الخام. Direct اليوم؛ <see cref="RelayTransport"/> إن فتحت بوابة ADR-0003.</summary>
+    /// <summary>النقل الخام للمرشحين المباشرين.</summary>
     public ITunnelTransport Transport { get; init; } = new DirectTransport();
+
+    /// <summary>
+    /// ما وصل في <c>session.created.relay</c>: عنوان الـ Relay وتوكن هذا الطرف. null = لا Relay في هذا النشر،
+    /// فيبقى المباشر وحده كما كان قبل ADR-0009. حين يوجد، يُجرَّب <b>بالتوازي</b> مع المرشحين المباشرين.
+    /// التوكن بيان حامل: لا يُسجَّل ولا يظهر في التشخيص.
+    /// </summary>
+    public RelayEndpointInfo? Relay { get; init; }
 
     /// <summary>IP هذا الجهاز العام كما يراه الخادم (hello.ack.public_ip): مرشح public، ومحظور في سياسة الخروج.</summary>
     public string? OurPublicIp { get; init; }

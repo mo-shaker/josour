@@ -13,7 +13,12 @@ public enum TunnelEndReason
 }
 
 /// <summary>نوع المرشح كما في docs/protocol.md القسم 2.</summary>
-public enum CandidateType { Lan, V6, Upnp, Public }
+/// <summary>
+/// نوع المسار. الأربعة الأولى مرشحون يُعلنون في session.endpoint ويُتصل بهم؛ <see cref="Relay"/> ليس مرشحًا:
+/// لا يُرسل في session.endpoint أبدًا (الخادم يرفضه)، ويصل عنوانه في session.created.relay. لكنه قيمة صالحة
+/// لـ winner_type لأنه جواب صحيح على «ما الذي حمل الجلسة» (ADR-0009).
+/// </summary>
+public enum CandidateType { Lan, V6, Upnp, Public, Relay }
 
 public sealed record CandidateEndpoint(CandidateType Type, string Ip, int Port);
 
@@ -35,3 +40,9 @@ public sealed record GuestProxyInfo(int Port, string ProbeUrl);
 
 /// <summary>مواد الجلسة القادمة من session.created. تُمسح عند الإنهاء.</summary>
 public sealed record SessionMaterial(Guid SessionId, TunnelRole Role, byte[] Secret, DateTimeOffset ExpiresAt, bool SamePublicIp, string PeerPublicIp);
+
+/// <summary>
+/// عنوان الـ Relay وتوكن هذا الطرف، كما يصلان في <c>session.created.relay</c> (ADR-0009).
+/// <see cref="Token"/> بيان حامل قصير العمر مربوط بالجلسة وبالدور: لا يُسجَّل ولا يوضع في أي تشخيص.
+/// </summary>
+public sealed record RelayEndpointInfo(string Address, int Port, string Token);

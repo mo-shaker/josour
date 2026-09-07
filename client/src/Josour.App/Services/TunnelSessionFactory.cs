@@ -35,6 +35,7 @@ public sealed class TunnelSessionFactory : ITunnelSessionFactory
             HostEgress = EgressTunnelAdapter.Create,
             GuestProxy = context => ProxyTunnelAdapter.Create(context, request.Browser),
             CloseBrowserAsync = request.CloseBrowserAsync,
+            Relay = request.Relay,
         };
 
         _logger.LogInformation(
@@ -44,6 +45,9 @@ public sealed class TunnelSessionFactory : ITunnelSessionFactory
             request.Allowlist.Version,
             request.Allowlist.Entries.Count,
             string.Join(",", request.AllowedPorts));
+        // The address only; the token is a bearer credential and never reaches a log.
+        if (request.Relay is { } relay)
+            _logger.LogInformation("Relay available for session {SessionId}: {Address}:{Port}", request.Material.SessionId, relay.Address, relay.Port);
 
         return new TunnelSession(request.Material, options);
     }

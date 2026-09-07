@@ -31,7 +31,9 @@ public sealed record TunnelSessionRequest(
     IReadOnlyList<int> AllowedPorts,
     string? OurPublicIp,
     IBrowserSession Browser,
-    Func<CancellationToken, Task> CloseBrowserAsync);
+    Func<CancellationToken, Task> CloseBrowserAsync,
+    /// <summary>From <c>session.created.relay</c>; null when the deployment has no relay (ADR-0009).</summary>
+    RelayEndpointInfo? Relay = null);
 
 /// <summary>Creates the tunnel for one session. The App supplies the real implementation; tests substitute a fake.</summary>
 public interface ITunnelSessionFactory

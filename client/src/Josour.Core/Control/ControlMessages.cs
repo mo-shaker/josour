@@ -114,7 +114,17 @@ public sealed record SessionCreatedMessage(
     [property: JsonPropertyName("allowlist_version")] int AllowlistVersion,
     [property: JsonPropertyName("peer_public_ip")] string PeerPublicIp,
     [property: JsonPropertyName("same_public_ip")] bool SamePublicIp,
-    [property: JsonPropertyName("peer")] PeerDto Peer) : ControlMessage("session.created");
+    [property: JsonPropertyName("peer")] PeerDto Peer,
+    [property: JsonPropertyName("relay")] RelayDto? Relay = null) : ControlMessage("session.created");
+
+/// <summary>
+/// عنوان الـ Relay وتوكن هذا الطرف (ADR-0009). null في نشر بلا Relay، وهو مدعوم: المباشر وحده.
+/// <see cref="Token"/> بيان حامل: لا يُسجَّل ولا يوضع في تشخيص.
+/// </summary>
+public sealed record RelayDto(
+    [property: JsonPropertyName("address")] string Address,
+    [property: JsonPropertyName("port")] int Port,
+    [property: JsonPropertyName("token")] string Token);
 
 public sealed record SessionPeerEndpointMessage(
     [property: JsonPropertyName("session_id")] Guid SessionId,

@@ -65,13 +65,19 @@
 | `request.incoming` | `request_id`, `guest_name`, `guest_device`, `duration_min`, `allowlist_version`, `expires_at` | المضيف |
 | `request.result` | `request_id`, `accepted` (bool), `reason` (`rejected`/`expired`/`cancelled`/`host_unavailable` عند `false`), `session_id` (عند `true`) | المستخدم |
 | `request.expired` | `request_id` | المضيف: إطار «أغلق نافذة الطلب» عمومًا، يُرسل عند انتهاء المهلة وعند إلغاء المستخدم وعند انقطاعه |
-| `session.created` | `session_id`, `role` (`guest`/`host`), `secret_b64` (32 بايت Base64), `expires_at`, `allowlist_version`, `peer_public_ip`, `same_public_ip` (bool), `peer` (`{user_display_name, device_name}`) | الطرفان |
+| `session.created` | `session_id`, `role` (`guest`/`host`), `secret_b64` (32 بايت Base64), `expires_at`, `allowlist_version`, `peer_public_ip`, `same_public_ip` (bool), `peer` (`{user_display_name, device_name}`), `relay` (`{address, port, token}` أو `null`) | الطرفان |
 | `session.peer_endpoint` | `session_id`, `cert_fp_sha256`, `candidates` | الطرف الآخر لمن أرسل `session.endpoint` |
 | `session.active` | `session_id`, `expires_at` | الطرفان |
 | `session.terminate` | `session_id`, `reason` | الطرفان (أو الطرف الباقي) |
 | `allowlist.updated` | `version` | كل العملاء |
 | `error` | `ref` (اختياري), `code`, `message` | العميل المعني |
 | `ping` / `pong` | لا حقول | |
+
+**كائن `relay` في `session.created`** (أُضيف في 2026-09-07 بـ [ADR-0009](decisions/0009-relay-default.md)): `{address, port, token}`، أو `null` إن لم يُضبط Relay في النشر — وهو نشر مدعوم يعني «المباشر وحده» كما كان قبل القرار.
+
+- `token` موقَّع بـ HS256 ومربوط **بالجلسة وبالدور معًا** وقصير العمر. بدون ربط الدور يستطيع حامل توكن واحد فتح طرفَي الـ Relay والاقتران بنفسه، فيحتل الجلسة ويحرم نظيره منها.
+- `token` **بيان حامل** حتى انتهاء صلاحيته: لا يُسجَّل في أي سجل، ولا يظهر في تشخيص، ولا يُخزَّن على الخادم (الـ Relay يتحقق من التوقيع بدل أن يبحث عن الجلسة، فلا شيء يحتاج البقاء).
+- كل طرف يتلقى **توكنه هو**؛ توكنان مختلفان في الجلسة الواحدة.
 
 ## 5. دورة حياة الجلسة (الخادم مرجع الحالة)
 
@@ -142,7 +148,7 @@ ended: حذف session_keys، حفظ الإحصاءات والنطاقات، إر
 
 **التحقق من الحقول:**
 - `candidates[].ip` عنوان IP حرفي (v4 أو v6) لا اسم مضيف، ويُخزَّن بصيغته المعيارية. الحد 16 مرشحًا، والمكرر هو تطابق `(type, ip, port)` الثلاثي؛ نفس `ip:port` بنوعين مختلفين (`upnp` و`public`) مسموح.
-- `winner_type` من مفردات المرشحين نفسها: `lan|upnp|public|v6`. **إضافة Relay لاحقًا تستلزم توسيع هذه المفردات في العقد.**
+- `winner_type`: `lan|upnp|public|v6|relay` — **وُسِّعت في 2026-09-07 بـ [ADR-0009](decisions/0009-relay-default.md)**. وهي مفردات أوسع من `candidates[].type` عمدًا: `relay` ليس مرشحًا يُطلب الاتصال به (لا يظهر في `session.endpoint` أبدًا، ويُرفض فيها بـ `bad_request`)، لكنه جواب صحيح على «ما الذي حمل الجلسة»، وبدونه يعمى تقرير `admin/diagnostics` عن النقل الذي يعمل فعلًا.
 - `connect_ms` ≤ 2³¹−1، والبايتات ≤ 2⁶³−1 (مطابقة لأنواع الأعمدة)؛ التجاوز `bad_request`.
 - `session.end.domains` اختياري ويُعامل كقائمة فارغة عند غيابه: لا يُرفض إنهاء بسبب تفصيل ثانوي. `session.connect_failed.diagnostics` إلزامي.
 - `session.endpoint` مقبولة في حالة `connecting` فقط؛ بعد `active` تُرد `bad_request`.

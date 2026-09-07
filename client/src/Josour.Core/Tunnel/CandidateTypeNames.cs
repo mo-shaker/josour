@@ -9,6 +9,7 @@ public static class CandidateTypeNames
         CandidateType.V6 => "v6",
         CandidateType.Upnp => "upnp",
         CandidateType.Public => "public",
+        CandidateType.Relay => "relay",
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, "unknown candidate type"),
     };
 
@@ -20,6 +21,7 @@ public static class CandidateTypeNames
             case "v6": type = CandidateType.V6; return true;
             case "upnp": type = CandidateType.Upnp; return true;
             case "public": type = CandidateType.Public; return true;
+            case "relay": type = CandidateType.Relay; return true;
             default: type = default; return false;
         }
     }

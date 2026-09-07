@@ -6,6 +6,7 @@ using Josour.Core.Tunnel;
 using Josour.Tunnel.Candidates;
 using Josour.Tunnel.Certificates;
 using Josour.Tunnel.Mux;
+using Josour.Tunnel.Transport;
 
 namespace Josour.Tunnel;
 
@@ -168,7 +169,7 @@ public sealed class TunnelSession : ITunnelSession
             throw new InvalidOperationException("ConnectAsync may be called only once");
 
         SetState(TunnelState.Connecting);
-        var connector = new SymmetricConnector(_material, _certificate, _listener, _options.Transport, _local.Candidates);
+        var connector = new SymmetricConnector(_material, _certificate, _listener, _options.Transport, _local.Candidates, BuildRelayLeg(timeout));
         void OnStage(string stage)
         {
             if (stage == "auth" && State == TunnelState.Connecting) SetState(TunnelState.Authenticating);
@@ -247,6 +248,28 @@ public sealed class TunnelSession : ITunnelSession
         {
             _gate.Release();
         }
+    }
+
+    /// <summary>
+    /// يبني مسار الـ Relay من <c>session.created.relay</c>، أو null إن لم يُضبط Relay في النشر.
+    /// <para>
+    /// مهلة المصافحة هنا هي نافذة الاتصال كاملة لا الخمس ثوانٍ الافتراضية: رد الـ Relay هو
+    /// <c>paired</c>، وهو لا يصل حتى يصل <b>النظير أيضًا</b> — وقد يتأخر بقدر النافذة. خمس ثوانٍ كانت
+    /// ستُسقط كل جلسة لا يبدأ طرفاها في اللحظة نفسها، وهو الحال الطبيعي لا الاستثناء.
+    /// </para>
+    /// </summary>
+    private RelayLeg? BuildRelayLeg(TimeSpan connectWindow)
+    {
+        if (_options.Relay is not { } relay) return null;
+        var transport = new RelayTransport(new RelayTransportOptions
+        {
+            SessionId = _material.SessionId,
+            Role = _material.Role,
+            TokenProvider = _ => ValueTask.FromResult(relay.Token),
+            HandshakeTimeout = connectWindow,
+        });
+        Note("relay_endpoint", $"{relay.Address}:{relay.Port}"); // التوكن لا يُسجَّل
+        return new RelayLeg(transport, new CandidateEndpoint(CandidateType.Relay, relay.Address, relay.Port));
     }
 
     // ---------- 3. الحيوية والموت ----------

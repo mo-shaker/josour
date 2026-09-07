@@ -21,6 +21,7 @@ from app.ws.protocol import (
     Ping,
     RequestCreated,
     RequestResult,
+    SessionConnected,
     SessionEnd,
     SessionEndpoint,
     WsError,
@@ -186,7 +187,7 @@ def test_candidate_ip_is_canonicalised() -> None:
         # the whole frame
         '{"type":"session.endpoint","session_id":"nope","cert_fp_sha256":"' + FINGERPRINT + '"}',
         # session.connected
-        '{"type":"session.connected","session_id":"' + SESSION_ID + '","winner_type":"relay",'
+        '{"type":"session.connected","session_id":"' + SESSION_ID + '","winner_type":"carrier",'
         '"connect_ms":1,"tls_version":"1.3"}',
         '{"type":"session.connected","session_id":"' + SESSION_ID + '","winner_type":"lan",'
         '"connect_ms":-1,"tls_version":"1.3"}',
@@ -358,3 +359,24 @@ async def test_a_past_deadline_fires_immediately() -> None:
 
     scheduler.schedule_at("k", utcnow() - timedelta(seconds=10), callback)
     await asyncio.wait_for(fired.wait(), 1.0)
+
+
+def test_relay_wins_a_session_but_is_never_a_candidate() -> None:
+    """ADR-0009 widened ``winner_type`` without widening ``candidates``.
+
+    The two vocabularies look alike and are not the same one. ``session.endpoint`` lists addresses
+    the peer can dial, and the relay is never one of those: a client reaches it through
+    ``session.created.relay``, not by dialling a candidate. But ``relay`` is a truthful answer to
+    "what carried this session", and the admin diagnostics that feed the transport decision are
+    worthless if it cannot be reported."""
+    frame = parse_client_message(
+        '{"type":"session.connected","session_id":"' + SESSION_ID + '","winner_type":"relay",'
+        '"connect_ms":42,"tls_version":"1.3"}'
+    )
+    assert isinstance(frame, SessionConnected)
+    assert frame.winner_type == "relay"
+
+    with pytest.raises(WsError):
+        parse_client_message(
+            _endpoint_frame(candidates=[{"type": "relay", "ip": "10.0.0.4", "port": 443}])
+        )
