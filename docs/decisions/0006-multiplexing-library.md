@@ -6,17 +6,17 @@
 النفق بين الجهازين stream واحد مصادَق (`SslStream` من `SymmetricConnector`) يجب أن يحمل مئات الـ streams المتزامنة (اتصال TCP لكل `CONNECT` من المتصفح) مع Backpressure لكل stream على حدة، ورفض فتح الـ stream بسبب مرمّز (`OPEN_FAIL`)، وإغلاق نصفي نظيف. الخياران: `Nerdbank.Streams.MultiplexingStream` أو Framing يدوي وفق `docs/protocol.md` القسم 5.
 
 ## القرار
-**`Nerdbank.Streams.MultiplexingStream` (الإصدار 2.13.31، بروتوكول 3)** خلف واجهتي `IMuxConnection` (جانب Guest) و`IMuxAcceptor` (جانب Host) في `RouteBridge.Tunnel.Mux`. الفئة `NerdbankMux` تنفذ الواجهتين معًا وتُنشأ من الـ stream المصادَق بـ `NerdbankMux.Create(stream, role)`.
+**`Nerdbank.Streams.MultiplexingStream` (الإصدار 2.13.31، بروتوكول 3)** خلف واجهتي `IMuxConnection` (جانب Guest) و`IMuxAcceptor` (جانب Host) في `Josour.Tunnel.Mux`. الفئة `NerdbankMux` تنفذ الواجهتين معًا وتُنشأ من الـ stream المصادَق بـ `NerdbankMux.Create(stream, role)`.
 
 كيفية تحقيق عقد القسم 5 فوق Nerdbank:
 - **OPEN:** Guest يعرض قناة باسم `host:port`. المضيف يقبل القناة دائمًا ثم يكتب **بايت حالة واحدًا** كأول بايت فيها: `0` = `OPEN_OK` ويبدأ الضخ، وإلا رمز `OPEN_FAIL` نفسه (1 `not_allowed` … 7 `ip_literal`) ثم يكمل الكتابة. الرفض داخل القناة نفسها يضمن الترتيب ولا يحتاج قناة تحكم لكل فتح ولا الاعتماد على دلالات رفض Nerdbank (التي لا تحمل سببًا).
 - **PING/PONG/GOAWAY:** قناة مزروعة (seeded, id 0) لا تحتاج مصافحة، بإطارات ثابتة 9 بايت: `u8 type | 8 بايت حمولة`. `PING` كل 20 ثانية من الطرفين، ولا `PONG` خلال 60 ثانية = نفق ميت (`Completion` يفشل بـ `MuxClosedException`). `GOAWAY(reason)` يُرسل قبل الإغلاق ويظهر عند الطرف الآخر في `RemoteGoAway`.
 - **النافذة:** `DefaultChannelReceivingWindowSize = 1 MiB` لكل قناة (نفس القسم 5)؛ Backpressure من `System.IO.Pipelines`: الكاتب يتوقف عند امتلاء نافذة الطرف الآخر.
 - **الإغلاق النصفي:** `Output.Complete()` على القناة يظهر عند الطرف الآخر كـ EOF، و`StreamPump` يحوّله إلى `Shutdown(Send)` على المقبس الوجهة (`SocketStream`)، والعكس. القناة تُغلق ذاتيًا عندما يكمل الطرفان الكتابة.
-- **الحدود (256 stream، 50 OPEN/ث)** تُنفَّذ في `RouteBridge.Egress.StreamLimiter` وترد `OPEN_FAIL(limit)`.
+- **الحدود (256 stream، 50 OPEN/ث)** تُنفَّذ في `Josour.Egress.StreamLimiter` وترد `OPEN_FAIL(limit)`.
 - **التتبع:** `MuxOptions.Trace` يمرر `TraceSource` إلى Nerdbank لتسجيل الإطارات عند الأعطال؛ `MuxStats` تعطي بايتات النقل في الاتجاهين وعدد الـ streams المفتوحة.
 
-## أرقام النموذج (macOS، TLS 1.2 على loopback، `tests/RouteBridge.Tunnel.Tests/Mux/MuxBenchmarks.cs` بوسم `Category=Benchmark`)
+## أرقام النموذج (macOS، TLS 1.2 على loopback، `tests/Josour.Tunnel.Tests/Mux/MuxBenchmarks.cs` بوسم `Category=Benchmark`)
 
 | المعيار | النتيجة |
 |---|---|
@@ -54,11 +54,11 @@
 **التوصية أعلاه اعتُمدت.** `docs/protocol.md` القسم 5 عُدِّل، فلم تعد النافذة في هذا الـ ADR رقمًا ثابتًا:
 
 - **النافذة:** `DefaultChannelReceivingWindowSize` = ما تعيده `MuxWindow.ForRoundTrip(connect_ms)` في
-  `RouteBridge.Tunnel.Mux`: **1 MiB حتى 60 ms، 2 MiB حتى 150 ms، 4 MiB فوقها**. من يستدعيها `TunnelSession`
+  `Josour.Tunnel.Mux`: **1 MiB حتى 60 ms، 2 MiB حتى 150 ms، 4 MiB فوقها**. من يستدعيها `TunnelSession`
   بعد `SymmetricConnector` (أول موضع يُعرف فيه `connect_ms`). قياس فاسد (صفر أو سالب أو > 5 ثوانٍ) ⇒ الشريحة
   الوسطى مع سبب مكتوب. `MuxOptions.ReceiveWindow` بقيت تجاوزًا صريحًا يفوز على الاشتقاق (الاختبارات وأداة Spike).
 - **الحدود:** الحد المتزامن يتبع النافذة (**256 / 128 / 64**) فيبقى الحاصل 256 MiB، ويصل إلى
-  `RouteBridge.Egress.StreamLimiter` عبر `TunnelEgressContext.MaxConcurrentStreams`. حد الـ 50 `OPEN`/ثانية لم يتغير.
+  `Josour.Egress.StreamLimiter` عبر `TunnelEgressContext.MaxConcurrentStreams`. حد الـ 50 `OPEN`/ثانية لم يتغير.
   ويحجز الضيف مكان الـ stream محليًا قبل العرض بحد شريحته هو، حتى يبقى سقف ذاكرته 256 MiB لو وقع الطرفان في شريحتين
   مختلفتين (المضيف يفرض حده على السلك؛ هذا يحمي ذاكرة الضيف نفسه).
 - **لا تفاوض على السلك:** نافذة الاستقبال في بروتوكول Nerdbank 3 خاصية **المستقبل** وتُعلَن لكل قناة في إطار

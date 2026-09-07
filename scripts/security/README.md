@@ -17,7 +17,7 @@
 scripts/security/check-session-keys.sh
 scripts/security/check-listener.sh 203.0.113.10 51234
 scripts/security/check-egress-blocks.sh 49152
-scripts/security/check-logs-clean.sh ~/Library/Logs/RouteBridge/app.log
+scripts/security/check-logs-clean.sh ~/Library/Logs/Josour/app.log
 ```
 
 على Windows تُشغَّل من Git Bash أو WSL؛ يحتاج `check-listener.sh` إلى `openssl` و`nc`، ويستفيد من `nmap` إن وُجد.

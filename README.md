@@ -1,4 +1,4 @@
-# RouteBridge
+# Josour
 
 تطبيق Windows يسمح لمستخدم (Guest) باستخدام اتصال الإنترنت الخاص بجهاز مستخدم آخر (Host) مؤقتًا وبموافقته الصريحة. المواقع المسموح بها فقط تمر عبر جهاز المضيف؛ الخادم المركزي للتحكم والتنسيق ولا يمرر أي بيانات تصفح.
 
@@ -13,7 +13,7 @@
 
 **للبدء بتجربة حقيقية:** [docs/trial-setup-guide.md](docs/trial-setup-guide.md) — دليل من الصفر لنشر الخادم وتثبيت التطبيق على Windows 11.
 
-الخطة الكاملة: [docs/RouteBridge-MVP-Implementation-Plan.md](docs/RouteBridge-MVP-Implementation-Plan.md)
+الخطة الكاملة: [docs/Josour-MVP-Implementation-Plan.md](docs/Josour-MVP-Implementation-Plan.md)
 
 ## العقود المجمّدة
 
@@ -46,17 +46,17 @@ uvicorn app.main:app --reload
 
 ```bash
 cd client
-dotnet build RouteBridge.sln
-dotnet test RouteBridge.sln
+dotnet build Josour.sln
+dotnet test Josour.sln
 ```
 
-تطبيق WPF (`RouteBridge.App`) يعمل على Windows فقط، لكنه يُبنى على macOS/Linux عبر `EnableWindowsTargeting`.
+تطبيق WPF (`Josour.App`) يعمل على Windows فقط، لكنه يُبنى على macOS/Linux عبر `EnableWindowsTargeting`.
 
 ## المسارات
 
 | المسار | النطاق |
 |---|---|
 | A: الخادم | `backend/` |
-| B: الشبكات | `client/src/RouteBridge.{Core,Tunnel,Proxy,Egress,Browser}` + `client/tools/` |
-| C: التطبيق | `client/src/RouteBridge.{Infrastructure,App}` |
+| B: الشبكات | `client/src/Josour.{Core,Tunnel,Proxy,Egress,Browser}` + `client/tools/` |
+| C: التطبيق | `client/src/Josour.{Infrastructure,App}` |
 | D: DevOps/QA | `deploy/`, `.github/`, `client/installer/`, `docs/runbook.md`, `docs/acceptance-checklist.md` |

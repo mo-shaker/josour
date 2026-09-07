@@ -5,7 +5,7 @@ discriminated union; unknown or malformed frames never raise out of the handler,
 ``error`` frame with code ``bad_request`` that echoes the client's ``ref`` when there is one.
 
 Field names here are the wire names, literally as documented; the C# mirror of these models is
-``client/src/RouteBridge.Core/Control/ControlMessages.cs``.
+``client/src/Josour.Core/Control/ControlMessages.cs``.
 """
 
 import enum
@@ -113,7 +113,7 @@ def _cert_fingerprint(value: str) -> str:
 CertFingerprint = Annotated[str, AfterValidator(_cert_fingerprint)]
 
 type CandidateType = Literal["lan", "upnp", "public", "v6"]
-"""Section 3; the C# mirror is ``RouteBridge.Core.Tunnel.CandidateTypeNames``."""
+"""Section 3; the C# mirror is ``Josour.Core.Tunnel.CandidateTypeNames``."""
 
 
 class Candidate(BaseModel):

@@ -17,7 +17,7 @@ from app.services import allowlist
 from app.services import sessions as session_service
 from app.services.users import create_user
 
-cli = typer.Typer(help="RouteBridge management commands.", no_args_is_help=True)
+cli = typer.Typer(help="Josour management commands.", no_args_is_help=True)
 
 
 def _run[T](fn: Callable[[AsyncSession], Awaitable[T]]) -> T:

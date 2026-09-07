@@ -3,9 +3,9 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "routebridge-backend"
+name = "josour-backend"
 version = "0.1.0"
-description = "RouteBridge control/coordination server (auth, devices, presence, requests, sessions)."
+description = "Josour control/coordination server (auth, devices, presence, requests, sessions)."
 requires-python = ">=3.12"
 license = { text = "Proprietary" }
 dependencies = [
@@ -31,7 +31,7 @@ dev = [
 ]
 
 [project.scripts]
-routebridge = "app.cli:main"
+josour = "app.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["app*"]

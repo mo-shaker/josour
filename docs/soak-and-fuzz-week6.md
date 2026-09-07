@@ -1,6 +1,6 @@
 # التحمّل والـ Fuzz — الأسبوع 6 (المسار B)
 
-المالك: المسار B. النطاق: `client/src/RouteBridge.{Core,Tunnel,Egress,Proxy,Browser}` و`client/tools/RouteBridge.Spike`.
+المالك: المسار B. النطاق: `client/src/Josour.{Core,Tunnel,Egress,Proxy,Browser}` و`client/tools/Josour.Spike`.
 
 سؤال هذا الأسبوع واحد: **ما الذي لا يكشفه إلا الوقت أو المدخل المعادي؟** كل ما سبق قيس في ثوانٍ، ومحلل إطارات
 النفق — أخطر محلل في المنتج — لم يُفحص بمدخل معادٍ قط (الأسبوع 4 فحص محلل HTTP وقائمة المواقع، لا الـ Mux).
@@ -16,7 +16,7 @@ cd client
 
 ### التحمّل (soak)
 
-كله في `tests/RouteBridge.Tunnel.Tests/Soak/`، وكله موسوم `Category=Benchmark` فلا يدخل المجموعة الافتراضية.
+كله في `tests/Josour.Tunnel.Tests/Soak/`، وكله موسوم `Category=Benchmark` فلا يدخل المجموعة الافتراضية.
 يعمل بلا مراقبة، ويضبطه متغيرات بيئة لا إعادة ترجمة:
 
 | المتغير | الافتراضي | المعنى |
@@ -29,12 +29,12 @@ cd client
 ```bash
 # نصف ساعة على نفق تحت حمل، ونصف ساعة على نفق خامل، بالتوازي في عمليتين
 ROUTEBRIDGE_SOAK_MINUTES=30 ROUTEBRIDGE_SOAK_OUT=/tmp/soak \
-  dotnet test tests/RouteBridge.Tunnel.Tests --filter 'FullyQualifiedName~WorkingTunnel_DoesNotGrowOverTime'
+  dotnet test tests/Josour.Tunnel.Tests --filter 'FullyQualifiedName~WorkingTunnel_DoesNotGrowOverTime'
 ROUTEBRIDGE_SOAK_MINUTES=30 ROUTEBRIDGE_SOAK_OUT=/tmp/soak \
-  dotnet test tests/RouteBridge.Tunnel.Tests --filter 'FullyQualifiedName~IdleTunnel_AccumulatesNothing'
+  dotnet test tests/Josour.Tunnel.Tests --filter 'FullyQualifiedName~IdleTunnel_AccumulatesNothing'
 # دورة حياة الجلسة (شهادة + مستمع + مرشحون) — الافتراضي 5 دقائق
 ROUTEBRIDGE_SOAK_OUT=/tmp/soak \
-  dotnet test tests/RouteBridge.Tunnel.Tests --filter 'FullyQualifiedName~SessionLifecycleSoakTests'
+  dotnet test tests/Josour.Tunnel.Tests --filter 'FullyQualifiedName~SessionLifecycleSoakTests'
 ```
 
 **المخرجات الآلية** لكل تشغيل في `ROUTEBRIDGE_SOAK_OUT`:
@@ -58,13 +58,13 @@ ROUTEBRIDGE_SOAK_OUT=/tmp/soak \
 
 ### الـ Fuzz
 
-كله في `tests/RouteBridge.Tunnel.Tests/Fuzz/`. **الحالات السريعة تعمل في المجموعة الافتراضية** (72 اختبارًا في
+كله في `tests/Josour.Tunnel.Tests/Fuzz/`. **الحالات السريعة تعمل في المجموعة الافتراضية** (72 اختبارًا في
 5 ثوانٍ)، والعميقة موسومة `Category=Benchmark`:
 
 ```bash
-dotnet test tests/RouteBridge.Tunnel.Tests --filter 'FullyQualifiedName~Fuzz&Category!=Benchmark'   # السريع
-dotnet test tests/RouteBridge.Tunnel.Tests --filter 'FullyQualifiedName~Fuzz&Category=Benchmark'    # العميق
-ROUTEBRIDGE_FUZZ_CASES=20000 dotnet test tests/RouteBridge.Tunnel.Tests --filter 'FullyQualifiedName~Fuzz'
+dotnet test tests/Josour.Tunnel.Tests --filter 'FullyQualifiedName~Fuzz&Category!=Benchmark'   # السريع
+dotnet test tests/Josour.Tunnel.Tests --filter 'FullyQualifiedName~Fuzz&Category=Benchmark'    # العميق
+ROUTEBRIDGE_FUZZ_CASES=20000 dotnet test tests/Josour.Tunnel.Tests --filter 'FullyQualifiedName~Fuzz'
 ```
 
 **كل حالة مبذورة (seeded).** `FuzzSeed.For(scope, i)` يشتق مولّدًا من بذرة جذر ثابتة، فأي فشل يُعاد إنتاجه
@@ -129,7 +129,7 @@ ADR-0006 يفوّض صيغة الإطارات إلى `Nerdbank.Streams`، فال
 ### F-2 — مسار قبول القنوات بلا حد خاص به (متوسط، أُصلح)
 
 `NerdbankMux.HandleOfferAsync` كان يزيد العدّاد وينشئ قناة (بأنبوبَيها) **لكل عرض** بلا سقف. الحد الوحيد كان في
-`RouteBridge.Egress.StreamLimiter` على المضيف. أما **الضيف** فلا حد له على الإطلاق: مضيف معادٍ (أو مخترَق) يستطيع
+`Josour.Egress.StreamLimiter` على المضيف. أما **الضيف** فلا حد له على الإطلاق: مضيف معادٍ (أو مخترَق) يستطيع
 أن يعرض قنوات بلا نهاية فيقرر وحده كم قناة تُنشئ عمليةُ الضيف.
 
 **الإصلاح:** سقف على مسار القبول أيضًا عند `_window.MaxConcurrentStreams` (‏256/128/64 بحسب الشريحة،
@@ -260,7 +260,7 @@ IPv4 حتى لا يظهر العنوان الواحد مرتين على مستم
 التي يفرضها العقد.
 
 **حالة التوصيل عند كتابة هذه الوثيقة:** المسار C بنى محوّله بالفعل في
-`RouteBridge.Infrastructure/Diagnostics/ListenerAuthDiagnostics.cs`، وهو يقرأ الأسماء الثلاثة نفسها ويقبل
+`Josour.Infrastructure/Diagnostics/ListenerAuthDiagnostics.cs`، وهو يقرأ الأسماء الثلاثة نفسها ويقبل
 `List<string>` للعناوين و`int` للعدّاد — أي أن الطرفين متوافقان بلا تعديل. فرقان مقصودان يستحقان أن يكونا قرارًا
 لا مصادفة:
 
@@ -421,19 +421,19 @@ Gen2` في كل عيّنة، وهي بصمة الجمع الكامل القسر�
 
 | المشروع | قبل | بعد | الزيادة |
 |---|---|---|---|
-| `RouteBridge.Core.Tests` | 360 | 360 | — |
-| `RouteBridge.Tunnel.Tests` | 173 | **264** | +91 (72 fuzz، 12 عدّاد المحاولات، 7 وحدات أداة التحمّل) |
-| `RouteBridge.Egress.Tests` | 59 | 59 | — |
-| `RouteBridge.Proxy.Tests` | 183 | 183 | — |
-| `RouteBridge.Browser.Tests` | 38 | 38 | — |
-| `RouteBridge.E2E.Tests` | 20 | 20 | — |
+| `Josour.Core.Tests` | 360 | 360 | — |
+| `Josour.Tunnel.Tests` | 173 | **264** | +91 (72 fuzz، 12 عدّاد المحاولات، 7 وحدات أداة التحمّل) |
+| `Josour.Egress.Tests` | 59 | 59 | — |
+| `Josour.Proxy.Tests` | 183 | 183 | — |
+| `Josour.Browser.Tests` | 38 | 38 | — |
+| `Josour.E2E.Tests` | 20 | 20 | — |
 | **المجموع** | **833** | **924** | **+91** |
 
 وخارج المجموعة الافتراضية: **21 اختبار `Category=Benchmark`** (معايير Mux وWAN من الأسبوعين 4 و5، والتحمّل
 الثلاثة، والـ fuzz العميق الثلاثة).
 
 **التحقق:** بناء بلا تحذيرات على كل مشروع مملوك (Debug وRelease)، وثلاث تشغيلات كاملة متتالية بلا فشل بمرشِّح
-`Category!=Benchmark`. زمن مجموعة `RouteBridge.Tunnel.Tests` صار **38–41 ثانية** (كان 31)، والزيادة كلها من
+`Category!=Benchmark`. زمن مجموعة `Josour.Tunnel.Tests` صار **38–41 ثانية** (كان 31)، والزيادة كلها من
 الـ fuzz السريع وعدّاد المحاولات.
 
 ---

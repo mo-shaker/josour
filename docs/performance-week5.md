@@ -16,15 +16,15 @@
 export DOTNET_ROOT="$HOME/.dotnet"; export PATH="$HOME/.dotnet:$PATH"
 
 # كل المعايير (معايير ADR-0006 على loopback + معايير الأسبوع 5 على RTT مُحاكى). نحو 4 دقائق.
-dotnet test client/tests/RouteBridge.Tunnel.Tests -c Release \
+dotnet test client/tests/Josour.Tunnel.Tests -c Release \
   --filter 'Category=Benchmark' --logger "console;verbosity=detailed"
 
 # معيار واحد
-dotnet test client/tests/RouteBridge.Tunnel.Tests -c Release \
+dotnet test client/tests/Josour.Tunnel.Tests -c Release \
   --filter 'FullyQualifiedName~WanBenchmarks.PerStreamThroughput' --logger "console;verbosity=detailed"
 
 # التشغيل الافتراضي (بلا معايير) يبقى سريعًا كما كان
-dotnet test client/tests/RouteBridge.Tunnel.Tests --filter 'Category!=Benchmark'
+dotnet test client/tests/Josour.Tunnel.Tests --filter 'Category!=Benchmark'
 ```
 
 الأسطر المطبوعة تبدأ بـ `[throughput]` و`[derived]` و`[page]` و`[video]` و`[256]`، وهي مصدر الجداول أدناه حرفيًا.
@@ -34,10 +34,10 @@ dotnet test client/tests/RouteBridge.Tunnel.Tests --filter 'Category!=Benchmark'
 
 | الملف | الدور |
 |---|---|
-| `client/tests/RouteBridge.Tunnel.Tests/Perf/LinkSimulator.cs` | محاكي الوصلة (تأخير، ارتجاف، سقف نطاق، فقد) |
-| `client/tests/RouteBridge.Tunnel.Tests/Perf/LinkSimulatorTests.cs` | اختبارات المحاكي نفسه (سريعة، بلا وسم Benchmark) |
-| `client/tests/RouteBridge.Tunnel.Tests/Perf/PerfSupport.cs` | زوج Mux فوق الوصلة، بروتوكول الموارد، ملف الصفحة، وجهة مُعدَّلة الإيقاع |
-| `client/tests/RouteBridge.Tunnel.Tests/Perf/WanBenchmarks.cs` | المعايير الخمسة (منها معيار النافذة المشتقة في القسم 8) |
+| `client/tests/Josour.Tunnel.Tests/Perf/LinkSimulator.cs` | محاكي الوصلة (تأخير، ارتجاف، سقف نطاق، فقد) |
+| `client/tests/Josour.Tunnel.Tests/Perf/LinkSimulatorTests.cs` | اختبارات المحاكي نفسه (سريعة، بلا وسم Benchmark) |
+| `client/tests/Josour.Tunnel.Tests/Perf/PerfSupport.cs` | زوج Mux فوق الوصلة، بروتوكول الموارد، ملف الصفحة، وجهة مُعدَّلة الإيقاع |
+| `client/tests/Josour.Tunnel.Tests/Perf/WanBenchmarks.cs` | المعايير الخمسة (منها معيار النافذة المشتقة في القسم 8) |
 
 ---
 
@@ -236,7 +236,7 @@ ADR-0006 أثبت هذا العزل على RTT = 0 فقط، حيث النافذ�
 
 ## 8. بعد التعديل: النافذة مشتقة من الـ RTT (مقيس)
 
-العقد عُدِّل (`docs/protocol.md` القسم 5) والكود تبعه: `MuxWindow.ForRoundTrip` في `RouteBridge.Tunnel.Mux` تختار النافذة
+العقد عُدِّل (`docs/protocol.md` القسم 5) والكود تبعه: `MuxWindow.ForRoundTrip` في `Josour.Tunnel.Mux` تختار النافذة
 من `connect_ms`، و`TunnelSession` تستدعيها بعد `SymmetricConnector` وتمرر الحد المتزامن المرافق إلى `StreamLimiter`
 عبر `TunnelEgressContext.MaxConcurrentStreams`. حد الـ 50 فتحة/ثانية لم يتغير.
 
@@ -244,7 +244,7 @@ ADR-0006 أثبت هذا العزل على RTT = 0 فقط، حيث النافذ�
 تنزيل القسم 3 لكن بالنافذة التي تختارها الدالة نفسها (لا برقم مكتوب في الاختبار):
 
 ```bash
-dotnet test client/tests/RouteBridge.Tunnel.Tests -c Release \
+dotnet test client/tests/Josour.Tunnel.Tests -c Release \
   --filter 'FullyQualifiedName~PerStreamThroughput_WithRttDerivedWindow' --logger "console;verbosity=detailed"
 ```
 

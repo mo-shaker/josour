@@ -1,5 +1,5 @@
 #!/bin/sh
-# استعادة نسخة: ./backup/restore.sh backups/routebridge-YYYYMMDDTHHMMSSZ.sql.gz
+# استعادة نسخة: ./backup/restore.sh backups/josour-YYYYMMDDTHHMMSSZ.sql.gz
 # يوقف api، يعيد إنشاء القاعدة، يستورد، ثم يشغّل api.
 set -eu
 FILE="${1:?usage: restore.sh <file.sql.gz>}"

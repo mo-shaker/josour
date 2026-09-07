@@ -1,6 +1,6 @@
 # عقد القناة بين الجهازين (Tunnel Protocol)
 
-الإصدار: 1 (مجمّد نهاية الأسبوع 1). المالك: المسار B. المستهلك: المسار C عبر واجهات `RouteBridge.Core`.
+الإصدار: 1 (مجمّد نهاية الأسبوع 1). المالك: المسار B. المستهلك: المسار C عبر واجهات `Josour.Core`.
 
 ## 1. الأدوار
 
@@ -11,7 +11,7 @@
 ## 2. إنشاء الاتصال
 
 1. عند `session.created` كل طرف:
-   - يولّد شهادة ذاتية: ECDSA P-256، الموضوع `CN=routebridge`, EKU `serverAuth` + `clientAuth`, الصلاحية من الآن − 5 دقائق إلى `expires_at` + ساعة. تُصدَّر PFX وتُعاد استيرادها بـ `X509KeyStorageFlags.UserKeySet` (بلا `PersistKeySet`) لتعمل مع Schannel وتُحذف حاوية المفتاح عند `Dispose`.
+   - يولّد شهادة ذاتية: ECDSA P-256، الموضوع `CN=josour`, EKU `serverAuth` + `clientAuth`, الصلاحية من الآن − 5 دقائق إلى `expires_at` + ساعة. تُصدَّر PFX وتُعاد استيرادها بـ `X509KeyStorageFlags.UserKeySet` (بلا `PersistKeySet`) لتعمل مع Schannel وتُحذف حاوية المفتاح عند `Dispose`.
    - يفتح مستمع TCP على `[::]:0` بـ `DualMode=true` ويقرأ المنفذ.
    - يطلب تعيين UPnP/NAT-PMP بـ Mono.Nat لهذا المنفذ (عمر التعيين = المدة المتبقية + 5 دقائق).
    - يجمع المرشحين ويرسل `session.endpoint` مع بصمة الشهادة (SHA-256 على `RawData`, hex صغير).
@@ -26,7 +26,7 @@
 ## 3. TLS
 
 - `SslStream` مع `SslProtocols.None` (افتراضي النظام). بعد المصافحة: إن كان `SslProtocol < Tls12` يُغلق الاتصال ويُسجَّل `tls_too_old`. الإصدار المتفاوَض عليه يُرسل في `session.connected`.
-- الطرف الذي يتصل (Client في TLS) يقدّم `TargetHost="routebridge"` ويقبل الشهادة فقط إذا طابقت `SHA256(RawData)` بصمة الطرف الآخر من `session.peer_endpoint`؛ يتجاهل أخطاء السلسلة والاسم؛ `CertificateRevocationCheckMode=NoCheck`.
+- الطرف الذي يتصل (Client في TLS) يقدّم `TargetHost="josour"` ويقبل الشهادة فقط إذا طابقت `SHA256(RawData)` بصمة الطرف الآخر من `session.peer_endpoint`؛ يتجاهل أخطاء السلسلة والاسم؛ `CertificateRevocationCheckMode=NoCheck`.
 - الطرف الذي يستمع (Server في TLS) يقدّم شهادته الذاتية ولا يطلب شهادة عميل.
 - لا يُكتب أي بايت خارج TLS.
 
@@ -130,7 +130,7 @@ u8  type | u8 flags | u16 length | u32 stream_id
 5. `Dispose` للشهادات ومسح السر.
 6. `session.end` بالإحصاءات والنطاقات.
 
-## 8. واجهات `RouteBridge.Core` (ما يستهلكه المسار C)
+## 8. واجهات `Josour.Core` (ما يستهلكه المسار C)
 
 ```csharp
 public interface ITunnelSession : IAsyncDisposable
@@ -148,4 +148,4 @@ public interface ITunnelSession : IAsyncDisposable
 public interface ITunnelTransport { Task<Stream> ConnectAsync(...); }   // Direct today, Relay later
 ```
 
-التعريف الملزم في `client/src/RouteBridge.Core/Tunnel/*.cs`.
+التعريف الملزم في `client/src/Josour.Core/Tunnel/*.cs`.

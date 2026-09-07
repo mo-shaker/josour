@@ -5,7 +5,7 @@ Nothing in this module logs; callers must never log the plaintext values handled
 argon2id is deliberately expensive: even at the ADR-0007 parameters one hash costs
 ~35 ms and 64 MiB here, and roughly four times that on the single-core VPS the product targets,
 because the four lanes cannot run in parallel there. The server is one uvicorn worker
-(docs/RouteBridge-MVP-Implementation-Plan.md section 2), so a hash computed on the event loop
+(docs/Josour-MVP-Implementation-Plan.md section 2), so a hash computed on the event loop
 stops *every* live control channel for that long - heartbeats, ``hosts.update``, session frames
 and all. :func:`hash_password_async` and :func:`verify_password_async` therefore run the KDF on
 a worker thread (argon2 releases the GIL), which is what every ``await``-ing caller must use;

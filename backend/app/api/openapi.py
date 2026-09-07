@@ -13,7 +13,7 @@ from typing import Any
 from app.schemas.common import ErrorEnvelope
 
 API_DESCRIPTION = """\
-Control plane for RouteBridge: accounts and devices, the shared domain allow-list, host
+Control plane for Josour: accounts and devices, the shared domain allow-list, host
 availability, and the lifecycle of a connection session. **No browsing traffic passes through
 this API** - the tunnel is established directly between the two clients and the server only
 coordinates it.

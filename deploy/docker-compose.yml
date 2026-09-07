@@ -1,4 +1,4 @@
-# RouteBridge control plane: Caddy (TLS) + FastAPI (1 worker) + PostgreSQL + daily backup
+# Josour control plane: Caddy (TLS) + FastAPI (1 worker) + PostgreSQL + daily backup
 # Usage: cp .env.example .env && docker compose up -d
 services:
   caddy:
