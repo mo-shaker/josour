@@ -1,0 +1,44 @@
+# The Josour relay, deployed on its own host (ADR-0009).
+#
+# Separate from the control plane on purpose, for two reasons: the relay wants to own port 443,
+# which the API's Caddy already holds; and its useful location is different. The relay sits on the
+# path between the two peers, so for an Egypt <-> Saudi pair a Gulf region (Jeddah, Dubai, Bahrain)
+# costs ~40 ms while a European one costs ~150 ms. The API can live anywhere.
+#
+# Usage on the relay host:
+#   cp .env.relay.example .env && $EDITOR .env   # RELAY_SECRET must match the API's
+#   docker compose -f docker-compose.relay.yml up -d --build
+services:
+  relay:
+    build:
+      context: ../relay
+    restart: unless-stopped
+    environment:
+      RELAY_SECRET: ${RELAY_SECRET}
+      RELAY_PORT: 8443
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Deadlines. PAIR_TIMEOUT_SECONDS is sized to the control plane's connect deadline: waiting
+      # longer than the API will wait only holds a slot for a session already being failed.
+      PREAMBLE_TIMEOUT_SECONDS: ${PREAMBLE_TIMEOUT_SECONDS:-5}
+      PAIR_TIMEOUT_SECONDS: ${PAIR_TIMEOUT_SECONDS:-30}
+      IDLE_TIMEOUT_SECONDS: ${IDLE_TIMEOUT_SECONDS:-120}
+      MAX_SESSION_SECONDS: ${MAX_SESSION_SECONDS:-7200}
+      # Limits. Sized for the five users of this release; raise them on measurement, not on guess.
+      MAX_SESSIONS: ${MAX_SESSIONS:-64}
+      MAX_CONNECTIONS_PER_IP: ${MAX_CONNECTIONS_PER_IP:-16}
+      MAX_BYTES_PER_SESSION: ${MAX_BYTES_PER_SESSION:-0}
+    ports:
+      - "443:8443"
+    healthcheck:
+      # The relay speaks its own binary protocol, so "is the port accepting?" is the only check
+      # that does not require forging a signed token inside the healthcheck.
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import socket,sys; s=socket.create_connection(('127.0.0.1',8443),3); s.close()",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
