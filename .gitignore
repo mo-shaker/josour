@@ -29,3 +29,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# relay benchmark scratch (one log per run, named by the ephemeral port)
+relay/bench-relay-*.log

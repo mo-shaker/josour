@@ -20,6 +20,7 @@ dev = [
     "pytest-asyncio>=0.23",
     "ruff>=0.5",
 ]
+bench = ["psutil>=5.9"]  # process metrics for `python -m bench`; not needed to run the service
 
 [project.scripts]
 josour-relay = "relay.__main__:main"
