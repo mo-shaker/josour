@@ -28,7 +28,10 @@ services:
       MAX_CONNECTIONS_PER_IP: ${MAX_CONNECTIONS_PER_IP:-16}
       MAX_BYTES_PER_SESSION: ${MAX_BYTES_PER_SESSION:-0}
     ports:
-      - "443:8443"
+      # 443 on the host is the point: it is the one outbound port open on essentially every
+      # network. Set RELAY_PUBLIC_PORT when something else already holds it - the API's Caddy
+      # does, if you are running both on one machine for a first test.
+      - "${RELAY_PUBLIC_PORT:-443}:8443"
     healthcheck:
       # The relay speaks its own binary protocol, so "is the port accepting?" is the only check
       # that does not require forging a signed token inside the healthcheck.
