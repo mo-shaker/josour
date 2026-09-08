@@ -205,7 +205,9 @@ public partial class App : Application
     {
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
         {
-            ApplicationName = Strings.AppName,
+            // The stable identifier, not the display name: IHostEnvironment.ApplicationName feeds
+            // configuration and log enrichment, so it should not change with the interface language.
+            ApplicationName = ApiClient.ProductId,
             ContentRootPath = AppContext.BaseDirectory, // the Run-key launch has an arbitrary working directory
         });
 
@@ -257,7 +259,7 @@ public partial class App : Application
                 InnerHandler = inner,
             };
             var device = sp.GetRequiredService<IDeviceInfoProvider>();
-            var http = ApiClient.CreateHttpClient(handler, userAgent: $"{Strings.AppName}/{device.AppVersion}");
+            var http = ApiClient.CreateHttpClient(handler, userAgent: $"{ApiClient.ProductId}/{device.AppVersion}");
             return new ApiClient(http, sp.GetRequiredService<IAppSettingsStore>(), sp.GetRequiredService<ILogger<ApiClient>>());
         });
         services.AddSingleton<AuthSession>(sp => new AuthSession(

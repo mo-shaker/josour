@@ -41,6 +41,14 @@ public sealed class ApiClient : IApiClient
         _logger = logger ?? NullLogger<ApiClient>.Instance;
     }
 
+    /// <summary>
+    /// The product name as it goes on the wire (User-Agent). Deliberately **not** the localized
+    /// display name: an HTTP header value must be ASCII, so building it from the UI string made the
+    /// Arabic build - the default one - throw at start-up while the English build was fine.
+    /// This one is a protocol identifier and stays ASCII whatever the interface language is.
+    /// </summary>
+    public const string ProductId = "Josour";
+
     /// <summary>Creates the <see cref="HttpClient"/> this class expects: 15 s timeout, JSON Accept header, optional User-Agent.</summary>
     public static HttpClient CreateHttpClient(HttpMessageHandler handler, string? userAgent = null, bool disposeHandler = true)
     {
@@ -49,7 +57,13 @@ public sealed class ApiClient : IApiClient
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         if (!string.IsNullOrWhiteSpace(userAgent))
         {
-            client.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
+            // A User-Agent is diagnostic decoration. Refusing to construct the client over one the
+            // header parser dislikes turns a cosmetic string into a dead application, which is
+            // exactly what happened once; the request is fine without the header.
+            if (!client.DefaultRequestHeaders.UserAgent.TryParseAdd(userAgent))
+            {
+                client.DefaultRequestHeaders.UserAgent.TryParseAdd($"{ProductId}/unknown");
+            }
         }
 
         return client;
