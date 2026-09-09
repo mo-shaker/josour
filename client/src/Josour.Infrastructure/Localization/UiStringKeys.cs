@@ -132,6 +132,7 @@ public static class UiStringKeys
     public const string IncomingRequestDeviceLabel = "IncomingRequestDeviceLabel";
     public const string IncomingRequestDurationLabel = "IncomingRequestDurationLabel";
     public const string IncomingRequestAllowedSitesLabel = "IncomingRequestAllowedSitesLabel";
+    public const string IncomingRequestScopeLabel = "IncomingRequestScopeLabel";
     public const string DurationMinutesFormat = "DurationMinutesFormat";
     public const string AllowedSitesNote = "AllowedSitesNote";
     public const string AllowedSitesSummaryFormat = "AllowedSitesSummaryFormat";

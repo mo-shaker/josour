@@ -64,9 +64,10 @@
 
             <!-- The allow-list of THIS request's version (GET /domains?version=N), or why it is not there. -->
             <ui:TextBlock Margin="0,16,0,0" FontTypography="BodyStrong"
-                          Text="{x:Static app:Strings.IncomingRequestAllowedSitesLabel}" />
+                          Text="{Binding ScopeLabel}" />
             <ui:TextBlock Appearance="Secondary" TextWrapping="Wrap" Margin="0,2,0,0"
-                          Text="{x:Static app:Strings.AllowedSitesNote}" />
+                          Text="{Binding ScopeNote}"
+                          Visibility="{Binding HasScopeNote, Converter={StaticResource BoolToVis}}" />
 
             <ui:Card Padding="12" Margin="0,8,0,0"
                      Visibility="{Binding HasAllowedSites, Converter={StaticResource BoolToVis}}">

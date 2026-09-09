@@ -142,6 +142,7 @@ public static class Strings
     public static string IncomingRequestDeviceLabel => LocalizedStrings.Current[UiStringKeys.IncomingRequestDeviceLabel];
     public static string IncomingRequestDurationLabel => LocalizedStrings.Current[UiStringKeys.IncomingRequestDurationLabel];
     public static string IncomingRequestAllowedSitesLabel => LocalizedStrings.Current[UiStringKeys.IncomingRequestAllowedSitesLabel];
+    public static string IncomingRequestScopeLabel => LocalizedStrings.Current[UiStringKeys.IncomingRequestScopeLabel];
     public static string DurationMinutesFormat => LocalizedStrings.Current[UiStringKeys.DurationMinutesFormat];
     public static string AllowedSitesNote => LocalizedStrings.Current[UiStringKeys.AllowedSitesNote];
     public static string AllowedSitesSummaryFormat => LocalizedStrings.Current[UiStringKeys.AllowedSitesSummaryFormat];

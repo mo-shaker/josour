@@ -394,6 +394,9 @@
   <data name="DurationMinutesFormat" xml:space="preserve">
     <value>{0} دقيقة</value>
   </data>
+  <data name="IncomingRequestScopeLabel" xml:space="preserve">
+    <value>نطاق التصفح</value>
+  </data>
   <data name="AllowedSitesNote" xml:space="preserve">
     <value>لا يمكن الوصول عبر جهازك إلا إلى المواقع المدرجة في قائمة الشركة.</value>
   </data>

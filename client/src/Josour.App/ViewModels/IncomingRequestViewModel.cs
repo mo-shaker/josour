@@ -60,7 +60,9 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
         AllowedSitesSummary = request.Allowlist.Loaded
             ? string.Format(UiFlow.Culture, Strings.AllowedSitesSummaryFormat, request.Allowlist.Sites.Count, request.Allowlist.Version)
             : string.Empty;
-        AllowedSitesMessage = DescribeAllowlist(request.Allowlist);
+        AllowedSitesMessage = DisclosureText.Message(request.Allowlist);
+        ScopeLabel = DisclosureText.Label(request.Allowlist);
+        ScopeNote = DisclosureText.Note(request.Allowlist);
 
         _timer = new DispatcherTimer(DispatcherPriority.Normal, _dispatcher) { Interval = TimeSpan.FromMilliseconds(250) };
         _timer.Tick += (_, _) => Tick();
@@ -97,6 +99,21 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
     /// </summary>
     public string AllowedSitesMessage { get; }
 
+    /// <summary>
+    /// The heading over the scope block. With a list it names the list; with no list it names the
+    /// scope, because "Allowed sites" over "any site" reads as a restriction that is not there.
+    /// </summary>
+    public string ScopeLabel { get; }
+
+    /// <summary>
+    /// The company-list sentence, or empty when there is no list. It used to be fixed text, and after
+    /// <see href="../../../docs/decisions/0010-route-all-through-host.md">ADR-0010</see> that text told
+    /// the host the opposite of what it was agreeing to - directly above the line saying so.
+    /// </summary>
+    public string ScopeNote { get; }
+
+    public bool HasScopeNote => ScopeNote.Length > 0;
+
     public bool HasAllowedSitesMessage => AllowedSitesMessage.Length > 0;
 
     /// <summary>True when the allow-list could not be fetched at all (the window says so, in a warning).</summary>
@@ -109,25 +126,6 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
 
     /// <summary>Raised on the UI thread once a decision exists; the window closes itself on it.</summary>
     public event EventHandler? Completed;
-
-    /// <summary>The disclosure's failure sentence, or empty when the list itself is on screen.</summary>
-    public static string DescribeAllowlist(AllowlistDisclosure allowlist)
-    {
-        ArgumentNullException.ThrowIfNull(allowlist);
-        if (allowlist.Unrestricted)
-        {
-            // Not "no list" and not "an empty list": no restriction. The host is agreeing to something
-            // wider than a named set, and the window must say so before the answer, not after.
-            return Strings.AllowedSitesUnrestricted;
-        }
-
-        if (!allowlist.Loaded)
-        {
-            return Strings.AllowedSitesUnavailable;
-        }
-
-        return allowlist.IsEmpty ? Strings.AllowedSitesEmpty : string.Empty;
-    }
 
     private bool CanDecide() => !IsCompleted;
 

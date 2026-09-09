@@ -394,6 +394,9 @@
   <data name="DurationMinutesFormat" xml:space="preserve">
     <value>{0} minutes</value>
   </data>
+  <data name="IncomingRequestScopeLabel" xml:space="preserve">
+    <value>Browsing scope</value>
+  </data>
   <data name="AllowedSitesNote" xml:space="preserve">
     <value>Only sites on the company allow-list can be reached through your device.</value>
   </data>

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Josour.Infrastructure.Api;
+using Josour.Infrastructure.Localization;
 
 namespace Josour.Infrastructure.Session;
 
@@ -29,6 +30,57 @@ public sealed record AllowlistDisclosure(
 
     /// <summary>The version really does allow nothing (a genuine, and alarming, answer).</summary>
     public bool IsEmpty => Loaded && !Unrestricted && Sites.Count == 0;
+}
+
+/// <summary>
+/// What the host's request window says about the scope of what it is being asked to grant: a heading, an
+/// optional note under it, and the sentence shown when there is no list on screen.
+/// <para>
+/// It lives here, not in the window, for the reason the countdown does: the window is the one place in the
+/// app with no test project, and this text is the consent. Its previous form was a fixed line reading
+/// "only sites on the company allow-list can be reached through your device", which after
+/// <see href="../../../../docs/decisions/0010-route-all-through-host.md">ADR-0010</see> was false - and sat
+/// directly above the line saying the guest could reach anything. Two opposite claims in one window, the
+/// false one reassuring.
+/// </para>
+/// </summary>
+public static class DisclosureText
+{
+    /// <summary>The heading: the list, or - with no list - the scope, since "Allowed sites" over "any site" reads as a limit that is not there.</summary>
+    public static string Label(AllowlistDisclosure disclosure, LocalizedStrings? strings = null)
+    {
+        ArgumentNullException.ThrowIfNull(disclosure);
+        return (strings ?? LocalizedStrings.Current)[disclosure.Unrestricted
+            ? UiStringKeys.IncomingRequestScopeLabel
+            : UiStringKeys.IncomingRequestAllowedSitesLabel];
+    }
+
+    /// <summary>The company-list note, or empty when no list is being enforced. Never shown alongside "any site".</summary>
+    public static string Note(AllowlistDisclosure disclosure, LocalizedStrings? strings = null)
+    {
+        ArgumentNullException.ThrowIfNull(disclosure);
+        return disclosure.Unrestricted ? string.Empty : (strings ?? LocalizedStrings.Current)[UiStringKeys.AllowedSitesNote];
+    }
+
+    /// <summary>The failure or no-list sentence, or empty when the list itself is on screen.</summary>
+    public static string Message(AllowlistDisclosure disclosure, LocalizedStrings? strings = null)
+    {
+        ArgumentNullException.ThrowIfNull(disclosure);
+        strings ??= LocalizedStrings.Current;
+        if (disclosure.Unrestricted)
+        {
+            // Not "no list" and not "an empty list": no restriction. The host is agreeing to something
+            // wider than a named set, and the window must say so before the answer, not after.
+            return strings[UiStringKeys.AllowedSitesUnrestricted];
+        }
+
+        if (!disclosure.Loaded)
+        {
+            return strings[UiStringKeys.AllowedSitesUnavailable];
+        }
+
+        return disclosure.IsEmpty ? strings[UiStringKeys.AllowedSitesEmpty] : string.Empty;
+    }
 }
 
 /// <summary>Resolves an <c>allowlist_version</c> into the sites it allows, for the host's pre-accept disclosure.</summary>
