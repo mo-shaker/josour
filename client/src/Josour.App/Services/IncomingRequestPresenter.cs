@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Josour.App.Models;
 using Josour.App.ViewModels;
 using Josour.App.Views;
+using Josour.Infrastructure.Session;
 
 namespace Josour.App.Services;
 
@@ -21,18 +22,26 @@ public sealed class IncomingRequestPresenter : IIncomingRequestPresenter, IDispo
     private readonly IToastActivationHandler _activation;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<IncomingRequestPresenter> _logger;
+    private readonly Func<DateTimeOffset> _serverNow;
     private readonly ConcurrentDictionary<Guid, ActiveRequest> _active = new();
 
+    /// <param name="coordinator">
+    /// Only for its clock: <c>expires_at</c> is server time, and the coordinator is what knows the offset
+    /// from <c>hello.ack</c>. Comparing against the local clock instead disabled Accept and Reject on a
+    /// host whose machine ran fast.
+    /// </param>
     public IncomingRequestPresenter(
         IToastService toasts,
         IToastActivationHandler activation,
         ILoggerFactory loggerFactory,
-        ILogger<IncomingRequestPresenter> logger)
+        ILogger<IncomingRequestPresenter> logger,
+        SessionCoordinator coordinator)
     {
         _toasts = toasts;
         _activation = activation;
         _loggerFactory = loggerFactory;
         _logger = logger;
+        _serverNow = (coordinator ?? throw new ArgumentNullException(nameof(coordinator))).ServerTimeNow;
         _activation.Activated += OnToastActivated;
     }
 
@@ -44,7 +53,8 @@ public sealed class IncomingRequestPresenter : IIncomingRequestPresenter, IDispo
         // The ViewModel owns a DispatcherTimer and the Window is a WPF object: both must be created on the UI thread.
         var active = await dispatcher.InvokeAsync(() =>
         {
-            var viewModel = new IncomingRequestViewModel(request, _loggerFactory.CreateLogger<IncomingRequestViewModel>());
+            var viewModel = new IncomingRequestViewModel(
+                request, _loggerFactory.CreateLogger<IncomingRequestViewModel>(), _serverNow);
             var window = new IncomingRequestWindow(viewModel);
             return new ActiveRequest(viewModel, window);
         });

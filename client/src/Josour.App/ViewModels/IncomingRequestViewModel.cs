@@ -23,6 +23,7 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
     private readonly ILogger<IncomingRequestViewModel> _logger;
     private readonly Dispatcher _dispatcher;
     private readonly DispatcherTimer _timer;
+    private readonly RequestCountdown _countdown;
     private readonly TaskCompletionSource<IncomingRequestDecision> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     [ObservableProperty]
@@ -35,11 +36,20 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
     [NotifyCanExecuteChangedFor(nameof(AcceptCommand), nameof(RejectCommand))]
     private bool _isCompleted;
 
-    public IncomingRequestViewModel(IncomingRequest request, ILogger<IncomingRequestViewModel> logger)
+    /// <param name="serverNow">
+    /// The server's clock as the app knows it. Defaults to the local clock only so that the debug
+    /// simulator can build one without a session; the real path always supplies the corrected clock,
+    /// because <c>expires_at</c> is the server's and a fast local clock used to kill the window.
+    /// </param>
+    public IncomingRequestViewModel(
+        IncomingRequest request,
+        ILogger<IncomingRequestViewModel> logger,
+        Func<DateTimeOffset>? serverNow = null)
     {
         _request = request ?? throw new ArgumentNullException(nameof(request));
         _logger = logger;
         _dispatcher = Dispatcher.CurrentDispatcher;
+        _countdown = new RequestCountdown(request.ExpiresAt, serverNow ?? (() => DateTimeOffset.UtcNow));
 
         Heading = string.Format(UiFlow.Culture, Strings.IncomingRequestHeadingFormat, request.GuestName);
         DurationText = string.Format(UiFlow.Culture, Strings.DurationMinutesFormat, request.DurationMinutes);
@@ -128,15 +138,16 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
 
     private void Tick()
     {
-        var remaining = ExpiresAt - DateTimeOffset.UtcNow;
-        var seconds = (int)Math.Max(0, Math.Ceiling(remaining.TotalSeconds));
+        var seconds = _countdown.SecondsRemaining();
         if (seconds != SecondsRemaining || CountdownText.Length == 0)
         {
             SecondsRemaining = seconds;
             CountdownText = string.Format(UiFlow.Culture, Strings.CountdownFormat, seconds);
         }
 
-        if (seconds == 0)
+        // Only a window that was genuinely open can run out. A request that reads as expired the moment
+        // it arrives is a clock, not a fact, and the server sends request.expired when it truly is one.
+        if (_countdown.HasRunOut())
         {
             Complete(IncomingRequestDecision.TimedOut);
         }

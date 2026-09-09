@@ -1172,6 +1172,13 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
 
     private DateTimeOffset ServerNow() => _time.GetUtcNow() + _serverClockOffset;
 
+    /// <summary>
+    /// The server's clock as this client best knows it, for anything that has to reason about a
+    /// server-issued deadline. The incoming-request window needs it: comparing <c>expires_at</c> against
+    /// the local clock is what greyed out Accept and Reject on a host whose machine ran fast.
+    /// </summary>
+    public DateTimeOffset ServerTimeNow() => ServerNow();
+
     /// <summary>What is left of the 30 s the server gives a session to become active (docs/ws-protocol.md section 5).</summary>
     private TimeSpan RemainingConnectBudget(SessionRun run)
     {
