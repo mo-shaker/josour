@@ -23,6 +23,19 @@ public sealed class ProxyTunnelAdapter : ITunnelProxy
         _server.ProbeHit += OnProbeHit;
     }
 
+    public IReadOnlyDictionary<string, long> Counters => new Dictionary<string, long>(StringComparer.Ordinal)
+    {
+        ["accepted"] = _server.Counters.Accepted,
+        ["rejected_by_owner"] = _server.Counters.RejectedByOwner,
+        ["tunneled"] = _server.Counters.Tunneled,
+        ["direct"] = _server.Counters.DirectConnects,
+        ["direct_http"] = _server.Counters.DirectHttpRequests,
+        ["rejected"] = _server.Counters.Rejected,
+        ["probe_hits"] = _server.Counters.ProbeHits,
+        ["errors"] = _server.Counters.Errors,
+        ["via_system_proxy"] = _server.Counters.ViaSystemProxy,
+    };
+
     /// <summary>الاستعمال الإنتاجي بلا فحص مالك: <c>GuestProxy = ProxyTunnelAdapter.Create</c>.</summary>
     public static ITunnelProxy Create(TunnelProxyContext context) => Create(context, null);
 

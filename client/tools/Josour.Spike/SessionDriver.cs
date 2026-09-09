@@ -503,6 +503,7 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
         public IReadOnlyCollection<string> DomainsSeen => _inner.DomainsSeen;
 
         public GuestProxyInfo? Proxy => _inner.Proxy;
+        public IReadOnlyDictionary<string, long>? ProxyCounters => _inner.ProxyCounters;
 
         public IReadOnlyDictionary<string, object?> Diagnostics => _inner.Diagnostics;
 

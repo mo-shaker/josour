@@ -79,6 +79,13 @@ public interface ITunnelProxy : IAsyncDisposable
     /// <summary>أول وصول لصفحة الفحص (وما بعده).</summary>
     event Action? ProbeSeen;
 
+    /// <summary>
+    /// عدّادات الوكيل، للحظة الوحيدة التي تهم فيها: لم تصل صفحة الفحص ولا أحد يعرف لماذا.
+    /// «قُبل صفر واتصال واحد رُفض لمالكه» و«لم يُقبل شيء أصلًا» عطلان مختلفان تمامًا وعلاجهما مختلف،
+    /// وبدون هذه الأرقام يبدوان في السجل سطرًا واحدًا: «لم تصل الصفحة».
+    /// </summary>
+    IReadOnlyDictionary<string, long> Counters { get; }
+
     void Start();
 
     /// <summary>خطوة التنظيف 1: لا اتصالات جديدة؛ الجارية تستمر.</summary>

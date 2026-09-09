@@ -29,6 +29,12 @@ public interface ITunnelSession : IAsyncDisposable
     GuestProxyInfo? Proxy { get; }
 
     /// <summary>
+    /// ما عدّه الوكيل المحلي على جانب Guest، أو null على المضيف وقبل الاتصال. يُقرأ عند انتهاء مهلة صفحة
+    /// الفحص: بدونه يقول السجل «لم تصل الصفحة» ولا يميّز بين متصفح لم يتصل أصلًا واتصال رفضه الوكيل.
+    /// </summary>
+    IReadOnlyDictionary<string, long>? ProxyCounters { get; }
+
+    /// <summary>
     /// إضافة الأسبوع 3: يُرفع عند أول وصول لصفحة الفحص عبر الـ Proxy (Guest فقط). غيابه بعد تشغيل المتصفح =
     /// المتصفح لا يمر بالـ Proxy، وهو ما يبلّغ عنه التطبيق بـ browser_not_proxied (docs/ws-protocol.md القسم 5).
     /// </summary>

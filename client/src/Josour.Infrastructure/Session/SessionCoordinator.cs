@@ -715,14 +715,33 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
             return;
         }
 
-        _logger.LogError("No probe page within {Timeout}: the work browser is not using the local proxy", _options.ProbeTimeout);
+        // What the proxy counted is the whole difference between "the browser never called us" and
+        // "it called and we turned it away", which are opposite problems with opposite fixes. Without
+        // this line the log says only that the page did not arrive, and the investigation starts from
+        // nothing - which is exactly how this failure was first met.
+        var counters = DescribeProxyCounters(run.Tunnel.ProxyCounters);
+        _logger.LogError(
+            "No probe page within {Timeout}: the work browser is not using the local proxy on 127.0.0.1:{ProxyPort} ({Counters})",
+            _options.ProbeTimeout, proxy.Port, counters);
         Publish(() =>
         {
             BrowserFailure = BrowserLaunchFailure.ProbeTimeout;
-            BrowserFailureDetail = $"no request for {proxy.ProbeUrl} through 127.0.0.1:{proxy.Port} within {_options.ProbeTimeout.TotalSeconds:0} s";
+            BrowserFailureDetail = $"no request for {proxy.ProbeUrl} through 127.0.0.1:{proxy.Port} within {_options.ProbeTimeout.TotalSeconds:0} s ({counters})";
         });
         await EndCoreAsync(TunnelEndReason.BrowserNotProxied, notifyServer: true).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// The proxy's counters as one readable clause, or a plain note when there are none to read.
+    /// <c>accepted=0</c> means the browser never reached us; <c>rejected_by_owner&gt;0</c> means it did
+    /// and the owner check refused it; both are invisible without this.
+    /// </summary>
+    private static string DescribeProxyCounters(IReadOnlyDictionary<string, long>? counters)
+        => counters is null or { Count: 0 }
+            ? "proxy counters unavailable"
+            : string.Join(" ", counters.Where(kv => kv.Value != 0).Select(kv => $"{kv.Key}={kv.Value}")) is { Length: > 0 } text
+                ? text
+                : "all proxy counters zero: nothing ever connected to the local proxy";
 
     private async Task<bool> WaitForProbeAsync(SessionRun run)
     {

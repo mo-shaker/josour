@@ -230,6 +230,61 @@ public sealed class SessionCoordinatorTests
     }
 
     [Fact]
+    public async Task Guest_WithoutTheProbePage_ReportsWhatTheProxyCounted()
+    {
+        // "the page did not arrive" is where the investigation used to start and stop. A browser that
+        // never connected and one whose connection the owner check turned away produce the identical
+        // sentence, and they are opposite faults. The counters are what tell them apart, so they have
+        // to reach the log and the failure detail, not just exist.
+        await using var rig = await Rig.StartAsync();
+        var session = await rig.CreateSessionAsync(SessionInfo.GuestRole);
+        await rig.Connection.NextAsync<SessionEndpointMessage>();
+        await rig.SendPeerEndpointAsync(session);
+        await rig.WaitAsync(() => rig.Tunnels.Last.ConnectCount == 1);
+        rig.Tunnels.Last.ProxyCounters = new Dictionary<string, long>(StringComparer.Ordinal)
+        {
+            ["accepted"] = 4,
+            ["rejected_by_owner"] = 4,
+            ["probe_hits"] = 0,
+        };
+        await rig.SendActiveAsync(session);
+        await rig.WaitAsync(() => rig.Browsers.Created.Count == 1);
+
+        await rig.AdvanceUntilAsync(rig.Connection.NextAsync<SessionEndMessage>(), TimeSpan.FromSeconds(1), steps: 20);
+
+        var detail = rig.Coordinator.BrowserFailureDetail ?? string.Empty;
+        Assert.Contains("accepted=4", detail, StringComparison.Ordinal);
+        Assert.Contains("rejected_by_owner=4", detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("probe_hits", detail, StringComparison.Ordinal); // zeros are noise
+        Assert.True(rig.Logger.Contains("rejected_by_owner=4"), "the counters must reach the log too");
+    }
+
+    [Fact]
+    public async Task Guest_WithoutTheProbePage_SaysSoWhenNothingEverConnected()
+    {
+        // The other half of the same question: all-zero counters are not "no information", they are
+        // the finding that the browser never reached the proxy at all.
+        await using var rig = await Rig.StartAsync();
+        var session = await rig.CreateSessionAsync(SessionInfo.GuestRole);
+        await rig.Connection.NextAsync<SessionEndpointMessage>();
+        await rig.SendPeerEndpointAsync(session);
+        await rig.WaitAsync(() => rig.Tunnels.Last.ConnectCount == 1);
+        rig.Tunnels.Last.ProxyCounters = new Dictionary<string, long>(StringComparer.Ordinal)
+        {
+            ["accepted"] = 0,
+            ["rejected_by_owner"] = 0,
+        };
+        await rig.SendActiveAsync(session);
+        await rig.WaitAsync(() => rig.Browsers.Created.Count == 1);
+
+        await rig.AdvanceUntilAsync(rig.Connection.NextAsync<SessionEndMessage>(), TimeSpan.FromSeconds(1), steps: 20);
+
+        Assert.Contains(
+            "nothing ever connected", rig.Coordinator.BrowserFailureDetail ?? string.Empty,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Guest_WithoutAWorkBrowser_SkipsTheProbeWait_AndKeepsTheSessionRunning()
     {
         // NoWorkBrowser: nothing was launched, so nothing could bypass the proxy and browser_not_proxied would be a lie.

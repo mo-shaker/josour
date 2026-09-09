@@ -49,6 +49,8 @@ public sealed class FakeTunnelSession : ITunnelSession
 
     public GuestProxyInfo? Proxy { get; set; }
 
+    public IReadOnlyDictionary<string, long>? ProxyCounters { get; set; }
+
     public TunnelStats Stats { get; set; } = new(0, 0, 0);
 
     public IReadOnlyCollection<string> DomainsSeen { get; set; } = Array.Empty<string>();

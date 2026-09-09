@@ -117,6 +117,8 @@ internal sealed class FakeEgress : ITunnelEgress
 /// <summary>Proxy وهمي: يسجّل ترتيب خطوات الإيقاف ويسمح برفع إشارة صفحة الفحص يدويًا.</summary>
 internal sealed class FakeProxy : ITunnelProxy
 {
+    public IReadOnlyDictionary<string, long> Counters { get; } = new Dictionary<string, long>(StringComparer.Ordinal);
+
     private readonly List<string> _log;
 
     public FakeProxy(List<string>? log = null) => _log = log ?? new List<string>();

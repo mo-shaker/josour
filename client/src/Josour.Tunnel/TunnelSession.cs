@@ -72,6 +72,8 @@ public sealed class TunnelSession : ITunnelSession
 
     public GuestProxyInfo? Proxy { get; private set; }
 
+    public IReadOnlyDictionary<string, long>? ProxyCounters => _proxy?.Counters;
+
     /// <summary>وقت أول وصول لصفحة الفحص (للمشتركين المتأخرين على <see cref="ProbeSeen"/>).</summary>
     public DateTimeOffset? ProbeSeenAt { get; private set; }
 
