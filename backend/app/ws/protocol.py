@@ -5,7 +5,7 @@ discriminated union; unknown or malformed frames never raise out of the handler,
 ``error`` frame with code ``bad_request`` that echoes the client's ``ref`` when there is one.
 
 Field names here are the wire names, literally as documented; the C# mirror of these models is
-``client/src/RouteBridge.Core/Control/ControlMessages.cs``.
+``client/src/Josour.Core/Control/ControlMessages.cs``.
 """
 
 import enum
@@ -113,7 +113,12 @@ def _cert_fingerprint(value: str) -> str:
 CertFingerprint = Annotated[str, AfterValidator(_cert_fingerprint)]
 
 type CandidateType = Literal["lan", "upnp", "public", "v6"]
-"""Section 3; the C# mirror is ``RouteBridge.Core.Tunnel.CandidateTypeNames``."""
+"""Section 3; the C# mirror is ``Josour.Core.Tunnel.CandidateTypeNames``."""
+
+type WinnerType = Literal["lan", "upnp", "public", "v6", "relay"]
+"""What actually carried the session (section 5). A superset of :data:`CandidateType`: ``relay``
+is never a dialable candidate in ``session.endpoint`` - it is the transport the client reaches
+over ``session.created.relay`` - but it is a legitimate answer to "what won" (ADR-0009)."""
 
 
 class Candidate(BaseModel):
@@ -216,7 +221,7 @@ class SessionConnected(_ClientFrame):
 
     type: Literal["session.connected"]
     session_id: uuid.UUID
-    winner_type: CandidateType
+    winner_type: WinnerType
     connect_ms: int = Field(ge=0, le=MAX_CONNECT_MS)
     tls_version: Literal["1.2", "1.3"]
 
@@ -306,6 +311,11 @@ class ServerSettings(BaseModel):
     request_timeout_seconds: int
     allowed_ports: list[int]
     log_domains: bool
+    enforce_allowlist: bool = False
+    """ADR-0010. False - the default - means every site the work browser asks for goes through the
+    host; the allow-list is then an optional restriction an operator can switch on. It rides here
+    rather than in ``session.created`` because it is a property of the deployment, not of a session,
+    and both parties have to agree on it before one is created."""
 
 
 class HelloAck(ServerMessage):
@@ -368,6 +378,19 @@ class Peer(BaseModel):
     device_name: str
 
 
+class Relay(BaseModel):
+    """Where to reach the relay, and the token that admits this party to this session.
+
+    Present whenever the deployment has a relay configured (ADR-0009). Absent means direct-only,
+    which still works wherever one side is reachable and is what every deployment did before."""
+
+    address: str
+    port: int = Field(ge=1, le=65535)
+    token: str
+    """Signed by :mod:`app.services.relay_tokens`, bound to this session **and** this role, and
+    short-lived. Never logged: it is a bearer credential until it expires."""
+
+
 class SessionCreated(ServerMessage):
     type: Literal["session.created"] = "session.created"
     session_id: uuid.UUID
@@ -378,6 +401,7 @@ class SessionCreated(ServerMessage):
     peer_public_ip: str
     same_public_ip: bool
     peer: Peer
+    relay: Relay | None = None
 
 
 class SessionPeerEndpoint(ServerMessage):

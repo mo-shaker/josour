@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "josour-relay"
+version = "0.1.0"
+description = "Josour relay: pairs two peers by session id and forwards opaque bytes (ADR-0009)."
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+dependencies = [
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "PyJWT>=2.8",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.5",
+]
+bench = ["psutil>=5.9"]  # process metrics for `python -m bench`; not needed to run the service
+
+[project.scripts]
+josour-relay = "relay.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["relay*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["relay"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]

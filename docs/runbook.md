@@ -1,4 +1,4 @@
-# Runbook: تشغيل خادم RouteBridge على VPS
+# Runbook: تشغيل خادم Josour على VPS
 
 الهدف: VPS Linux صغير (1 vCPU / 2 GB) يشغّل Caddy + FastAPI + PostgreSQL + نسخ احتياطي يومي بـ Docker Compose.
 
@@ -59,9 +59,9 @@ docker compose logs --tail=50 api
 
 ## 5. النسخ الاحتياطي والاستعادة
 
-- تلقائي: خدمة `backup` تكتب `deploy/backups/routebridge-<UTC>.sql.gz` يوميًا وتحذف ما يتجاوز `BACKUP_RETENTION_DAYS`.
+- تلقائي: خدمة `backup` تكتب `deploy/backups/josour-<UTC>.sql.gz` يوميًا وتحذف ما يتجاوز `BACKUP_RETENTION_DAYS`.
 - انسخ المجلد خارج الخادم (rsync أو S3) يوميًا؛ النسخة على القرص نفسه ليست خطة كوارث.
-- الاستعادة: `./backup/restore.sh backups/routebridge-….sql.gz` (يوقف `api`، يعيد إنشاء القاعدة، يستورد، يشغّل `api`).
+- الاستعادة: `./backup/restore.sh backups/josour-….sql.gz` (يوقف `api`، يعيد إنشاء القاعدة، يستورد، يشغّل `api`).
 - اختبر الاستعادة على خادم staging مرة شهريًا.
 
 ### نتيجة تجربة الاستعادة (2026-09-05)

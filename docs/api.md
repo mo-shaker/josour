@@ -59,9 +59,9 @@
 
   **العدّاد صفرًا ليس إشارة:** الخادم لا يكتب حدثًا أمنيًا إلا لقيمة موجبة. أما هل يُرسل الطلب أصلًا فقرار المرسِل: **التطبيق** لا يرسل عند الصفر لأن ليس لديه ما يقوله، بينما **أداة النموذج** ترسل تشخيصها كاملًا في كل تشغيل والصفر فيه بيان لا صمت. المقام (كم جلسة لم تر شيئًا) يُشتق من جدول الجلسات، فلا يضيع بأي من السلوكين.
 
-- `GET /healthz` (بلا مصادقة، وخارج `/api/v1`) → `{ "status": "ok", "product": "routebridge", "version": "0.1.0" }`.
+- `GET /healthz` (بلا مصادقة، وخارج `/api/v1`) → `{ "status": "ok", "product":"josour", "version": "0.1.0" }`.
 
-  البنية جزء من العقد رغم أنها خارج OpenAPI: شاشتا التشغيل الأول والإعدادات في العميل تقرران منه **هل هذا خادم RouteBridge** قبل السماح للمستخدم بالمتابعة، ولولا علامة المنتج لعاد عنوان خاطئ لاحقًا في صورة «كلمة مرور خاطئة». وهي ليست ضابطًا أمنيًا — الرد بلا مصادقة ويسهل تقليده — بل وسيلة للفشل مبكرًا وبوضوح.
+  البنية جزء من العقد رغم أنها خارج OpenAPI: شاشتا التشغيل الأول والإعدادات في العميل تقرران منه **هل هذا خادم Josour** قبل السماح للمستخدم بالمتابعة، ولولا علامة المنتج لعاد عنوان خاطئ لاحقًا في صورة «كلمة مرور خاطئة». وهي ليست ضابطًا أمنيًا — الرد بلا مصادقة ويسهل تقليده — بل وسيلة للفشل مبكرًا وبوضوح.
 
 ## الإدارة (role = admin)
 
@@ -72,7 +72,7 @@
 - `PUT /admin/domains` `{ "entries": [...] }` → إصدار جديد؛ يتحقق من صحة كل مدخل؛ يبث `allowlist.updated`.
 - `GET /admin/sessions?status=&limit=` ، `POST /admin/sessions/{id}/terminate` → `204`.
 - `GET /admin/security-events?limit=` ، `GET /admin/diagnostics` → ملخص: عدد الجلسات، نسبة `connect_result=ok` (و`timeout` يُحسب فشلًا)، توزيع `winner_type`، توزيع `tls_version`، وتوزيع `end_reason` (أُضيف في الأسبوع 4).
-- `GET /admin/settings` ، `PATCH /admin/settings` `{ max_session_minutes?, request_timeout_seconds?, log_domains?, allowed_ports? }`.
+- `GET /admin/settings` ، `PATCH /admin/settings` `{ max_session_minutes?, request_timeout_seconds?, log_domains?, enforce_allowlist?, allowed_ports? }`.
 
 ## القيم الافتراضية للإعدادات
 
@@ -82,4 +82,5 @@
 | `request_timeout_seconds` | 60 |
 | `connect_timeout_seconds` | 30 |
 | `log_domains` | false |
+| `enforce_allowlist` | false — **[ADR-0010](decisions/0010-route-all-through-host.md)**: كل ما يطلبه متصفح العمل يمر عبر المضيف. القائمة تقيّد فقط حين يُفعّل المسؤول هذا المفتاح |
 | `allowed_ports` | `[80, 443]` |

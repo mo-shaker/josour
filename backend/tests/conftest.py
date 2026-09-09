@@ -52,7 +52,7 @@ def database_url(tmp_path_factory: pytest.TempPathFactory) -> str:
     configured = os.environ.get("DATABASE_URL_TEST")
     if configured:
         return configured
-    path = tmp_path_factory.mktemp("db") / "routebridge-test.sqlite"
+    path = tmp_path_factory.mktemp("db") / "josour-test.sqlite"
     return f"sqlite+aiosqlite:///{path}"
 
 

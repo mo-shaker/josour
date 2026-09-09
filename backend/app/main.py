@@ -29,7 +29,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         configure_logging("DEBUG" if settings.is_dev else "INFO")
-        log.info("routebridge api starting", extra={"env": settings.env})
+        log.info("josour api starting", extra={"env": settings.env})
         await on_startup(settings)
         try:
             yield
@@ -38,7 +38,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await dispose_engine()
 
     app = FastAPI(
-        title="RouteBridge API",
+        title="Josour API",
         version="1",
         summary="Control plane for peer-to-peer browsing sessions between two Windows devices.",
         description=API_DESCRIPTION,

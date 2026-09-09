@@ -2,7 +2,7 @@ from httpx import AsyncClient
 
 
 async def test_healthz_answers_with_the_product_marker(client: AsyncClient) -> None:
-    """The client's first-run and settings screens decide "is this a RouteBridge server?" from
+    """The client's first-run and settings screens decide "is this a Josour server?" from
     this payload before letting the user past, so the marker is part of the contract
     (``docs/api.md``): without it a wrong address resurfaces later as "wrong password"."""
     from app import __version__
@@ -10,7 +10,7 @@ async def test_healthz_answers_with_the_product_marker(client: AsyncClient) -> N
     response = await client.get("/healthz")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "product": "routebridge", "version": __version__}
+    assert response.json() == {"status": "ok", "product": "josour", "version": __version__}
 
 
 async def test_healthz_needs_no_authentication(client: AsyncClient) -> None:

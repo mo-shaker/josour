@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Josour.Proxy</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Josour.Core/Josour.Core.csproj" />
+    <ProjectReference Include="../Josour.Tunnel/Josour.Tunnel.csproj" />
+  </ItemGroup>
+
+</Project>

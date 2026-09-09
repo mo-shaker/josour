@@ -29,6 +29,7 @@ class AppSettings(BaseModel):
                     "request_timeout_seconds": 60,
                     "connect_timeout_seconds": 30,
                     "log_domains": False,
+                    "enforce_allowlist": False,
                     "allowed_ports": [80, 443],
                 }
             ]
@@ -39,6 +40,7 @@ class AppSettings(BaseModel):
     request_timeout_seconds: int = Field(DEFAULT_SETTINGS["request_timeout_seconds"], ge=10, le=300)
     connect_timeout_seconds: int = Field(DEFAULT_SETTINGS["connect_timeout_seconds"], ge=10, le=300)
     log_domains: bool = DEFAULT_SETTINGS["log_domains"]
+    enforce_allowlist: bool = DEFAULT_SETTINGS["enforce_allowlist"]
     allowed_ports: list[int] = Field(
         default_factory=lambda: list(DEFAULT_SETTINGS["allowed_ports"]), min_length=1
     )
@@ -61,6 +63,7 @@ class SettingsPatch(BaseModel):
     request_timeout_seconds: int | None = Field(None, ge=10, le=300)
     connect_timeout_seconds: int | None = Field(None, ge=10, le=300)
     log_domains: bool | None = None
+    enforce_allowlist: bool | None = None
     allowed_ports: list[int] | None = Field(None, min_length=1)
 
     @field_validator("allowed_ports")

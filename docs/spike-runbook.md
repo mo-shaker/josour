@@ -1,6 +1,6 @@
 # دليل النموذج التقني: قياس الاتصال المباشر على 10 أزواج حقيقية
 
-الهدف: تغذية بوابة قرار Relay (ADR-0003) ببيانات حقيقية بنهاية الأسبوع 2. الأداة: `client/tools/RouteBridge.Spike`.
+الهدف: تغذية بوابة قرار Relay (ADR-0003) ببيانات حقيقية بنهاية الأسبوع 2. الأداة: `client/tools/Josour.Spike`.
 
 ## المتطلبات على كل جهاز
 - Windows 10 أو 11 مع .NET 8 SDK (أو نشر الأداة كـ self-contained من CI).
@@ -9,13 +9,13 @@
 
 ## 1. فحص الشهادة وTLS (كل جهاز على حدة)
 ```
-dotnet run --project tools/RouteBridge.Spike -c Release -- certtest
+dotnet run --project tools/Josour.Spike -c Release -- certtest
 ```
 المتوقع: `tls_loopback: ok (server 1.3 …)` على Windows 11 و`1.2` على Windows 10، و`disposed: True`. سجّل الإصدار.
 
 ## 2. المرشحون وUPnP (كل جهاز على حدة)
 ```
-dotnet run --project tools/RouteBridge.Spike -c Release -- gather --port 40000 --public-ip <IP العام>
+dotnet run --project tools/Josour.Spike -c Release -- gather --port 40000 --public-ip <IP العام>
 ```
 سجّل من JSON: `upnp_found`, `mapping_ok`, `upnp_external_ip`, `cgnat_suspected`, `ipv6_global`, `firewall_rule_present`, `vpn_adapter`, `system_proxy_present`.
 
@@ -26,11 +26,11 @@ dotnet run --project tools/RouteBridge.Spike -c Release -- gather --port 40000 -
 
 الجهاز A (المضيف):
 ```
-dotnet run --project tools/RouteBridge.Spike -c Release -- symmetric --role host --session <GUID> --secret-b64 <SECRET> --public-ip <IP A> --peer-file endpoint-guest.json
+dotnet run --project tools/Josour.Spike -c Release -- symmetric --role host --session <GUID> --secret-b64 <SECRET> --public-ip <IP A> --peer-file endpoint-guest.json
 ```
 الجهاز B (المستخدم):
 ```
-dotnet run --project tools/RouteBridge.Spike -c Release -- symmetric --role guest --session <GUID> --secret-b64 <SECRET> --public-ip <IP B> --peer-file endpoint-host.json
+dotnet run --project tools/Josour.Spike -c Release -- symmetric --role guest --session <GUID> --secret-b64 <SECRET> --public-ip <IP B> --peer-file endpoint-host.json
 ```
 كل طرف يطبع سطر JSON بنقطة نهايته ويكتب `endpoint-<role>.json`. انقل ملف A إلى مجلد B والعكس (أو الصق سطر JSON على stdin بدون `--peer-file`). خيارات: `--same-public-ip` على الطرفين إن كانا خلف الـ IP العام نفسه، `--no-upnp` لتخطي الاكتشاف، `--timeout-s N` (افتراضي 30).
 
@@ -53,7 +53,7 @@ dotnet run --project tools/RouteBridge.Spike -c Release -- symmetric --role gues
 3. Mono.Nat على راوترين أو ثلاثة: الاكتشاف خلال 4 ثوانٍ، نجاح التعيين، هل يحترم الراوتر المنفذ المطلوب أم يعيد آخر، الإبلاغ عن IP الخارجي، إزالة التعيين.
 4. صحة `cgnat_suspected` على شبكة CGNAT واحدة وشبكة NAT مزدوج واحدة على الأقل.
 5. تصفية مرشحي IPv6 على Windows (العناوين المؤقتة وحالة DAD).
-6. `HostDiagnostics` عبر `netsh`: كشف قاعدة «RouteBridge Tunnel» ومحلل `currentprofile` على Windows غير الإنجليزي، وقراءة `ProxyEnable`.
+6. `HostDiagnostics` عبر `netsh`: كشف قاعدة «Josour Tunnel» ومحلل `currentprofile` على Windows غير الإنجليزي، وقراءة `ProxyEnable`.
 7. المستمع والمتصل بوضع DualMode على Windows، بما فيها أجهزة IPv6 معطّل (يسقط إلى IPv4).
 8. تفاعل Windows Firewall: القبول الوارد على المنفذ المؤقت مع القاعدة وبدونها.
 9. سلوك `Socket.Close(0)` للاتصالات الزائدة عن السعة على Windows.
@@ -62,9 +62,9 @@ dotnet run --project tools/RouteBridge.Spike -c Release -- symmetric --role gues
 
 # مصفوفة تشغيل المتصفح (الأسبوع 2)
 
-الهدف: إثبات أن متصفح العمل يمر فعلًا عبر الـ Proxy المحلي، وكشف الحالات التي تتجاوز فيها سياسات الشركة سطر الأوامر. الأداة: `dotnet run --project tools/RouteBridge.Spike -c Release -- browser --self-hosted [--browser chrome|edge]`.
+الهدف: إثبات أن متصفح العمل يمر فعلًا عبر الـ Proxy المحلي، وكشف الحالات التي تتجاوز فيها سياسات الشركة سطر الأوامر. الأداة: `dotnet run --project tools/Josour.Spike -c Release -- browser --self-hosted [--browser chrome|edge]`.
 
-مع `--self-hosted` تشغّل الأداة `ConnectProxyServer` بقائمة مواقع فارغة (كل شيء مباشر) وتفتح المتصفح على `http://check.routebridge/`، ثم تطبع JSON يشمل: مسار المتصفح، التحقق من ناشره، حالة السياسات، نتيجة التشغيل، هل حدث Handoff، زمن وصول صفحة الفحص، وعدّادات الـ Proxy.
+مع `--self-hosted` تشغّل الأداة `ConnectProxyServer` بقائمة مواقع فارغة (كل شيء مباشر) وتفتح المتصفح على `http://check.josour/`، ثم تطبع JSON يشمل: مسار المتصفح، التحقق من ناشره، حالة السياسات، نتيجة التشغيل، هل حدث Handoff، زمن وصول صفحة الفحص، وعدّادات الـ Proxy.
 
 ## الخانات الثماني المطلوب تعبئتها
 
@@ -90,7 +90,7 @@ dotnet run --project tools/RouteBridge.Spike -c Release -- symmetric --role gues
 
 # جلسة كاملة بلا واجهة: أمر `session` (الأسبوع 4)
 
-الهدف: تشغيل **جلسة حقيقية بين جهازي Windows** بالمكدّس الإنتاجي كاملًا — تسجيل دخول عبر `ApiClient`/`AuthSession`، قناة تحكم حقيقية على WSS، `TunnelSession` بالدورين، سياسة الخروج على المضيف، والـ Proxy المحلي على المستخدم — قبل أن يجهز تطبيق WPF. الأداة هي نفسها `client/tools/RouteBridge.Spike`، والأمر `session`.
+الهدف: تشغيل **جلسة حقيقية بين جهازي Windows** بالمكدّس الإنتاجي كاملًا — تسجيل دخول عبر `ApiClient`/`AuthSession`، قناة تحكم حقيقية على WSS، `TunnelSession` بالدورين، سياسة الخروج على المضيف، والـ Proxy المحلي على المستخدم — قبل أن يجهز تطبيق WPF. الأداة هي نفسها `client/tools/Josour.Spike`، والأمر `session`.
 
 ما يُثبته هذا الأمر ولا يُثبته `symmetric`: أن الخادم والعميل يتفقان على دورة الجلسة كاملة (`session.created` ← `endpoint` ← `peer_endpoint` ← `connected` ← `active` ← `stats` ← `end`)، وأن حركة المرور تخرج فعلًا من عنوان المضيف.
 
@@ -106,7 +106,7 @@ dotnet run --project tools/RouteBridge.Spike -c Release -- symmetric --role gues
 على **جهاز المضيف** (الجهاز الذي ستخرج منه حركة المرور)، شغّل أولًا وأبقه يعمل:
 
 ```
-dotnet run --project tools/RouteBridge.Spike -c Release -- session ^
+dotnet run --project tools/Josour.Spike -c Release -- session ^
   --api https://<الخادم> --email host@example.com --password '<كلمة السر>' ^
   --role host --available > host.jsonl
 ```
@@ -114,11 +114,11 @@ dotnet run --project tools/RouteBridge.Spike -c Release -- session ^
 على **جهاز المستخدم**، تعرّف على المضيفين المتاحين ثم اطلب أحدهم:
 
 ```
-dotnet run --project tools/RouteBridge.Spike -c Release -- session ^
+dotnet run --project tools/Josour.Spike -c Release -- session ^
   --api https://<الخادم> --email guest@example.com --password '<كلمة السر>' ^
   --role guest --list-hosts
 
-dotnet run --project tools/RouteBridge.Spike -c Release -- session ^
+dotnet run --project tools/Josour.Spike -c Release -- session ^
   --api https://<الخادم> --email guest@example.com --password '<كلمة السر>' ^
   --role guest --host-device <معرّف الجهاز أو اسمه> --minutes 30 ^
   --curl-test https://api.ipify.org > guest.jsonl
@@ -152,7 +152,7 @@ dotnet run --project tools/RouteBridge.Spike -c Release -- session ^
 كل حدث سطر JSON واحد. المظروف ثابت:
 
 ```json
-{"ts":"2026-09-05T09:12:33.4210000Z","seq":14,"role":"guest","event":"tunnel.connected","winner_type":"upnp","connect_ms":812,"tls_version":"1.3","proxy_port":51544,"probe_url":"http://check.routebridge/"}
+{"ts":"2026-09-05T09:12:33.4210000Z","seq":14,"role":"guest","event":"tunnel.connected","winner_type":"upnp","connect_ms":812,"tls_version":"1.3","proxy_port":51544,"probe_url":"http://check.josour/"}
 ```
 
 `ts` بـ ISO-8601 UTC، و`seq` عدّاد يبدأ من 1، و`role` هو `host` أو `guest`. الأسطر البشرية تذهب إلى stderr، فـ `> run.jsonl` يعطي ملفًا صالحًا للتحليل بينما تبقى المتابعة على الشاشة.

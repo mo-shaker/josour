@@ -1,6 +1,6 @@
 # دليل التجربة: نشر الخادم وتثبيت التطبيق على Windows 11
 
-دليل تنفيذي من الصفر لتشغيل تجربة حقيقية لـ RouteBridge. يفترض أنك لم تجهّز شيئًا بعد.
+دليل تنفيذي من الصفر لتشغيل تجربة حقيقية لـ Josour. يفترض أنك لم تجهّز شيئًا بعد.
 
 **ما ستحصل عليه في النهاية:** خادم يعمل على الإنترنت، وجهازا Windows 11 عليهما التطبيق، وجلسة تثبت أن المواقع ترى عنوان المضيف لا عنوانك.
 
@@ -94,7 +94,7 @@ docker compose logs -f api
 curl -s https://rb.example.com/healthz
 ```
 
-المتوقع: `{"status":"ok","product":"routebridge","version":"0.1.0"}`
+المتوقع: `{"status":"ok","product":"josour","version":"0.1.0"}`
 
 > إن فشل: `docker compose logs caddy` غالبًا يشرح فشل الشهادة. السببان الأشيع: سجل DNS لم ينتشر، أو المنفذ 80 مغلق (Let's Encrypt يحتاجه للتحقق).
 
@@ -145,8 +145,8 @@ ls -la backups/
 بما أن المستودع صار على GitHub، فأسهل طريق هو **بناء CI**:
 
 1. افتح مستودعك ← تبويب **Actions** ← آخر تشغيل ناجح لـ `ci-client`.
-2. نزّل الملف المرفق `routebridge-app-unsigned`.
-3. فك الضغط في مجلد دائم، مثل `C:\RouteBridge`.
+2. نزّل الملف المرفق `josour-app-unsigned`.
+3. فك الضغط في مجلد دائم، مثل `C:\Josour`.
 
 > إن لم يظهر تشغيل، ادفع أي تغيير إلى `main` أو شغّل الـ workflow يدويًا من نفس التبويب.
 
@@ -155,7 +155,7 @@ ls -la backups/
 ```powershell
 git clone https://github.com/<حسابك>/routebridge.git
 cd routebridge\client
-dotnet publish src\RouteBridge.App -c Release -r win-x64 --self-contained false -o publish\app
+dotnet publish src\Josour.App -c Release -r win-x64 --self-contained false -o publish\app
 ```
 
 ### 2.2 تجاوز SmartScreen بوعي
@@ -171,20 +171,20 @@ dotnet publish src\RouteBridge.App -c Release -r win-x64 --self-contained false 
 المثبّت الموقّع يضيفها تلقائيًا، لكن مع النسخة المنشورة يدويًا **أضفها بنفسك**. افتح PowerShell **كمسؤول**:
 
 ```powershell
-netsh advfirewall firewall add rule name="RouteBridge Tunnel" dir=in action=allow program="C:\RouteBridge\RouteBridge.exe" enable=yes profile=domain,private,public protocol=TCP
+netsh advfirewall firewall add rule name="Josour Tunnel" dir=in action=allow program="C:\Josour\Josour.exe" enable=yes profile=domain,private,public protocol=TCP
 ```
 
-> بدونها يحجب Windows اتصال المستخدم الوارد **بصمت**، ويبدو الأمر وكأنه فشل شبكة. الاسم `RouteBridge Tunnel` بالضبط: التطبيق يفحص وجود القاعدة بهذا الاسم ويحذّرك إن غابت.
+> بدونها يحجب Windows اتصال المستخدم الوارد **بصمت**، ويبدو الأمر وكأنه فشل شبكة. الاسم `Josour Tunnel` بالضبط: التطبيق يفحص وجود القاعدة بهذا الاسم ويحذّرك إن غابت.
 
 للحذف بعد التجربة:
 
 ```powershell
-netsh advfirewall firewall delete rule name="RouteBridge Tunnel"
+netsh advfirewall firewall delete rule name="Josour Tunnel"
 ```
 
 ### 2.4 التشغيل الأول
 
-شغّل `RouteBridge.exe`. الواجهة **بالعربية** مع اتجاه من اليمين إلى اليسار (`--lang en` للإنجليزية).
+شغّل `Josour.exe`. الواجهة **بالعربية** مع اتجاه من اليمين إلى اليسار (`--lang en` للإنجليزية).
 
 سيطلب منك:
 1. **عنوان الخادم**: `https://rb.example.com` — يفحصه فعليًا قبل السماح بالمتابعة.
@@ -217,7 +217,7 @@ netsh advfirewall firewall delete rule name="RouteBridge Tunnel"
 
 ```powershell
 cd routebridge\client
-dotnet run --project tools\RouteBridge.Spike -c Release -- session `
+dotnet run --project tools\Josour.Spike -c Release -- session `
   --api https://rb.example.com --email host@example.com --password "Host-pass-1234" `
   --role host --available --state-dir C:\rb-host
 ```
@@ -228,7 +228,7 @@ dotnet run --project tools\RouteBridge.Spike -c Release -- session `
 
 ```powershell
 cd routebridge\client
-dotnet run --project tools\RouteBridge.Spike -c Release -- session `
+dotnet run --project tools\Josour.Spike -c Release -- session `
   --api https://rb.example.com --email guest@example.com --password "Guest-pass-1234" `
   --role guest --list-hosts --state-dir C:\rb-guest
 ```
@@ -236,7 +236,7 @@ dotnet run --project tools\RouteBridge.Spike -c Release -- session `
 انسخ `device_id` المضيف من القائمة، ثم:
 
 ```powershell
-dotnet run --project tools\RouteBridge.Spike -c Release -- session `
+dotnet run --project tools\Josour.Spike -c Release -- session `
   --api https://rb.example.com --email guest@example.com --password "Guest-pass-1234" `
   --role guest --host-device <device_id> --minutes 15 `
   --curl-test https://api.ipify.org --state-dir C:\rb-guest
@@ -261,7 +261,7 @@ dotnet run --project tools\RouteBridge.Spike -c Release -- session `
 عند فشل الاتصال (كود خروج `2`)، احفظ مخرجات JSON كاملة — فيها المرشحون المجرَّبون وسبب فشل كل واحد. وشغّل على كل جهاز:
 
 ```powershell
-dotnet run --project tools\RouteBridge.Spike -c Release -- gather --port 40000 --public-ip <عنوانك العام>
+dotnet run --project tools\Josour.Spike -c Release -- gather --port 40000 --public-ip <عنوانك العام>
 ```
 
 **هذه البيانات تحكم قرارًا معلّقًا منذ الأسبوع الأول:** إن كانت نسبة النجاح على عشرة أزواج حقيقية أقل من 85%، تُبنى خدمة Relay (الجانب العميل جاهز، والخادم يُبنى في أسبوع). التفصيل في `docs/spike-runbook.md` و`docs/test-matrix.md`.
@@ -272,7 +272,7 @@ dotnet run --project tools\RouteBridge.Spike -c Release -- gather --port 40000 -
 
 | # | الفحص | المتوقع |
 |---|---|---|
-| 1 | `curl https://rb.example.com/healthz` | `{"status":"ok","product":"routebridge",...}` |
+| 1 | `curl https://rb.example.com/healthz` | `{"status":"ok","product":"josour",...}` |
 | 2 | تسجيل الدخول من الجهازين | ينجح |
 | 3 | ظهور المضيف في قائمة المستخدم | يظهر خلال ثوانٍ |
 | 4 | نافذة الطلب على المضيف | تعرض الاسم والجهاز والمدة وقائمة المواقع والتنبيه |

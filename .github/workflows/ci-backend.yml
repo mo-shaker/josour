@@ -47,4 +47,4 @@ jobs:
       - name: Tests
         run: pytest -q
       - name: Docker image builds
-        run: docker build -t routebridge-api:ci .
+        run: docker build -t josour-api:ci .

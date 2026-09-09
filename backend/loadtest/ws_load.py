@@ -1,8 +1,8 @@
-"""WebSocket load harness for the RouteBridge control plane.
+"""WebSocket load harness for the Josour control plane.
 
 Standalone (not part of the ``app`` package): it talks to a *running* server over HTTP and
 WebSocket exactly like a real client would, so what it measures is the deployed single-uvicorn-
-worker model of docs/RouteBridge-MVP-Implementation-Plan.md section 10, not an in-process mock.
+worker model of docs/Josour-MVP-Implementation-Plan.md section 10, not an in-process mock.
 
     cd backend
     .venv/bin/python -m loadtest.ws_load --users 200 --host-fraction 0.4 \

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Josour.Spike</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Josour.Core/Josour.Core.csproj" />
+    <ProjectReference Include="../../src/Josour.Tunnel/Josour.Tunnel.csproj" />
+    <ProjectReference Include="../../src/Josour.Proxy/Josour.Proxy.csproj" />
+    <ProjectReference Include="../../src/Josour.Browser/Josour.Browser.csproj" />
+    <!-- الأسبوع 4: أمر session يقود المكدّس الحقيقي، فيحتاج جانب المضيف (Egress) وطبقة الخادم (Infrastructure) -->
+    <ProjectReference Include="../../src/Josour.Egress/Josour.Egress.csproj" />
+    <ProjectReference Include="../../src/Josour.Infrastructure/Josour.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

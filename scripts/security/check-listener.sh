@@ -21,13 +21,13 @@ echo "بايتات مستلمة: $resp"
 
 echo "== 3. مصافحة TLS ثم صمت: المضيف يجب ألا يرسل شيئًا قبل AUTH1 =="
 out=$(timeout_bin=$(command -v gtimeout || command -v timeout || true); \
-      if [ -n "$timeout_bin" ]; then "$timeout_bin" 8 openssl s_client -connect "$HOST:$PORT" -servername routebridge -quiet 2>&1 </dev/null; \
-      else openssl s_client -connect "$HOST:$PORT" -servername routebridge -quiet 2>&1 </dev/null & sleep 8; kill %1 2>/dev/null; fi || true)
+      if [ -n "$timeout_bin" ]; then "$timeout_bin" 8 openssl s_client -connect "$HOST:$PORT" -servername josour -quiet 2>&1 </dev/null; \
+      else openssl s_client -connect "$HOST:$PORT" -servername josour -quiet 2>&1 </dev/null & sleep 8; kill %1 2>/dev/null; fi || true)
 echo "$out" | grep -iE 'protocol|cipher|verify|self.signed' | head -5
 payload=$(echo "$out" | grep -vcE '^(CONNECTED|depth|verify|---|Protocol|Cipher|Server|No client|SSL|DONE|read|write|New,|Verification|Peer)' || true)
 echo "أسطر حمولة بعد المصافحة: $payload (المتوقع 0)"
 
 echo "== 4. الشهادة ذاتية التوقيع ومؤقتة (لا CA عامة) =="
-echo | openssl s_client -connect "$HOST:$PORT" -servername routebridge 2>/dev/null | openssl x509 -noout -subject -issuer -dates 2>/dev/null || echo "تعذّر جلب الشهادة"
+echo | openssl s_client -connect "$HOST:$PORT" -servername josour 2>/dev/null | openssl x509 -noout -subject -issuer -dates 2>/dev/null || echo "تعذّر جلب الشهادة"
 
 exit $fail

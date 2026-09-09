@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["dev", "test", "prod"]
@@ -35,6 +35,18 @@ class Settings(BaseSettings):
     """``POST /probe`` per user: the server opens a TCP socket to a caller-named public address,
     so this is what stops the endpoint being used as a slow port scanner wearing our identity."""
 
+    # --- Relay (ADR-0009). The relay is the guaranteed transport; direct is the optimisation.
+    relay_host: str = ""
+    """Hostname or address clients dial. Empty disables the relay: ``session.created`` then
+    carries no ``relay`` object and clients fall back to direct-only, which is the pre-ADR-0009
+    behaviour and still works wherever one side is reachable."""
+    relay_port: int = Field(default=443, ge=1, le=65535)
+    """443 because it is the one outbound port open on essentially every network - that is what
+    lets a session connect with no router or firewall configuration."""
+    relay_secret: str = ""
+    """Shared with the relay service, which verifies the tokens minted here. Must be at least 32
+    bytes when the relay is enabled; deliberately NOT ``jwt_secret`` (see services/relay_tokens)."""
+
     # --- Automatic suspicious-device revocation (ADR-0008, part two).
     device_risk_enabled: bool = True
     device_risk_interval_seconds: int = Field(default=300, ge=10)
@@ -51,6 +63,24 @@ class Settings(BaseSettings):
     @property
     def is_dev(self) -> bool:
         return self.env == "dev"
+
+    @property
+    def relay_enabled(self) -> bool:
+        return bool(self.relay_host and self.relay_secret)
+
+    @model_validator(mode="after")
+    def _relay_is_configured_completely(self) -> "Settings":
+        """Half a relay configuration is the dangerous state: an address with no secret mints
+        nothing, a secret with no address is never sent, and either way every session silently
+        falls back to direct-only - which is exactly the failure ADR-0009 exists to remove. Fail
+        at boot instead of discovering it on a session that will not connect."""
+        if self.relay_host and not self.relay_secret:
+            raise ValueError("RELAY_HOST is set but RELAY_SECRET is not")
+        if self.relay_secret and not self.relay_host:
+            raise ValueError("RELAY_SECRET is set but RELAY_HOST is not")
+        if self.relay_secret and len(self.relay_secret) < 32:
+            raise ValueError("RELAY_SECRET must be at least 32 characters")
+        return self
 
 
 @lru_cache

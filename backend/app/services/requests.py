@@ -21,10 +21,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clock import ensure_utc, utcnow
+from app.core.config import Settings, get_settings
 from app.db.session import session_scope
 from app.models import ConnectionRequest, Device, Presence, Session, SessionKey, User
 from app.models.enums import RequestStatus, SessionRole, SessionStatus
-from app.services import allowlist, session_flow
+from app.services import allowlist, relay_tokens, session_flow
 from app.services import hosts as host_service
 from app.services import sessions as session_service
 from app.services.app_settings import settings_service
@@ -34,6 +35,7 @@ from app.ws.connection_manager import connection_manager
 from app.ws.protocol import (
     ErrorCode,
     Peer,
+    Relay,
     RequestCreated,
     RequestExpired,
     RequestIncoming,
@@ -223,9 +225,16 @@ async def reject(*, request_id: uuid.UUID, device_id: uuid.UUID, ref: str) -> No
     )
 
 
-async def accept(*, request_id: uuid.UUID, device_id: uuid.UUID, ref: str) -> Session:
+async def accept(
+    *, request_id: uuid.UUID, device_id: uuid.UUID, ref: str, runtime: Settings | None = None
+) -> Session:
     """``request.accept`` from the addressed host: create the session and its secret, then tell
-    the guest (``request.result``) and both parties (``session.created``)."""
+    the guest (``request.result``) and both parties (``session.created``).
+
+    ``settings`` here is the operator-editable row set in ``app_settings``; ``runtime`` is the
+    process configuration from the environment. Only the second knows about the relay, and the
+    two are named apart because reaching for the wrong one reads correct and is not."""
+    runtime = runtime or get_settings()
     async with session_scope() as db:
         settings = await settings_service.get(db)
         request = await _load_pending(db, request_id, device_id=device_id, is_host=True, ref=ref)
@@ -285,6 +294,17 @@ async def accept(*, request_id: uuid.UUID, device_id: uuid.UUID, ref: str) -> Se
                 peer_public_ip=peer.public_ip or "",
                 same_public_ip=same_public_ip,
                 peer=Peer(user_display_name=peer.user.display_name, device_name=peer.device.name),
+                # One token per party, minted here and never stored: the relay verifies the
+                # signature rather than looking the session up, so nothing has to persist.
+                relay=(
+                    Relay(
+                        address=runtime.relay_host,
+                        port=runtime.relay_port,
+                        token=relay_tokens.mint(runtime, session.id, role),
+                    )
+                    if runtime.relay_enabled
+                    else None
+                ),
             ),
         )
     # The host is busy now, so it leaves everybody's host list.

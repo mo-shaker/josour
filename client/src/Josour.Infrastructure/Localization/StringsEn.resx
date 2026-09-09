@@ -1,0 +1,758 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Josour UI text, English. Keys are Josour.Infrastructure.Localization.UiStringKeys.
+  -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- product -->
+  <data name="AppName" xml:space="preserve">
+    <value>Josour</value>
+  </data>
+  <data name="VersionFormat" xml:space="preserve">
+    <value>v{0}</value>
+  </data>
+  <!-- tray -->
+  <data name="TrayTooltip" xml:space="preserve">
+    <value>Josour</value>
+  </data>
+  <data name="TrayShowWindow" xml:space="preserve">
+    <value>Show window</value>
+  </data>
+  <data name="TrayAvailableForRequests" xml:space="preserve">
+    <value>Available for requests</value>
+  </data>
+  <data name="TrayStartWithWindows" xml:space="preserve">
+    <value>Start with Windows</value>
+  </data>
+  <data name="TrayDebug" xml:space="preserve">
+    <value>Debug</value>
+  </data>
+  <data name="TraySimulateIncomingRequest" xml:space="preserve">
+    <value>Simulate incoming request</value>
+  </data>
+  <data name="TraySignOut" xml:space="preserve">
+    <value>Sign out</value>
+  </data>
+  <data name="TrayExit" xml:space="preserve">
+    <value>Exit</value>
+  </data>
+  <data name="TrayTooltipSignedInFormat" xml:space="preserve">
+    <value>Josour — {0} · {1}</value>
+  </data>
+  <data name="TrayTooltipNotSignedIn" xml:space="preserve">
+    <value>Josour — not signed in</value>
+  </data>
+  <!-- main window -->
+  <data name="HostTab" xml:space="preserve">
+    <value>Host</value>
+  </data>
+  <data name="GuestTab" xml:space="preserve">
+    <value>Guest</value>
+  </data>
+  <data name="StatusNotSignedIn" xml:space="preserve">
+    <value>Not signed in</value>
+  </data>
+  <data name="StatusSignedInFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="StatusOffline" xml:space="preserve">
+    <value>Offline</value>
+  </data>
+  <data name="StatusConnecting" xml:space="preserve">
+    <value>Connecting…</value>
+  </data>
+  <data name="StatusConnected" xml:space="preserve">
+    <value>Connected</value>
+  </data>
+  <data name="StatusReconnecting" xml:space="preserve">
+    <value>Reconnecting…</value>
+  </data>
+  <data name="StatusReplacedElsewhere" xml:space="preserve">
+    <value>Connected on another window</value>
+  </data>
+  <data name="StatusSignInExpired" xml:space="preserve">
+    <value>Sign-in expired</value>
+  </data>
+  <data name="StatusNoServer" xml:space="preserve">
+    <value>No server address</value>
+  </data>
+  <!-- host page -->
+  <data name="HostPageTitle" xml:space="preserve">
+    <value>Share your connection</value>
+  </data>
+  <data name="HostPageDescription" xml:space="preserve">
+    <value>When you are available, colleagues can ask to browse the company's allowed sites through your internet connection.</value>
+  </data>
+  <data name="HostAvailableToggle" xml:space="preserve">
+    <value>Available for requests</value>
+  </data>
+  <data name="HostStatusAvailable" xml:space="preserve">
+    <value>Available — waiting for requests</value>
+  </data>
+  <data name="HostStatusNotAvailable" xml:space="preserve">
+    <value>Not available</value>
+  </data>
+  <data name="HostStatusAnnouncing" xml:space="preserve">
+    <value>Telling the server you are available…</value>
+  </data>
+  <data name="HostStatusAvailabilityFailed" xml:space="preserve">
+    <value>The server did not accept the change. Try again.</value>
+  </data>
+  <data name="HostNotConnectedTitle" xml:space="preserve">
+    <value>Not connected</value>
+  </data>
+  <data name="HostNotConnectedHint" xml:space="preserve">
+    <value>Requests only arrive while Josour is connected to the server.</value>
+  </data>
+  <data name="HostFirewallWarningTitle" xml:space="preserve">
+    <value>Firewall rule missing</value>
+  </data>
+  <data name="HostFirewallWarningMessage" xml:space="preserve">
+    <value>Windows Firewall has no inbound rule named "Josour Tunnel", which may stop the other device from reaching you. Run the installer again or ask your administrator.</value>
+  </data>
+  <data name="HostSimulatedServerTitle" xml:space="preserve">
+    <value>Simulated server</value>
+  </data>
+  <data name="HostSimulatedServerHint" xml:space="preserve">
+    <value>This build talks to a built-in simulated server: hosts, requests and sessions are scripted. Real connections arrive in a later build.</value>
+  </data>
+  <!-- guest page -->
+  <data name="GuestPageTitle" xml:space="preserve">
+    <value>Browse through a host</value>
+  </data>
+  <data name="GuestPageDescription" xml:space="preserve">
+    <value>Pick an available host to open a work browser that routes allowed sites through their connection.</value>
+  </data>
+  <data name="GuestRefresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="GuestNoHostsTitle" xml:space="preserve">
+    <value>No hosts available</value>
+  </data>
+  <data name="GuestNoHostsText" xml:space="preserve">
+    <value>Hosts appear here when a colleague turns on "Available for requests".</value>
+  </data>
+  <data name="HostReachable" xml:space="preserve">
+    <value>Reachable</value>
+  </data>
+  <data name="HostUnreachable" xml:space="preserve">
+    <value>Not reachable</value>
+  </data>
+  <data name="HostReachabilityUnknown" xml:space="preserve">
+    <value>Checking…</value>
+  </data>
+  <data name="GuestHostsUnavailableTitle" xml:space="preserve">
+    <value>Could not load hosts</value>
+  </data>
+  <data name="GuestHostsUnavailableText" xml:space="preserve">
+    <value>The server cannot be reached. Check your connection and try again.</value>
+  </data>
+  <data name="GuestHostsErrorFormat" xml:space="preserve">
+    <value>The server answered: {0}</value>
+  </data>
+  <data name="GuestNotSignedInText" xml:space="preserve">
+    <value>Sign in to see available hosts.</value>
+  </data>
+  <data name="GuestDurationLabel" xml:space="preserve">
+    <value>Session length</value>
+  </data>
+  <data name="GuestRequestConnection" xml:space="preserve">
+    <value>Request connection</value>
+  </data>
+  <data name="GuestWaitingTitle" xml:space="preserve">
+    <value>Waiting for an answer</value>
+  </data>
+  <data name="GuestWaitingTextFormat" xml:space="preserve">
+    <value>{0} has one minute to accept your request.</value>
+  </data>
+  <data name="GuestCancelRequest" xml:space="preserve">
+    <value>Cancel request</value>
+  </data>
+  <data name="GuestRequestSentFormat" xml:space="preserve">
+    <value>Request sent to {0} for {1} minutes.</value>
+  </data>
+  <data name="GuestRequestAccepted" xml:space="preserve">
+    <value>Accepted — preparing the session…</value>
+  </data>
+  <data name="GuestRequestRejected" xml:space="preserve">
+    <value>The host declined the request.</value>
+  </data>
+  <data name="GuestRequestExpiredText" xml:space="preserve">
+    <value>The host did not answer in time.</value>
+  </data>
+  <data name="GuestRequestCancelled" xml:space="preserve">
+    <value>Request cancelled.</value>
+  </data>
+  <data name="GuestRequestDisconnected" xml:space="preserve">
+    <value>The connection to the server was lost before the host answered.</value>
+  </data>
+  <data name="GuestErrorHostUnavailable" xml:space="preserve">
+    <value>That host is not available any more.</value>
+  </data>
+  <data name="GuestErrorSessionExists" xml:space="preserve">
+    <value>A session is already in progress.</value>
+  </data>
+  <data name="GuestErrorRequestPending" xml:space="preserve">
+    <value>A request is already pending.</value>
+  </data>
+  <data name="GuestErrorRateLimited" xml:space="preserve">
+    <value>Too many requests. Wait a moment and try again.</value>
+  </data>
+  <data name="GuestErrorNotConnected" xml:space="preserve">
+    <value>Not connected to the server.</value>
+  </data>
+  <data name="GuestErrorGenericFormat" xml:space="preserve">
+    <value>The server refused the request ({0}).</value>
+  </data>
+  <!-- session panel -->
+  <data name="SessionPanelTitle" xml:space="preserve">
+    <value>Session</value>
+  </data>
+  <data name="SessionPeerFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="SessionRoleHost" xml:space="preserve">
+    <value>You are sharing your connection</value>
+  </data>
+  <data name="SessionRoleGuest" xml:space="preserve">
+    <value>You are browsing through the host</value>
+  </data>
+  <data name="SessionPhasePreparing" xml:space="preserve">
+    <value>Preparing…</value>
+  </data>
+  <data name="SessionPhaseConnecting" xml:space="preserve">
+    <value>Connecting to the other device…</value>
+  </data>
+  <data name="SessionPhaseActive" xml:space="preserve">
+    <value>Connected</value>
+  </data>
+  <data name="SessionPhaseEnding" xml:space="preserve">
+    <value>Closing the session…</value>
+  </data>
+  <data name="SessionPhaseEnded" xml:space="preserve">
+    <value>Session ended</value>
+  </data>
+  <data name="SessionTimeRemainingFormat" xml:space="preserve">
+    <value>{0} left</value>
+  </data>
+  <data name="SessionTimeUp" xml:space="preserve">
+    <value>Time is up</value>
+  </data>
+  <data name="SessionDataUsedFormat" xml:space="preserve">
+    <value>About {0} sent · {1} received</value>
+  </data>
+  <data name="SessionDisconnect" xml:space="preserve">
+    <value>Disconnect</value>
+  </data>
+  <data name="SessionReopenBrowser" xml:space="preserve">
+    <value>Reopen work browser</value>
+  </data>
+  <data name="SessionDismiss" xml:space="preserve">
+    <value>Dismiss</value>
+  </data>
+  <data name="SessionSummaryFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="BytesFormat" xml:space="preserve">
+    <value>{0:0.#} {1}</value>
+  </data>
+  <data name="BytesUnitB" xml:space="preserve">
+    <value>B</value>
+  </data>
+  <data name="BytesUnitKb" xml:space="preserve">
+    <value>KB</value>
+  </data>
+  <data name="BytesUnitMb" xml:space="preserve">
+    <value>MB</value>
+  </data>
+  <data name="BytesUnitGb" xml:space="preserve">
+    <value>GB</value>
+  </data>
+  <!-- session end reasons (docs/ws-protocol.md section 5) -->
+  <data name="SessionEndedByYou" xml:space="preserve">
+    <value>You ended the session.</value>
+  </data>
+  <data name="SessionEndedByPeer" xml:space="preserve">
+    <value>The other side ended the session.</value>
+  </data>
+  <data name="SessionEndedExpired" xml:space="preserve">
+    <value>The session reached its time limit.</value>
+  </data>
+  <data name="SessionEndedPeerDisconnected" xml:space="preserve">
+    <value>The other device lost its connection.</value>
+  </data>
+  <data name="SessionEndedYouDisconnected" xml:space="preserve">
+    <value>This device lost its connection to the server.</value>
+  </data>
+  <data name="SessionEndedConnectFailed" xml:space="preserve">
+    <value>The two devices could not reach each other.</value>
+  </data>
+  <data name="SessionEndedAdminTerminated" xml:space="preserve">
+    <value>An administrator ended the session.</value>
+  </data>
+  <data name="SessionEndedBrowserNotProxied" xml:space="preserve">
+    <value>The work browser did not go through Josour, so the session was stopped.</value>
+  </data>
+  <data name="SessionEndedProtocolError" xml:space="preserve">
+    <value>The session stopped because the two devices did not understand each other.</value>
+  </data>
+  <data name="SessionEndedUnknownFormat" xml:space="preserve">
+    <value>The session ended ({0}).</value>
+  </data>
+  <!-- work browser -->
+  <data name="BrowserErrorNotFound" xml:space="preserve">
+    <value>Google Chrome or Microsoft Edge must be installed to open the work browser.</value>
+  </data>
+  <data name="BrowserErrorManagedByPolicy" xml:space="preserve">
+    <value>Your organisation's browser policy overrides the proxy setting, so the work browser cannot use this session.</value>
+  </data>
+  <data name="BrowserErrorInstanceHandoff" xml:space="preserve">
+    <value>Another Josour browser window is still open. Close it and start the session again.</value>
+  </data>
+  <data name="BrowserErrorProbeTimeout" xml:space="preserve">
+    <value>The work browser did not send its traffic through Josour.</value>
+  </data>
+  <data name="BrowserErrorOther" xml:space="preserve">
+    <value>The work browser could not be started.</value>
+  </data>
+  <!-- incoming request: the pre-accept disclosure (product document section 15) -->
+  <data name="IncomingRequestWindowTitle" xml:space="preserve">
+    <value>Incoming request</value>
+  </data>
+  <data name="IncomingRequestHeadingFormat" xml:space="preserve">
+    <value>{0} wants to browse through your connection</value>
+  </data>
+  <data name="IncomingRequestRequesterLabel" xml:space="preserve">
+    <value>Requester</value>
+  </data>
+  <data name="IncomingRequestDeviceLabel" xml:space="preserve">
+    <value>Device</value>
+  </data>
+  <data name="IncomingRequestDurationLabel" xml:space="preserve">
+    <value>Requested duration</value>
+  </data>
+  <data name="IncomingRequestAllowedSitesLabel" xml:space="preserve">
+    <value>Allowed sites</value>
+  </data>
+  <data name="DurationMinutesFormat" xml:space="preserve">
+    <value>{0} minutes</value>
+  </data>
+  <data name="AllowedSitesNote" xml:space="preserve">
+    <value>Only sites on the company allow-list can be reached through your device.</value>
+  </data>
+  <data name="AllowedSitesSummaryFormat" xml:space="preserve">
+    <value>{0} entries · allow-list version {1}</value>
+  </data>
+  <data name="AllowedSitesUnavailable" xml:space="preserve">
+    <value>The allowed sites could not be loaded from the server, so they cannot be shown. This does not mean the list is empty.</value>
+  </data>
+  <data name="AllowedSitesEmpty" xml:space="preserve">
+    <value>The current version of the list allows no site at all.</value>
+  </data>
+  <data name="AllowedSitesUnrestricted" xml:space="preserve">
+    <value>They will be able to browse any site through your connection, not a fixed list.</value>
+  </data>
+  <data name="IncomingRequestWarningTitle" xml:space="preserve">
+    <value>Privacy notice</value>
+  </data>
+  <data name="IncomingRequestWarning" xml:space="preserve">
+    <value>Sites will see your public IP address.</value>
+  </data>
+  <data name="IncomingRequestDisconnectHint" xml:space="preserve">
+    <value>You can disconnect the session at any time from the session panel.</value>
+  </data>
+  <data name="CountdownFormat" xml:space="preserve">
+    <value>Expires in {0} s</value>
+  </data>
+  <data name="RequestExpired" xml:space="preserve">
+    <value>Request expired</value>
+  </data>
+  <data name="Accept" xml:space="preserve">
+    <value>Accept</value>
+  </data>
+  <data name="Reject" xml:space="preserve">
+    <value>Reject</value>
+  </data>
+  <!-- toasts -->
+  <data name="ToastIncomingRequestTitle" xml:space="preserve">
+    <value>Incoming browsing request</value>
+  </data>
+  <data name="ToastIncomingRequestBodyFormat" xml:space="preserve">
+    <value>{0} ({1}) asks to browse through your connection for {2} minutes.</value>
+  </data>
+  <!-- debug -->
+  <data name="DebugSampleGuestName" xml:space="preserve">
+    <value>Sara Ahmed</value>
+  </data>
+  <data name="DebugSampleGuestDevice" xml:space="preserve">
+    <value>SARA-LAPTOP</value>
+  </data>
+  <!-- login -->
+  <data name="LoginWindowTitle" xml:space="preserve">
+    <value>Sign in</value>
+  </data>
+  <data name="LoginHeading" xml:space="preserve">
+    <value>Sign in to Josour</value>
+  </data>
+  <data name="LoginDescription" xml:space="preserve">
+    <value>Use the account your administrator created for you.</value>
+  </data>
+  <data name="LoginServerUrlLabel" xml:space="preserve">
+    <value>Server address</value>
+  </data>
+  <data name="LoginServerUrlPlaceholder" xml:space="preserve">
+    <value>https://josour.example.com</value>
+  </data>
+  <data name="LoginEmailLabel" xml:space="preserve">
+    <value>Email</value>
+  </data>
+  <data name="LoginPasswordLabel" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="LoginSignIn" xml:space="preserve">
+    <value>Sign in</value>
+  </data>
+  <data name="LoginSigningIn" xml:space="preserve">
+    <value>Signing in…</value>
+  </data>
+  <data name="LoginErrorServerUrl" xml:space="preserve">
+    <value>Enter the server address as https://… (http:// is only accepted for localhost).</value>
+  </data>
+  <data name="LoginErrorInvalidCredentials" xml:space="preserve">
+    <value>Wrong email or password.</value>
+  </data>
+  <data name="LoginErrorAccountLocked" xml:space="preserve">
+    <value>Too many failed attempts. The account is locked for 15 minutes.</value>
+  </data>
+  <data name="LoginErrorAccountDisabled" xml:space="preserve">
+    <value>This account is disabled. Contact your administrator.</value>
+  </data>
+  <data name="LoginErrorDeviceRevoked" xml:space="preserve">
+    <value>An administrator removed this device. Sign in again to register it anew.</value>
+  </data>
+  <data name="LoginErrorDeviceRejected" xml:space="preserve">
+    <value>This device could not be verified. Sign in again to register it anew.</value>
+  </data>
+  <data name="LoginErrorRateLimited" xml:space="preserve">
+    <value>Too many sign-in attempts. Wait a minute and try again.</value>
+  </data>
+  <data name="LoginErrorUnavailable" xml:space="preserve">
+    <value>The server cannot be reached. Check the address and your connection.</value>
+  </data>
+  <data name="LoginErrorValidationFormat" xml:space="preserve">
+    <value>The server rejected the request: {0}</value>
+  </data>
+  <data name="LoginErrorGenericFormat" xml:space="preserve">
+    <value>Sign-in failed ({0}).</value>
+  </data>
+  <!-- signed out notices -->
+  <data name="SignedOutTitle" xml:space="preserve">
+    <value>Signed out of Josour</value>
+  </data>
+  <data name="SignedOutSessionExpired" xml:space="preserve">
+    <value>Your session expired. Please sign in again.</value>
+  </data>
+  <data name="SignedOutDeviceRevoked" xml:space="preserve">
+    <value>An administrator removed this device.</value>
+  </data>
+  <data name="SignedOutAccountDisabled" xml:space="preserve">
+    <value>Your account was disabled.</value>
+  </data>
+  <!-- host readiness: firewall + VPN (week 6) -->
+  <data name="HostVpnWarningTitle" xml:space="preserve">
+    <value>This device goes out through a VPN</value>
+  </data>
+  <data name="HostVpnWarningMessageFormat" xml:space="preserve">
+    <value>Outbound traffic from this device goes through the “{0}” adapter, so sites will see the VPN's exit address, not this device's. You may continue, but the point of sharing your device may be lost.</value>
+  </data>
+  <data name="ReadinessTitle" xml:space="preserve">
+    <value>This device's readiness to host</value>
+  </data>
+  <data name="ReadinessChecking" xml:space="preserve">
+    <value>Checking…</value>
+  </data>
+  <data name="ReadinessRecheck" xml:space="preserve">
+    <value>Check again</value>
+  </data>
+  <data name="ReadinessFirewallOk" xml:space="preserve">
+    <value>The firewall allows Josour's inbound connection.</value>
+  </data>
+  <data name="ReadinessFirewallMissing" xml:space="preserve">
+    <value>There is no inbound Josour firewall rule, so the other device may not be able to reach this one.</value>
+  </data>
+  <data name="ReadinessFirewallUnknown" xml:space="preserve">
+    <value>The firewall rule could not be checked on this device.</value>
+  </data>
+  <data name="ReadinessVpnOk" xml:space="preserve">
+    <value>No VPN is carrying the outbound traffic.</value>
+  </data>
+  <data name="ReadinessVpnWarningFormat" xml:space="preserve">
+    <value>Outbound traffic goes through “{0}”, so sites will see the VPN's address.</value>
+  </data>
+  <!-- settings -->
+  <data name="SettingsWindowTitle" xml:space="preserve">
+    <value>Josour settings</value>
+  </data>
+  <data name="SettingsHeading" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="SettingsDescription" xml:space="preserve">
+    <value>These settings are stored on this device only.</value>
+  </data>
+  <data name="SettingsServerSection" xml:space="preserve">
+    <value>Server</value>
+  </data>
+  <data name="SettingsServerUrlLabel" xml:space="preserve">
+    <value>Server address</value>
+  </data>
+  <data name="SettingsServerUrlHint" xml:space="preserve">
+    <value>An HTTPS address your administrator gives you.</value>
+  </data>
+  <data name="SettingsTestConnection" xml:space="preserve">
+    <value>Test the connection</value>
+  </data>
+  <data name="SettingsTesting" xml:space="preserve">
+    <value>Testing…</value>
+  </data>
+  <data name="SettingsServerOk" xml:space="preserve">
+    <value>The server answered.</value>
+  </data>
+  <data name="SettingsServerInvalidUrl" xml:space="preserve">
+    <value>That is not a valid address. Enter a full address such as https://josour.example.com</value>
+  </data>
+  <data name="SettingsServerInsecure" xml:space="preserve">
+    <value>The address must start with https.</value>
+  </data>
+  <data name="SettingsServerUnreachable" xml:space="preserve">
+    <value>The server at this address could not be reached.</value>
+  </data>
+  <data name="SettingsServerNotJosour" xml:space="preserve">
+    <value>Something answers at this address, but it is not a Josour server.</value>
+  </data>
+  <data name="SettingsServerDetailFormat" xml:space="preserve">
+    <value>Detail: {0}</value>
+  </data>
+  <data name="SettingsInterfaceSection" xml:space="preserve">
+    <value>Interface</value>
+  </data>
+  <data name="SettingsLanguageLabel" xml:space="preserve">
+    <value>Interface language</value>
+  </data>
+  <data name="SettingsLanguageArabic" xml:space="preserve">
+    <value>Arabic</value>
+  </data>
+  <data name="SettingsLanguageEnglish" xml:space="preserve">
+    <value>English</value>
+  </data>
+  <data name="SettingsLanguageRestartNote" xml:space="preserve">
+    <value>The new language applies the next time Josour starts.</value>
+  </data>
+  <data name="SettingsBrowserLabel" xml:space="preserve">
+    <value>Work browser</value>
+  </data>
+  <data name="SettingsBrowserHint" xml:space="preserve">
+    <value>The browser opened with a separate profile during a session.</value>
+  </data>
+  <data name="SettingsBrowserAuto" xml:space="preserve">
+    <value>Automatic</value>
+  </data>
+  <data name="SettingsBrowserChrome" xml:space="preserve">
+    <value>Chrome</value>
+  </data>
+  <data name="SettingsBrowserEdge" xml:space="preserve">
+    <value>Edge</value>
+  </data>
+  <data name="SettingsStartupSection" xml:space="preserve">
+    <value>Start-up</value>
+  </data>
+  <data name="SettingsStartWithWindows" xml:space="preserve">
+    <value>Start with Windows</value>
+  </data>
+  <data name="SettingsStartWithWindowsUnavailable" xml:space="preserve">
+    <value>Not available on this system.</value>
+  </data>
+  <data name="SettingsStartMinimized" xml:space="preserve">
+    <value>Start minimized to the notification area</value>
+  </data>
+  <data name="SettingsSave" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="SettingsCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="SettingsSaved" xml:space="preserve">
+    <value>Settings saved.</value>
+  </data>
+  <data name="SettingsSaveFailedFormat" xml:space="preserve">
+    <value>The settings could not be saved: {0}</value>
+  </data>
+  <!-- first run -->
+  <data name="FirstRunWindowTitle" xml:space="preserve">
+    <value>Set up Josour</value>
+  </data>
+  <data name="FirstRunWelcomeHeading" xml:space="preserve">
+    <value>Welcome to Josour</value>
+  </data>
+  <data name="FirstRunWelcomeText" xml:space="preserve">
+    <value>Two steps before you begin: the server address, then signing in.</value>
+  </data>
+  <data name="FirstRunStepFormat" xml:space="preserve">
+    <value>Step {0} of {1}</value>
+  </data>
+  <data name="FirstRunServerTitle" xml:space="preserve">
+    <value>The server address</value>
+  </data>
+  <data name="FirstRunServerText" xml:space="preserve">
+    <value>Enter the address your administrator gave you, and test it before continuing.</value>
+  </data>
+  <data name="FirstRunSignInTitle" xml:space="preserve">
+    <value>Sign in</value>
+  </data>
+  <data name="FirstRunSignInText" xml:space="preserve">
+    <value>Use the e-mail and password your administrator created for you.</value>
+  </data>
+  <data name="FirstRunReadyTitle" xml:space="preserve">
+    <value>Before you make your device available</value>
+  </data>
+  <data name="FirstRunReadyText" xml:space="preserve">
+    <value>This is what the other device will meet if you turn on “Available for requests”. Nothing here stops you from continuing.</value>
+  </data>
+  <data name="FirstRunNext" xml:space="preserve">
+    <value>Next</value>
+  </data>
+  <data name="FirstRunBack" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="FirstRunFinish" xml:space="preserve">
+    <value>Finish</value>
+  </data>
+  <!-- about / diagnostics -->
+  <data name="AboutWindowTitle" xml:space="preserve">
+    <value>About Josour</value>
+  </data>
+  <data name="AboutHeading" xml:space="preserve">
+    <value>About and diagnostics</value>
+  </data>
+  <data name="AboutDescription" xml:space="preserve">
+    <value>Quote these values when you ask for support.</value>
+  </data>
+  <data name="AboutAppVersionLabel" xml:space="preserve">
+    <value>App version</value>
+  </data>
+  <data name="AboutDeviceNameLabel" xml:space="preserve">
+    <value>Device name</value>
+  </data>
+  <data name="AboutDeviceIdLabel" xml:space="preserve">
+    <value>Device id</value>
+  </data>
+  <data name="AboutOsLabel" xml:space="preserve">
+    <value>Operating system</value>
+  </data>
+  <data name="AboutServerLabel" xml:space="preserve">
+    <value>Server</value>
+  </data>
+  <data name="AboutSignedInLabel" xml:space="preserve">
+    <value>Account</value>
+  </data>
+  <data name="AboutConnectionLabel" xml:space="preserve">
+    <value>Connection</value>
+  </data>
+  <data name="AboutLogsLabel" xml:space="preserve">
+    <value>Log folder</value>
+  </data>
+  <data name="AboutOpenLogFolder" xml:space="preserve">
+    <value>Open the log folder</value>
+  </data>
+  <data name="AboutOpenLogFolderFailedFormat" xml:space="preserve">
+    <value>The folder could not be opened: {0}</value>
+  </data>
+  <data name="AboutCopy" xml:space="preserve">
+    <value>Copy the details</value>
+  </data>
+  <data name="AboutCopied" xml:space="preserve">
+    <value>The details were copied.</value>
+  </data>
+  <data name="AboutSecretsNote" xml:space="preserve">
+    <value>No access token and no device secret appear here.</value>
+  </data>
+  <data name="AboutNotAvailable" xml:space="preserve">
+    <value>Not available</value>
+  </data>
+  <!-- tray and main window entry points (week 6) -->
+  <data name="TraySettings" xml:space="preserve">
+    <value>Settings…</value>
+  </data>
+  <data name="TrayAbout" xml:space="preserve">
+    <value>About and diagnostics…</value>
+  </data>
+  <data name="MainSettingsTooltip" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="MainAboutTooltip" xml:space="preserve">
+    <value>About and diagnostics</value>
+  </data>
+  <!-- errors -->
+  <data name="StartupFailedTitle" xml:space="preserve">
+    <value>Josour could not start</value>
+  </data>
+  <data name="StartupFailedMessageFormat" xml:space="preserve">
+    <value>Josour could not start.&#10;&#10;{0}&#10;&#10;See the log folder %LOCALAPPDATA%\Josour\logs for details.</value>
+  </data>
+</root>

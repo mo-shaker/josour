@@ -1,0 +1,396 @@
+using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
+using System.Security.Authentication;
+using Josour.Core.Tunnel;
+using Josour.Tunnel.Auth;
+using Josour.Tunnel.Candidates;
+using Josour.Tunnel.Certificates;
+using Josour.Tunnel.Tls;
+
+namespace Josour.Tunnel;
+
+/// <summary>اتصال مصادَق (TLS + AUTH1/AUTH2 مكتملان). الـ Stream هو SslStream يملك المقبس.</summary>
+public sealed record AuthenticatedConnection(Stream Stream, CandidateType WinnerType, string TlsVersion, bool Inbound, string RemoteDescription) : IAsyncDisposable
+{
+    public ValueTask DisposeAsync() => Stream.DisposeAsync();
+}
+
+public sealed record SymmetricConnectOutcome(TunnelConnectResult Result, AuthenticatedConnection? Connection, IReadOnlyDictionary<string, object?> Diagnostics);
+
+/// <summary>مسار الـ Relay: النقل الذي يتكلم بروتوكوله والعنوان الذي وصل في session.created.relay (ADR-0009).</summary>
+public sealed record RelayLeg(ITunnelTransport Transport, CandidateEndpoint Endpoint);
+
+/// <summary>
+/// تنسيق docs/protocol.md القسم 2 الخطوات 3-6 لكلا الدورين: قبول الاتصالات الواردة (TLS Server بشهادتنا) والاتصال بكل مرشحي
+/// الطرف الآخر بالتوازي (TLS Client مثبّت على بصمته)، ثم المصادقة حسب الدور المنطقي. أول اتصال يجتاز المصادقة يفوز؛
+/// الباقي يُغلق ويُوقَف المستمع.
+///
+/// من يقرر الفائز: المضيف هو المرجع (session.connected). لتفادي أن يحتفظ كل طرف باتصال مختلف، المضيف لا يرسل AUTH2 إلا على
+/// أول اتصال يجتاز AUTH1 ويغلق ما عداه بلا رد (وهو ما يسمح به القسم 4). وهكذا لا يرى Guest سوى AUTH2 واحدة، فاتصاله
+/// "الأول المصادَق" هو نفسه اتصال المضيف. الأسبوع 4 يضيف مصافحة تأكيد صريحة إن أظهرت التجارب الحقيقية حاجة إليها.
+/// </summary>
+public sealed class SymmetricConnector
+{
+    public static readonly TimeSpan DialTimeout = TimeSpan.FromSeconds(5);
+    public static readonly TimeSpan TlsTimeout = TimeSpan.FromSeconds(10);
+    public static readonly TimeSpan AuthTimeout = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// سقف صفوف الاتصالات الواردة في التشخيص. المشروع لا يتوقع أكثر من عدد مرشحي الطرف الآخر، لكن أي طرف على
+    /// الشبكة يستطيع فتح اتصالات على المنفذ خلال نافذة الاتصال. بلا سقف تنمو القائمة بلا حد (ذاكرة)، ويتضخم
+    /// <c>session.connect_failed</c> فوق حد 64 KB في <c>docs/api.md</c> فيُرفض التشخيص كله. الزائد يبقى معدودًا في
+    /// <c>inbound_attempts</c> و<c>inbound_unauthenticated</c> وفي <see cref="TunnelListener.Probes"/>.
+    /// </summary>
+    public const int MaxRecordedInboundAttempts = 16;
+
+    private readonly SessionMaterial _material;
+    private readonly SessionCertificate _certificate;
+    private readonly TunnelListener _listener;
+    private readonly ITunnelTransport _transport;
+    private readonly IReadOnlyList<CandidateEndpoint> _ourCandidates;
+    private readonly RelayLeg? _relay;
+
+    private readonly List<Attempt> _attempts = new();
+    private readonly object _gate = new();
+    private int _claimed;
+    private int _started;
+    private int _inboundSeen;
+    private int _inboundDropped;
+    /// <summary>رُفع مرة واحدة عند أول اتصال يجتاز المصادقة، ولا يعود. انظر <see cref="IsUnauthenticatedProbe"/>.</summary>
+    private int _authenticatedAny;
+
+    public SymmetricConnector(SessionMaterial material, SessionCertificate ourCertificate, TunnelListener listener, ITunnelTransport transport, IReadOnlyList<CandidateEndpoint>? ourCandidates = null, RelayLeg? relay = null)
+    {
+        _relay = relay;
+        _material = material ?? throw new ArgumentNullException(nameof(material));
+        _certificate = ourCertificate ?? throw new ArgumentNullException(nameof(ourCertificate));
+        _listener = listener ?? throw new ArgumentNullException(nameof(listener));
+        _transport = transport ?? throw new ArgumentNullException(nameof(transport));
+        _ourCandidates = ourCandidates ?? Array.Empty<CandidateEndpoint>();
+    }
+
+    /// <summary>
+    /// تقدّم أي محاولة إلى مرحلة جديدة ("tls" ثم "auth" ثم "ok"). يُرفع من خيوط متعددة وقد يتكرر؛
+    /// <see cref="TunnelSession"/> يستعمله ليعكس Connecting → Authenticating في StateChanged. أخطاء المستمع تُبتلع.
+    /// </summary>
+    public event Action<string>? StageReached;
+
+    /// <summary>يُستدعى مرة واحدة. عند الانتهاء يكون المستمع متوقفًا وكل المحاولات الأخرى مغلقة.</summary>
+    public async Task<SymmetricConnectOutcome> ConnectAsync(PeerEndpointInfo peer, TimeSpan timeout, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(peer);
+        if (Interlocked.Exchange(ref _started, 1) != 0) throw new InvalidOperationException("ConnectAsync may be called only once");
+
+        byte[] peerFp;
+        try { peerFp = Convert.FromHexString(peer.CertFingerprintSha256Hex); }
+        catch (FormatException e) { throw new ArgumentException("peer certificate fingerprint is not valid hex", nameof(peer), e); }
+        if (peerFp.Length != TlsChannel.FingerprintLength) throw new ArgumentException("peer certificate fingerprint must be 32 bytes", nameof(peer));
+        var ourFp = _certificate.FingerprintSha256;
+
+        var clock = Stopwatch.StartNew();
+        var winner = new TaskCompletionSource<(AuthenticatedConnection Connection, long Ms)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(timeout);
+
+        await _listener.StartAsync((socket, lct) => HandleInboundAsync(socket, peerFp, ourFp, winner, clock, lct), cts.Token).ConfigureAwait(false);
+        // ADR-0009: الـ Relay يُجرَّب بالتوازي مع المباشر لا بعده. المباشر أسرع حين ينجح، والـ Relay يعمل دائمًا،
+        // فالسباق يعطي الأفضل المتاح بلا انتظار فشل أحدهما.
+        var dials = peer.Candidates.Select(c => DialAsync(c, peerFp, ourFp, winner, clock, cts.Token))
+            .Append(_relay is null ? Task.CompletedTask : DialRelayAsync(_relay, timeout, peerFp, ourFp, winner, clock, cts.Token))
+            .ToArray();
+
+        try
+        {
+            await winner.Task.WaitAsync(cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // مهلة أو إلغاء خارجي
+        }
+
+        cts.Cancel();
+        await _listener.StopAsync().ConfigureAwait(false);
+        try { await Task.WhenAll(dials).ConfigureAwait(false); } catch { /* المحاولات تبتلع أخطاءها */ }
+
+        var elapsed = (int)Math.Min(clock.ElapsedMilliseconds, int.MaxValue);
+        if (winner.Task.IsCompletedSuccessfully)
+        {
+            var (connection, ms) = winner.Task.Result;
+            var result = new TunnelConnectResult(true, connection.WinnerType, (int)Math.Min(ms, int.MaxValue), connection.TlsVersion, null);
+            return new SymmetricConnectOutcome(result, connection, BuildDiagnostics(timeout, elapsed, connection));
+        }
+
+        var reason = ct.IsCancellationRequested ? "cancelled" : "timeout";
+        var failed = new TunnelConnectResult(false, null, elapsed, null, reason);
+        return new SymmetricConnectOutcome(failed, null, BuildDiagnostics(timeout, elapsed, null));
+    }
+
+    // ---------- inbound ----------
+
+    private async Task HandleInboundAsync(Socket socket, byte[] peerFp, byte[] ourFp, TaskCompletionSource<(AuthenticatedConnection, long)> winner, Stopwatch clock, CancellationToken ct)
+    {
+        var sw = Stopwatch.StartNew();
+        var remote = socket.RemoteEndPoint as IPEndPoint;
+        var local = socket.LocalEndPoint as IPEndPoint;
+        var remoteAddress = remote?.Address is { IsIPv4MappedToIPv6: true } mapped ? mapped.MapToIPv4() : remote?.Address;
+        var attempt = new Attempt("inbound", ClassifyInbound(local), remoteAddress?.ToString() ?? "?", remote?.Port ?? 0);
+        Record(attempt);
+        try
+        {
+            Stream raw;
+            try { raw = new NetworkStream(socket, ownsSocket: true); }
+            catch { socket.Dispose(); throw; }
+            await AuthenticateAsync(raw, inbound: true, tlsServer: true, attempt, peerFp, ourFp, winner, clock, ct).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            attempt.Error = Describe(e);
+            attempt.PeerClosed = e is AuthFailedException { PeerClosed: true };
+        }
+        finally
+        {
+            attempt.Ms = sw.ElapsedMilliseconds;
+            if (IsUnauthenticatedProbe(attempt)) _listener.Probes.Record(remoteAddress);
+        }
+    }
+
+    /// <summary>
+    /// هل هذا الاتصال الوارد محاولة وصول غير مصرَّح بها إلى منفذنا (‏<c>docs/api.md</c>: <c>listener_unauthenticated</c>)؟
+    ///
+    /// <para>الإشارة لا تحتمل إيجابية كاذبة واحدة: إيجابية في كل جلسة ناجحة تُفقدها معناها تمامًا. لذلك تُستثنى
+    /// ثلاث حالات، كلٌّ منها تصف <b>الطرف الآخر الشرعي</b> لا مهاجمًا:</para>
+    /// <list type="number">
+    ///   <item><b>ما ألغيناه نحن</b> (‏<c>cancelled</c>): فوز اتصال آخر أو انتهاء نافذة الاتصال.</item>
+    ///   <item><b>ما أغلقه الطرف الآخر بلا رد</b> (‏<see cref="AuthFailedException.PeerClosed"/>): هذا نصًّا ما
+    ///     يفعله المضيف بالاتصال الخاسر في القسم 2 الخطوة 5 — «يغلق أي اتصال آخر بلا رد». والاتصال المتماثل يفتح
+    ///     اتصالين بين الجهازين دائمًا، فأحدهما خاسر <b>في كل جلسة ناجحة</b>.</item>
+    ///   <item><b>ما أخفق بعد أن صادقنا أحدًا</b>: من تلك اللحظة كل إخفاق حطام سباق لا دليل.</item>
+    /// </list>
+    /// <para>الثمن مقبول ومعلوم: فاحص منافذ يكمل مصافحة TLS ثم يغلق بلا كلام لا يُحتسب. أما ما يُحتسب فيشمل
+    /// كل فحص لا يكمل TLS (الأغلبية الساحقة)، وكل مهلة، و<b>كل فشل تحقق</b> — وهو أقوى دليل ممكن.</para>
+    /// </summary>
+    private bool IsUnauthenticatedProbe(Attempt attempt)
+    {
+        if (attempt.Authenticated || attempt.Error is null) return false;
+        if (attempt.Error == "cancelled" || attempt.PeerClosed) return false;
+        return Volatile.Read(ref _authenticatedAny) == 0;
+    }
+
+    // ---------- dial ----------
+
+    private async Task DialAsync(CandidateEndpoint candidate, byte[] peerFp, byte[] ourFp, TaskCompletionSource<(AuthenticatedConnection, long)> winner, Stopwatch clock, CancellationToken ct)
+    {
+        var sw = Stopwatch.StartNew();
+        var attempt = new Attempt("dial", candidate.Type, candidate.Ip, candidate.Port) { Stage = "connect" };
+        Record(attempt);
+        try
+        {
+            var raw = await _transport.ConnectAsync(candidate, DialTimeout, ct).ConfigureAwait(false);
+            await AuthenticateAsync(raw, inbound: false, tlsServer: false, attempt, peerFp, ourFp, winner, clock, ct).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            attempt.Error = Describe(e);
+        }
+        finally
+        {
+            attempt.Ms = sw.ElapsedMilliseconds;
+        }
+    }
+
+    /// <summary>محاولة الاتصال عبر الـ Relay: نقل واحد وعنوان واحد، بلا مرشحين ولا مستمع.</summary>
+    private async Task DialRelayAsync(RelayLeg relay, TimeSpan timeout, byte[] peerFp, byte[] ourFp, TaskCompletionSource<(AuthenticatedConnection, long)> winner, Stopwatch clock, CancellationToken ct)
+    {
+        var sw = Stopwatch.StartNew();
+        var attempt = new Attempt("relay", CandidateType.Relay, relay.Endpoint.Ip, relay.Endpoint.Port) { Stage = "connect" };
+        Record(attempt);
+        try
+        {
+            // المهلة الكاملة لا DialTimeout: رد الـ Relay لا يصل حتى يصل النظير أيضًا، وقد يتأخر بقدر نافذة
+            // الاتصال كلها. قصرها على خمس ثوانٍ كان سيُسقط كل جلسة لا يتزامن طرفاها.
+            var raw = await relay.Transport.ConnectAsync(relay.Endpoint, timeout, ct).ConfigureAwait(false);
+            // docs/protocol.md القسم 3: لا مستمع هنا، فالمضيف هو TLS Server دائمًا على هذا المسار.
+            await AuthenticateAsync(raw, inbound: false, tlsServer: _material.Role == TunnelRole.Host, attempt, peerFp, ourFp, winner, clock, ct).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            attempt.Error = Describe(e);
+        }
+        finally
+        {
+            attempt.Ms = sw.ElapsedMilliseconds;
+        }
+    }
+
+    // ---------- shared ----------
+
+    /// <summary>
+    /// <paramref name="tlsServer"/> مفصول عن <paramref name="inbound"/> عمدًا. على المسار المباشر هما الشيء نفسه
+    /// (المستمع هو Server)، أما فوق الـ Relay فلا مستمع: الطرفان يتصلان خارجًا، فلو بقيت القاعدة مشتقة من
+    /// «من اتصل» لانتظر كلاهما مصافحة الآخر إلى الأبد. القاعدة هناك: المضيف Server دائمًا (docs/protocol.md القسم 3).
+    /// </summary>
+    private async Task AuthenticateAsync(Stream raw, bool inbound, bool tlsServer, Attempt attempt, byte[] peerFp, byte[] ourFp, TaskCompletionSource<(AuthenticatedConnection, long)> winner, Stopwatch clock, CancellationToken ct)
+    {
+        Stage(attempt, "tls");
+        var tls = tlsServer
+            ? await TlsChannel.AuthenticateAsServerAsync(raw, _certificate.Certificate, TlsTimeout, ct).ConfigureAwait(false)
+            : await TlsChannel.AuthenticateAsClientAsync(raw, peerFp, TlsTimeout, ct).ConfigureAwait(false);
+
+        // listener_cert_fp = شهادة من يعمل TLS Server في هذا الاتصال، أيًا كان من فتح المقبس.
+        var listenerFp = tlsServer ? ourFp : peerFp;
+        Stage(attempt, "auth");
+        try
+        {
+            if (_material.Role == TunnelRole.Host)
+            {
+                var auth1 = await AuthHandshake.VerifyAuth1Async(tls.Stream, _material, listenerFp, AuthTimeout, ct).ConfigureAwait(false);
+                attempt.Authenticated = true; // اجتاز AUTH1: ليس محاولة غير مصرَّح بها حتى لو خسر السباق بعد ذلك
+                Volatile.Write(ref _authenticatedAny, 1);
+                if (!TryClaim()) throw new SupersededException();
+                try
+                {
+                    await AuthHandshake.SendAuth2Async(tls.Stream, _material, listenerFp, auth1, AuthTimeout, ct).ConfigureAwait(false);
+                }
+                catch
+                {
+                    Volatile.Write(ref _claimed, 0);
+                    throw;
+                }
+            }
+            else
+            {
+                await AuthHandshake.SendAuth1AndVerifyAuth2Async(tls.Stream, _material, listenerFp, AuthTimeout, ct).ConfigureAwait(false);
+                attempt.Authenticated = true;
+                Volatile.Write(ref _authenticatedAny, 1);
+                if (!TryClaim()) throw new SupersededException();
+            }
+
+            var connection = new AuthenticatedConnection(tls.Stream, attempt.Type ?? CandidateType.Public, tls.TlsVersion, inbound, $"{attempt.Ip}:{attempt.Port}");
+            Stage(attempt, "ok");
+            if (!winner.TrySetResult((connection, clock.ElapsedMilliseconds)))
+                throw new SupersededException();
+        }
+        catch
+        {
+            await tls.Stream.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private bool TryClaim() => Interlocked.CompareExchange(ref _claimed, 1, 0) == 0;
+
+    private void Stage(Attempt attempt, string stage)
+    {
+        attempt.Stage = stage;
+        try { StageReached?.Invoke(stage); } catch { /* المستمع مسؤول عن أخطائه */ }
+    }
+
+    /// <summary>
+    /// يضيف المحاولة إلى التشخيص. صفوف الاتصال (dial) تُسجَّل كلها لأن عددها = عدد مرشحي الطرف الآخر؛ أما الواردة
+    /// فيحدها <see cref="MaxRecordedInboundAttempts"/> لأن مصدرها الشبكة لا نحن (انظر تعليق الثابت).
+    /// </summary>
+    private void Record(Attempt attempt)
+    {
+        if (attempt.Direction == "inbound" && Interlocked.Increment(ref _inboundSeen) > MaxRecordedInboundAttempts)
+        {
+            Interlocked.Increment(ref _inboundDropped);
+            return;
+        }
+        lock (_gate) _attempts.Add(attempt);
+    }
+
+    /// <summary>
+    /// تصنيف الاتصال الوارد حسب العنوان المحلي الذي وصل إليه: يطابق مرشحينا lan/v6؛ وإلا فالاتصال جاء عبر NAT
+    /// حيث لا يمكن التمييز بين upnp وpublic من جهة المستقبِل، فنفضّل upnp إن كان لدينا تعيين.
+    /// </summary>
+    private CandidateType? ClassifyInbound(IPEndPoint? local)
+    {
+        if (local is null) return null;
+        var address = local.Address.IsIPv4MappedToIPv6 ? local.Address.MapToIPv4() : local.Address;
+        var text = address.ToString();
+        foreach (var c in _ourCandidates)
+            if (c.Type is CandidateType.Lan or CandidateType.V6 && c.Ip == text) return c.Type;
+        if (address.AddressFamily == AddressFamily.InterNetworkV6 && LocalNetwork.IsGlobalIPv6(address)) return CandidateType.V6;
+        if (address.AddressFamily == AddressFamily.InterNetwork && IPAddress.IsLoopback(address)) return CandidateType.Lan;
+        if (_ourCandidates.Any(c => c.Type == CandidateType.Upnp)) return CandidateType.Upnp;
+        return CandidateType.Public;
+    }
+
+    private IReadOnlyDictionary<string, object?> BuildDiagnostics(TimeSpan timeout, int elapsedMs, AuthenticatedConnection? connection)
+    {
+        Attempt[] attempts;
+        lock (_gate) attempts = _attempts.ToArray();
+        var rows = attempts.Select(a => new Dictionary<string, object?>
+        {
+            ["direction"] = a.Direction,
+            ["type"] = a.Type is null ? null : CandidateTypeNames.ToWire(a.Type.Value),
+            ["ip"] = a.Ip,
+            ["port"] = a.Port,
+            ["ms"] = a.Ms,
+            ["stage"] = a.Stage,
+            ["error"] = a.Error,
+        }).ToList();
+
+        return new Dictionary<string, object?>
+        {
+            ["role"] = _material.Role == TunnelRole.Host ? "host" : "guest",
+            ["timeout_ms"] = (long)timeout.TotalMilliseconds,
+            ["elapsed_ms"] = elapsedMs,
+            ["listener_port"] = _listener.Port,
+            ["inbound_attempts"] = _listener.InboundAttempts,
+            ["inbound_rejected"] = _listener.RejectedOverCapacity,
+            // اتصالات واردة لم تجتز AUTH1، وعدد الصفوف التي أُسقطت من القائمة بسبب السقف (كلاهما معدود لا مسجَّل).
+            ["inbound_unauthenticated"] = _listener.Probes.Count,
+            ["inbound_dropped"] = Volatile.Read(ref _inboundDropped),
+            ["candidates"] = rows,
+            ["winner"] = connection is null ? null : $"{(connection.Inbound ? "inbound" : "dial")} {CandidateTypeNames.ToWire(connection.WinnerType)} {connection.RemoteDescription}",
+            ["winner_type"] = connection is null ? null : CandidateTypeNames.ToWire(connection.WinnerType),
+            ["tls_version"] = connection?.TlsVersion,
+        };
+    }
+
+    // لا أسرار ولا حمولات في النصوص؛ رسائل الاستثناءات هنا وصفية فقط.
+    private static string Describe(Exception e) => e switch
+    {
+        SupersededException => "superseded",
+        OperationCanceledException => "cancelled",
+        TimeoutException t => $"timeout: {t.Message}",
+        TlsTooOldException => "tls_too_old",
+        AuthFailedException a => $"auth_failed: {a.Message}",
+        AuthenticationException a => $"tls: {a.Message}",
+        SocketException s => $"socket: {s.SocketErrorCode}",
+        IOException io when io.InnerException is SocketException s => $"socket: {s.SocketErrorCode}",
+        _ => $"{e.GetType().Name}: {e.Message}",
+    };
+
+    private sealed class SupersededException : Exception
+    {
+        public SupersededException() : base("another connection already won") { }
+    }
+
+    private sealed class Attempt
+    {
+        public Attempt(string direction, CandidateType? type, string ip, int port)
+        {
+            Direction = direction;
+            Type = type;
+            Ip = ip;
+            Port = port;
+        }
+
+        public string Direction { get; }
+        public CandidateType? Type { get; }
+        public string Ip { get; }
+        public int Port { get; }
+        public long Ms { get; set; }
+        public string? Stage { get; set; }
+        public string? Error { get; set; }
+
+        /// <summary>اجتاز AUTH1 (المضيف) أو تحقق من AUTH2 (Guest)، ولو خسر السباق بعدها.</summary>
+        public bool Authenticated { get; set; }
+
+        /// <summary>أغلق الطرف الآخر أو انقطع قبل اكتمال رسالة المصادقة (لا فشل تحقق).</summary>
+        public bool PeerClosed { get; set; }
+    }
+}

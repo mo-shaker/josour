@@ -1,0 +1,758 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Josour UI text, Arabic (the default language). Keys are Josour.Infrastructure.Localization.UiStringKeys.
+  -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- product -->
+  <data name="AppName" xml:space="preserve">
+    <value>جسور</value>
+  </data>
+  <data name="VersionFormat" xml:space="preserve">
+    <value>v{0}</value>
+  </data>
+  <!-- tray -->
+  <data name="TrayTooltip" xml:space="preserve">
+    <value>جسور</value>
+  </data>
+  <data name="TrayShowWindow" xml:space="preserve">
+    <value>إظهار النافذة</value>
+  </data>
+  <data name="TrayAvailableForRequests" xml:space="preserve">
+    <value>متاح لاستقبال الطلبات</value>
+  </data>
+  <data name="TrayStartWithWindows" xml:space="preserve">
+    <value>التشغيل مع بدء Windows</value>
+  </data>
+  <data name="TrayDebug" xml:space="preserve">
+    <value>أدوات التشخيص</value>
+  </data>
+  <data name="TraySimulateIncomingRequest" xml:space="preserve">
+    <value>محاكاة طلب وارد</value>
+  </data>
+  <data name="TraySignOut" xml:space="preserve">
+    <value>تسجيل الخروج</value>
+  </data>
+  <data name="TrayExit" xml:space="preserve">
+    <value>إنهاء البرنامج</value>
+  </data>
+  <data name="TrayTooltipSignedInFormat" xml:space="preserve">
+    <value>جسور — {0} · {1}</value>
+  </data>
+  <data name="TrayTooltipNotSignedIn" xml:space="preserve">
+    <value>جسور — لم يُسجَّل الدخول</value>
+  </data>
+  <!-- main window -->
+  <data name="HostTab" xml:space="preserve">
+    <value>المضيف</value>
+  </data>
+  <data name="GuestTab" xml:space="preserve">
+    <value>المستخدم</value>
+  </data>
+  <data name="StatusNotSignedIn" xml:space="preserve">
+    <value>لم يُسجَّل الدخول</value>
+  </data>
+  <data name="StatusSignedInFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="StatusOffline" xml:space="preserve">
+    <value>غير متصل</value>
+  </data>
+  <data name="StatusConnecting" xml:space="preserve">
+    <value>جارٍ الاتصال…</value>
+  </data>
+  <data name="StatusConnected" xml:space="preserve">
+    <value>متصل</value>
+  </data>
+  <data name="StatusReconnecting" xml:space="preserve">
+    <value>جارٍ إعادة الاتصال…</value>
+  </data>
+  <data name="StatusReplacedElsewhere" xml:space="preserve">
+    <value>الاتصال مفتوح في نافذة أخرى</value>
+  </data>
+  <data name="StatusSignInExpired" xml:space="preserve">
+    <value>انتهت صلاحية تسجيل الدخول</value>
+  </data>
+  <data name="StatusNoServer" xml:space="preserve">
+    <value>لا يوجد عنوان خادم</value>
+  </data>
+  <!-- host page -->
+  <data name="HostPageTitle" xml:space="preserve">
+    <value>مشاركة اتصالك بالإنترنت</value>
+  </data>
+  <data name="HostPageDescription" xml:space="preserve">
+    <value>عند تفعيل «متاح»، يستطيع زملاؤك طلب تصفح المواقع المسموح بها في الشركة عبر اتصالك بالإنترنت.</value>
+  </data>
+  <data name="HostAvailableToggle" xml:space="preserve">
+    <value>متاح لاستقبال الطلبات</value>
+  </data>
+  <data name="HostStatusAvailable" xml:space="preserve">
+    <value>متاح — في انتظار الطلبات</value>
+  </data>
+  <data name="HostStatusNotAvailable" xml:space="preserve">
+    <value>غير متاح</value>
+  </data>
+  <data name="HostStatusAnnouncing" xml:space="preserve">
+    <value>جارٍ إبلاغ الخادم بأنك متاح…</value>
+  </data>
+  <data name="HostStatusAvailabilityFailed" xml:space="preserve">
+    <value>لم يقبل الخادم التغيير. أعد المحاولة.</value>
+  </data>
+  <data name="HostNotConnectedTitle" xml:space="preserve">
+    <value>غير متصل بالخادم</value>
+  </data>
+  <data name="HostNotConnectedHint" xml:space="preserve">
+    <value>لا تصل الطلبات إلا أثناء اتصال جسور بالخادم.</value>
+  </data>
+  <data name="HostFirewallWarningTitle" xml:space="preserve">
+    <value>قاعدة جدار الحماية غير موجودة</value>
+  </data>
+  <data name="HostFirewallWarningMessage" xml:space="preserve">
+    <value>لا توجد قاعدة واردة باسم «Josour Tunnel» في جدار حماية Windows، وقد يمنع ذلك جهاز المستخدم من الوصول إليك. أعد تشغيل المثبّت أو راجع المسؤول.</value>
+  </data>
+  <data name="HostSimulatedServerTitle" xml:space="preserve">
+    <value>خادم محاكى</value>
+  </data>
+  <data name="HostSimulatedServerHint" xml:space="preserve">
+    <value>تتحدث هذه النسخة إلى خادم محاكى مدمج: المضيفون والطلبات والجلسات كلها مُعدّة مسبقًا، والاتصالات الحقيقية تأتي في نسخة لاحقة.</value>
+  </data>
+  <!-- guest page -->
+  <data name="GuestPageTitle" xml:space="preserve">
+    <value>التصفح عبر مضيف</value>
+  </data>
+  <data name="GuestPageDescription" xml:space="preserve">
+    <value>اختر مضيفًا متاحًا ليُفتح متصفح العمل الذي يوجّه المواقع المسموح بها عبر اتصال ذلك المضيف.</value>
+  </data>
+  <data name="GuestRefresh" xml:space="preserve">
+    <value>تحديث</value>
+  </data>
+  <data name="GuestNoHostsTitle" xml:space="preserve">
+    <value>لا يوجد مضيفون متاحون</value>
+  </data>
+  <data name="GuestNoHostsText" xml:space="preserve">
+    <value>يظهر المضيفون هنا عندما يفعّل أحد الزملاء خيار «متاح لاستقبال الطلبات».</value>
+  </data>
+  <data name="HostReachable" xml:space="preserve">
+    <value>يمكن الوصول إليه</value>
+  </data>
+  <data name="HostUnreachable" xml:space="preserve">
+    <value>لا يمكن الوصول إليه</value>
+  </data>
+  <data name="HostReachabilityUnknown" xml:space="preserve">
+    <value>جارٍ الفحص…</value>
+  </data>
+  <data name="GuestHostsUnavailableTitle" xml:space="preserve">
+    <value>تعذّر تحميل قائمة المضيفين</value>
+  </data>
+  <data name="GuestHostsUnavailableText" xml:space="preserve">
+    <value>تعذّر الوصول إلى الخادم. تحقق من اتصالك ثم أعد المحاولة.</value>
+  </data>
+  <data name="GuestHostsErrorFormat" xml:space="preserve">
+    <value>رد الخادم: {0}</value>
+  </data>
+  <data name="GuestNotSignedInText" xml:space="preserve">
+    <value>سجّل الدخول لعرض المضيفين المتاحين.</value>
+  </data>
+  <data name="GuestDurationLabel" xml:space="preserve">
+    <value>مدة الجلسة</value>
+  </data>
+  <data name="GuestRequestConnection" xml:space="preserve">
+    <value>طلب الاتصال</value>
+  </data>
+  <data name="GuestWaitingTitle" xml:space="preserve">
+    <value>في انتظار الرد</value>
+  </data>
+  <data name="GuestWaitingTextFormat" xml:space="preserve">
+    <value>أمام {0} دقيقة واحدة لقبول طلبك.</value>
+  </data>
+  <data name="GuestCancelRequest" xml:space="preserve">
+    <value>إلغاء الطلب</value>
+  </data>
+  <data name="GuestRequestSentFormat" xml:space="preserve">
+    <value>أُرسل الطلب إلى {0} لمدة {1} دقيقة.</value>
+  </data>
+  <data name="GuestRequestAccepted" xml:space="preserve">
+    <value>قُبل الطلب — جارٍ تجهيز الجلسة…</value>
+  </data>
+  <data name="GuestRequestRejected" xml:space="preserve">
+    <value>رفض المضيف الطلب.</value>
+  </data>
+  <data name="GuestRequestExpiredText" xml:space="preserve">
+    <value>لم يرد المضيف في الوقت المحدد.</value>
+  </data>
+  <data name="GuestRequestCancelled" xml:space="preserve">
+    <value>أُلغي الطلب.</value>
+  </data>
+  <data name="GuestRequestDisconnected" xml:space="preserve">
+    <value>انقطع الاتصال بالخادم قبل رد المضيف.</value>
+  </data>
+  <data name="GuestErrorHostUnavailable" xml:space="preserve">
+    <value>لم يعد هذا المضيف متاحًا.</value>
+  </data>
+  <data name="GuestErrorSessionExists" xml:space="preserve">
+    <value>هناك جلسة جارية بالفعل.</value>
+  </data>
+  <data name="GuestErrorRequestPending" xml:space="preserve">
+    <value>هناك طلب معلّق بالفعل.</value>
+  </data>
+  <data name="GuestErrorRateLimited" xml:space="preserve">
+    <value>طلبات كثيرة في وقت قصير. انتظر قليلًا ثم أعد المحاولة.</value>
+  </data>
+  <data name="GuestErrorNotConnected" xml:space="preserve">
+    <value>لا يوجد اتصال بالخادم.</value>
+  </data>
+  <data name="GuestErrorGenericFormat" xml:space="preserve">
+    <value>رفض الخادم الطلب ({0}).</value>
+  </data>
+  <!-- session panel -->
+  <data name="SessionPanelTitle" xml:space="preserve">
+    <value>الجلسة</value>
+  </data>
+  <data name="SessionPeerFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="SessionRoleHost" xml:space="preserve">
+    <value>أنت تشارك اتصالك بالإنترنت</value>
+  </data>
+  <data name="SessionRoleGuest" xml:space="preserve">
+    <value>أنت تتصفح عبر اتصال المضيف</value>
+  </data>
+  <data name="SessionPhasePreparing" xml:space="preserve">
+    <value>جارٍ التجهيز…</value>
+  </data>
+  <data name="SessionPhaseConnecting" xml:space="preserve">
+    <value>جارٍ الاتصال بالجهاز الآخر…</value>
+  </data>
+  <data name="SessionPhaseActive" xml:space="preserve">
+    <value>متصل</value>
+  </data>
+  <data name="SessionPhaseEnding" xml:space="preserve">
+    <value>جارٍ إنهاء الجلسة…</value>
+  </data>
+  <data name="SessionPhaseEnded" xml:space="preserve">
+    <value>انتهت الجلسة</value>
+  </data>
+  <data name="SessionTimeRemainingFormat" xml:space="preserve">
+    <value>يتبقّى {0}</value>
+  </data>
+  <data name="SessionTimeUp" xml:space="preserve">
+    <value>انتهت المدة</value>
+  </data>
+  <data name="SessionDataUsedFormat" xml:space="preserve">
+    <value>أُرسل نحو {0} واستُقبل {1}</value>
+  </data>
+  <data name="SessionDisconnect" xml:space="preserve">
+    <value>قطع الاتصال</value>
+  </data>
+  <data name="SessionReopenBrowser" xml:space="preserve">
+    <value>إعادة فتح متصفح العمل</value>
+  </data>
+  <data name="SessionDismiss" xml:space="preserve">
+    <value>إغلاق</value>
+  </data>
+  <data name="SessionSummaryFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="BytesFormat" xml:space="preserve">
+    <value>{0:0.#} {1}</value>
+  </data>
+  <data name="BytesUnitB" xml:space="preserve">
+    <value>بايت</value>
+  </data>
+  <data name="BytesUnitKb" xml:space="preserve">
+    <value>كيلوبايت</value>
+  </data>
+  <data name="BytesUnitMb" xml:space="preserve">
+    <value>ميجابايت</value>
+  </data>
+  <data name="BytesUnitGb" xml:space="preserve">
+    <value>جيجابايت</value>
+  </data>
+  <!-- session end reasons (docs/ws-protocol.md section 5) -->
+  <data name="SessionEndedByYou" xml:space="preserve">
+    <value>أنهيت الجلسة.</value>
+  </data>
+  <data name="SessionEndedByPeer" xml:space="preserve">
+    <value>أنهى الطرف الآخر الجلسة.</value>
+  </data>
+  <data name="SessionEndedExpired" xml:space="preserve">
+    <value>بلغت الجلسة مدتها المحددة.</value>
+  </data>
+  <data name="SessionEndedPeerDisconnected" xml:space="preserve">
+    <value>فقد الجهاز الآخر اتصاله.</value>
+  </data>
+  <data name="SessionEndedYouDisconnected" xml:space="preserve">
+    <value>فقد هذا الجهاز اتصاله بالخادم.</value>
+  </data>
+  <data name="SessionEndedConnectFailed" xml:space="preserve">
+    <value>تعذّر على الجهازين الوصول إلى بعضهما.</value>
+  </data>
+  <data name="SessionEndedAdminTerminated" xml:space="preserve">
+    <value>أنهى المسؤول الجلسة.</value>
+  </data>
+  <data name="SessionEndedBrowserNotProxied" xml:space="preserve">
+    <value>لم تمر حركة متصفح العمل عبر جسور، فأُوقفت الجلسة.</value>
+  </data>
+  <data name="SessionEndedProtocolError" xml:space="preserve">
+    <value>توقفت الجلسة لأن الجهازين لم يتفاهما على البروتوكول.</value>
+  </data>
+  <data name="SessionEndedUnknownFormat" xml:space="preserve">
+    <value>انتهت الجلسة ({0}).</value>
+  </data>
+  <!-- work browser -->
+  <data name="BrowserErrorNotFound" xml:space="preserve">
+    <value>يلزم تثبيت Google Chrome أو Microsoft Edge لفتح متصفح العمل.</value>
+  </data>
+  <data name="BrowserErrorManagedByPolicy" xml:space="preserve">
+    <value>سياسة المتصفح في مؤسستك تتجاوز إعداد الوسيط، فلا يستطيع متصفح العمل استخدام هذه الجلسة.</value>
+  </data>
+  <data name="BrowserErrorInstanceHandoff" xml:space="preserve">
+    <value>ما زالت نافذة متصفح جسور أخرى مفتوحة. أغلقها ثم ابدأ الجلسة من جديد.</value>
+  </data>
+  <data name="BrowserErrorProbeTimeout" xml:space="preserve">
+    <value>لم يمرّر متصفح العمل حركته عبر جسور.</value>
+  </data>
+  <data name="BrowserErrorOther" xml:space="preserve">
+    <value>تعذّر تشغيل متصفح العمل.</value>
+  </data>
+  <!-- incoming request: the pre-accept disclosure (product document section 15) -->
+  <data name="IncomingRequestWindowTitle" xml:space="preserve">
+    <value>طلب اتصال وارد</value>
+  </data>
+  <data name="IncomingRequestHeadingFormat" xml:space="preserve">
+    <value>يطلب {0} التصفح عبر اتصالك</value>
+  </data>
+  <data name="IncomingRequestRequesterLabel" xml:space="preserve">
+    <value>مقدّم الطلب</value>
+  </data>
+  <data name="IncomingRequestDeviceLabel" xml:space="preserve">
+    <value>الجهاز</value>
+  </data>
+  <data name="IncomingRequestDurationLabel" xml:space="preserve">
+    <value>المدة المطلوبة</value>
+  </data>
+  <data name="IncomingRequestAllowedSitesLabel" xml:space="preserve">
+    <value>المواقع المسموح بها</value>
+  </data>
+  <data name="DurationMinutesFormat" xml:space="preserve">
+    <value>{0} دقيقة</value>
+  </data>
+  <data name="AllowedSitesNote" xml:space="preserve">
+    <value>لا يمكن الوصول عبر جهازك إلا إلى المواقع المدرجة في قائمة الشركة.</value>
+  </data>
+  <data name="AllowedSitesSummaryFormat" xml:space="preserve">
+    <value>الإصدار {1} من القائمة · عدد المدخلات: {0}</value>
+  </data>
+  <data name="AllowedSitesUnavailable" xml:space="preserve">
+    <value>تعذّر تحميل قائمة المواقع المسموح بها من الخادم، فلا يمكن عرضها الآن. هذا لا يعني أن القائمة فارغة.</value>
+  </data>
+  <data name="AllowedSitesEmpty" xml:space="preserve">
+    <value>لا يسمح الإصدار الحالي من القائمة بأي موقع.</value>
+  </data>
+  <data name="AllowedSitesUnrestricted" xml:space="preserve">
+    <value>سيتمكّن من تصفّح أي موقع عبر اتصالك، لا قائمة محددة.</value>
+  </data>
+  <data name="IncomingRequestWarningTitle" xml:space="preserve">
+    <value>تنبيه خصوصية</value>
+  </data>
+  <data name="IncomingRequestWarning" xml:space="preserve">
+    <value>ستَرى المواقعُ التي يزورها المستخدم عنوانَ الإنترنت العام الخاص بك.</value>
+  </data>
+  <data name="IncomingRequestDisconnectHint" xml:space="preserve">
+    <value>يمكنك قطع الجلسة في أي وقت من لوحة الجلسة.</value>
+  </data>
+  <data name="CountdownFormat" xml:space="preserve">
+    <value>تنتهي صلاحية الطلب خلال {0} ثانية</value>
+  </data>
+  <data name="RequestExpired" xml:space="preserve">
+    <value>انتهت صلاحية الطلب</value>
+  </data>
+  <data name="Accept" xml:space="preserve">
+    <value>قبول</value>
+  </data>
+  <data name="Reject" xml:space="preserve">
+    <value>رفض</value>
+  </data>
+  <!-- toasts -->
+  <data name="ToastIncomingRequestTitle" xml:space="preserve">
+    <value>طلب تصفح وارد</value>
+  </data>
+  <data name="ToastIncomingRequestBodyFormat" xml:space="preserve">
+    <value>يطلب {0} ({1}) التصفح عبر اتصالك لمدة {2} دقيقة.</value>
+  </data>
+  <!-- debug -->
+  <data name="DebugSampleGuestName" xml:space="preserve">
+    <value>سارة أحمد</value>
+  </data>
+  <data name="DebugSampleGuestDevice" xml:space="preserve">
+    <value>SARA-LAPTOP</value>
+  </data>
+  <!-- login -->
+  <data name="LoginWindowTitle" xml:space="preserve">
+    <value>تسجيل الدخول</value>
+  </data>
+  <data name="LoginHeading" xml:space="preserve">
+    <value>تسجيل الدخول إلى جسور</value>
+  </data>
+  <data name="LoginDescription" xml:space="preserve">
+    <value>استخدم الحساب الذي أنشأه لك المسؤول.</value>
+  </data>
+  <data name="LoginServerUrlLabel" xml:space="preserve">
+    <value>عنوان الخادم</value>
+  </data>
+  <data name="LoginServerUrlPlaceholder" xml:space="preserve">
+    <value>https://josour.example.com</value>
+  </data>
+  <data name="LoginEmailLabel" xml:space="preserve">
+    <value>البريد الإلكتروني</value>
+  </data>
+  <data name="LoginPasswordLabel" xml:space="preserve">
+    <value>كلمة المرور</value>
+  </data>
+  <data name="LoginSignIn" xml:space="preserve">
+    <value>تسجيل الدخول</value>
+  </data>
+  <data name="LoginSigningIn" xml:space="preserve">
+    <value>جارٍ تسجيل الدخول…</value>
+  </data>
+  <data name="LoginErrorServerUrl" xml:space="preserve">
+    <value>أدخل عنوان الخادم بالصيغة https://… (لا يُقبل http:// إلا للعنوان المحلي).</value>
+  </data>
+  <data name="LoginErrorInvalidCredentials" xml:space="preserve">
+    <value>البريد الإلكتروني أو كلمة المرور غير صحيحة.</value>
+  </data>
+  <data name="LoginErrorAccountLocked" xml:space="preserve">
+    <value>محاولات فاشلة كثيرة. الحساب مقفل لمدة خمس عشرة دقيقة.</value>
+  </data>
+  <data name="LoginErrorAccountDisabled" xml:space="preserve">
+    <value>هذا الحساب معطّل. راجع المسؤول.</value>
+  </data>
+  <data name="LoginErrorDeviceRevoked" xml:space="preserve">
+    <value>ألغى المسؤول تسجيل هذا الجهاز. سجّل الدخول من جديد لتسجيله مرة أخرى.</value>
+  </data>
+  <data name="LoginErrorDeviceRejected" xml:space="preserve">
+    <value>تعذّر التحقق من هذا الجهاز. سجّل الدخول من جديد لتسجيله مرة أخرى.</value>
+  </data>
+  <data name="LoginErrorRateLimited" xml:space="preserve">
+    <value>محاولات دخول كثيرة. انتظر دقيقة ثم أعد المحاولة.</value>
+  </data>
+  <data name="LoginErrorUnavailable" xml:space="preserve">
+    <value>تعذّر الوصول إلى الخادم. تحقق من العنوان ومن اتصالك.</value>
+  </data>
+  <data name="LoginErrorValidationFormat" xml:space="preserve">
+    <value>رفض الخادم الطلب: {0}</value>
+  </data>
+  <data name="LoginErrorGenericFormat" xml:space="preserve">
+    <value>فشل تسجيل الدخول ({0}).</value>
+  </data>
+  <!-- signed out notices -->
+  <data name="SignedOutTitle" xml:space="preserve">
+    <value>تم تسجيل الخروج من جسور</value>
+  </data>
+  <data name="SignedOutSessionExpired" xml:space="preserve">
+    <value>انتهت صلاحية جلستك. سجّل الدخول من جديد.</value>
+  </data>
+  <data name="SignedOutDeviceRevoked" xml:space="preserve">
+    <value>ألغى المسؤول تسجيل هذا الجهاز.</value>
+  </data>
+  <data name="SignedOutAccountDisabled" xml:space="preserve">
+    <value>عُطّل حسابك.</value>
+  </data>
+  <!-- host readiness: firewall + VPN (week 6) -->
+  <data name="HostVpnWarningTitle" xml:space="preserve">
+    <value>هذا الجهاز يخرج عبر VPN</value>
+  </data>
+  <data name="HostVpnWarningMessageFormat" xml:space="preserve">
+    <value>حركة الخروج من هذا الجهاز تمر عبر محوّل «{0}»، فسترى المواقعُ عنوانَ الـ VPN لا عنوان هذا الجهاز. يمكنك المتابعة، لكن الغرض من مشاركة جهازك قد لا يتحقق.</value>
+  </data>
+  <data name="ReadinessTitle" xml:space="preserve">
+    <value>جاهزية هذا الجهاز للاستضافة</value>
+  </data>
+  <data name="ReadinessChecking" xml:space="preserve">
+    <value>جارٍ الفحص…</value>
+  </data>
+  <data name="ReadinessRecheck" xml:space="preserve">
+    <value>إعادة الفحص</value>
+  </data>
+  <data name="ReadinessFirewallOk" xml:space="preserve">
+    <value>جدار الحماية يسمح بالاتصال الوارد إلى جسور.</value>
+  </data>
+  <data name="ReadinessFirewallMissing" xml:space="preserve">
+    <value>لا توجد قاعدة واردة لـ جسور في جدار الحماية، وقد يتعذّر على الجهاز الآخر الوصول إلى هذا الجهاز.</value>
+  </data>
+  <data name="ReadinessFirewallUnknown" xml:space="preserve">
+    <value>تعذّر التحقق من قاعدة جدار الحماية على هذا الجهاز.</value>
+  </data>
+  <data name="ReadinessVpnOk" xml:space="preserve">
+    <value>لا توجد شبكة VPN تحمل حركة الخروج.</value>
+  </data>
+  <data name="ReadinessVpnWarningFormat" xml:space="preserve">
+    <value>حركة الخروج تمر عبر «{0}»، فسترى المواقع عنوان الـ VPN.</value>
+  </data>
+  <!-- settings -->
+  <data name="SettingsWindowTitle" xml:space="preserve">
+    <value>إعدادات جسور</value>
+  </data>
+  <data name="SettingsHeading" xml:space="preserve">
+    <value>الإعدادات</value>
+  </data>
+  <data name="SettingsDescription" xml:space="preserve">
+    <value>تُحفظ هذه الإعدادات على هذا الجهاز وحده.</value>
+  </data>
+  <data name="SettingsServerSection" xml:space="preserve">
+    <value>الخادم</value>
+  </data>
+  <data name="SettingsServerUrlLabel" xml:space="preserve">
+    <value>عنوان الخادم</value>
+  </data>
+  <data name="SettingsServerUrlHint" xml:space="preserve">
+    <value>عنوان HTTPS يعطيك إياه مسؤول النظام.</value>
+  </data>
+  <data name="SettingsTestConnection" xml:space="preserve">
+    <value>اختبار الاتصال</value>
+  </data>
+  <data name="SettingsTesting" xml:space="preserve">
+    <value>جارٍ الاختبار…</value>
+  </data>
+  <data name="SettingsServerOk" xml:space="preserve">
+    <value>الخادم استجاب.</value>
+  </data>
+  <data name="SettingsServerInvalidUrl" xml:space="preserve">
+    <value>العنوان غير صالح. اكتب عنوانًا كاملًا مثل https://josour.example.com</value>
+  </data>
+  <data name="SettingsServerInsecure" xml:space="preserve">
+    <value>يجب أن يبدأ العنوان بـ https.</value>
+  </data>
+  <data name="SettingsServerUnreachable" xml:space="preserve">
+    <value>تعذّر الوصول إلى الخادم على هذا العنوان.</value>
+  </data>
+  <data name="SettingsServerNotJosour" xml:space="preserve">
+    <value>هناك خادم يردّ على هذا العنوان، لكنه ليس خادم جسور.</value>
+  </data>
+  <data name="SettingsServerDetailFormat" xml:space="preserve">
+    <value>التفصيل: {0}</value>
+  </data>
+  <data name="SettingsInterfaceSection" xml:space="preserve">
+    <value>الواجهة</value>
+  </data>
+  <data name="SettingsLanguageLabel" xml:space="preserve">
+    <value>لغة الواجهة</value>
+  </data>
+  <data name="SettingsLanguageArabic" xml:space="preserve">
+    <value>العربية</value>
+  </data>
+  <data name="SettingsLanguageEnglish" xml:space="preserve">
+    <value>الإنجليزية</value>
+  </data>
+  <data name="SettingsLanguageRestartNote" xml:space="preserve">
+    <value>تسري اللغة الجديدة عند إعادة تشغيل جسور.</value>
+  </data>
+  <data name="SettingsBrowserLabel" xml:space="preserve">
+    <value>متصفح العمل</value>
+  </data>
+  <data name="SettingsBrowserHint" xml:space="preserve">
+    <value>المتصفح الذي يُفتح بملف تعريف منفصل أثناء الجلسة.</value>
+  </data>
+  <data name="SettingsBrowserAuto" xml:space="preserve">
+    <value>تلقائي</value>
+  </data>
+  <data name="SettingsBrowserChrome" xml:space="preserve">
+    <value>Chrome</value>
+  </data>
+  <data name="SettingsBrowserEdge" xml:space="preserve">
+    <value>Edge</value>
+  </data>
+  <data name="SettingsStartupSection" xml:space="preserve">
+    <value>بدء التشغيل</value>
+  </data>
+  <data name="SettingsStartWithWindows" xml:space="preserve">
+    <value>التشغيل مع بدء Windows</value>
+  </data>
+  <data name="SettingsStartWithWindowsUnavailable" xml:space="preserve">
+    <value>غير متاح على هذا النظام.</value>
+  </data>
+  <data name="SettingsStartMinimized" xml:space="preserve">
+    <value>البدء مصغّرًا في منطقة الإشعارات</value>
+  </data>
+  <data name="SettingsSave" xml:space="preserve">
+    <value>حفظ</value>
+  </data>
+  <data name="SettingsCancel" xml:space="preserve">
+    <value>إلغاء</value>
+  </data>
+  <data name="SettingsSaved" xml:space="preserve">
+    <value>حُفظت الإعدادات.</value>
+  </data>
+  <data name="SettingsSaveFailedFormat" xml:space="preserve">
+    <value>تعذّر حفظ الإعدادات: {0}</value>
+  </data>
+  <!-- first run -->
+  <data name="FirstRunWindowTitle" xml:space="preserve">
+    <value>إعداد جسور</value>
+  </data>
+  <data name="FirstRunWelcomeHeading" xml:space="preserve">
+    <value>أهلًا بك في جسور</value>
+  </data>
+  <data name="FirstRunWelcomeText" xml:space="preserve">
+    <value>خطوتان قبل البدء: عنوان الخادم، ثم تسجيل الدخول.</value>
+  </data>
+  <data name="FirstRunStepFormat" xml:space="preserve">
+    <value>الخطوة {0} من {1}</value>
+  </data>
+  <data name="FirstRunServerTitle" xml:space="preserve">
+    <value>عنوان الخادم</value>
+  </data>
+  <data name="FirstRunServerText" xml:space="preserve">
+    <value>اكتب العنوان الذي أعطاك إياه مسؤول النظام، ثم اختبره قبل المتابعة.</value>
+  </data>
+  <data name="FirstRunSignInTitle" xml:space="preserve">
+    <value>تسجيل الدخول</value>
+  </data>
+  <data name="FirstRunSignInText" xml:space="preserve">
+    <value>استخدم البريد وكلمة المرور اللذين أنشأهما لك المسؤول.</value>
+  </data>
+  <data name="FirstRunReadyTitle" xml:space="preserve">
+    <value>قبل أن تتيح جهازك</value>
+  </data>
+  <data name="FirstRunReadyText" xml:space="preserve">
+    <value>هذا ما سيجده الجهاز الآخر إن فعّلت «متاح للطلبات». لا شيء هنا يمنعك من المتابعة.</value>
+  </data>
+  <data name="FirstRunNext" xml:space="preserve">
+    <value>التالي</value>
+  </data>
+  <data name="FirstRunBack" xml:space="preserve">
+    <value>رجوع</value>
+  </data>
+  <data name="FirstRunFinish" xml:space="preserve">
+    <value>إنهاء</value>
+  </data>
+  <!-- about / diagnostics -->
+  <data name="AboutWindowTitle" xml:space="preserve">
+    <value>حول جسور</value>
+  </data>
+  <data name="AboutHeading" xml:space="preserve">
+    <value>حول البرنامج والتشخيص</value>
+  </data>
+  <data name="AboutDescription" xml:space="preserve">
+    <value>اذكر هذه القيم عند طلب الدعم.</value>
+  </data>
+  <data name="AboutAppVersionLabel" xml:space="preserve">
+    <value>إصدار التطبيق</value>
+  </data>
+  <data name="AboutDeviceNameLabel" xml:space="preserve">
+    <value>اسم الجهاز</value>
+  </data>
+  <data name="AboutDeviceIdLabel" xml:space="preserve">
+    <value>معرّف الجهاز</value>
+  </data>
+  <data name="AboutOsLabel" xml:space="preserve">
+    <value>نظام التشغيل</value>
+  </data>
+  <data name="AboutServerLabel" xml:space="preserve">
+    <value>الخادم</value>
+  </data>
+  <data name="AboutSignedInLabel" xml:space="preserve">
+    <value>الحساب</value>
+  </data>
+  <data name="AboutConnectionLabel" xml:space="preserve">
+    <value>حالة الاتصال</value>
+  </data>
+  <data name="AboutLogsLabel" xml:space="preserve">
+    <value>مجلد السجلات</value>
+  </data>
+  <data name="AboutOpenLogFolder" xml:space="preserve">
+    <value>فتح مجلد السجلات</value>
+  </data>
+  <data name="AboutOpenLogFolderFailedFormat" xml:space="preserve">
+    <value>تعذّر فتح المجلد: {0}</value>
+  </data>
+  <data name="AboutCopy" xml:space="preserve">
+    <value>نسخ التفاصيل</value>
+  </data>
+  <data name="AboutCopied" xml:space="preserve">
+    <value>نُسخت التفاصيل.</value>
+  </data>
+  <data name="AboutSecretsNote" xml:space="preserve">
+    <value>لا يظهر هنا أي رمز دخول ولا سرّ الجهاز.</value>
+  </data>
+  <data name="AboutNotAvailable" xml:space="preserve">
+    <value>غير متاح</value>
+  </data>
+  <!-- tray and main window entry points (week 6) -->
+  <data name="TraySettings" xml:space="preserve">
+    <value>الإعدادات…</value>
+  </data>
+  <data name="TrayAbout" xml:space="preserve">
+    <value>حول البرنامج والتشخيص…</value>
+  </data>
+  <data name="MainSettingsTooltip" xml:space="preserve">
+    <value>الإعدادات</value>
+  </data>
+  <data name="MainAboutTooltip" xml:space="preserve">
+    <value>حول البرنامج والتشخيص</value>
+  </data>
+  <!-- errors -->
+  <data name="StartupFailedTitle" xml:space="preserve">
+    <value>تعذّر تشغيل جسور</value>
+  </data>
+  <data name="StartupFailedMessageFormat" xml:space="preserve">
+    <value>تعذّر تشغيل جسور.&#10;&#10;{0}&#10;&#10;راجع مجلد السجلات %LOCALAPPDATA%\جسور\logs لمعرفة التفاصيل.</value>
+  </data>
+</root>

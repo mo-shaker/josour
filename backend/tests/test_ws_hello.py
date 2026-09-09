@@ -33,6 +33,7 @@ async def test_hello_ack_contents(
         "request_timeout_seconds": 60,
         "allowed_ports": [80, 443],
         "log_domains": False,
+        "enforce_allowlist": False,
     }
     assert ws.snapshot == {"type": "hosts.snapshot", "hosts": []}
 
@@ -308,3 +309,18 @@ async def test_a_frame_flood_is_logged_once_not_once_per_frame(
         await ws.drain(timeout=0.5)
     warnings = [r for r in caplog.records if r.message == "ws frame budget exceeded"]
     assert len(warnings) == 1
+
+
+async def test_hello_ack_carries_the_routing_mode(app_factory, ws_connect, make_actor, db) -> None:
+    """The client decides tunnel-vs-direct from this flag, so it has to arrive before any session
+    does. It rides hello.ack rather than session.created because it describes the deployment, and
+    both parties must already agree on it when a session is created."""
+    from app.schemas.settings import SettingsPatch
+    from app.services.app_settings import settings_service
+
+    await settings_service.update(db, SettingsPatch(enforce_allowlist=True))
+    await db.commit()
+
+    actor = await make_actor("host@example.com")
+    ws = await ws_connect(actor)
+    assert ws.hello_ack["settings"]["enforce_allowlist"] is True

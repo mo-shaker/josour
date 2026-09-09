@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Josour.Tunnel</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Josour.Core/Josour.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Mono.Nat" Version="3.0.4" />
+    <PackageReference Include="Nerdbank.Streams" Version="2.13.31" />
+  </ItemGroup>
+
+</Project>

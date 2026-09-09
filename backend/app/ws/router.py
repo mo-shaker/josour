@@ -187,6 +187,7 @@ async def _handshake(websocket: WebSocket) -> Connection | None:
                         request_timeout_seconds=app_settings.request_timeout_seconds,
                         allowed_ports=list(app_settings.allowed_ports),
                         log_domains=app_settings.log_domains,
+                        enforce_allowlist=app_settings.enforce_allowlist,
                     ),
                     allowlist_version=await allowlist.current_version(db),
                 )
@@ -212,6 +213,12 @@ async def _handshake(websocket: WebSocket) -> Connection | None:
 # ---------------------------------------------------------------- message handling
 
 
+def _runtime(connection: Connection) -> Settings:
+    """The process configuration, as resolved at handshake time. ``accept`` needs it for the
+    relay; every other handler is served by the operator settings in the database."""
+    return getattr(connection.websocket.app.state, "settings", None) or get_settings()
+
+
 async def _handle(connection: Connection, message: ClientMessage) -> None:
     match message:
         case ClientPing():
@@ -234,7 +241,10 @@ async def _handle(connection: Connection, message: ClientMessage) -> None:
             )
         case RequestAccept():
             await requests.accept(
-                request_id=message.request_id, device_id=connection.device_id, ref=message.ref
+                request_id=message.request_id,
+                device_id=connection.device_id,
+                ref=message.ref,
+                runtime=_runtime(connection),
             )
         case RequestReject():
             await requests.reject(
