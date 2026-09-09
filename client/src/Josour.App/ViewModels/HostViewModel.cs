@@ -274,7 +274,11 @@ public sealed partial class HostViewModel : ObservableObject
     public async Task ReceiveIncomingRequestAsync(RequestIncomingMessage incoming, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(incoming);
-        var allowlist = await _allowlist.DescribeAsync(incoming.AllowlistVersion, ct).ConfigureAwait(true);
+        // ADR-0010: with the list unenforced there is no bounded set of sites, and showing one would
+        // ask the host to consent to something narrower than what actually happens.
+        var allowlist = _sessions.EnforceAllowlist
+            ? await _allowlist.DescribeAsync(incoming.AllowlistVersion, ct).ConfigureAwait(true)
+            : AllowlistDisclosure.NoRestriction(incoming.AllowlistVersion);
         if (!allowlist.Loaded)
         {
             _logger.LogWarning(

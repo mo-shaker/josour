@@ -147,6 +147,7 @@ public static class Strings
     public static string AllowedSitesSummaryFormat => LocalizedStrings.Current[UiStringKeys.AllowedSitesSummaryFormat];
     public static string AllowedSitesUnavailable => LocalizedStrings.Current[UiStringKeys.AllowedSitesUnavailable];
     public static string AllowedSitesEmpty => LocalizedStrings.Current[UiStringKeys.AllowedSitesEmpty];
+    public static string AllowedSitesUnrestricted => LocalizedStrings.Current[UiStringKeys.AllowedSitesUnrestricted];
     public static string IncomingRequestWarningTitle => LocalizedStrings.Current[UiStringKeys.IncomingRequestWarningTitle];
     public static string IncomingRequestWarning => LocalizedStrings.Current[UiStringKeys.IncomingRequestWarning];
     public static string IncomingRequestDisconnectHint => LocalizedStrings.Current[UiStringKeys.IncomingRequestDisconnectHint];

@@ -58,7 +58,7 @@
 
 | النوع | الحقول | إلى من |
 |---|---|---|
-| `hello.ack` | `server_time`, `public_ip` (كما يراه الخادم), `settings` (`max_session_minutes`, `request_timeout_seconds`, `allowed_ports`, `log_domains`), `allowlist_version` | العميل بعد `hello` |
+| `hello.ack` | `server_time`, `public_ip` (كما يراه الخادم), `settings` (`max_session_minutes`, `request_timeout_seconds`, `allowed_ports`, `log_domains`, `enforce_allowlist`), `allowlist_version` | العميل بعد `hello` |
 | `hosts.snapshot` | `hosts`: مصفوفة `{device_id, user_display_name, device_name, reachable (true/false/null)}` | بعد `hello.ack` |
 | `hosts.update` | `hosts` (المصفوفة الكاملة الجديدة) | كل العملاء عند أي تغير |
 | `request.created` | `ref`, `request_id`, `expires_at` | المستخدم |

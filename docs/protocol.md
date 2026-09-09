@@ -107,7 +107,7 @@ u8  type | u8 flags | u16 length | u32 stream_id
 
 1. إن كان `host` عنوان IP (v4 أو v6، ولو بين أقواس) → `OPEN_FAIL(ip_literal)`.
 2. تطبيع: أحرف صغيرة، حذف النقطة الأخيرة، تحويل IDN إلى Punycode.
-3. مطابقة القائمة (`AllowlistMatcher`):
+3. مطابقة القائمة (`AllowlistMatcher`) — **تُرفع افتراضيًا منذ [ADR-0010](decisions/0010-route-all-through-host.md)**: كل اسم مسموح ما لم يُفعّل المسؤول `enforce_allowlist`. لا يتغير شيء آخر في هذه الخطوات: الخطوة 6 (رفض أي عنوان ناتج محظور) هي الحدّ الأمني وتبقى نافذة كما هي، وكذلك رفض العناوين الحرفية والتطبيع الصارم وحدّ `allowed_ports`. «مرّر كل المواقع» ترفع شرط الاسم وحده:
    - `example.com` يطابق `example.com` وكل نطاق فرعي.
    - `=exact.com` يطابق `exact.com` فقط.
    - لاحقة `:port` اختيارية تقيّد المنفذ؛ بدونها يُسمح بمنافذ `allowed_ports`.

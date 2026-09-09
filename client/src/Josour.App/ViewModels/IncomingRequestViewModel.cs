@@ -114,6 +114,13 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
     public static string DescribeAllowlist(AllowlistDisclosure allowlist)
     {
         ArgumentNullException.ThrowIfNull(allowlist);
+        if (allowlist.Unrestricted)
+        {
+            // Not "no list" and not "an empty list": no restriction. The host is agreeing to something
+            // wider than a named set, and the window must say so before the answer, not after.
+            return Strings.AllowedSitesUnrestricted;
+        }
+
         if (!allowlist.Loaded)
         {
             return Strings.AllowedSitesUnavailable;

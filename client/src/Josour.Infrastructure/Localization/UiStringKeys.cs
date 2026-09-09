@@ -137,6 +137,10 @@ public static class UiStringKeys
     public const string AllowedSitesSummaryFormat = "AllowedSitesSummaryFormat";
     public const string AllowedSitesUnavailable = "AllowedSitesUnavailable";
     public const string AllowedSitesEmpty = "AllowedSitesEmpty";
+
+    /// <summary>ADR-0010: the deployment does not restrict the session to a list, so there is no
+    /// bounded set of sites to show and the host must be told that plainly.</summary>
+    public const string AllowedSitesUnrestricted = "AllowedSitesUnrestricted";
     public const string IncomingRequestWarningTitle = "IncomingRequestWarningTitle";
     public const string IncomingRequestWarning = "IncomingRequestWarning";
     public const string IncomingRequestDisconnectHint = "IncomingRequestDisconnectHint";

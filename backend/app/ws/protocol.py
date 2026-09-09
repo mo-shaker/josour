@@ -311,6 +311,11 @@ class ServerSettings(BaseModel):
     request_timeout_seconds: int
     allowed_ports: list[int]
     log_domains: bool
+    enforce_allowlist: bool = False
+    """ADR-0010. False - the default - means every site the work browser asks for goes through the
+    host; the allow-list is then an optional restriction an operator can switch on. It rides here
+    rather than in ``session.created`` because it is a property of the deployment, not of a session,
+    and both parties have to agree on it before one is created."""
 
 
 class HelloAck(ServerMessage):

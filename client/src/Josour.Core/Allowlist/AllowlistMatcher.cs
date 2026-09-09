@@ -149,6 +149,9 @@ public sealed class AllowlistMatcher : IAllowlist
         }
     }
 
+    public bool HostMatches(string normalizedHost)
+        => Entries.Any(entry => HostMatches(normalizedHost, entry));
+
     public bool IsAllowed(string normalizedHost, int port, IReadOnlyList<int> allowedPorts)
         => Evaluate(normalizedHost, port, allowedPorts) == AllowlistDecision.Allowed;
 

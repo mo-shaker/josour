@@ -406,6 +406,9 @@
   <data name="AllowedSitesEmpty" xml:space="preserve">
     <value>لا يسمح الإصدار الحالي من القائمة بأي موقع.</value>
   </data>
+  <data name="AllowedSitesUnrestricted" xml:space="preserve">
+    <value>سيتمكّن من تصفّح أي موقع عبر اتصالك، لا قائمة محددة.</value>
+  </data>
   <data name="IncomingRequestWarningTitle" xml:space="preserve">
     <value>تنبيه خصوصية</value>
   </data>

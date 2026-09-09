@@ -72,7 +72,7 @@
 - `PUT /admin/domains` `{ "entries": [...] }` → إصدار جديد؛ يتحقق من صحة كل مدخل؛ يبث `allowlist.updated`.
 - `GET /admin/sessions?status=&limit=` ، `POST /admin/sessions/{id}/terminate` → `204`.
 - `GET /admin/security-events?limit=` ، `GET /admin/diagnostics` → ملخص: عدد الجلسات، نسبة `connect_result=ok` (و`timeout` يُحسب فشلًا)، توزيع `winner_type`، توزيع `tls_version`، وتوزيع `end_reason` (أُضيف في الأسبوع 4).
-- `GET /admin/settings` ، `PATCH /admin/settings` `{ max_session_minutes?, request_timeout_seconds?, log_domains?, allowed_ports? }`.
+- `GET /admin/settings` ، `PATCH /admin/settings` `{ max_session_minutes?, request_timeout_seconds?, log_domains?, enforce_allowlist?, allowed_ports? }`.
 
 ## القيم الافتراضية للإعدادات
 
@@ -82,4 +82,5 @@
 | `request_timeout_seconds` | 60 |
 | `connect_timeout_seconds` | 30 |
 | `log_domains` | false |
+| `enforce_allowlist` | false — **[ADR-0010](decisions/0010-route-all-through-host.md)**: كل ما يطلبه متصفح العمل يمر عبر المضيف. القائمة تقيّد فقط حين يُفعّل المسؤول هذا المفتاح |
 | `allowed_ports` | `[80, 443]` |

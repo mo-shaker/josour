@@ -12,6 +12,10 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "request_timeout_seconds": 60,
     "connect_timeout_seconds": 30,
     "log_domains": False,
+    # ADR-0010: the allow-list is an optional restriction, off by default. The product exists to
+    # reach sites that only serve the host's country, and a hand-curated list defeats that - one
+    # page pulls from dozens of subdomains. Switching this on restricts a deployment to the list.
+    "enforce_allowlist": False,
     "allowed_ports": [80, 443],
 }
 

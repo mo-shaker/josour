@@ -406,6 +406,9 @@
   <data name="AllowedSitesEmpty" xml:space="preserve">
     <value>The current version of the list allows no site at all.</value>
   </data>
+  <data name="AllowedSitesUnrestricted" xml:space="preserve">
+    <value>They will be able to browse any site through your connection, not a fixed list.</value>
+  </data>
   <data name="IncomingRequestWarningTitle" xml:space="preserve">
     <value>Privacy notice</value>
   </data>

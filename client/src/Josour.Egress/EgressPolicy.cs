@@ -83,7 +83,7 @@ public sealed class EgressPolicy
 
         if (_allowlist.IsAllowed(normalized, port, _options.AllowedPorts)) return null;
         // الاسم مطابق لكن المنفذ ليس ضمن allowed_ports ولا قيد المدخل → port_not_allowed؛ وإلا not_allowed.
-        var hostMatched = _allowlist.Entries.Any(entry => AllowlistMatcher.HostMatches(normalized, entry));
+        var hostMatched = _allowlist.HostMatches(normalized);
         return hostMatched ? OpenFailReason.PortNotAllowed : OpenFailReason.NotAllowed;
     }
 

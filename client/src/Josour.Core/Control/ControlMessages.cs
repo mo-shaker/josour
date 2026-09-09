@@ -65,7 +65,13 @@ public sealed record ServerSettings(
     [property: JsonPropertyName("max_session_minutes")] int MaxSessionMinutes,
     [property: JsonPropertyName("request_timeout_seconds")] int RequestTimeoutSeconds,
     [property: JsonPropertyName("allowed_ports")] IReadOnlyList<int> AllowedPorts,
-    [property: JsonPropertyName("log_domains")] bool LogDomains);
+    [property: JsonPropertyName("log_domains")] bool LogDomains,
+    /// <summary>
+    /// ADR-0010. false (the default) routes every site the work browser asks for through the host; the
+    /// allow-list is then an optional restriction the operator can switch on. Defaulted here so a client
+    /// talking to a server that predates the field behaves as the decision says, not as the old code did.
+    /// </summary>
+    [property: JsonPropertyName("enforce_allowlist")] bool EnforceAllowlist = false);
 
 public sealed record HelloAckMessage(
     [property: JsonPropertyName("server_time")] DateTimeOffset ServerTime,

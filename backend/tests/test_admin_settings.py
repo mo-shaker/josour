@@ -12,6 +12,9 @@ DEFAULTS = {
     "request_timeout_seconds": 60,
     "connect_timeout_seconds": 30,
     "log_domains": False,
+    # ADR-0010: off by default - the published list restricts a deployment only where an operator
+    # asks it to, because the product exists to reach sites nobody listed in advance.
+    "enforce_allowlist": False,
     "allowed_ports": [80, 443],
 }
 
@@ -99,3 +102,18 @@ async def test_settings_service_ignores_invalid_rows(db: AsyncSession) -> None:
     await db.commit()
     loaded = await SettingsService().get(db)
     assert loaded.max_session_minutes == 120 and loaded.allowed_ports == [22]
+
+
+async def test_enforce_allowlist_is_off_by_default_and_can_be_switched_on(
+    client: AsyncClient, admin_headers: dict
+) -> None:
+    """ADR-0010. The default is what makes the product work at all: a guest reaching sites that
+    only serve the host's country cannot depend on someone having listed them first. The switch is
+    what lets an operator go back to a bounded deployment."""
+    assert (await client.get(SETTINGS, headers=admin_headers)).json()["enforce_allowlist"] is False
+
+    patched = await client.patch(SETTINGS, headers=admin_headers, json={"enforce_allowlist": True})
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["enforce_allowlist"] is True
+
+    assert (await client.get(SETTINGS, headers=admin_headers)).json()["enforce_allowlist"] is True

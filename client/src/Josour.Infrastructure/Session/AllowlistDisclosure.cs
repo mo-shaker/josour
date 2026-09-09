@@ -12,13 +12,23 @@ namespace Josour.Infrastructure.Session;
 /// <param name="Version">The <c>allowlist_version</c> of the request this disclosure belongs to.</param>
 /// <param name="Sites">The entries of exactly that version, in the server's order; empty when it could not be loaded.</param>
 /// <param name="Loaded">True when the server answered with that version.</param>
-public sealed record AllowlistDisclosure(int Version, IReadOnlyList<string> Sites, bool Loaded)
+public sealed record AllowlistDisclosure(
+    int Version, IReadOnlyList<string> Sites, bool Loaded, bool Unrestricted = false)
 {
     /// <summary>The server could not be asked, or refused: show "could not be loaded", never an empty list.</summary>
     public static AllowlistDisclosure Unavailable(int version) => new(version, Array.Empty<string>(), Loaded: false);
 
+    /// <summary>
+    /// The deployment does not enforce the list (ADR-0010), so there is no bounded set of sites to show
+    /// and naming one would be a false consent: the guest can reach anything through this host. Distinct
+    /// from an empty list on purpose - three states, three sentences, because the host is agreeing to
+    /// something different in each.
+    /// </summary>
+    public static AllowlistDisclosure NoRestriction(int version)
+        => new(version, Array.Empty<string>(), Loaded: true, Unrestricted: true);
+
     /// <summary>The version really does allow nothing (a genuine, and alarming, answer).</summary>
-    public bool IsEmpty => Loaded && Sites.Count == 0;
+    public bool IsEmpty => Loaded && !Unrestricted && Sites.Count == 0;
 }
 
 /// <summary>Resolves an <c>allowlist_version</c> into the sites it allows, for the host's pre-accept disclosure.</summary>

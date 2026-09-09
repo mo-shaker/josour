@@ -594,9 +594,41 @@ public sealed class SessionCoordinatorTests
     // ---------- the allow-list ----------
 
     [Fact]
+    public async Task Allowlist_IsNotEnforcedByDefault_AndNothingIsFetched()
+    {
+        // ADR-0010's default and the product's whole point: reaching sites that only serve the host's
+        // country cannot depend on someone having listed them first. Nothing is fetched because there is
+        // nothing to apply, and the version still travels for the host's disclosure.
+        await using var rig = await Rig.StartAsync();
+
+        await rig.CreateSessionAsync(SessionInfo.GuestRole, allowlistVersion: 7);
+        await rig.Connection.NextAsync<SessionEndpointMessage>();
+
+        var allowlist = rig.Tunnels.Requests[0].Allowlist;
+        Assert.Equal(7, allowlist.Version);
+        Assert.True(allowlist.IsAllowed("anything.example", 443, new[] { 80, 443 }));
+        Assert.True(allowlist.HostMatches("anything.example"));
+        Assert.Empty(rig.Api.DomainsVersionCalls);
+        Assert.Empty(rig.Api.DomainsCalls);
+    }
+
+    [Fact]
+    public async Task Allowlist_UnenforcedStillRefusesAPortOutsideAllowedPorts()
+    {
+        // "Any site" is not "any port": the tunnel must not become a route to arbitrary services.
+        await using var rig = await Rig.StartAsync();
+
+        await rig.CreateSessionAsync(SessionInfo.GuestRole, allowlistVersion: 7);
+        await rig.Connection.NextAsync<SessionEndpointMessage>();
+
+        Assert.False(rig.Tunnels.Requests[0].Allowlist.IsAllowed("anything.example", 8080, new[] { 80, 443 }));
+    }
+
+
+    [Fact]
     public async Task Allowlist_IsFetchedAtTheSessionsExactVersion_AndCached()
     {
-        await using var rig = await Rig.StartAsync();
+        await using var rig = await Rig.StartAsync(enforceAllowlist: true);
 
         await rig.CreateSessionAsync(SessionInfo.GuestRole, allowlistVersion: 7);
         await rig.Connection.NextAsync<SessionEndpointMessage>();
@@ -626,7 +658,7 @@ public sealed class SessionCoordinatorTests
     [Fact]
     public async Task Allowlist_ANewVersion_IsFetchedAgain_NotServedFromTheCache()
     {
-        await using var rig = await Rig.StartAsync();
+        await using var rig = await Rig.StartAsync(enforceAllowlist: true);
 
         await rig.CreateSessionAsync(SessionInfo.GuestRole, allowlistVersion: 7);
         await rig.Connection.NextAsync<SessionEndpointMessage>();
@@ -646,7 +678,7 @@ public sealed class SessionCoordinatorTests
     {
         // The tunnel enforces the list. Substituting the current list would enforce rules neither party saw, and an empty
         // list would deny everything silently. Neither is acceptable, so the session is refused with a named reason.
-        await using var rig = await Rig.StartAsync();
+        await using var rig = await Rig.StartAsync(enforceAllowlist: true);
         rig.Api.DomainsVersionError = new ApiUnavailableException("the server is unreachable");
 
         var session = await rig.CreateSessionAsync(SessionInfo.HostRole, allowlistVersion: 9);
@@ -667,7 +699,7 @@ public sealed class SessionCoordinatorTests
     public async Task Allowlist_AServerThatAnswersWithADifferentVersion_IsAlsoRefused()
     {
         // Retention says this cannot happen; if it does, the answer is not a list this session may be policed with.
-        await using var rig = await Rig.StartAsync();
+        await using var rig = await Rig.StartAsync(enforceAllowlist: true);
         rig.Api.DomainsVersionOverride = 4;
 
         await rig.CreateSessionAsync(SessionInfo.GuestRole, allowlistVersion: 9);
@@ -680,7 +712,7 @@ public sealed class SessionCoordinatorTests
     [Fact]
     public async Task Allowlist_A404ForARetainedVersion_IsTreatedTheSameWay()
     {
-        await using var rig = await Rig.StartAsync();
+        await using var rig = await Rig.StartAsync(enforceAllowlist: true);
         rig.Api.DomainsVersionError = new ApiException(System.Net.HttpStatusCode.NotFound, ApiErrorCodes.NotFound, "no such version");
 
         await rig.CreateSessionAsync(SessionInfo.GuestRole, allowlistVersion: 9);
@@ -907,7 +939,8 @@ public sealed class SessionCoordinatorTests
             Action<FakeTunnelSession>? configure = null,
             bool logDomains = false,
             IWorkBrowser? browser = null,
-            TimeSpan? serverOffset = null)
+            TimeSpan? serverOffset = null,
+            bool enforceAllowlist = false)
         {
             var clock = new TestClock();
             var offset = serverOffset ?? TimeSpan.Zero;
@@ -916,7 +949,7 @@ public sealed class SessionCoordinatorTests
                 Ack = new HelloAckMessage(
                     clock.GetUtcNow() + offset,
                     "203.0.113.7",
-                    new ServerSettings(120, 60, new[] { 80, 443 }, logDomains),
+                    new ServerSettings(120, 60, new[] { 80, 443 }, logDomains, enforceAllowlist),
                     AllowlistVersion: 7),
             };
 

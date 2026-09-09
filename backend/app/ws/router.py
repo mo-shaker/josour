@@ -187,6 +187,7 @@ async def _handshake(websocket: WebSocket) -> Connection | None:
                         request_timeout_seconds=app_settings.request_timeout_seconds,
                         allowed_ports=list(app_settings.allowed_ports),
                         log_domains=app_settings.log_domains,
+                        enforce_allowlist=app_settings.enforce_allowlist,
                     ),
                     allowlist_version=await allowlist.current_version(db),
                 )

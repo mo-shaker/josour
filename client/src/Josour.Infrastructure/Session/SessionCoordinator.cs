@@ -484,7 +484,13 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
 
         try
         {
-            var allowlist = await GetAllowlistAsync(message.AllowlistVersion, run.Cts.Token).ConfigureAwait(false);
+            // ADR-0010: the allow-list restricts only where the operator asked for it. Everywhere else
+            // every site goes through the host, which is the whole point of the product. The published
+            // list is still fetched when it is enforced, and its version still travels for disclosure.
+            var enforce = _hello?.Settings.EnforceAllowlist ?? false;
+            IAllowlist allowlist = enforce
+                ? await GetAllowlistAsync(message.AllowlistVersion, run.Cts.Token).ConfigureAwait(false)
+                : new AllowAllAllowlist(message.AllowlistVersion);
             var material = new SessionMaterial(run.SessionId, run.Role, secret, message.ExpiresAt, message.SamePublicIp, message.PeerPublicIp);
 
             ITunnelSession tunnel;
@@ -1178,6 +1184,13 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
     /// the local clock is what greyed out Accept and Reject on a host whose machine ran fast.
     /// </summary>
     public DateTimeOffset ServerTimeNow() => ServerNow();
+
+    /// <summary>
+    /// Does this deployment restrict the session to the published allow-list (ADR-0010)? False - the
+    /// default - means every site goes through the host, and the host's pre-accept disclosure has to
+    /// say exactly that instead of naming a list that will not bound anything.
+    /// </summary>
+    public bool EnforceAllowlist => _hello?.Settings.EnforceAllowlist ?? false;
 
     /// <summary>What is left of the 30 s the server gives a session to become active (docs/ws-protocol.md section 5).</summary>
     private TimeSpan RemainingConnectBudget(SessionRun run)

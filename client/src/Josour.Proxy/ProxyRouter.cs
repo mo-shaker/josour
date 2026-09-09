@@ -41,7 +41,7 @@ public static class ProxyRouter
 
     /// <summary>هل الاسم مطابق لأي مدخل في القائمة بغض النظر عن المنفذ (لرد 307 على http://).</summary>
     public static bool HostIsAllowlisted(string normalizedHost, IAllowlist allowlist)
-        => allowlist.Entries.Any(entry => AllowlistMatcher.HostMatches(normalizedHost, entry));
+        => allowlist.HostMatches(normalizedHost);
 
     /// <summary>OPEN_FAIL → رمز HTTP صادق للمتصفح: 403 سياسة، 502 فشل وصول، 503 حدود.</summary>
     public static int StatusForOpenFail(OpenFailReason reason) => reason switch
