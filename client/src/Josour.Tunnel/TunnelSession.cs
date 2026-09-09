@@ -267,6 +267,9 @@ public sealed class TunnelSession : ITunnelSession
             Role = _material.Role,
             TokenProvider = _ => ValueTask.FromResult(relay.Token),
             HandshakeTimeout = connectWindow,
+            // RELAY_HOST هو اسم مضيف بحكم التصميم، وDirectTransport يرفض غير العناوين الحرفية عمدًا
+            // (المرشحون يأتون من النظير؛ هذا العنوان يأتي من خادمنا). انظر ResolvingTransport.
+            Inner = new ResolvingTransport(),
         });
         Note("relay_endpoint", $"{relay.Address}:{relay.Port}"); // التوكن لا يُسجَّل
         return new RelayLeg(transport, new CandidateEndpoint(CandidateType.Relay, relay.Address, relay.Port));

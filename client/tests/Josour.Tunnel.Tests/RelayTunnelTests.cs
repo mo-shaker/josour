@@ -34,7 +34,9 @@ public class RelayTunnelTests
         {
             BindAddress = IPAddress.Loopback,
             CandidateSource = () => new StaticCandidateSource(),
-            Relay = new RelayEndpointInfo("127.0.0.1", relay.Port, token),
+            // اسم مضيف لا عنوان حرفي: هذا شكل RELAY_HOST الحقيقي، وتمرير "127.0.0.1" هنا هو ما أخفى
+            // عطلًا وصل إلى الإنتاج — النقل كان يرفض الاسم قبل أن يفتح مقبسًا.
+            Relay = new RelayEndpointInfo("localhost", relay.Port, token),
             HostEgress = role == TunnelRole.Host ? _ => new FakeEgress(log) : null,
             GuestProxy = role == TunnelRole.Guest ? _ => new FakeProxy(log) : null,
             Mux = new MuxOptions { PingInterval = TimeSpan.FromSeconds(2), DeadAfter = TimeSpan.FromSeconds(8) },
