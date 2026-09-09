@@ -95,6 +95,18 @@ public sealed class ConnectProxyServer : IAsyncDisposable
         _options = options ?? throw new ArgumentNullException(nameof(options));
         ArgumentNullException.ThrowIfNull(options.Allowlist);
         _rejectUnknownOwner = options.RejectUnknownOwner ?? OperatingSystem.IsWindows();
+        // A browser to check against, a checker that never identifies anyone, and a policy of refusing
+        // whoever it cannot identify: that combination admits nothing, ever. It is not a strict policy,
+        // it is a wiring mistake, and it shipped once - every connection the work browser made was
+        // refused and the only symptom was a session that would not browse. Refuse to start instead.
+        if (options.Browser is not null && _rejectUnknownOwner && options.OwnerPidChecker is PermissiveOwnerPidChecker)
+        {
+            throw new ArgumentException(
+                "the proxy would refuse every connection: a browser is configured for owner checks, but the owner " +
+                "checker cannot identify anyone and unknown owners are rejected. Supply a real IOwnerPidChecker, " +
+                "or set RejectUnknownOwner = false if this really is meant to admit everything.",
+                nameof(options));
+        }
         _isBlocked = options.AddressBlocker ?? (address => IpRangePolicy.IsBlocked(address));
         _listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         _listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));

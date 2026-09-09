@@ -65,12 +65,24 @@ public sealed class ProxyTunnelAdapter : ITunnelProxy
             PeerPublicIp = context.PeerPublicIp,
             Mux = context.Mux,
             Browser = browser,
-            OwnerPidChecker = ownerPidChecker ?? PermissiveOwnerPidChecker.Instance,
+            // The default must match the platform, not the tests. PermissiveOwnerPidChecker answers
+            // "I don't know" to every question, and on Windows an unknown owner is refused - so wiring a
+            // browser without also wiring a checker refused every connection the browser made, which is
+            // exactly what shipped: accepted=33 rejected_by_owner=33 and a session that could not browse.
+            OwnerPidChecker = ownerPidChecker ?? DefaultOwnerPidChecker(),
             AddressBlocker = addressBlocker,
             SystemProxy = systemProxy ?? SystemProxyResolver.Default,
         };
         return new ProxyTunnelAdapter(new ConnectProxyServer(options));
     }
+
+    /// <summary>
+    /// The checker that can actually answer on this platform. Only Windows has one; elsewhere the
+    /// permissive checker is correct, and <see cref="ConnectProxyOptions.RejectUnknownOwner"/> defaults
+    /// to false there so "unknown" admits rather than refuses.
+    /// </summary>
+    private static IOwnerPidChecker DefaultOwnerPidChecker()
+        => OperatingSystem.IsWindows() ? new WindowsOwnerPidChecker() : PermissiveOwnerPidChecker.Instance;
 
     /// <summary>الخادم الأصلي (العدّادات التفصيلية، وقت أول وصول لصفحة الفحص).</summary>
     public ConnectProxyServer Server => _server;
