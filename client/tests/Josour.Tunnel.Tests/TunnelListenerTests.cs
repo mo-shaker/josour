@@ -20,8 +20,19 @@ public class TunnelListenerTests
 
         await listener.StopAsync();
         Assert.False(listener.IsRunning);
+
+        // The claim is that nothing is accepting on that port any more, so the only outcome that fails
+        // this test is a connect that SUCCEEDS. How a closed port announces itself is the operating
+        // system's business, not ours: most machines answer RST (SocketException), and some - Windows 11
+        // on ARM64 among them - silently drop the SYN, which surfaces as a timeout. Asserting the RST
+        // asserted the OS, and failed every run on a machine whose loopback drops instead of refusing.
         using var after = new TcpClient();
-        await Assert.ThrowsAnyAsync<SocketException>(() => after.ConnectAsync(IPAddress.Loopback, listener.Port).WaitAsync(TimeSpan.FromSeconds(2)));
+        var refused = await Record.ExceptionAsync(
+            () => after.ConnectAsync(IPAddress.Loopback, listener.Port).WaitAsync(TimeSpan.FromSeconds(2)));
+
+        Assert.NotNull(refused);
+        Assert.True(refused is SocketException or TimeoutException, $"unexpected {refused.GetType().Name}: {refused.Message}");
+        Assert.False(after.Connected);
         await listener.DisposeAsync();
     }
 
