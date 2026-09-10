@@ -12,14 +12,22 @@ public sealed record GatherOptions(
     TimeSpan MappingLifetime,
     bool EnableUpnp = true);
 
-/// <summary>تشخيص الجمع لبوابة قرار Relay (ADR-0003).</summary>
+/// <summary>
+/// تشخيص الجمع. كان لبوابة قرار Relay (ADR-0003)؛ وبعد [ADR-0009] صار وظيفته تفسير فشل الاتصال بعد وقوعه.
+/// </summary>
+/// <param name="CgnatChecked">
+/// هل أمكن الحكم أصلًا. حين تكون <c>false</c> فإن <see cref="CgnatSuspected"/> تعني «لا نعرف» لا «لا يوجد».
+/// </param>
 public sealed record GatherDiagnostics(
     bool UpnpFound,
     bool MappingOk,
     string? UpnpExternalIp,
     bool CgnatSuspected,
     bool Ipv6Global,
-    IReadOnlyList<string> Errors)
+    IReadOnlyList<string> Errors,
+    bool CgnatChecked = false,
+    NatReachability Reachability = NatReachability.Unknown,
+    string NatEvidence = "not_assessed")
 {
     public Dictionary<string, object?> ToDictionary() => new()
     {
@@ -27,6 +35,10 @@ public sealed record GatherDiagnostics(
         ["mapping_ok"] = MappingOk,
         ["upnp_external_ip"] = UpnpExternalIp,
         ["cgnat_suspected"] = CgnatSuspected,
+        // بلا هذا المفتاح كانت cgnat_suspected=false تحمل معنيين لا يفترقان: «فُحص ولا يوجد» و«تعذّر الفحص».
+        ["cgnat_checked"] = CgnatChecked,
+        ["nat_reachability"] = Reachability.ToString().ToLowerInvariant(),
+        ["nat_evidence"] = NatEvidence,
         ["ipv6_global"] = Ipv6Global,
         ["errors"] = Errors.ToList(),
     };
@@ -151,14 +163,29 @@ public sealed class CandidateGatherer : ICandidateSource
             }
         }
 
-        // CGNAT/NAT مزدوج مشتبه به: IP الراوتر الخارجي ضمن 100.64.0.0/10 (أو أي نطاق خاص) أو يخالف ما يراه الخادم.
-        var cgnat = externalUsable && (IpRangePolicy.IsBlockedRange(externalIp!) || (backendIp is not null && !backendIp.Equals(externalIp)));
+        // الحكم على الـ NAT يزن كل مصدر ينطق، لا الـ UPnP وحده: عناوين الجهاز نفسه، وما يراه الخادم،
+        // والبوابة إن ردّت. خلف نقطة اتصال الهاتف لا بوابة ترد — وهناك بالذات يعيش الـ CGNAT.
+        IReadOnlyList<IPAddress> localAddresses;
+        try
+        {
+            localAddresses = LocalNetwork.GetUnicastAddresses().Select(a => a.Address).ToList();
+        }
+        catch (Exception e)
+        {
+            errors.Add($"local addresses: {Describe(e)}");
+            localAddresses = Array.Empty<IPAddress>();
+        }
+
+        var nat = NatAssessment.Assess(localAddresses, backendIp, upnpFound, mappingOk, externalUsable ? externalIp : null);
 
         var candidates = lan.Concat(v6).Concat(upnp).Concat(pub)
             .DistinctBy(c => (c.Ip, c.Port))
             .ToList();
 
-        var diagnostics = new GatherDiagnostics(upnpFound, mappingOk, externalUsable ? externalIp!.ToString() : null, cgnat, ipv6Global, errors);
+        var diagnostics = new GatherDiagnostics(
+            upnpFound, mappingOk, externalUsable ? externalIp!.ToString() : null,
+            nat.CgnatSuspected, ipv6Global, errors,
+            nat.Checked, nat.Reachability, nat.Evidence);
         return new GatherResult(candidates, diagnostics);
     }
 
