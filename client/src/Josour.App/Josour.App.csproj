@@ -17,6 +17,25 @@
     <Description>Josour Windows client</Description>
   </PropertyGroup>
 
+  <!--
+    Single-file publishing only. WPF's native libraries (wpfgfx_cor3, PresentationNative_cor3,
+    D3DCompiler_47, vcruntime140_cor3) are NOT bundled by default: the SDK drops them beside the
+    exe instead, and an "exe" copied on its own to another machine then dies before it can draw a
+    window or write a log line - it simply never opens.
+
+    That is not a scenario to guess at: the whole distribution story here is one file that a
+    non-technical user copies and double-clicks. So the flag lives with the project, not in
+    whoever's shell last built it.
+
+    Both properties are ignored unless -p:PublishSingleFile=true, so CI's framework-dependent
+    publish is unaffected. Use scripts/publish-exe.ps1, which checks the result really is one file.
+  -->
+  <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
   <ItemGroup>
     <Resource Include="Assets/josour.ico" />
   </ItemGroup>
