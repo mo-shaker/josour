@@ -201,17 +201,27 @@ ls -la backups/
 
 ```powershell
 git clone https://github.com/<حسابك>/routebridge.git
-cd routebridge\client
-dotnet publish src\Josour.App -c Release -r win-x64 --self-contained false -o publish\app
+cd routebridge
+powershell -ExecutionPolicy Bypass -File scripts\publish-exe.ps1
 ```
 
-### 2.2 تجاوز SmartScreen بوعي
+يخرج **ملف واحد** في `client\publish\exe\Josour.exe`، ويطبع بصمته. ولا تبنِ بأمر `dotnet publish` مباشرة: مكتبات WPF الأصلية لا تُدمج افتراضيًا، فيخرج ملف يعمل على جهاز البناء **ويموت صامتًا** على أي جهاز آخر. السكربت يفحص ذلك ويرفض الناتج الناقص.
 
-الملف **غير موقّع** لأن شهادة توقيع الكود لم تُطلب بعد. عند التشغيل سيظهر «Windows protected your PC».
+### 2.2 التحقق من الملف، ثم تجاوز SmartScreen
 
-على **جهاز اختبار فقط**، وبعد أن تكون واثقًا أن الملف من بنائك أنت أو من CI مستودعك: اضغط **More info** ثم **Run anyway**.
+الملف **غير موقّع، وهذا قرار لا نقص** ([ADR-0011](decisions/0011-no-code-signing-certificate.md)): المستخدمون من ثلاثة إلى خمسة يعرفون من أعطاهم الملف، وشهادة OV لا تلغي تحذير SmartScreen عند هذا العدد أصلًا — إنما تبني سمعة بعدد التنزيلات.
 
-> لا توزّع هذا الملف على مستخدمين حقيقيين. الحل الدائم شهادة توقيع كود (OV تكفي؛ EV لم تعد تمنح سمعة فورية منذ أغسطس 2024)، وبها يُبنى مثبّت Inno Setup الجاهز في `client/installer/`.
+**البديل ليس أضعف من التوقيع.** التوقيع يثبت أن الملف من جهة اشترت شهادة؛ **البصمة تثبت أنه هذا الملف بعينه**. لذلك، قبل التشغيل على أي جهاز:
+
+```powershell
+Get-FileHash C:\Josour\Josour.exe -Algorithm SHA256
+```
+
+طابق الناتج مع البصمة التي طبعها `publish-exe.ps1` عند البناء — **بمكالمة أو رسالة مباشرة، لا بالقناة نفسها التي وصل بها الملف**. غير مطابقة تعني ملفًا آخر: احذفه.
+
+بعد المطابقة سيظهر «Windows protected your PC» مرة واحدة على كل جهاز: **More info** ثم **Run anyway**.
+
+> **متى يتغيّر هذا؟** حين يصير الجواب على «هل يعرف كل مستخدم من أعطاه الملف؟» هو «لا». عندها تعود الشهادة إلى الطاولة، ومعها مثبّت Inno Setup الجاهز في `client/installer/`.
 
 ### 2.3 قاعدة جدار الحماية (اختيارية الآن)
 
