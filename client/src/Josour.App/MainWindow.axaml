@@ -1,0 +1,65 @@
+<Window x:Class="Josour.App.MainWindow"
+                 xmlns="https://github.com/avaloniaui"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                 xmlns:app="clr-namespace:Josour.App"
+                 xmlns:c="clr-namespace:Josour.App.Controls"
+                 xmlns:vm="clr-namespace:Josour.App.ViewModels"
+                 xmlns:views="clr-namespace:Josour.App.Views"
+                 mc:Ignorable="d"
+                 Title="{x:Static app:Strings.AppName}"
+                 FlowDirection="{x:Static app:UiFlow.Direction}"
+                 Icon="/Assets/josour.ico"
+                 Width="460" Height="560" MinWidth="420" MinHeight="480"
+                 WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- The session takes over the window while it lasts (and until its summary is dismissed); otherwise the two tabs. -->
+        <Grid Grid.Row="1" Margin="12,4,12,0">
+            <TabControl IsVisible="{Binding !Session.IsVisible}">
+                <TabItem Header="{x:Static app:Strings.HostTab}">
+                    <views:HostPage DataContext="{Binding Host}" />
+                </TabItem>
+                <TabItem Header="{x:Static app:Strings.GuestTab}">
+                    <views:GuestPage DataContext="{Binding Guest}" />
+                </TabItem>
+            </TabControl>
+
+            <views:SessionPanel DataContext="{Binding Session}"
+                                IsVisible="{Binding IsVisible}" />
+        </Grid>
+
+        <Grid Grid.Row="2" Margin="16,8,16,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Classes="caption secondary" Grid.Column="0"
+                          Text="{Binding StatusText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+
+            <!-- The settings and the About/diagnostics surface are reachable from here as well as from the tray. -->
+            <Button Classes="transparent" Grid.Column="1" Padding="6" Margin="8,0,0,0"
+                       ToolTip.Tip="{x:Static app:Strings.MainSettingsTooltip}"
+                       Command="{Binding ShowSettingsCommand}" >
+                <c:Icon Symbol="Settings" />
+            </Button>
+            <Button Classes="transparent" Grid.Column="2" Padding="6" Margin="4,0,0,0"
+                       ToolTip.Tip="{x:Static app:Strings.MainAboutTooltip}"
+                       Command="{Binding ShowAboutCommand}" >
+                <c:Icon Symbol="Info" />
+            </Button>
+
+            <!-- VersionText is bidi-isolated by the ViewModel, so "v0.1.0" reads left to right in either language. -->
+            <TextBlock Classes="caption tertiary" Grid.Column="3"
+                          Text="{Binding VersionText}" VerticalAlignment="Center" Margin="12,0,0,0" />
+        </Grid>
+    </Grid>
+</Window>

@@ -1,0 +1,49 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:c="clr-namespace:Josour.App.Controls">
+    <!--
+        Icon, Card and InfoBar: the three WPF-UI controls the views actually used, rebuilt on Avalonia's Fluent theme.
+        They are styles over plain controls rather than new widgets, so they inherit the theme's colours and respond to
+        light/dark without a second definition.
+    -->
+    <ControlTheme x:Key="{x:Type c:Icon}" TargetType="c:Icon">
+        <Setter Property="Width" Value="16" />
+        <Setter Property="Height" Value="16" />
+        <Setter Property="Foreground" Value="{DynamicResource TextControlForeground}" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <!-- Uniform stretch keeps the 24x24 geometry square at whatever size the call site asked for. -->
+                <Viewbox Stretch="Uniform">
+                    <Path Data="{TemplateBinding Data}"
+                          Fill="{TemplateBinding Foreground}" />
+                </Viewbox>
+            </ControlTemplate>
+        </Setter>
+    </ControlTheme>
+
+    <!--
+        Card: a panel with the theme's surface colour and border. WPF-UI's ui:Card in one Border, which is all the
+        views ever used it for.
+    -->
+    <ControlTheme x:Key="{x:Type c:Card}" TargetType="c:Card">
+        <Setter Property="Background" Value="{DynamicResource ThemeBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderMidBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="16" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        Padding="{TemplateBinding Padding}">
+                    <ContentPresenter Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </ControlTheme>
+</ResourceDictionary>

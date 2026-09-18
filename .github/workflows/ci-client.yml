@@ -27,16 +27,38 @@ jobs:
 
       - name: Mux benchmarks (informational, ADR-0006 criteria)
         run: dotnet test tests/Josour.Tunnel.Tests --no-build -c Release --filter "Category=Benchmark" --logger "console;verbosity=detailed"
+      # The app multi-targets (ADR-0013), so publish names the framework: the Windows one, which is the build
+      # that carries the toast notifications.
       - name: Publish app (unsigned, artifact for QA)
-        run: dotnet publish src/Josour.App -c Release -r win-x64 --self-contained false -o publish/app
+        run: dotnet publish src/Josour.App -c Release -f net8.0-windows10.0.19041.0 -r win-x64 --self-contained false -o publish/app
       - uses: actions/upload-artifact@v4
         with:
           name: josour-app-unsigned
           path: client/publish/app
           retention-days: 7
 
+  build-macos:
+    # ADR-0013: macOS is a supported platform, not a place the libraries merely compile. This job builds the
+    # app itself and runs the headless UI tests, so a view that only loads on Windows fails here.
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build the app for macOS
+        run: dotnet build src/Josour.App -c Release -f net8.0
+      - name: Test
+        run: |
+          for p in Core Tunnel Proxy Egress Browser Infrastructure E2E App; do
+            dotnet test tests/Josour.$p.Tests -c Release --filter "Category!=Benchmark"
+          done
+
   build-linux:
-    # يثبت أن المكتبات (بلا WPF) تُبنى وتُختبر خارج Windows أيضًا
+    # يثبت أن المكتبات تُبنى وتُختبر خارج Windows وmacOS أيضًا
     runs-on: ubuntu-latest
     defaults:
       run:

@@ -26,7 +26,7 @@ public static class Strings
     public static string TrayTooltip => LocalizedStrings.Current[UiStringKeys.TrayTooltip];
     public static string TrayShowWindow => LocalizedStrings.Current[UiStringKeys.TrayShowWindow];
     public static string TrayAvailableForRequests => LocalizedStrings.Current[UiStringKeys.TrayAvailableForRequests];
-    public static string TrayStartWithWindows => LocalizedStrings.Current[UiStringKeys.TrayStartWithWindows];
+    public static string TrayStartAtLogin => LocalizedStrings.Current[UiStringKeys.TrayStartAtLogin];
     public static string TrayDebug => LocalizedStrings.Current[UiStringKeys.TrayDebug];
     public static string TraySimulateIncomingRequest => LocalizedStrings.Current[UiStringKeys.TraySimulateIncomingRequest];
     public static string TraySignOut => LocalizedStrings.Current[UiStringKeys.TraySignOut];
@@ -230,8 +230,8 @@ public static class Strings
     public static string SettingsBrowserChrome => LocalizedStrings.Current[UiStringKeys.SettingsBrowserChrome];
     public static string SettingsBrowserEdge => LocalizedStrings.Current[UiStringKeys.SettingsBrowserEdge];
     public static string SettingsStartupSection => LocalizedStrings.Current[UiStringKeys.SettingsStartupSection];
-    public static string SettingsStartWithWindows => LocalizedStrings.Current[UiStringKeys.SettingsStartWithWindows];
-    public static string SettingsStartWithWindowsUnavailable => LocalizedStrings.Current[UiStringKeys.SettingsStartWithWindowsUnavailable];
+    public static string SettingsStartAtLogin => LocalizedStrings.Current[UiStringKeys.SettingsStartAtLogin];
+    public static string SettingsStartAtLoginUnavailable => LocalizedStrings.Current[UiStringKeys.SettingsStartAtLoginUnavailable];
     public static string SettingsStartMinimized => LocalizedStrings.Current[UiStringKeys.SettingsStartMinimized];
     public static string SettingsSave => LocalizedStrings.Current[UiStringKeys.SettingsSave];
     public static string SettingsCancel => LocalizedStrings.Current[UiStringKeys.SettingsCancel];
@@ -269,6 +269,7 @@ public static class Strings
     public static string AboutOpenLogFolderFailedFormat => LocalizedStrings.Current[UiStringKeys.AboutOpenLogFolderFailedFormat];
     public static string AboutCopy => LocalizedStrings.Current[UiStringKeys.AboutCopy];
     public static string AboutCopied => LocalizedStrings.Current[UiStringKeys.AboutCopied];
+    public static string AboutCopyFailed => LocalizedStrings.Current[UiStringKeys.AboutCopyFailed];
     public static string AboutSecretsNote => LocalizedStrings.Current[UiStringKeys.AboutSecretsNote];
     public static string AboutNotAvailable => LocalizedStrings.Current[UiStringKeys.AboutNotAvailable];
 
@@ -281,4 +282,24 @@ public static class Strings
     // ---- errors ----
     public static string StartupFailedTitle => LocalizedStrings.Current[UiStringKeys.StartupFailedTitle];
     public static string StartupFailedMessageFormat => LocalizedStrings.Current[UiStringKeys.StartupFailedMessageFormat];
+
+    // ---- auto-accept for trusted guests (docs/ws-protocol.md section 5a) ----
+    public static string AutoAcceptToastTitle => LocalizedStrings.Current[UiStringKeys.AutoAcceptToastTitle];
+    public static string AutoAcceptToastBodyFormat => LocalizedStrings.Current[UiStringKeys.AutoAcceptToastBodyFormat];
+    public static string SettingsAutoAcceptSection => LocalizedStrings.Current[UiStringKeys.SettingsAutoAcceptSection];
+    public static string SettingsAutoAcceptEnable => LocalizedStrings.Current[UiStringKeys.SettingsAutoAcceptEnable];
+    public static string SettingsAutoAcceptHint => LocalizedStrings.Current[UiStringKeys.SettingsAutoAcceptHint];
+    public static string SettingsAutoAcceptWarning => LocalizedStrings.Current[UiStringKeys.SettingsAutoAcceptWarning];
+    public static string SettingsAutoAcceptEmpty => LocalizedStrings.Current[UiStringKeys.SettingsAutoAcceptEmpty];
+    public static string SettingsAutoAcceptColumnLimit => LocalizedStrings.Current[UiStringKeys.SettingsAutoAcceptColumnLimit];
+    public static string SettingsAutoAcceptColumnExpiry => LocalizedStrings.Current[UiStringKeys.SettingsAutoAcceptColumnExpiry];
+    public static string SettingsAutoAcceptNeverExpires => LocalizedStrings.Current[UiStringKeys.SettingsAutoAcceptNeverExpires];
+    public static string SettingsAutoAcceptExpired => LocalizedStrings.Current[UiStringKeys.SettingsAutoAcceptExpired];
+    public static string SettingsAutoAcceptRemove => LocalizedStrings.Current[UiStringKeys.SettingsAutoAcceptRemove];
+    public static string SettingsAutoAcceptMinutesFormat => LocalizedStrings.Current[UiStringKeys.SettingsAutoAcceptMinutesFormat];
+    public static string IncomingRequestTrustThisGuest => LocalizedStrings.Current[UiStringKeys.IncomingRequestTrustThisGuest];
+    public static string IncomingRequestTrustHint => LocalizedStrings.Current[UiStringKeys.IncomingRequestTrustHint];
+    public static string AutoAcceptTrustWeek => LocalizedStrings.Current[UiStringKeys.AutoAcceptTrustWeek];
+    public static string AutoAcceptTrustMonth => LocalizedStrings.Current[UiStringKeys.AutoAcceptTrustMonth];
+    public static string AutoAcceptTrustAlways => LocalizedStrings.Current[UiStringKeys.AutoAcceptTrustAlways];
 }

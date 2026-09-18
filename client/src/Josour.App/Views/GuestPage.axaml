@@ -1,0 +1,132 @@
+<UserControl x:Class="Josour.App.Views.GuestPage"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:app="clr-namespace:Josour.App"
+                 xmlns:c="clr-namespace:Josour.App.Controls"
+             xmlns:vm="clr-namespace:Josour.App.ViewModels"
+             mc:Ignorable="d"
+             d:DesignWidth="420" d:DesignHeight="420">
+    <Grid Margin="4,12,4,4">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+                <TextBlock Classes="subtitle" Text="{x:Static app:Strings.GuestPageTitle}" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,4,0,0"
+                              Text="{x:Static app:Strings.GuestPageDescription}" />
+            </StackPanel>
+            <Button Grid.Column="1" VerticalAlignment="Top" Margin="12,0,0,0"
+                       Command="{Binding RefreshCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <c:Icon Symbol="ArrowSync" />
+                    <TextBlock Text="{x:Static app:Strings.GuestRefresh}" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <ListBox Grid.Row="1"
+                  ItemsSource="{Binding Hosts}"
+                  SelectedItem="{Binding SelectedHost, Mode=TwoWay}"
+                  IsVisible="{Binding HasHosts}">
+            <ListBox.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:HostListItem}">
+                    <Grid Margin="4,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <c:Icon Grid.Column="0" Symbol="Desktop" FontSize="22" VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Classes="bodyStrong" Text="{Binding UserDisplayName}" />
+                            <!-- Device name: a technical identifier, bidi-isolated by the item so it never reorders. -->
+                            <TextBlock Classes="secondary" Text="{Binding DeviceNameText}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Ellipse Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,6,0"
+                                     Fill="{Binding Reachable, Converter={StaticResource ReachabilityBrush}}" />
+                            <TextBlock Classes="caption tertiary"
+                                          VerticalAlignment="Center" Text="{Binding ReachabilityText}" />
+                        </StackPanel>
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24"
+                    IsVisible="{Binding !HasHosts}">
+            <c:Icon Symbol="Desktop" FontSize="40" HorizontalAlignment="Center" Opacity="0.6" />
+            <TextBlock Classes="bodyStrong" HorizontalAlignment="Center" Margin="0,12,0,4"
+                          Text="{Binding EmptyStateTitle}" />
+            <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="300"
+                          Text="{Binding EmptyStateText}" />
+            <ProgressBar IsIndeterminate="True" Width="24" Height="24" Margin="0,16,0,0"
+                             IsVisible="{Binding IsRefreshing}" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Margin="0,12,0,0">
+            <!-- Pick a length and ask: request.create -->
+            <Grid IsVisible="{Binding !IsWaitingForHost}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Classes="secondary" Grid.Column="0" VerticalAlignment="Center"
+                              Text="{x:Static app:Strings.GuestDurationLabel}" />
+                <ComboBox Grid.Column="1" Margin="8,0,0,0" MinWidth="120" VerticalAlignment="Center"
+                          ItemsSource="{Binding DurationOptions}"
+                          SelectedItem="{Binding SelectedDuration, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding StringFormat={x:Static app:Strings.DurationMinutesFormat}}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <Button Grid.Column="2" HorizontalAlignment="Right" Classes="accent"
+                           Content="{x:Static app:Strings.GuestRequestConnection}"
+                           Command="{Binding RequestConnectionCommand}">
+                    <Button.Content>
+                        <!-- WPF mirrors layout, not glyphs: an arrow has to be flipped by hand in a right-to-left UI. -->
+                        <c:Icon Symbol="Send"
+                                       RenderTransformOrigin="0.5,0.5"
+                                       RenderTransform="{x:Static app:UiFlow.GlyphMirror}" />
+                    </Button.Content>
+                </Button>
+            </Grid>
+
+            <!-- Waiting for request.result -->
+            <c:Card Padding="12" IsVisible="{Binding IsWaitingForHost}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ProgressBar IsIndeterminate="True" Grid.Column="0" Width="72" Height="4" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Classes="bodyStrong" Text="{x:Static app:Strings.GuestWaitingTitle}" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding WaitingText}" />
+                    </StackPanel>
+                    <Button Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center"
+                               Content="{x:Static app:Strings.GuestCancelRequest}"
+                               Command="{Binding CancelRequestCommand}" />
+                </Grid>
+            </c:Card>
+
+            <TextBlock Classes="caption secondary" Margin="0,8,0,0" TextWrapping="Wrap"
+                          Text="{Binding StatusMessage}"
+                          IsVisible="{Binding HasStatusMessage}" />
+        </StackPanel>
+    </Grid>
+</UserControl>

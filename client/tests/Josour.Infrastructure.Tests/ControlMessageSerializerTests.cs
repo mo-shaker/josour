@@ -9,6 +9,8 @@ public sealed class ControlMessageSerializerTests
     private static readonly Guid HostId = new("11111111-1111-4111-8111-111111111111");
     private static readonly Guid RequestId = new("cccccccc-0000-4000-8000-000000000003");
     private static readonly Guid SessionId = new("dddddddd-0000-4000-8000-000000000004");
+    private static readonly Guid GuestUserId = new("eeeeeeee-0000-4000-8000-000000000005");
+    private static readonly Guid GuestDeviceId = new("ffffffff-0000-4000-8000-000000000006");
     private static readonly DateTimeOffset T = new(2026, 9, 4, 10, 15, 30, 123, TimeSpan.Zero);
     private const string Fp = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
 
@@ -28,6 +30,7 @@ public sealed class ControlMessageSerializerTests
             { new RequestCreateMessage("c1", HostId, 30), "request.create" },
             { new RequestCancelMessage("c2", RequestId), "request.cancel" },
             { new RequestAcceptMessage("c3", RequestId), "request.accept" },
+            { new RequestAcceptMessage("c3", RequestId, Auto: true), "request.accept" },
             { new RequestRejectMessage("c4", RequestId), "request.reject" },
             { new SessionEndpointMessage(SessionId, Fp, candidates), "session.endpoint" },
             { new SessionConnectedMessage(SessionId, "lan", 87, "1.3"), "session.connected" },
@@ -43,11 +46,11 @@ public sealed class ControlMessageSerializerTests
             { new HostsMessage("hosts.snapshot", hosts), "hosts.snapshot" },
             { new HostsMessage("hosts.update", Array.Empty<HostInfoDto>()), "hosts.update" },
             { new RequestCreatedMessage("c1", RequestId, T), "request.created" },
-            { new RequestIncomingMessage(RequestId, "Sara Ahmed", "SARA-LAPTOP", 30, 3, T), "request.incoming" },
+            { new RequestIncomingMessage(RequestId, GuestUserId, GuestDeviceId, "Sara Ahmed", "SARA-LAPTOP", 30, 3, T), "request.incoming" },
             { new RequestResultMessage(RequestId, true, null, SessionId), "request.result" },
             { new RequestResultMessage(RequestId, false, "rejected", null), "request.result" },
             { new RequestExpiredMessage(RequestId), "request.expired" },
-            { new SessionCreatedMessage(SessionId, "guest", Convert.ToBase64String(new byte[32]), T, 3, "203.0.113.10", false, new PeerDto("Omar Hassan", "OMAR-DESKTOP")), "session.created" },
+            { new SessionCreatedMessage(SessionId, "guest", Convert.ToBase64String(new byte[32]), T, 3, "203.0.113.10", false, new PeerDto(GuestUserId, GuestDeviceId, "Omar Hassan", "OMAR-DESKTOP")), "session.created" },
             { new SessionPeerEndpointMessage(SessionId, Fp, candidates), "session.peer_endpoint" },
             { new SessionActiveMessage(SessionId, T), "session.active" },
             { new SessionTerminateMessage(SessionId, "host_ended"), "session.terminate" },

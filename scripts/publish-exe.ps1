@@ -40,7 +40,7 @@ if ($running.Count) {
 
 Push-Location $client
 try {
-    & dotnet publish src\Josour.App -c Release -r $Runtime --self-contained true `
+    & dotnet publish src\Josour.App -c Release -f net8.0-windows10.0.19041.0 -r $Runtime --self-contained true `
         -p:PublishSingleFile=true -o $outDir --nologo -v q
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish exited with $LASTEXITCODE" }
 } finally {

@@ -1,0 +1,86 @@
+<Window x:Class="Josour.App.Views.AboutWindow"
+                 xmlns="https://github.com/avaloniaui"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                 xmlns:app="clr-namespace:Josour.App"
+                 xmlns:c="clr-namespace:Josour.App.Controls"
+                 xmlns:vm="clr-namespace:Josour.App.ViewModels"
+                 mc:Ignorable="d"
+                 Title="{x:Static app:Strings.AboutWindowTitle}"
+                 FlowDirection="{x:Static app:UiFlow.Direction}"
+                 Icon="/Assets/josour.ico"
+                 Width="480" SizeToContent="Height" MinHeight="420"
+                 CanResize="False"
+                 WindowStartupLocation="CenterOwner">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="1" Margin="24,4,24,0">
+            <TextBlock Classes="title" Text="{x:Static app:Strings.AboutHeading}" />
+            <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,4,0,16"
+                          Text="{x:Static app:Strings.AboutDescription}" />
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" MinWidth="130" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Classes="secondary" Grid.Row="0" Grid.Column="0" Text="{x:Static app:Strings.AboutAppVersionLabel}" Margin="0,0,12,6" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding AppVersion}" Margin="0,0,0,6" TextWrapping="Wrap" />
+
+                <TextBlock Classes="secondary" Grid.Row="1" Grid.Column="0" Text="{x:Static app:Strings.AboutDeviceNameLabel}" Margin="0,0,12,6" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding DeviceName}" Margin="0,0,0,6" TextWrapping="Wrap" />
+
+                <TextBlock Classes="secondary" Grid.Row="2" Grid.Column="0" Text="{x:Static app:Strings.AboutDeviceIdLabel}" Margin="0,0,12,6" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding DeviceId}" Margin="0,0,0,6" TextWrapping="Wrap"
+                              FontFamily="Consolas, Courier New, monospace" />
+
+                <TextBlock Classes="secondary" Grid.Row="3" Grid.Column="0" Text="{x:Static app:Strings.AboutOsLabel}" Margin="0,0,12,6" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding OperatingSystem}" Margin="0,0,0,6" TextWrapping="Wrap" />
+
+                <TextBlock Classes="secondary" Grid.Row="4" Grid.Column="0" Text="{x:Static app:Strings.AboutServerLabel}" Margin="0,0,12,6" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding ServerUrl}" Margin="0,0,0,6" TextWrapping="Wrap" />
+
+                <TextBlock Classes="secondary" Grid.Row="5" Grid.Column="0" Text="{x:Static app:Strings.AboutSignedInLabel}" Margin="0,0,12,6" />
+                <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding SignedInAs}" Margin="0,0,0,6" TextWrapping="Wrap" />
+
+                <TextBlock Classes="secondary" Grid.Row="6" Grid.Column="0" Text="{x:Static app:Strings.AboutConnectionLabel}" Margin="0,0,12,6" />
+                <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding ConnectionState}" Margin="0,0,0,6" TextWrapping="Wrap" />
+
+                <TextBlock Classes="secondary" Grid.Row="7" Grid.Column="0" Text="{x:Static app:Strings.AboutLogsLabel}" Margin="0,0,12,6" />
+                <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding LogDirectory}" Margin="0,0,0,6" TextWrapping="Wrap" />
+            </Grid>
+
+            <c:InfoBar Margin="0,12,0,0" IsClosable="False" Severity="Informational"
+                        IsOpen="True" Message="{x:Static app:Strings.AboutSecretsNote}" />
+
+            <c:InfoBar Margin="0,8,0,0" IsClosable="False"
+                        IsOpen="{Binding HasMessage, Mode=OneWay}"
+                        Severity="{Binding IsMessageAnError, Converter={StaticResource ErrorSeverity}}"
+                        Message="{Binding Message}" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="24,16,24,20">
+            <Button Content="{x:Static app:Strings.AboutCopy}" Command="{Binding CopyDetailsCommand}" />
+            <Button Margin="8,0,0,0" Classes="accent"
+                       Content="{x:Static app:Strings.AboutOpenLogFolder}" Command="{Binding OpenLogFolderCommand}" />
+        </StackPanel>
+    </Grid>
+</Window>

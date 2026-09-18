@@ -201,7 +201,15 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
     // ---------- host: the answer ----------
 
     public Task AcceptRequestAsync(Guid requestId, CancellationToken ct) =>
-        _channel.SendAsync(new RequestAcceptMessage(ControlRef.Next(), requestId), ct);
+        AcceptRequestAsync(requestId, auto: false, ct);
+
+    /// <summary>
+    /// <c>request.accept</c>. <paramref name="auto"/> says the host never saw a prompt because the request matched a
+    /// trusted-guest rule it had set up beforehand (docs/ws-protocol.md section 5a); it only travels to the server's
+    /// audit trail and changes nothing about the session that follows.
+    /// </summary>
+    public Task AcceptRequestAsync(Guid requestId, bool auto, CancellationToken ct) =>
+        _channel.SendAsync(new RequestAcceptMessage(ControlRef.Next(), requestId, auto), ct);
 
     public Task RejectRequestAsync(Guid requestId, CancellationToken ct) =>
         _channel.SendAsync(new RequestRejectMessage(ControlRef.Next(), requestId), ct);

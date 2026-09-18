@@ -24,6 +24,13 @@ public static class AppPaths
     public static string SettingsFile => Path.Combine(LocalAppDataRoot, "settings.json");
 
     /// <summary>
+    /// <c>%LOCALAPPDATA%\Josour\auto-accept.json</c>: the host's auto-accept switch and its trusted-guest rules
+    /// (docs/ws-protocol.md section 5a). Kept apart from <see cref="SettingsFile"/> so that saving an unrelated
+    /// preference can never race with, or half-write, a standing consent decision.
+    /// </summary>
+    public static string AutoAcceptFile => Path.Combine(LocalAppDataRoot, "auto-accept.json");
+
+    /// <summary>
     /// <c>%LOCALAPPDATA%\Josour\work-browser.json</c>: the note that says a work browser is running, so a start-up
     /// after a crash can close it (see <c>Session.StaleWorkBrowserGuard</c>). Present only while a browser is up.
     /// </summary>

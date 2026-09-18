@@ -1,0 +1,134 @@
+<Window x:Class="Josour.App.Views.IncomingRequestWindow"
+                 xmlns="https://github.com/avaloniaui"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                 xmlns:app="clr-namespace:Josour.App"
+                 xmlns:c="clr-namespace:Josour.App.Controls"
+                 xmlns:vm="clr-namespace:Josour.App.ViewModels"
+                 mc:Ignorable="d"
+                 Title="{x:Static app:Strings.IncomingRequestWindowTitle}"
+                 Icon="/Assets/josour.ico"
+                 FlowDirection="{x:Static app:UiFlow.Direction}"
+                 Width="480" SizeToContent="Height" MinHeight="420"
+                 CanResize="False"
+                 Topmost="True"
+                 ShowInTaskbar="True"
+                 WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="1" Margin="20,8,20,20">
+            <TextBlock Classes="title" TextWrapping="Wrap" Text="{Binding Heading}" />
+
+            <!-- Product document section 15: who, from which device, for how long. -->
+            <Grid Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Classes="secondary" Grid.Row="0" Grid.Column="0" Margin="0,0,16,6"
+                              Text="{x:Static app:Strings.IncomingRequestRequesterLabel}" />
+                <TextBlock Classes="bodyStrong" Grid.Row="0" Grid.Column="1" Margin="0,0,0,6"
+                              TextTrimming="CharacterEllipsis" Text="{Binding GuestName}" />
+
+                <TextBlock Classes="secondary" Grid.Row="1" Grid.Column="0" Margin="0,0,16,6"
+                              Text="{x:Static app:Strings.IncomingRequestDeviceLabel}" />
+                <!-- A device name is a technical identifier: the ViewModel isolates it so it never reorders. -->
+                <TextBlock Classes="bodyStrong" Grid.Row="1" Grid.Column="1" Margin="0,0,0,6"
+                              TextTrimming="CharacterEllipsis" Text="{Binding GuestDevice}" />
+
+                <TextBlock Classes="secondary" Grid.Row="2" Grid.Column="0" Margin="0,0,16,0"
+                              Text="{x:Static app:Strings.IncomingRequestDurationLabel}" />
+                <TextBlock Classes="bodyStrong" Grid.Row="2" Grid.Column="1"
+                              Text="{Binding DurationText}" />
+            </Grid>
+
+            <!-- The allow-list of THIS request's version (GET /domains?version=N), or why it is not there. -->
+            <TextBlock Classes="bodyStrong" Margin="0,16,0,0"
+                          Text="{Binding ScopeLabel}" />
+            <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,2,0,0"
+                          Text="{Binding ScopeNote}"
+                          IsVisible="{Binding HasScopeNote}" />
+
+            <c:Card Padding="12" Margin="0,8,0,0"
+                     IsVisible="{Binding HasAllowedSites}">
+                <StackPanel>
+                    <ScrollViewer MaxHeight="132" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding AllowedSites}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <!-- Each entry is bidi-isolated: "portal.corp:8443" keeps its order, while the
+                                         list itself still starts at the reading edge of the mirrored card. -->
+                                    <TextBlock Margin="0,1" TextWrapping="Wrap" Text="{Binding}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <TextBlock Classes="caption tertiary" Margin="0,8,0,0"
+                                  Text="{Binding AllowedSitesSummary}" />
+                </StackPanel>
+            </c:Card>
+
+            <!-- "Could not be loaded" and "this version allows nothing" are different sentences, on purpose. -->
+            <c:InfoBar Margin="0,8,0,0" IsClosable="False" Severity="Warning"
+                        IsOpen="{Binding HasAllowedSitesMessage, Mode=OneWay}"
+                        Message="{Binding AllowedSitesMessage}" />
+
+            <c:InfoBar Margin="0,12,0,0" IsOpen="True" IsClosable="False" Severity="Warning"
+                        Title="{x:Static app:Strings.IncomingRequestWarningTitle}"
+                        Message="{x:Static app:Strings.IncomingRequestWarning}" />
+
+            <TextBlock Classes="secondary" Margin="0,8,0,0" TextWrapping="Wrap"
+                          Text="{x:Static app:Strings.IncomingRequestDisconnectHint}" />
+
+            <!--
+                docs/ws-protocol.md section 5a: the one place a standing consent can be given, because it is the only
+                screen where the host is looking at who is asking. Unticked every time the window opens, and below the
+                warnings rather than beside the buttons, so it is read as part of the decision and not as part of
+                pressing Accept.
+            -->
+            <c:Card Margin="0,12,0,0">
+                <StackPanel>
+                    <CheckBox Content="{x:Static app:Strings.IncomingRequestTrustThisGuest}"
+                              IsChecked="{Binding TrustThisGuest, Mode=TwoWay}" />
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0"
+                                IsEnabled="{Binding TrustThisGuest, Mode=OneWay}">
+                        <TextBlock Classes="secondary" VerticalAlignment="Center" Margin="0,0,8,0"
+                                      Text="{x:Static app:Strings.SettingsAutoAcceptColumnExpiry}" />
+                        <ComboBox MinWidth="140"
+                                  ItemsSource="{Binding TrustDurations}"
+                                  SelectedItem="{Binding SelectedTrustDuration, Mode=TwoWay}" />
+                    </StackPanel>
+                    <TextBlock Classes="caption tertiary" Margin="0,8,0,0" TextWrapping="Wrap"
+                                  Text="{x:Static app:Strings.IncomingRequestTrustHint}" />
+                </StackPanel>
+            </c:Card>
+
+            <Grid Margin="0,20,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <c:Icon Symbol="Timer" Margin="0,0,6,0" />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding CountdownText}" />
+                </StackPanel>
+                <Button Grid.Column="1" MinWidth="110" Margin="8,0,0,0" Classes="accent"
+                           Content="{x:Static app:Strings.Accept}" Command="{Binding AcceptCommand}" />
+                <Button Grid.Column="2" MinWidth="110" Margin="8,0,0,0"
+                           Content="{x:Static app:Strings.Reject}" Command="{Binding RejectCommand}" />
+            </Grid>
+        </StackPanel>
+    </Grid>
+</Window>

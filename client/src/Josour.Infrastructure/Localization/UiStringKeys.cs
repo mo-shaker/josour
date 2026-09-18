@@ -16,7 +16,7 @@ public static class UiStringKeys
     public const string TrayTooltip = "TrayTooltip";
     public const string TrayShowWindow = "TrayShowWindow";
     public const string TrayAvailableForRequests = "TrayAvailableForRequests";
-    public const string TrayStartWithWindows = "TrayStartWithWindows";
+    public const string TrayStartAtLogin = "TrayStartAtLogin";
     public const string TrayDebug = "TrayDebug";
     public const string TraySimulateIncomingRequest = "TraySimulateIncomingRequest";
     public const string TraySignOut = "TraySignOut";
@@ -223,8 +223,8 @@ public static class UiStringKeys
     public const string SettingsBrowserChrome = "SettingsBrowserChrome";
     public const string SettingsBrowserEdge = "SettingsBrowserEdge";
     public const string SettingsStartupSection = "SettingsStartupSection";
-    public const string SettingsStartWithWindows = "SettingsStartWithWindows";
-    public const string SettingsStartWithWindowsUnavailable = "SettingsStartWithWindowsUnavailable";
+    public const string SettingsStartAtLogin = "SettingsStartAtLogin";
+    public const string SettingsStartAtLoginUnavailable = "SettingsStartAtLoginUnavailable";
     public const string SettingsStartMinimized = "SettingsStartMinimized";
     public const string SettingsSave = "SettingsSave";
     public const string SettingsCancel = "SettingsCancel";
@@ -262,6 +262,7 @@ public static class UiStringKeys
     public const string AboutOpenLogFolderFailedFormat = "AboutOpenLogFolderFailedFormat";
     public const string AboutCopy = "AboutCopy";
     public const string AboutCopied = "AboutCopied";
+    public const string AboutCopyFailed = "AboutCopyFailed";
     public const string AboutSecretsNote = "AboutSecretsNote";
     public const string AboutNotAvailable = "AboutNotAvailable";
 
@@ -281,4 +282,24 @@ public static class UiStringKeys
         .Where(f => f.IsLiteral && f.FieldType == typeof(string))
         .Select(f => (string)f.GetRawConstantValue()!)
         .ToArray();
+
+    // ---- auto-accept for trusted guests (docs/ws-protocol.md section 5a) ----
+    public const string AutoAcceptToastTitle = "AutoAcceptToastTitle";
+    public const string AutoAcceptToastBodyFormat = "AutoAcceptToastBodyFormat";
+    public const string SettingsAutoAcceptSection = "SettingsAutoAcceptSection";
+    public const string SettingsAutoAcceptEnable = "SettingsAutoAcceptEnable";
+    public const string SettingsAutoAcceptHint = "SettingsAutoAcceptHint";
+    public const string SettingsAutoAcceptWarning = "SettingsAutoAcceptWarning";
+    public const string SettingsAutoAcceptEmpty = "SettingsAutoAcceptEmpty";
+    public const string SettingsAutoAcceptColumnLimit = "SettingsAutoAcceptColumnLimit";
+    public const string SettingsAutoAcceptColumnExpiry = "SettingsAutoAcceptColumnExpiry";
+    public const string SettingsAutoAcceptNeverExpires = "SettingsAutoAcceptNeverExpires";
+    public const string SettingsAutoAcceptExpired = "SettingsAutoAcceptExpired";
+    public const string SettingsAutoAcceptRemove = "SettingsAutoAcceptRemove";
+    public const string SettingsAutoAcceptMinutesFormat = "SettingsAutoAcceptMinutesFormat";
+    public const string IncomingRequestTrustThisGuest = "IncomingRequestTrustThisGuest";
+    public const string IncomingRequestTrustHint = "IncomingRequestTrustHint";
+    public const string AutoAcceptTrustWeek = "AutoAcceptTrustWeek";
+    public const string AutoAcceptTrustMonth = "AutoAcceptTrustMonth";
+    public const string AutoAcceptTrustAlways = "AutoAcceptTrustAlways";
 }

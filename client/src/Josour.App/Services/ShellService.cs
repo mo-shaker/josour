@@ -1,7 +1,8 @@
 using System.ComponentModel;
 using System.Diagnostics;
-using System.IO;
-using System.Windows;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Josour.App.Views;
@@ -83,7 +84,13 @@ public sealed class ShellService : IShellService
             }
 
             Directory.CreateDirectory(path);
-            using var process = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+
+            // Each desktop has its own "reveal this folder" command. UseShellExecute on a directory path is a
+            // Windows behaviour; on macOS the same act is `open`, and asking Windows' way of macOS silently
+            // opens nothing at all.
+            using var process = OperatingSystem.IsMacOS()
+                ? Process.Start(new ProcessStartInfo("/usr/bin/open") { ArgumentList = { path }, UseShellExecute = false })
+                : Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
             return true;
         }
         catch (Exception ex) when (ex is Win32Exception or IOException or UnauthorizedAccessException or InvalidOperationException or NotSupportedException or PlatformNotSupportedException)
@@ -122,7 +129,13 @@ public sealed class ShellService : IShellService
             _logger.LogError(ex, "Ending the session before exit failed");
         }
 
-        OnUiThread(() => Application.Current?.Shutdown());
+        OnUiThread(() =>
+        {
+            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                desktop.Shutdown();
+            }
+        });
     }
 
     /// <summary>
@@ -192,16 +205,14 @@ public sealed class ShellService : IShellService
         window.Focus();
     }
 
-    private static void OnUiThread(Action action)
+    /// <summary>The single MainWindow, as the desktop lifetime's main window, so closing it exits nothing by itself.</summary>
+    public static void AttachMainWindow(Window window)
     {
-        var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher is null || dispatcher.CheckAccess())
+        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            action();
-        }
-        else
-        {
-            dispatcher.Invoke(action);
+            desktop.MainWindow = window;
         }
     }
+
+    private static void OnUiThread(Action action) => UiThread.Post(action);
 }

@@ -1,0 +1,95 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:c="clr-namespace:Josour.App.Controls">
+    <!--
+        Severity is carried by colour AND by a different icon, never by colour alone: a warning and an error that
+        differ only in hue are the same message to anyone who cannot tell those hues apart, and this control is where
+        the app says its most consequential things.
+    -->
+    <ControlTheme x:Key="{x:Type c:InfoBar}" TargetType="c:InfoBar">
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="12,10" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        Padding="{TemplateBinding Padding}">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <c:Icon Name="PART_Icon" Grid.Column="0"
+                                Width="18" Height="18"
+                                Margin="0,1,10,0"
+                                VerticalAlignment="Top"
+                                Foreground="{TemplateBinding Foreground}" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Name="PART_Title"
+                                       Text="{TemplateBinding Title}"
+                                       FontWeight="SemiBold"
+                                       TextWrapping="Wrap"
+                                       IsVisible="False" />
+                            <TextBlock Text="{TemplateBinding Message}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button Name="PART_CloseButton" Grid.Column="2"
+                                Margin="8,0,0,0"
+                                Padding="6"
+                                VerticalAlignment="Top"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                IsVisible="{TemplateBinding IsClosable}">
+                            <c:Icon Symbol="Dismiss" Width="12" Height="12"
+                                    Foreground="{TemplateBinding Foreground}" />
+                        </Button>
+                    </Grid>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+
+        <Style Selector="^:has-title /template/ TextBlock#PART_Title">
+            <Setter Property="IsVisible" Value="True" />
+        </Style>
+
+        <!-- Informational -->
+        <Style Selector="^:informational">
+            <Setter Property="Background" Value="#F0F6FF" />
+            <Setter Property="BorderBrush" Value="#B4D2FF" />
+            <Setter Property="Foreground" Value="#0B4A94" />
+        </Style>
+        <Style Selector="^:informational /template/ c|Icon#PART_Icon">
+            <Setter Property="Symbol" Value="Info" />
+        </Style>
+
+        <!-- Success -->
+        <Style Selector="^:success">
+            <Setter Property="Background" Value="#EEF7ED" />
+            <Setter Property="BorderBrush" Value="#B7DFB0" />
+            <Setter Property="Foreground" Value="#0F5A22" />
+        </Style>
+        <Style Selector="^:success /template/ c|Icon#PART_Icon">
+            <Setter Property="Symbol" Value="Checkmark" />
+        </Style>
+
+        <!-- Warning -->
+        <Style Selector="^:warning">
+            <Setter Property="Background" Value="#FFF8E6" />
+            <Setter Property="BorderBrush" Value="#F0D28A" />
+            <Setter Property="Foreground" Value="#7A4F00" />
+        </Style>
+        <Style Selector="^:warning /template/ c|Icon#PART_Icon">
+            <Setter Property="Symbol" Value="Warning" />
+        </Style>
+
+        <!-- Error -->
+        <Style Selector="^:error">
+            <Setter Property="Background" Value="#FDF0F0" />
+            <Setter Property="BorderBrush" Value="#F0B4B4" />
+            <Setter Property="Foreground" Value="#8E1111" />
+        </Style>
+        <Style Selector="^:error /template/ c|Icon#PART_Icon">
+            <Setter Property="Symbol" Value="ErrorCircle" />
+        </Style>
+    </ControlTheme>
+</ResourceDictionary>

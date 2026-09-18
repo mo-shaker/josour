@@ -78,8 +78,8 @@
   <data name="TrayAvailableForRequests" xml:space="preserve">
     <value>متاح لاستقبال الطلبات</value>
   </data>
-  <data name="TrayStartWithWindows" xml:space="preserve">
-    <value>التشغيل مع بدء Windows</value>
+  <data name="TrayStartAtLogin" xml:space="preserve">
+    <value>التشغيل عند تسجيل الدخول</value>
   </data>
   <data name="TrayDebug" xml:space="preserve">
     <value>أدوات التشخيص</value>
@@ -625,10 +625,10 @@
   <data name="SettingsStartupSection" xml:space="preserve">
     <value>بدء التشغيل</value>
   </data>
-  <data name="SettingsStartWithWindows" xml:space="preserve">
-    <value>التشغيل مع بدء Windows</value>
+  <data name="SettingsStartAtLogin" xml:space="preserve">
+    <value>التشغيل عند تسجيل الدخول</value>
   </data>
-  <data name="SettingsStartWithWindowsUnavailable" xml:space="preserve">
+  <data name="SettingsStartAtLoginUnavailable" xml:space="preserve">
     <value>غير متاح على هذا النظام.</value>
   </data>
   <data name="SettingsStartMinimized" xml:space="preserve">
@@ -757,5 +757,62 @@
   </data>
   <data name="StartupFailedMessageFormat" xml:space="preserve">
     <value>تعذّر تشغيل جسور.&#10;&#10;{0}&#10;&#10;راجع مجلد السجلات %LOCALAPPDATA%\جسور\logs لمعرفة التفاصيل.</value>
+  </data>
+  <data name="AutoAcceptToastTitle" xml:space="preserve">
+    <value>اتصال تلقائي</value>
+  </data>
+  <data name="AutoAcceptToastBodyFormat" xml:space="preserve">
+    <value>{0} ({1}) اتصل تلقائيًا لأنه في قائمة الضيوف الموثوقين. يمكنك إنهاء الجلسة الآن من نافذة التطبيق.</value>
+  </data>
+  <data name="SettingsAutoAcceptSection" xml:space="preserve">
+    <value>القبول التلقائي</value>
+  </data>
+  <data name="SettingsAutoAcceptEnable" xml:space="preserve">
+    <value>اقبل طلبات الضيوف الموثوقين دون سؤالي</value>
+  </data>
+  <data name="SettingsAutoAcceptHint" xml:space="preserve">
+    <value>الطلب من ضيف في القائمة أدناه يُقبل فورًا دون أن تظهر لك نافذة، ما دام ضمن المدة المسموح بها ولم تنتهِ صلاحية ثقته. يبقى إشعار يخبرك بكل اتصال، ويمكنك إنهاء أي جلسة في أي لحظة. أي طلب من غير هؤلاء يظل يسألك كالمعتاد.</value>
+  </data>
+  <data name="SettingsAutoAcceptWarning" xml:space="preserve">
+    <value>الضيف الموثوق يستطيع استخدام اتصالك وعنوانك دون علمك اللحظي. لا تضف إلا من تثق به فعلًا، وراجع القائمة من حين لآخر.</value>
+  </data>
+  <data name="SettingsAutoAcceptEmpty" xml:space="preserve">
+    <value>لا ضيوف موثوقين بعد. تُضاف الثقة من نافذة الطلب حين يصلك طلب.</value>
+  </data>
+  <data name="SettingsAutoAcceptColumnLimit" xml:space="preserve">
+    <value>أقصى مدة</value>
+  </data>
+  <data name="SettingsAutoAcceptColumnExpiry" xml:space="preserve">
+    <value>تنتهي الثقة</value>
+  </data>
+  <data name="SettingsAutoAcceptNeverExpires" xml:space="preserve">
+    <value>لا تنتهي</value>
+  </data>
+  <data name="SettingsAutoAcceptExpired" xml:space="preserve">
+    <value>انتهت</value>
+  </data>
+  <data name="SettingsAutoAcceptRemove" xml:space="preserve">
+    <value>احذف</value>
+  </data>
+  <data name="SettingsAutoAcceptMinutesFormat" xml:space="preserve">
+    <value>{0} دقيقة</value>
+  </data>
+  <data name="IncomingRequestTrustThisGuest" xml:space="preserve">
+    <value>اقبل من هذا الضيف تلقائيًا لاحقًا</value>
+  </data>
+  <data name="IncomingRequestTrustHint" xml:space="preserve">
+    <value>ينطبق على هذا الجهاز وحده ولمدة لا تتجاوز مدة هذا الطلب. يمكنك سحب الثقة من الإعدادات متى شئت.</value>
+  </data>
+  <data name="AutoAcceptTrustWeek" xml:space="preserve">
+    <value>أسبوع</value>
+  </data>
+  <data name="AutoAcceptTrustMonth" xml:space="preserve">
+    <value>شهر</value>
+  </data>
+  <data name="AutoAcceptTrustAlways" xml:space="preserve">
+    <value>دائمًا</value>
+  </data>
+  <data name="AboutCopyFailed" xml:space="preserve">
+    <value>تعذّر النسخ: لا نافذة مفتوحة.</value>
   </data>
 </root>

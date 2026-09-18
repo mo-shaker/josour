@@ -22,7 +22,16 @@ public sealed record RequestCreateMessage(
     [property: JsonPropertyName("duration_min")] int DurationMin) : ControlMessage("request.create");
 
 public sealed record RequestCancelMessage([property: JsonPropertyName("ref")] string Ref, [property: JsonPropertyName("request_id")] Guid RequestId) : ControlMessage("request.cancel");
-public sealed record RequestAcceptMessage([property: JsonPropertyName("ref")] string Ref, [property: JsonPropertyName("request_id")] Guid RequestId) : ControlMessage("request.accept");
+/// <summary>
+/// <c>request.accept</c>. <paramref name="Auto"/> declares that this device matched the request against a trusted-guest
+/// rule the host had set up beforehand and answered without showing a prompt (docs/ws-protocol.md section 5a). It changes
+/// nothing about how the server settles the request — the acceptance is the host's either way — and exists so the audit
+/// trail can tell an acceptance nobody watched from one somebody did.
+/// </summary>
+public sealed record RequestAcceptMessage(
+    [property: JsonPropertyName("ref")] string Ref,
+    [property: JsonPropertyName("request_id")] Guid RequestId,
+    [property: JsonPropertyName("auto")] bool Auto = false) : ControlMessage("request.accept");
 public sealed record RequestRejectMessage([property: JsonPropertyName("ref")] string Ref, [property: JsonPropertyName("request_id")] Guid RequestId) : ControlMessage("request.reject");
 
 public sealed record CandidateDto(
@@ -94,6 +103,13 @@ public sealed record RequestCreatedMessage(
 
 public sealed record RequestIncomingMessage(
     [property: JsonPropertyName("request_id")] Guid RequestId,
+    /// <summary>
+    /// The pair a trusted-guest rule is keyed on (docs/ws-protocol.md section 5a). <see cref="GuestName"/> and
+    /// <see cref="GuestDevice"/> are chosen by the guest and may repeat or change; these two never do. A server that
+    /// predates the field leaves them <see cref="Guid.Empty"/>, which <c>AutoAcceptPolicy</c> refuses to match on.
+    /// </summary>
+    [property: JsonPropertyName("guest_user_id")] Guid GuestUserId,
+    [property: JsonPropertyName("guest_device_id")] Guid GuestDeviceId,
     [property: JsonPropertyName("guest_name")] string GuestName,
     [property: JsonPropertyName("guest_device")] string GuestDevice,
     [property: JsonPropertyName("duration_min")] int DurationMin,
@@ -108,7 +124,13 @@ public sealed record RequestResultMessage(
 
 public sealed record RequestExpiredMessage([property: JsonPropertyName("request_id")] Guid RequestId) : ControlMessage("request.expired");
 
+/// <summary>
+/// The other party of a session. <see cref="UserId"/> / <see cref="DeviceId"/> are the same identity
+/// <c>request.incoming</c> carries, so a host can trust the guest it has just finished a session with.
+/// </summary>
 public sealed record PeerDto(
+    [property: JsonPropertyName("user_id")] Guid UserId,
+    [property: JsonPropertyName("device_id")] Guid DeviceId,
     [property: JsonPropertyName("user_display_name")] string UserDisplayName,
     [property: JsonPropertyName("device_name")] string DeviceName);
 

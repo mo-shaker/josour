@@ -192,7 +192,7 @@ public sealed class SessionPhaseTrackerTests
     public void UnrelatedFrames_AndForeignSessions_DoNotChangeThePhase()
     {
         var tracker = new SessionPhaseTracker();
-        var created = new SessionCreatedMessage(Guid.NewGuid(), "guest", Convert.ToBase64String(new byte[32]), DateTimeOffset.UtcNow.AddMinutes(30), 1, "203.0.113.10", false, new PeerDto("Omar", "OMAR-DESKTOP"));
+        var created = new SessionCreatedMessage(Guid.NewGuid(), "guest", Convert.ToBase64String(new byte[32]), DateTimeOffset.UtcNow.AddMinutes(30), 1, "203.0.113.10", false, new PeerDto(Guid.NewGuid(), Guid.NewGuid(), "Omar", "OMAR-DESKTOP"));
 
         Assert.False(tracker.Apply(new HostsMessage("hosts.snapshot", Array.Empty<HostInfoDto>())));
         Assert.False(tracker.Apply(new PingMessage()));

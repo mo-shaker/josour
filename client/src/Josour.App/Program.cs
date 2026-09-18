@@ -1,22 +1,27 @@
-using Microsoft.Toolkit.Uwp.Notifications;
+using Avalonia;
 using Josour.App.Services;
+using Josour.App.Services.Notifications;
 
 namespace Josour.App;
 
 /// <summary>
-/// Custom entry point (the csproj sets <c>StartupObject</c>) so single-instance handling runs before WPF spins up.
+/// Entry point. Single-instance handling runs before Avalonia starts, so a second launch never builds a UI it is
+/// only going to throw away.
 /// </summary>
 public static class Program
 {
+    private static StartupOptions _options = StartupOptions.Parse(Array.Empty<string>());
+    private static SingleInstanceGuard? _instance;
+
     [STAThread]
     public static int Main(string[] args)
     {
-        var options = StartupOptions.Parse(args);
+        _options = StartupOptions.Parse(args);
 
-        if (options.UninstallNotifications)
+        if (_options.UninstallNotifications)
         {
             // Installer's [UninstallRun]: no window, no single-instance mutex, no logging.
-            return UninstallNotifications();
+            return NotifierFactory.Uninstall();
         }
 
         using var instance = SingleInstanceGuard.TryAcquire();
@@ -27,31 +32,16 @@ public static class Program
             return 0;
         }
 
-        var app = new App(options, instance);
-        app.InitializeComponent();
-        return app.Run();
+        _instance = instance;
+        return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args, Avalonia.Controls.ShutdownMode.OnExplicitShutdown);
     }
 
     /// <summary>
-    /// Removes what <see cref="ToastNotificationManagerCompat"/> registered under <c>HKCU\Software\Classes</c> (AppUserModelId + COM
-    /// activator CLSID). Exit code 0 on success (or off Windows, where there is nothing to remove); 1 when Windows refused.
+    /// Also the designer's entry point, which is why it is public, parameterless and free of side effects.
     /// </summary>
-    private static int UninstallNotifications()
-    {
-        if (!OperatingSystem.IsWindows())
-        {
-            return 0;
-        }
-
-        try
-        {
-            ToastNotificationManagerCompat.Uninstall();
-            return 0;
-        }
-        catch (Exception)
-        {
-            // Nothing sensible to show from an uninstaller context; the registry keys can be removed by hand if needed.
-            return 1;
-        }
-    }
+    public static AppBuilder BuildAvaloniaApp() =>
+        AppBuilder.Configure(() => new App(_options, _instance))
+            .UsePlatformDetect()
+            .WithInterFont()
+            .LogToTrace();
 }

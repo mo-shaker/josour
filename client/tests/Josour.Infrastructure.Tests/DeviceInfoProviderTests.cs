@@ -64,4 +64,18 @@ public sealed class DeviceInfoProviderTests
         Assert.Contains("Windows", provider.OsVersion, StringComparison.OrdinalIgnoreCase);
         Assert.Matches(@"^\d+(\.\d+)?$", provider.OsBuild);
     }
+
+    [MacFact]
+    public void OsVersion_OnMac_ReportsTheMacVersion_NotTheKernelVersion()
+    {
+        // RuntimeInformation.OSDescription would say "Darwin 25.6.0" here, which matches nothing the user or an
+        // administrator can see on the machine. sw_vers says "macOS 26.6.2" / "25G83".
+        var provider = new DeviceInfoProvider();
+
+        Assert.StartsWith("macOS ", provider.OsVersion, StringComparison.Ordinal);
+        Assert.DoesNotContain("Darwin", provider.OsVersion, StringComparison.OrdinalIgnoreCase);
+        Assert.Matches(@"^\d+(\.\d+)*$", provider.OsVersion["macOS ".Length..]);
+        // A macOS build is like "25G83": digits, a letter, then digits.
+        Assert.Matches(@"^\d+[A-Z]\w*$", provider.OsBuild);
+    }
 }

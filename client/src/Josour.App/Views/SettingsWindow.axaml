@@ -1,0 +1,156 @@
+<Window x:Class="Josour.App.Views.SettingsWindow"
+                 xmlns="https://github.com/avaloniaui"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                 xmlns:app="clr-namespace:Josour.App"
+                 xmlns:c="clr-namespace:Josour.App.Controls"
+                 xmlns:vm="clr-namespace:Josour.App.ViewModels"
+                 mc:Ignorable="d"
+                 Title="{x:Static app:Strings.SettingsWindowTitle}"
+                 FlowDirection="{x:Static app:UiFlow.Direction}"
+                 Icon="/Assets/josour.ico"
+                 Width="480" Height="620" MinWidth="440" MinHeight="520"
+                 WindowStartupLocation="CenterOwner">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="20,4,20,0">
+            <StackPanel IsEnabled="{Binding IsIdle}">
+                <TextBlock Classes="title" Text="{x:Static app:Strings.SettingsHeading}" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,4,0,16"
+                              Text="{x:Static app:Strings.SettingsDescription}" />
+
+                <!-- server -->
+                <TextBlock Classes="bodyStrong" Text="{x:Static app:Strings.SettingsServerSection}" />
+                <TextBlock Classes="caption secondary" Margin="0,8,0,0"
+                              Text="{x:Static app:Strings.SettingsServerUrlLabel}" />
+                <!-- A URL is typed left to right whatever the interface language is. -->
+                <TextBox Margin="0,4,0,4"
+                            FlowDirection="{x:Static app:UiFlow.Technical}"
+                            Text="{Binding ServerUrl, Mode=TwoWay}"
+                            Watermark="{x:Static app:Strings.LoginServerUrlPlaceholder}">
+                                <TextBox.InnerLeftContent>
+                                    <c:Icon Symbol="Globe" Margin="8,0,2,0" />
+                                </TextBox.InnerLeftContent>
+                            </TextBox>
+                <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
+                              Text="{x:Static app:Strings.SettingsServerUrlHint}" />
+
+                <Grid Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Button Grid.Column="0" Content="{Binding TestButtonText}" Command="{Binding TestConnectionCommand}" />
+                    <ProgressBar IsIndeterminate="True" Grid.Column="1" Width="72" Height="4"
+                                     HorizontalAlignment="Left" Margin="12,0,0,0"
+                                     IsVisible="{Binding IsBusy}" />
+                </Grid>
+
+                <c:InfoBar Margin="0,8,0,0" IsClosable="False"
+                            IsOpen="{Binding HasServerMessage, Mode=OneWay}"
+                            Severity="{Binding IsServerMessageAnError, Converter={StaticResource ErrorSeverity}}"
+                            Message="{Binding ServerMessage}" />
+
+                <!-- interface -->
+                <TextBlock Classes="bodyStrong" Margin="0,20,0,0" Text="{x:Static app:Strings.SettingsInterfaceSection}" />
+
+                <TextBlock Classes="caption secondary" Margin="0,8,0,0"
+                              Text="{x:Static app:Strings.SettingsLanguageLabel}" />
+                <ComboBox Margin="0,4,0,0"
+                          ItemsSource="{Binding Source={x:Static vm:SettingsViewModel.Languages}}"
+                          SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}" />
+                <c:InfoBar Margin="0,8,0,0" IsClosable="False" Severity="Informational"
+                            IsOpen="{Binding IsLanguageRestartNoteVisible, Mode=OneWay}"
+                            Message="{x:Static app:Strings.SettingsLanguageRestartNote}" />
+
+                <TextBlock Classes="caption secondary" Margin="0,12,0,0"
+                              Text="{x:Static app:Strings.SettingsBrowserLabel}" />
+                <ComboBox Margin="0,4,0,0"
+                          ItemsSource="{Binding Source={x:Static vm:SettingsViewModel.Browsers}}"
+                          SelectedItem="{Binding SelectedBrowser, Mode=TwoWay}" />
+                <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Margin="0,4,0,0"
+                              Text="{x:Static app:Strings.SettingsBrowserHint}" />
+
+                <!-- start-up -->
+                <TextBlock Classes="bodyStrong" Margin="0,20,0,0" Text="{x:Static app:Strings.SettingsStartupSection}" />
+                <CheckBox Margin="0,8,0,0"
+                          Content="{x:Static app:Strings.SettingsStartAtLogin}"
+                          IsChecked="{Binding StartAtLogin, Mode=TwoWay}"
+                          IsEnabled="{Binding IsStartAtLoginSupported}" />
+                <TextBlock Classes="caption tertiary" Margin="0,2,0,0"
+                              Text="{x:Static app:Strings.SettingsStartAtLoginUnavailable}"
+                              IsVisible="{Binding !IsStartAtLoginSupported}" />
+                <CheckBox Margin="0,8,0,0"
+                          Content="{x:Static app:Strings.SettingsStartMinimized}"
+                          IsChecked="{Binding StartMinimized, Mode=TwoWay}" />
+
+                <!--
+                    Auto-accept (docs/ws-protocol.md section 5a). The switch and the list are applied as they are
+                    changed, not on Save: they are a standing consent, and one that survived closing the window
+                    unsaved would be a consent the host thought it had withdrawn.
+                -->
+                <TextBlock Classes="bodyStrong" Margin="0,20,0,0" Text="{x:Static app:Strings.SettingsAutoAcceptSection}" />
+                <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Margin="0,4,0,0"
+                              Text="{x:Static app:Strings.SettingsAutoAcceptHint}" />
+                <CheckBox Margin="0,8,0,0"
+                          Content="{x:Static app:Strings.SettingsAutoAcceptEnable}"
+                          IsChecked="{Binding IsAutoAcceptEnabled, Mode=TwoWay}" />
+                <c:InfoBar Margin="0,8,0,0" IsClosable="False" Severity="Warning"
+                            IsOpen="{Binding IsAutoAcceptEnabled, Mode=OneWay}"
+                            Message="{x:Static app:Strings.SettingsAutoAcceptWarning}" />
+
+                <TextBlock Classes="caption secondary" Margin="0,12,0,0"
+                              Text="{x:Static app:Strings.SettingsAutoAcceptEmpty}"
+                              IsVisible="{Binding !HasTrustedGuests}" />
+
+                <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding TrustedGuests}"
+                              IsVisible="{Binding HasTrustedGuests}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <c:Card Margin="0,0,0,6" Padding="12,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Classes="bodyStrong" TextWrapping="Wrap" Text="{Binding GuestName}" />
+                                        <TextBlock Classes="caption secondary" TextWrapping="Wrap" Text="{Binding GuestDevice}" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                            <TextBlock Classes="caption tertiary" Margin="0,0,4,0"
+                                                          Text="{x:Static app:Strings.SettingsAutoAcceptColumnLimit}" />
+                                            <TextBlock Classes="caption tertiary" Margin="0,0,12,0" Text="{Binding LimitText}" />
+                                            <TextBlock Classes="caption tertiary" Margin="0,0,4,0"
+                                                          Text="{x:Static app:Strings.SettingsAutoAcceptColumnExpiry}" />
+                                            <TextBlock Classes="caption tertiary" Text="{Binding ExpiryText}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" VerticalAlignment="Center" Margin="8,0,0,0"
+                                               Content="{x:Static app:Strings.SettingsAutoAcceptRemove}"
+                                               Command="{Binding DataContext.RemoveTrustedGuestCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                               CommandParameter="{Binding}" />
+                                </Grid>
+                            </c:Card>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <c:InfoBar Margin="0,16,0,0" IsClosable="False" Severity="Error"
+                            IsOpen="{Binding HasSaveMessage, Mode=OneWay}"
+                            Message="{Binding SaveMessage}" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,12,20,16">
+            <Button MinWidth="100" Content="{x:Static app:Strings.SettingsCancel}" Command="{Binding CancelCommand}" />
+            <Button MinWidth="100" Margin="8,0,0,0" Classes="accent" IsDefault="True"
+                       Content="{x:Static app:Strings.SettingsSave}" Command="{Binding SaveCommand}" />
+        </StackPanel>
+    </Grid>
+</Window>

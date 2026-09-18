@@ -1,0 +1,118 @@
+<Window x:Class="Josour.App.Views.FirstRunWindow"
+                 xmlns="https://github.com/avaloniaui"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                 xmlns:app="clr-namespace:Josour.App"
+                 xmlns:c="clr-namespace:Josour.App.Controls"
+                 xmlns:vm="clr-namespace:Josour.App.ViewModels"
+                 mc:Ignorable="d"
+                 Title="{x:Static app:Strings.FirstRunWindowTitle}"
+                 FlowDirection="{x:Static app:UiFlow.Direction}"
+                 Icon="/Assets/josour.ico"
+                 Width="460" SizeToContent="Height" MinHeight="480"
+                 CanResize="False"
+                 WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="1" Margin="24,8,24,24" IsEnabled="{Binding IsIdle}">
+            <TextBlock Classes="title" Text="{x:Static app:Strings.FirstRunWelcomeHeading}"
+                          IsVisible="{Binding IsServerStep}" />
+            <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,4,0,12"
+                          Text="{x:Static app:Strings.FirstRunWelcomeText}"
+                          IsVisible="{Binding IsServerStep}" />
+
+            <TextBlock Classes="caption tertiary" Text="{Binding StepText}" />
+            <TextBlock Classes="subtitle" Margin="0,2,0,0" Text="{Binding StepTitle}" />
+            <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,4,0,16" Text="{Binding StepDescription}" />
+
+            <!-- step 1: the server address -->
+            <StackPanel IsVisible="{Binding IsServerStep}">
+                <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.SettingsServerUrlLabel}" />
+                <!-- A URL is typed left to right whatever the interface language is. -->
+                <TextBox Margin="0,4,0,4"
+                            FlowDirection="{x:Static app:UiFlow.Technical}"
+                            Text="{Binding ServerUrl, Mode=TwoWay}"
+                            Watermark="{x:Static app:Strings.LoginServerUrlPlaceholder}">
+                                <TextBox.InnerLeftContent>
+                                    <c:Icon Symbol="Globe" Margin="8,0,2,0" />
+                                </TextBox.InnerLeftContent>
+                            </TextBox>
+                <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
+                              Text="{x:Static app:Strings.SettingsServerUrlHint}" />
+            </StackPanel>
+
+            <!-- step 2: sign in -->
+            <StackPanel IsVisible="{Binding IsSignInStep}">
+                <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.LoginEmailLabel}" />
+                <TextBox Margin="0,4,0,12"
+                            FlowDirection="{x:Static app:UiFlow.Technical}"
+                            Text="{Binding Email, Mode=TwoWay}">
+                                <TextBox.InnerLeftContent>
+                                    <c:Icon Symbol="Mail" Margin="8,0,2,0" />
+                                </TextBox.InnerLeftContent>
+                            </TextBox>
+                <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.LoginPasswordLabel}" />
+                <TextBox PasswordChar="●" Margin="0,4,0,0"
+                                FlowDirection="{x:Static app:UiFlow.Technical}"
+                                Text="{Binding Password, Mode=TwoWay}">
+                                    <TextBox.InnerLeftContent>
+                                        <c:Icon Symbol="Key" Margin="8,0,2,0" />
+                                    </TextBox.InnerLeftContent>
+                                </TextBox>
+            </StackPanel>
+
+            <!-- step 3: what this machine looks like as a host (never a gate) -->
+            <StackPanel IsVisible="{Binding IsReadinessStep}">
+                <c:InfoBar IsClosable="False" IsOpen="True"
+                            Severity="{Binding IsFirewallWarning, Converter={StaticResource WarningSeverity}}"
+                            Message="{Binding FirewallText}" />
+                <c:InfoBar Margin="0,8,0,0" IsClosable="False" IsOpen="True"
+                            Severity="{Binding IsVpnWarning, Converter={StaticResource WarningSeverity}}"
+                            Message="{Binding VpnText}" />
+                <Button Margin="0,12,0,0" HorizontalAlignment="Left"
+                           Content="{x:Static app:Strings.ReadinessRecheck}"
+                           Command="{Binding RecheckReadinessCommand}"
+                           IsEnabled="{Binding !IsReadinessChecking}" />
+            </StackPanel>
+
+            <c:InfoBar Margin="0,12,0,0" IsClosable="False"
+                        IsOpen="{Binding HasMessage, Mode=OneWay}"
+                        Severity="{Binding IsMessageAnError, Converter={StaticResource ErrorSeverity}}"
+                        Message="{Binding Message}" />
+
+            <Grid Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <ProgressBar IsIndeterminate="True" Grid.Column="0" Width="80" Height="4" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                 IsVisible="{Binding IsBusy}" />
+
+                <Button Grid.Column="1" HorizontalAlignment="Left" Margin="12,0,0,0"
+                           Content="{x:Static app:Strings.FirstRunBack}"
+                           Command="{Binding BackToServerCommand}"
+                           IsVisible="{Binding IsSignInStep}" />
+
+                <Button Grid.Column="2" MinWidth="140" Classes="accent" IsDefault="True"
+                           Content="{x:Static app:Strings.FirstRunNext}"
+                           Command="{Binding ContinueFromServerCommand}"
+                           IsVisible="{Binding IsServerStep}" />
+                <Button Grid.Column="2" MinWidth="140" Classes="accent" IsDefault="True"
+                           Content="{x:Static app:Strings.LoginSignIn}"
+                           Command="{Binding SignInCommand}"
+                           IsVisible="{Binding IsSignInStep}" />
+                <Button Grid.Column="2" MinWidth="140" Classes="accent" IsDefault="True"
+                           Content="{x:Static app:Strings.FirstRunFinish}"
+                           Command="{Binding FinishCommand}"
+                           IsVisible="{Binding IsReadinessStep}" />
+            </Grid>
+        </StackPanel>
+    </Grid>
+</Window>

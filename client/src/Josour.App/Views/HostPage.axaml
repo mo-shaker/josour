@@ -1,0 +1,54 @@
+<UserControl x:Class="Josour.App.Views.HostPage"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:app="clr-namespace:Josour.App"
+                 xmlns:c="clr-namespace:Josour.App.Controls"
+             xmlns:vm="clr-namespace:Josour.App.ViewModels"
+             mc:Ignorable="d"
+             d:DesignWidth="420" d:DesignHeight="420">
+    <StackPanel Margin="4,12,4,4">
+        <TextBlock Classes="subtitle" Text="{x:Static app:Strings.HostPageTitle}" />
+        <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,4,0,16"
+                      Text="{x:Static app:Strings.HostPageDescription}" />
+
+        <c:Card Padding="16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Classes="bodyStrong" Text="{x:Static app:Strings.HostAvailableToggle}" />
+                    <TextBlock Classes="secondary" Text="{Binding StatusText}" Margin="0,2,0,0" />
+                </StackPanel>
+                <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0"
+                                 IsChecked="{Binding IsAvailable, Mode=TwoWay}" />
+            </Grid>
+        </c:Card>
+
+        <c:InfoBar Margin="0,12,0,0" IsClosable="False" Severity="Warning"
+                    IsOpen="{Binding !IsConnected}"
+                    Title="{x:Static app:Strings.HostNotConnectedTitle}"
+                    Message="{x:Static app:Strings.HostNotConnectedHint}" />
+
+        <!-- Plan 8.3 step 2: no inbound rule means the other device may never reach this one. -->
+        <c:InfoBar Margin="0,12,0,0" IsClosable="False" Severity="Warning"
+                    IsOpen="{Binding IsFirewallRuleMissing, Mode=OneWay}"
+                    Title="{x:Static app:Strings.HostFirewallWarningTitle}"
+                    Message="{x:Static app:Strings.HostFirewallWarningMessage}" />
+
+        <!-- Plan 8.5: a VPN that holds the outbound route makes the sites see ITS address, not this machine's.
+             Only the high-confidence result opens this bar; a VPN client that is merely running does not. -->
+        <c:InfoBar Margin="0,12,0,0" IsClosable="False" Severity="Warning"
+                    IsOpen="{Binding IsVpnWarningVisible, Mode=OneWay}"
+                    Title="{x:Static app:Strings.HostVpnWarningTitle}"
+                    Message="{Binding VpnWarningMessage}" />
+
+        <c:InfoBar Margin="0,12,0,0" IsClosable="False" Severity="Informational"
+                    IsOpen="{Binding IsSimulatedServer, Mode=OneWay}"
+                    Title="{x:Static app:Strings.HostSimulatedServerTitle}"
+                    Message="{x:Static app:Strings.HostSimulatedServerHint}" />
+    </StackPanel>
+</UserControl>

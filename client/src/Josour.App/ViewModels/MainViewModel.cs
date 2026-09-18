@@ -95,7 +95,7 @@ public sealed partial class MainViewModel : ObservableObject
         set => Host.IsAvailable = value;
     }
 
-    public bool StartWithWindows
+    public bool StartAtLogin
     {
         get => _startup.IsEnabled;
         set

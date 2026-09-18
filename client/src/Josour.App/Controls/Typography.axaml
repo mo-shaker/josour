@@ -1,0 +1,45 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--
+        The type scale and the two muted foregrounds the views ask for, as classes.
+
+        WPF-UI carried these on its own TextBlock as FontTypography and Appearance. Rebuilding them as classes on the
+        plain TextBlock keeps every view reading the same as before (Classes="subtitle" where it said
+        FontTypography="Subtitle") and keeps the scale in one file rather than as a FontSize at ninety call sites.
+    -->
+    <Style Selector="TextBlock.title">
+        <Setter Property="FontSize" Value="24" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style Selector="TextBlock.subtitle">
+        <Setter Property="FontSize" Value="18" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style Selector="TextBlock.bodyStrong">
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style Selector="TextBlock.caption">
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <!--
+        Opacity rather than a second brush: it stays correct in light and dark, and against a Card as well as against
+        the window, which two fixed greys would not.
+    -->
+    <Style Selector="TextBlock.secondary">
+        <Setter Property="Opacity" Value="0.75" />
+    </Style>
+
+    <Style Selector="TextBlock.tertiary">
+        <Setter Property="Opacity" Value="0.55" />
+    </Style>
+
+    <!-- A borderless button for the icon-only actions in the status strip. -->
+    <Style Selector="Button.transparent">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+</Styles>

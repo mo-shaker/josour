@@ -1,7 +1,9 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Josour.App.Services;
+using Josour.Core.Session;
 using Josour.Infrastructure.Api;
 using Josour.Infrastructure.Localization;
 using Josour.Infrastructure.Settings;
@@ -35,10 +37,13 @@ public sealed record SettingsChoice<T>(T Value, string Display)
 public sealed partial class SettingsViewModel : ObservableObject
 {
     private readonly IAppSettingsStore _settings;
+    private readonly IAutoAcceptStore _autoAccept;
     private readonly IServerCheck _serverCheck;
     private readonly IStartupRegistration _startup;
+    private readonly TimeProvider _time;
     private readonly ILogger<SettingsViewModel> _logger;
     private readonly UiLanguage _languageAtOpen;
+    private bool _loadingAutoAccept;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TestConnectionCommand))]
@@ -53,7 +58,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     private SettingsChoice<BrowserPreference> _selectedBrowser;
 
     [ObservableProperty]
-    private bool _startWithWindows;
+    private bool _startAtLogin;
 
     [ObservableProperty]
     private bool _startMinimized;
@@ -78,15 +83,26 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _testButtonText = Strings.SettingsTestConnection;
 
+    /// <summary>
+    /// The master switch of docs/ws-protocol.md section 5a. Unlike every other setting in this window it is applied the
+    /// moment it is changed rather than on Save — see <see cref="OnIsAutoAcceptEnabledChanged"/>.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isAutoAcceptEnabled;
+
     public SettingsViewModel(
         IAppSettingsStore settings,
+        IAutoAcceptStore autoAccept,
         IServerCheck serverCheck,
         IStartupRegistration startup,
-        ILogger<SettingsViewModel> logger)
+        ILogger<SettingsViewModel> logger,
+        TimeProvider? time = null)
     {
         _settings = settings;
+        _autoAccept = autoAccept;
         _serverCheck = serverCheck;
         _startup = startup;
+        _time = time ?? TimeProvider.System;
         _logger = logger;
 
         var current = settings.Current;
@@ -95,7 +111,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         _selectedLanguage = Languages.First(l => l.Value == _languageAtOpen);
         _selectedBrowser = Browsers.First(b => b.Value == current.PreferredBrowser);
         _startMinimized = current.StartMinimized;
-        _startWithWindows = SafeStartupState();
+        _startAtLogin = SafeStartupState();
+        LoadAutoAccept();
     }
 
     /// <summary>Each language in its own words: the point of the setting is to be findable by someone who cannot read the other one.</summary>
@@ -118,14 +135,97 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public bool HasSaveMessage => !string.IsNullOrEmpty(SaveMessage);
 
-    /// <summary>The Run key is a Windows thing; off Windows the checkbox is disabled with a reason instead of lying.</summary>
-    public bool IsStartWithWindowsSupported => _startup.IsSupported;
+    /// <summary>
+    /// Windows has a Run key and macOS has a LaunchAgent; anywhere else the checkbox is disabled with a reason
+    /// instead of pretending to do something.
+    /// </summary>
+    public bool IsStartAtLoginSupported => _startup.IsSupported;
 
     /// <summary>The language only takes effect at the next start, so say so as soon as it is changed rather than after Save.</summary>
     public bool IsLanguageRestartNoteVisible => SelectedLanguage.Value != _languageAtOpen;
 
+    /// <summary>The trusted guests of docs/ws-protocol.md section 5a, newest decision first.</summary>
+    public ObservableCollection<TrustedGuestRow> TrustedGuests { get; } = new();
+
+    public bool HasTrustedGuests => TrustedGuests.Count > 0;
+
     /// <summary>Raised when the window should close (Save succeeded, or Cancel).</summary>
     public event EventHandler? Closed;
+
+    // ---------------- auto-accept (docs/ws-protocol.md section 5a) ----------------
+
+    private void LoadAutoAccept()
+    {
+        var current = _autoAccept.Current;
+        var now = _time.GetUtcNow();
+
+        _loadingAutoAccept = true;
+        try
+        {
+            IsAutoAcceptEnabled = current.Enabled;
+        }
+        finally
+        {
+            _loadingAutoAccept = false;
+        }
+
+        TrustedGuests.Clear();
+        foreach (var guest in current.Guests.OrderByDescending(g => g.GrantedAt))
+        {
+            TrustedGuests.Add(TrustedGuestRow.From(guest, now));
+        }
+
+        OnPropertyChanged(nameof(HasTrustedGuests));
+    }
+
+    /// <summary>
+    /// Written at once, not on Save. Every other control in this window is a preference, and a preference that is
+    /// forgotten when the window is closed is merely annoying; this one is a standing consent. A host who unticks it,
+    /// closes the window and walks away must not still be accepting guests unasked — and the same, in reverse, is why
+    /// Cancel does not put it back.
+    /// </summary>
+    partial void OnIsAutoAcceptEnabledChanged(bool value)
+    {
+        if (_loadingAutoAccept)
+        {
+            return;
+        }
+
+        _ = ApplyAutoAcceptAsync(_autoAccept.Current with { Enabled = value }, $"switch set to {value}");
+    }
+
+    /// <summary>Withdraws one rule, immediately and for the same reason.</summary>
+    [RelayCommand]
+    private Task RemoveTrustedGuestAsync(TrustedGuestRow? row)
+    {
+        if (row is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        TrustedGuests.Remove(row);
+        OnPropertyChanged(nameof(HasTrustedGuests));
+        return ApplyAutoAcceptAsync(
+            _autoAccept.Current.Without(row.GuestUserId, row.GuestDeviceId),
+            "a trusted guest was removed");
+    }
+
+    private async Task ApplyAutoAcceptAsync(AutoAcceptSettings settings, string what)
+    {
+        try
+        {
+            await _autoAccept.SaveAsync(settings, CancellationToken.None).ConfigureAwait(true);
+            _logger.LogInformation("Auto-accept updated: {What}", what);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The file did not change, so neither did what the app will do. Put the window back in step with it
+            // rather than leaving a switch that shows one thing and means another.
+            _logger.LogError(ex, "Could not save the auto-accept settings ({What})", what);
+            SaveMessage = string.Format(UiFlow.Culture, Strings.SettingsSaveFailedFormat, ex.Message);
+            LoadAutoAccept();
+        }
+    }
 
     private bool CanAct() => !IsBusy && !string.IsNullOrWhiteSpace(ServerUrl);
 
@@ -193,12 +293,12 @@ public sealed partial class SettingsViewModel : ObservableObject
 
             ApplyStartupRegistration();
             _logger.LogInformation(
-                "Settings saved: server={ServerUrl} language={Language} browser={Browser} startMinimized={StartMinimized} startWithWindows={StartWithWindows}",
+                "Settings saved: server={ServerUrl} language={Language} browser={Browser} startMinimized={StartMinimized} startAtLogin={StartAtLogin}",
                 validated.NormalizedUrl,
                 SelectedLanguage.Value.ToCode(),
                 SelectedBrowser.Value,
                 StartMinimized,
-                StartWithWindows);
+                StartAtLogin);
 
             Closed?.Invoke(this, EventArgs.Empty);
         }
@@ -240,14 +340,14 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>The Run key can refuse a write (policy, a locked hive); the checkbox then goes back to what is really there.</summary>
     private void ApplyStartupRegistration()
     {
-        if (!_startup.IsSupported || _startup.IsEnabled == StartWithWindows)
+        if (!_startup.IsSupported || _startup.IsEnabled == StartAtLogin)
         {
             return;
         }
 
         try
         {
-            _startup.SetEnabled(StartWithWindows);
+            _startup.SetEnabled(StartAtLogin);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -255,7 +355,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         }
         finally
         {
-            StartWithWindows = SafeStartupState();
+            StartAtLogin = SafeStartupState();
         }
     }
 

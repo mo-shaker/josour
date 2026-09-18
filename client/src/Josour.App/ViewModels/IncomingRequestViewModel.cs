@@ -1,4 +1,4 @@
-using System.Windows.Threading;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -13,18 +13,17 @@ namespace Josour.App.ViewModels;
 /// the reminder that the host can disconnect at any time), the 60 s countdown from the request's <c>expires_at</c>, and
 /// Accept/Reject.
 /// <para>
-/// Create it on the UI thread — it owns a <see cref="DispatcherTimer"/>; decisions arriving from other threads (toast
-/// buttons) are marshalled back to that thread.
+/// Create it on the UI thread — it owns a <see cref="DispatcherTimer"/>; decisions arriving from other threads
+/// (notification buttons) are marshalled back to that thread.
 /// </para>
 /// </summary>
 public sealed partial class IncomingRequestViewModel : ObservableObject, IDisposable
 {
     private readonly IncomingRequest _request;
     private readonly ILogger<IncomingRequestViewModel> _logger;
-    private readonly Dispatcher _dispatcher;
     private readonly DispatcherTimer _timer;
     private readonly RequestCountdown _countdown;
-    private readonly TaskCompletionSource<IncomingRequestDecision> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<IncomingRequestAnswer> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     [ObservableProperty]
     private int _secondsRemaining;
@@ -35,6 +34,16 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AcceptCommand), nameof(RejectCommand))]
     private bool _isCompleted;
+
+    /// <summary>
+    /// "Accept from this guest automatically from now on" (docs/ws-protocol.md section 5a). Off every time the window
+    /// opens: a standing consent is not something a host should be able to give by not noticing a pre-ticked box.
+    /// </summary>
+    [ObservableProperty]
+    private bool _trustThisGuest;
+
+    [ObservableProperty]
+    private TrustDurationOption _selectedTrustDuration = TrustDurationOption.Options[0];
 
     /// <param name="serverNow">
     /// The server's clock as the app knows it. Defaults to the local clock only so that the debug
@@ -48,7 +57,6 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
     {
         _request = request ?? throw new ArgumentNullException(nameof(request));
         _logger = logger;
-        _dispatcher = Dispatcher.CurrentDispatcher;
         _countdown = new RequestCountdown(request.ExpiresAt, serverNow ?? (() => DateTimeOffset.UtcNow));
 
         Heading = string.Format(UiFlow.Culture, Strings.IncomingRequestHeadingFormat, request.GuestName);
@@ -64,7 +72,7 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
         ScopeLabel = DisclosureText.Label(request.Allowlist);
         ScopeNote = DisclosureText.Note(request.Allowlist);
 
-        _timer = new DispatcherTimer(DispatcherPriority.Normal, _dispatcher) { Interval = TimeSpan.FromMilliseconds(250) };
+        _timer = new DispatcherTimer(DispatcherPriority.Normal) { Interval = TimeSpan.FromMilliseconds(250) };
         _timer.Tick += (_, _) => Tick();
         Tick();
         _timer.Start();
@@ -121,8 +129,19 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
 
     public IncomingRequestDecision? Decision { get; private set; }
 
-    /// <summary>Completes with the decision (Accept/Reject/TimedOut/Dismissed).</summary>
-    public Task<IncomingRequestDecision> Completion => _completion.Task;
+    /// <summary>The options behind the "for how long" box next to the trust checkbox.</summary>
+    public IReadOnlyList<TrustDurationOption> TrustDurations => TrustDurationOption.Options;
+
+    /// <summary>
+    /// The rule the host is offering to write, or null when the box is unticked. The ceiling is this request's own
+    /// duration, which is the one number the host has actually looked at and agreed to.
+    /// </summary>
+    public TrustGrant? Trust => TrustThisGuest
+        ? new TrustGrant(SelectedTrustDuration.For, DurationMinutes)
+        : null;
+
+    /// <summary>Completes with the decision (Accept/Reject/TimedOut/Dismissed) and any trust granted with it.</summary>
+    public Task<IncomingRequestAnswer> Completion => _completion.Task;
 
     /// <summary>Raised on the UI thread once a decision exists; the window closes itself on it.</summary>
     public event EventHandler? Completed;
@@ -160,9 +179,9 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
 
     private void Complete(IncomingRequestDecision decision)
     {
-        if (!_dispatcher.CheckAccess())
+        if (!Dispatcher.UIThread.CheckAccess())
         {
-            _dispatcher.InvokeAsync(() => Complete(decision));
+            Dispatcher.UIThread.Post(() => Complete(decision));
             return;
         }
 
@@ -179,8 +198,15 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
             CountdownText = Strings.RequestExpired;
         }
 
-        _logger.LogInformation("Incoming request {RequestId} completed: {Decision}", RequestId, decision);
-        _completion.TrySetResult(decision);
+        // A rule only ever rides along with an acceptance: "trust from now on" on top of a refusal is not a thing
+        // the host can have meant, and a timeout or a dismissal is not an answer at all.
+        var trust = decision == IncomingRequestDecision.Accepted ? Trust : null;
+        _logger.LogInformation(
+            "Incoming request {RequestId} completed: {Decision} (trusted from now on: {Trusted})",
+            RequestId,
+            decision,
+            trust is not null);
+        _completion.TrySetResult(new IncomingRequestAnswer(decision, trust));
         Completed?.Invoke(this, EventArgs.Empty);
     }
 

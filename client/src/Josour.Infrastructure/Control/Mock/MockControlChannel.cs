@@ -24,7 +24,7 @@ public sealed class MockControlChannel : IControlChannel, IReconnectNow
 {
     private sealed record OutgoingRequest(string Ref, Guid RequestId, HostInfoDto Host, int DurationMin, CancellationTokenSource Timer);
 
-    private sealed record IncomingRequest(Guid RequestId, string GuestName, string GuestDevice, int DurationMin, DateTimeOffset ExpiresAt, CancellationTokenSource Timer);
+    private sealed record IncomingRequest(Guid RequestId, Guid GuestUserId, Guid GuestDeviceId, string GuestName, string GuestDevice, int DurationMin, DateTimeOffset ExpiresAt, CancellationTokenSource Timer);
 
     private sealed class MockSession
     {
@@ -277,11 +277,27 @@ public sealed class MockControlChannel : IControlChannel, IReconnectNow
             requestId = Guid.NewGuid();
             expiresAt = _time.GetUtcNow() + _options.RequestTimeout;
             var timer = new CancellationTokenSource();
-            _incoming = new IncomingRequest(requestId, guestName, guestDevice, durationMin, expiresAt, timer);
+            _incoming = new IncomingRequest(
+                requestId,
+                MockControlChannelOptions.SimulatedGuestUserId,
+                MockControlChannelOptions.SimulatedGuestDeviceId,
+                guestName,
+                guestDevice,
+                durationMin,
+                expiresAt,
+                timer);
             StartTimer(_options.RequestTimeout, timer.Token, () => ExpireIncoming(requestId));
         }
 
-        Schedule(TimeSpan.Zero, () => Emit(new RequestIncomingMessage(requestId, guestName, guestDevice, durationMin, _options.AllowlistVersion, expiresAt)));
+        Schedule(TimeSpan.Zero, () => Emit(new RequestIncomingMessage(
+            requestId,
+            MockControlChannelOptions.SimulatedGuestUserId,
+            MockControlChannelOptions.SimulatedGuestDeviceId,
+            guestName,
+            guestDevice,
+            durationMin,
+            _options.AllowlistVersion,
+            expiresAt)));
         return requestId;
     }
 
@@ -372,7 +388,7 @@ public sealed class MockControlChannel : IControlChannel, IReconnectNow
             var incoming = _incoming;
             incoming.Timer.Cancel();
             _incoming = null;
-            created = CreateSession("host", incoming.DurationMin, new PeerDto(incoming.GuestName, incoming.GuestDevice));
+            created = CreateSession("host", incoming.DurationMin, new PeerDto(incoming.GuestUserId, incoming.GuestDeviceId, incoming.GuestName, incoming.GuestDevice));
         }
 
         Schedule(TimeSpan.Zero, () => Emit(created));
@@ -492,7 +508,7 @@ public sealed class MockControlChannel : IControlChannel, IReconnectNow
 
             if (_options.AutoAcceptGuestRequests)
             {
-                created = CreateSession("guest", request.DurationMin, new PeerDto(request.Host.UserDisplayName, request.Host.DeviceName));
+                created = CreateSession("guest", request.DurationMin, new PeerDto(MockControlChannelOptions.SimulatedPeerUserId, request.Host.DeviceId, request.Host.UserDisplayName, request.Host.DeviceName));
             }
         }
 

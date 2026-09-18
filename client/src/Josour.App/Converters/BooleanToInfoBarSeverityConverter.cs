@@ -1,6 +1,6 @@
 using System.Globalization;
-using System.Windows.Data;
-using Wpf.Ui.Controls;
+using Avalonia.Data.Converters;
+using Josour.App.Controls;
 
 namespace Josour.App.Converters;
 
@@ -10,10 +10,10 @@ namespace Josour.App.Converters;
 /// </summary>
 public sealed class BooleanToInfoBarSeverityConverter : IValueConverter
 {
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+    public object? Convert(object? value, Type? targetType, object? parameter, CultureInfo culture) =>
         value is true ? InfoBarSeverity.Error : InfoBarSeverity.Success;
 
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+    public object? ConvertBack(object? value, Type? targetType, object? parameter, CultureInfo culture) =>
         throw new NotSupportedException();
 }
 
@@ -24,9 +24,9 @@ public sealed class BooleanToInfoBarSeverityConverter : IValueConverter
 /// </summary>
 public sealed class WarningFlagToSeverityConverter : IValueConverter
 {
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+    public object? Convert(object? value, Type? targetType, object? parameter, CultureInfo culture) =>
         value is true ? InfoBarSeverity.Warning : InfoBarSeverity.Success;
 
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+    public object? ConvertBack(object? value, Type? targetType, object? parameter, CultureInfo culture) =>
         throw new NotSupportedException();
 }

@@ -1,0 +1,73 @@
+<Window x:Class="Josour.App.Views.LoginWindow"
+                 xmlns="https://github.com/avaloniaui"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                 xmlns:app="clr-namespace:Josour.App"
+                 xmlns:c="clr-namespace:Josour.App.Controls"
+                 xmlns:vm="clr-namespace:Josour.App.ViewModels"
+                 mc:Ignorable="d"
+                 Title="{x:Static app:Strings.LoginWindowTitle}"
+                 FlowDirection="{x:Static app:UiFlow.Direction}"
+                 Icon="/Assets/josour.ico"
+                 Width="440" SizeToContent="Height" MinHeight="420"
+                 CanResize="False"
+                 WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="1" Margin="24,8,24,24" IsEnabled="{Binding IsIdle}">
+            <TextBlock Classes="title" Text="{x:Static app:Strings.LoginHeading}" />
+            <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,4,0,16"
+                          Text="{x:Static app:Strings.LoginDescription}" />
+
+            <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.LoginServerUrlLabel}" />
+            <!-- A URL, an address and a password are typed left to right whatever the interface language is. -->
+            <TextBox Margin="0,4,0,12"
+                        FlowDirection="{x:Static app:UiFlow.Technical}"
+                        Text="{Binding ServerUrl, Mode=TwoWay}"
+                        Watermark="{x:Static app:Strings.LoginServerUrlPlaceholder}">
+                            <TextBox.InnerLeftContent>
+                                <c:Icon Symbol="Globe" Margin="8,0,2,0" />
+                            </TextBox.InnerLeftContent>
+                        </TextBox>
+
+            <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.LoginEmailLabel}" />
+            <TextBox Margin="0,4,0,12"
+                        FlowDirection="{x:Static app:UiFlow.Technical}"
+                        Text="{Binding Email, Mode=TwoWay}">
+                            <TextBox.InnerLeftContent>
+                                <c:Icon Symbol="Mail" Margin="8,0,2,0" />
+                            </TextBox.InnerLeftContent>
+                        </TextBox>
+
+            <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.LoginPasswordLabel}" />
+            <TextBox PasswordChar="●" Margin="0,4,0,4"
+                            FlowDirection="{x:Static app:UiFlow.Technical}"
+                            Text="{Binding Password, Mode=TwoWay}">
+                                <TextBox.InnerLeftContent>
+                                    <c:Icon Symbol="Key" Margin="8,0,2,0" />
+                                </TextBox.InnerLeftContent>
+                            </TextBox>
+
+            <c:InfoBar Margin="0,12,0,0" IsClosable="False" Severity="Error"
+                        IsOpen="{Binding HasError, Mode=OneWay}"
+                        Message="{Binding ErrorText}" />
+
+            <Grid Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ProgressBar IsIndeterminate="True" Grid.Column="0" Width="80" Height="4" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                 IsVisible="{Binding IsBusy}" />
+                <Button Grid.Column="1" MinWidth="140" Classes="accent" IsDefault="True"
+                           Content="{Binding SignInButtonText}"
+                           Command="{Binding SignInCommand}" />
+            </Grid>
+        </StackPanel>
+    </Grid>
+</Window>

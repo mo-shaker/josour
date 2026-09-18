@@ -39,7 +39,7 @@ public sealed class HostDiagnosticsProbe : IHostReadinessProbe
         IVpnDetector? vpn = null,
         ILogger<HostDiagnosticsProbe>? logger = null)
     {
-        _firewall = firewall ?? FirewallDiagnostics.System;
+        _firewall = firewall ?? FirewallDiagnostics.ForCurrentPlatform();
         _vpn = vpn ?? SystemVpnDetector.Instance;
         _logger = (ILogger?)logger ?? NullLogger.Instance;
     }

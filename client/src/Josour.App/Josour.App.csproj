@@ -1,34 +1,41 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!--
+    ADR-0013: one UI on Avalonia for Windows and macOS, in place of WPF.
+
+    It multi-targets for one reason: Windows toast notifications. Microsoft.Toolkit.Uwp.Notifications
+    only resolves against a Windows TFM, and dropping it would have taken the Accept/Reject buttons off
+    the Windows toast — a capability the port was not asked to spend. Everything else, including every
+    view, is built once from the same sources. The plain net8.0 output is what macOS (and Linux) run.
+  -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
-    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
-    <UseWPF>true</UseWPF>
+    <TargetFrameworks>net8.0;net8.0-windows10.0.19041.0</TargetFrameworks>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <RootNamespace>Josour.App</RootNamespace>
     <AssemblyName>Josour</AssemblyName>
-    <StartupObject>Josour.App.Program</StartupObject>
-    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>Assets/josour.ico</ApplicationIcon>
     <Version>0.1.0</Version>
     <Product>Josour</Product>
-    <Description>Josour Windows client</Description>
+    <Description>Josour desktop client</Description>
+    <ApplicationIcon>Assets/josour.ico</ApplicationIcon>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+    <!--
+      AVLN3001 warns that a view has no public parameterless constructor, so Avalonia's RUNTIME XAML loader
+      could not build one. That is true and intended: every window here is constructed by the container with
+      its view model, and giving them parameterless constructors would be adding a way to build a window with
+      no view model purely to satisfy a loader this app never uses.
+    -->
+    <NoWarn>$(NoWarn);AVLN3001</NoWarn>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <ApplicationManifest Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">app.manifest</ApplicationManifest>
+    <SupportedOSPlatformVersion Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">10.0.17763.0</SupportedOSPlatformVersion>
   </PropertyGroup>
 
   <!--
-    Single-file publishing only. WPF's native libraries (wpfgfx_cor3, PresentationNative_cor3,
-    D3DCompiler_47, vcruntime140_cor3) are NOT bundled by default: the SDK drops them beside the
-    exe instead, and an "exe" copied on its own to another machine then dies before it can draw a
-    window or write a log line - it simply never opens.
-
-    That is not a scenario to guess at: the whole distribution story here is one file that a
-    non-technical user copies and double-clicks. So the flag lives with the project, not in
-    whoever's shell last built it.
-
-    Both properties are ignored unless -p:PublishSingleFile=true, so CI's framework-dependent
-    publish is unaffected. Use scripts/publish-exe.ps1, which checks the result really is one file.
+    Single-file publishing. Avalonia carries native libraries (libSkiaSharp, libHarfBuzzSharp) that the SDK
+    drops beside the exe by default, so an "exe" copied on its own to another machine dies before it can draw
+    a window — exactly the failure WPF's native libraries used to cause here. The whole distribution story is
+    one file a non-technical user copies and double-clicks, so the flag lives with the project.
   -->
   <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
@@ -37,7 +44,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Resource Include="Assets/josour.ico" />
+    <AvaloniaResource Include="Assets/**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -50,12 +57,27 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.22" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-    <PackageReference Include="H.NotifyIcon.Wpf" Version="2.3.2" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
-    <PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />
     <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
-    <PackageReference Include="WPF-UI" Version="3.1.1" />
+  </ItemGroup>
+
+  <!-- The live visual tree (F12), debug builds only. -->
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.22" />
+  </ItemGroup>
+
+  <!-- Windows toasts with buttons; see the note at the top. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">
+    <PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' != 'net8.0-windows10.0.19041.0'">
+    <Compile Remove="Services/Notifications/WindowsToastNotifier.cs" />
   </ItemGroup>
 
 </Project>

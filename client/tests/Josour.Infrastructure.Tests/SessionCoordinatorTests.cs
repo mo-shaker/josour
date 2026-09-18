@@ -977,7 +977,7 @@ public sealed class SessionCoordinatorTests
                 allowlistVersion,
                 "198.51.100.9",
                 SamePublicIp: true,
-                new PeerDto("Sara Ahmed", "SARA-LAPTOP")));
+                new PeerDto(Guid.NewGuid(), Guid.NewGuid(), "Sara Ahmed", "SARA-LAPTOP")));
 
             await WaitAsync(() => Coordinator.CurrentSession?.SessionId == sessionId);
             return sessionId;

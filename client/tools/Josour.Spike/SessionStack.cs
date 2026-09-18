@@ -1,6 +1,7 @@
 using System.Net;
 using Josour.Core.Allowlist;
 using Josour.Core.Control;
+using Josour.Core.Security;
 using Josour.Infrastructure.Api;
 using Josour.Infrastructure.Control;
 using Josour.Infrastructure.Device;
@@ -20,7 +21,7 @@ public sealed class SessionStack : IAsyncDisposable
     private SessionStack(
         string stateDirectory,
         AppSettingsStore settings,
-        DpapiSecretStore secrets,
+        ISecretStore secrets,
         HttpClient http,
         ApiClient api,
         AuthSession auth,
@@ -41,7 +42,7 @@ public sealed class SessionStack : IAsyncDisposable
 
     public string StateDirectory { get; }
     public AppSettingsStore Settings { get; }
-    public DpapiSecretStore Secrets { get; }
+    public ISecretStore Secrets { get; }
     public ApiClient Api { get; }
     public AuthSession Auth { get; }
     public ControlChannel Channel { get; }
@@ -67,7 +68,11 @@ public sealed class SessionStack : IAsyncDisposable
         var settings = new AppSettingsStore(Path.Combine(root, "settings.json"));
         await settings.SaveAsync(settings.Current with { ServerUrl = baseUri.ToString() }, ct).ConfigureAwait(false);
 
-        var secrets = new DpapiSecretStore(secretsDirectory);
+        // The spike is how a mac host is driven before the Avalonia window exists (docs/macos-port.md), so it takes
+        // the same store the app takes: the Keychain on macOS, DPAPI on Windows.
+        ISecretStore secrets = OperatingSystem.IsMacOS()
+            ? new KeychainSecretStore()
+            : new DpapiSecretStore(secretsDirectory);
         var device = new DeviceInfoProvider(typeof(SessionStack).Assembly);
 
         AuthSession? auth = null;

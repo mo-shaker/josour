@@ -11,6 +11,19 @@ public sealed record MockControlChannelOptions
     public static readonly Guid ReachableHostId = new("11111111-1111-4111-8111-111111111111");
     public static readonly Guid UnknownReachabilityHostId = new("22222222-2222-4222-8222-222222222222");
 
+    /// <summary>
+    /// Who the simulated <c>request.incoming</c> comes from. Fixed, not fresh per call, so that trusting the simulated
+    /// guest once makes the *next* simulated request auto-accept — which is the only way to exercise section 5a end to
+    /// end without two real machines.
+    /// </summary>
+    public static readonly Guid SimulatedGuestUserId = new("33333333-3333-4333-8333-333333333333");
+
+    public static readonly Guid SimulatedGuestDeviceId = new("44444444-4444-4444-8444-444444444444");
+
+    /// <summary>The user behind a fake host, in a simulated session's <c>peer</c>. The device id there is the fake
+    /// host's own, so the two agree with the host list the guest picked from.</summary>
+    public static readonly Guid SimulatedPeerUserId = new("55555555-5555-4555-8555-555555555555");
+
     public static IReadOnlyList<HostInfoDto> DefaultHosts { get; } = new[]
     {
         new HostInfoDto(ReachableHostId, "Omar Hassan", "OMAR-DESKTOP", Reachable: true),

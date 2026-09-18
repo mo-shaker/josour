@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -15,6 +16,7 @@ public sealed class DeviceInfoProvider : IDeviceInfoProvider
 {
     private const string FallbackVersion = "0.0.0";
     private const int FirstWindows11Build = 22000;
+    private const int SwVersTimeoutMs = 1_000;
 
     private readonly Lazy<DeviceInfo> _info;
 
@@ -42,9 +44,12 @@ public sealed class DeviceInfoProvider : IDeviceInfoProvider
 
     private static DeviceInfo Build(Assembly? appAssembly)
     {
-        var (osVersion, osBuild) = OperatingSystem.IsWindows()
-            ? ReadWindowsVersion()
-            : (RuntimeInformation.OSDescription.Trim(), Environment.OSVersion.Version.ToString());
+        var (osVersion, osBuild) = true switch
+        {
+            _ when OperatingSystem.IsWindows() => ReadWindowsVersion(),
+            _ when OperatingSystem.IsMacOS() => ReadMacVersion(),
+            _ => (RuntimeInformation.OSDescription.Trim(), Environment.OSVersion.Version.ToString()),
+        };
 
         return new DeviceInfo(ReadMachineName(), osVersion, osBuild, ResolveAppVersion(appAssembly));
     }
@@ -59,6 +64,74 @@ public sealed class DeviceInfoProvider : IDeviceInfoProvider
         catch (InvalidOperationException)
         {
             return "unknown-device";
+        }
+    }
+
+    /// <summary>
+    /// <c>sw_vers</c>: "macOS 26.6.2" and build "25G83".
+    /// <para>
+    /// Not <see cref="RuntimeInformation.OSDescription"/>, which on macOS reports the Darwin kernel version — "Darwin
+    /// 25.6.0" — and that is not a number any administrator reading the device list, or any user reading a support
+    /// bundle, can match to the macOS they believe they are running.
+    /// </para>
+    /// <para>The tool is absent or refused on no supported macOS, but if it ever is, the kernel description is a poor
+    /// answer rather than no answer, and registering the device must not fail over a cosmetic field.</para>
+    /// </summary>
+    [SupportedOSPlatform("macos")]
+    private static (string Version, string Build) ReadMacVersion()
+    {
+        var product = RunSwVers("-productName");
+        var version = RunSwVers("-productVersion");
+        var build = RunSwVers("-buildVersion");
+
+        if (string.IsNullOrWhiteSpace(version))
+        {
+            return (RuntimeInformation.OSDescription.Trim(), Environment.OSVersion.Version.ToString());
+        }
+
+        var name = string.IsNullOrWhiteSpace(product) ? "macOS" : product;
+        return ($"{name} {version}", string.IsNullOrWhiteSpace(build) ? version : build);
+    }
+
+    [SupportedOSPlatform("macos")]
+    private static string RunSwVers(string argument)
+    {
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo("/usr/bin/sw_vers", argument)
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+
+            if (process is null)
+            {
+                return string.Empty;
+            }
+
+            var output = process.StandardOutput.ReadToEnd();
+            // This runs once, at start-up, behind a Lazy; a second is a generous ceiling for a tool that prints one line.
+            if (!process.WaitForExit(SwVersTimeoutMs))
+            {
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch (InvalidOperationException)
+                {
+                    // It exited between the check and the kill.
+                }
+
+                return string.Empty;
+            }
+
+            return process.ExitCode == 0 ? output.Trim() : string.Empty;
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or IOException)
+        {
+            return string.Empty;
         }
     }
 

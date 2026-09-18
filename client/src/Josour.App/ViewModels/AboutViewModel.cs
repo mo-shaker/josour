@@ -1,4 +1,3 @@
-using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -29,6 +28,7 @@ public sealed partial class AboutViewModel : ObservableObject
     private readonly IControlChannel _channel;
     private readonly ControlChannelConnector _connector;
     private readonly IShellService _shell;
+    private readonly IClipboardService _clipboard;
     private readonly ILogger<AboutViewModel> _logger;
 
     [ObservableProperty]
@@ -45,6 +45,7 @@ public sealed partial class AboutViewModel : ObservableObject
         IControlChannel channel,
         ControlChannelConnector connector,
         IShellService shell,
+        IClipboardService clipboard,
         ILogger<AboutViewModel> logger)
     {
         _device = device;
@@ -53,6 +54,7 @@ public sealed partial class AboutViewModel : ObservableObject
         _channel = channel;
         _connector = connector;
         _shell = shell;
+        _clipboard = clipboard;
         _logger = logger;
         Refresh();
     }
@@ -113,11 +115,18 @@ public sealed partial class AboutViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void CopyDetails()
+    private async Task CopyDetailsAsync()
     {
         try
         {
-            Clipboard.SetText(Info.ToText());
+            if (!await _clipboard.SetTextAsync(Info.ToText()).ConfigureAwait(true))
+            {
+                // No window to copy through — the app can be running entirely in the tray.
+                Message = Strings.AboutCopyFailed;
+                IsMessageAnError = true;
+                return;
+            }
+
             Message = Strings.AboutCopied;
             IsMessageAnError = false;
         }

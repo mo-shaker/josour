@@ -1,0 +1,86 @@
+<UserControl x:Class="Josour.App.Views.SessionPanel"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:app="clr-namespace:Josour.App"
+                 xmlns:c="clr-namespace:Josour.App.Controls"
+             xmlns:vm="clr-namespace:Josour.App.ViewModels"
+             mc:Ignorable="d"
+             d:DesignWidth="420" d:DesignHeight="420">
+    <Grid Margin="4,12,4,4">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock Classes="subtitle" Text="{x:Static app:Strings.SessionPanelTitle}" />
+            <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,4,0,16" Text="{Binding RoleText}" />
+        </StackPanel>
+
+        <c:Card Grid.Row="1" Padding="16">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <c:Icon Grid.Column="0" Symbol="Desktop" FontSize="24" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Classes="bodyStrong" TextTrimming="CharacterEllipsis" Text="{Binding PeerText}" />
+                        <TextBlock Classes="secondary" Text="{Binding PhaseText}" />
+                    </StackPanel>
+                    <ProgressBar IsIndeterminate="True" Grid.Column="2" Width="72" Height="4" VerticalAlignment="Center"
+                                     IsVisible="{Binding !IsActive}" />
+                </Grid>
+
+                <TextBlock Classes="title" Margin="0,16,0,0" HorizontalAlignment="Center"
+                              Text="{Binding CountdownText}"
+                              IsVisible="{Binding HasCountdown}" />
+                <TextBlock Classes="caption tertiary" Margin="0,6,0,0" HorizontalAlignment="Center"
+                              Text="{Binding DataUsedText}"
+                              IsVisible="{Binding IsActive}" />
+            </StackPanel>
+        </c:Card>
+
+        <StackPanel Grid.Row="2" Margin="0,12,0,0">
+            <c:InfoBar IsOpen="{Binding HasBrowserMessage, Mode=OneWay}" IsClosable="False" Severity="Warning"
+                        Message="{Binding BrowserMessage}" />
+
+            <c:Card Padding="16" Margin="0,12,0,0"
+                     IsVisible="{Binding IsEnded}">
+                <StackPanel>
+                    <TextBlock Classes="bodyStrong" Text="{x:Static app:Strings.SessionPhaseEnded}" />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,4,0,0" Text="{Binding EndedText}" />
+                </StackPanel>
+            </c:Card>
+        </StackPanel>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Margin="0,0,8,0"
+                       Command="{Binding ReopenBrowserCommand}"
+                       IsVisible="{Binding CanReopenBrowser}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <c:Icon Symbol="Globe" />
+                    <TextBlock Text="{x:Static app:Strings.SessionReopenBrowser}" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+            <Button Classes="danger"
+                       Command="{Binding DisconnectCommand}"
+                       IsVisible="{Binding !IsEnded}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <c:Icon Symbol="PlugDisconnected" />
+                    <TextBlock Text="{x:Static app:Strings.SessionDisconnect}" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+            <Button Classes="accent"
+                       Content="{x:Static app:Strings.SessionDismiss}"
+                       Command="{Binding DismissCommand}"
+                       IsVisible="{Binding IsEnded}" />
+        </StackPanel>
+    </Grid>
+</UserControl>

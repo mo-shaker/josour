@@ -68,11 +68,21 @@ public sealed class FirewallDiagnostics : IFirewallDiagnostics
     public static FirewallDiagnostics System { get; } = new();
 
     /// <summary>
-    /// One call for both values. This is the entry point the tunnel's <c>HostDiagnostics</c> is meant to use in place of its
-    /// own netsh pair: <c>var firewall = await FirewallDiagnostics.InspectSystemAsync(ct);</c> then
+    /// The check this machine actually has: this class on Windows, <see cref="MacFirewallDiagnostics"/> on macOS, and
+    /// "unknown" anywhere else. Callers that used <see cref="System"/> directly were asking for the Windows one by
+    /// name, which on a mac is a permanent <see cref="FirewallStatus.Unknown"/> that nothing announces.
+    /// </summary>
+    public static IFirewallDiagnostics ForCurrentPlatform() =>
+        OperatingSystem.IsMacOS() ? MacFirewallDiagnostics.System : System;
+
+    /// <summary>
+    /// One call for both values, against whichever implementation this machine has
+    /// (<see cref="ForCurrentPlatform"/>). This is the entry point the tunnel's <c>HostDiagnostics</c> uses in place of
+    /// its own netsh pair: <c>var firewall = await FirewallDiagnostics.InspectSystemAsync(ct);</c> then
     /// <c>firewall.RulePresent</c> / <c>firewall.Profile</c>.
     /// </summary>
-    public static Task<FirewallStatus> InspectSystemAsync(CancellationToken ct) => System.InspectAsync(ct);
+    public static Task<FirewallStatus> InspectSystemAsync(CancellationToken ct) =>
+        ForCurrentPlatform().InspectAsync(ct);
 
     public async Task<FirewallStatus> InspectAsync(CancellationToken ct)
     {

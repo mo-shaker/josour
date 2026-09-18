@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Josour.Infrastructure.Api;
 using Josour.Infrastructure.Settings;
+using Josour.App.Services.Notifications;
 
 namespace Josour.App.Services;
 
@@ -10,7 +11,7 @@ public sealed class AuthFlow : IAuthFlow, IDisposable
     private readonly IAuthSession _auth;
     private readonly IShellService _shell;
     private readonly ControlChannelConnector _connector;
-    private readonly IToastService _toasts;
+    private readonly INotifier _toasts;
     private readonly IAppSettingsStore _settings;
     private readonly StartupOptions _options;
     private readonly ILogger<AuthFlow> _logger;
@@ -19,7 +20,7 @@ public sealed class AuthFlow : IAuthFlow, IDisposable
         IAuthSession auth,
         IShellService shell,
         ControlChannelConnector connector,
-        IToastService toasts,
+        INotifier toasts,
         IAppSettingsStore settings,
         StartupOptions options,
         ILogger<AuthFlow> logger)
