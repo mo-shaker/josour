@@ -70,6 +70,11 @@ class SecurityEventType(enum.StrEnum):
     REFRESH_REUSE = "refresh_reuse"
     DEVICE_REVOKED = "device_revoked"
     SESSION_ADMIN_TERMINATED = "session_admin_terminated"
+    REQUEST_AUTO_ACCEPTED = "request_auto_accepted"
+    """A host answered ``request.accept`` with ``auto: true``: the request matched a trusted-guest
+    rule the host had set up beforehand, so no prompt was shown. The consent is real - the host
+    gave it in advance - but it is the one acceptance no human saw at the moment it happened, so
+    it is on the record. Like ``listener_unauthenticated`` it never revokes anything (ADR-0008)."""
     LISTENER_UNAUTHENTICATED = "listener_unauthenticated"
     """Reported by a host client through ``POST /diagnostics``: connections that reached its
     listening port during a connect window and failed ``AUTH1``. The server cannot observe this

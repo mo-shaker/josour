@@ -199,6 +199,12 @@ class RequestAccept(_ClientFrame):
     type: Literal["request.accept"]
     ref: str
     request_id: uuid.UUID
+    auto: bool = False
+    """The host matched the request against a trusted-guest rule it had set up beforehand and
+    answered without showing a prompt (section 5a). It changes nothing about how the server
+    settles the request - the acceptance is the host's either way - and is declared only so the
+    audit trail can tell an acceptance nobody watched from one somebody did. Absent means false,
+    so an older client stays valid."""
 
 
 class RequestReject(_ClientFrame):
@@ -353,6 +359,11 @@ class RequestCreated(ServerMessage):
 class RequestIncoming(ServerMessage):
     type: Literal["request.incoming"] = "request.incoming"
     request_id: uuid.UUID
+    guest_user_id: uuid.UUID
+    guest_device_id: uuid.UUID
+    """The pair a host's trusted-guest rule is keyed on (section 5a). The display names below are
+    chosen by the guest and may repeat or change; these two never do, so a rule written against a
+    name would let a renamed stranger inherit a decision that was made about somebody else."""
     guest_name: str
     guest_device: str
     duration_min: int
@@ -374,6 +385,10 @@ class RequestExpired(ServerMessage):
 
 
 class Peer(BaseModel):
+    user_id: uuid.UUID
+    device_id: uuid.UUID
+    """Same identity as ``request.incoming.guest_user_id`` / ``guest_device_id``, so a host can
+    add the guest it has just finished a session with to its trusted list (section 5a)."""
     user_display_name: str
     device_name: str
 

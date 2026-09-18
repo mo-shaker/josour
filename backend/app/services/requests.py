@@ -24,8 +24,8 @@ from app.core.clock import ensure_utc, utcnow
 from app.core.config import Settings, get_settings
 from app.db.session import session_scope
 from app.models import ConnectionRequest, Device, Presence, Session, SessionKey, User
-from app.models.enums import RequestStatus, SessionRole, SessionStatus
-from app.services import allowlist, relay_tokens, session_flow
+from app.models.enums import RequestStatus, SecurityEventType, SessionRole, SessionStatus
+from app.services import allowlist, relay_tokens, security_events, session_flow
 from app.services import hosts as host_service
 from app.services import sessions as session_service
 from app.services.app_settings import settings_service
@@ -129,6 +129,8 @@ async def create(
         host.device.id,
         RequestIncoming(
             request_id=request.id,
+            guest_user_id=guest.user.id,
+            guest_device_id=guest.device.id,
             guest_name=guest.user.display_name,
             guest_device=guest.device.name,
             duration_min=duration_min,
@@ -226,14 +228,25 @@ async def reject(*, request_id: uuid.UUID, device_id: uuid.UUID, ref: str) -> No
 
 
 async def accept(
-    *, request_id: uuid.UUID, device_id: uuid.UUID, ref: str, runtime: Settings | None = None
+    *,
+    request_id: uuid.UUID,
+    device_id: uuid.UUID,
+    ref: str,
+    runtime: Settings | None = None,
+    auto: bool = False,
 ) -> Session:
     """``request.accept`` from the addressed host: create the session and its secret, then tell
     the guest (``request.result``) and both parties (``session.created``).
 
     ``settings`` here is the operator-editable row set in ``app_settings``; ``runtime`` is the
     process configuration from the environment. Only the second knows about the relay, and the
-    two are named apart because reaching for the wrong one reads correct and is not."""
+    two are named apart because reaching for the wrong one reads correct and is not.
+
+    ``auto`` is the host saying it matched its own trusted-guest rule and never prompted (section
+    5a). The server does not second-guess it and does not treat the session differently: the
+    decision belongs to the host either way, and the server has no view of the host's rules. It
+    is written to the audit trail, because an acceptance nobody watched is the one an operator
+    will want to find later."""
     runtime = runtime or get_settings()
     async with session_scope() as db:
         settings = await settings_service.get(db)
@@ -266,6 +279,24 @@ async def accept(
         # Never logged: the tunnel pre-shared secret, deleted again by ``end_session``.
         key = SessionKey(session_id=session.id, secret=secrets.token_bytes(SECRET_BYTES))
         db.add(key)
+        if auto:
+            # Attributed to the host: it is the host's standing rule that answered, and the row
+            # is what lets an operator (or the host itself) audit who that rule let in.
+            security_events.record_event(
+                db,
+                SecurityEventType.REQUEST_AUTO_ACCEPTED,
+                user_id=host.user.id,
+                device_id=host.device.id,
+                details={
+                    "request_id": str(request.id),
+                    "session_id": str(session.id),
+                    "guest_user_id": str(guest.user.id),
+                    "guest_device_id": str(guest.device.id),
+                    "guest_display_name": guest.user.display_name,
+                    "guest_device_name": guest.device.name,
+                    "duration_min": request.requested_minutes,
+                },
+            )
         await db.commit()
 
         secret_b64 = base64.b64encode(key.secret).decode("ascii")
@@ -293,7 +324,12 @@ async def accept(
                 allowlist_version=allowlist_version,
                 peer_public_ip=peer.public_ip or "",
                 same_public_ip=same_public_ip,
-                peer=Peer(user_display_name=peer.user.display_name, device_name=peer.device.name),
+                peer=Peer(
+                    user_id=peer.user.id,
+                    device_id=peer.device.id,
+                    user_display_name=peer.user.display_name,
+                    device_name=peer.device.name,
+                ),
                 # One token per party, minted here and never stored: the relay verifies the
                 # signature rather than looking the session up, so nothing has to persist.
                 relay=(

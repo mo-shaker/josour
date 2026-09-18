@@ -257,6 +257,10 @@ class Actor:
     def device_id(self) -> str:
         return str(self.device.id)
 
+    @property
+    def user_id(self) -> str:
+        return str(self.user.id)
+
 
 ActorFactory = Callable[..., Awaitable[Actor]]
 

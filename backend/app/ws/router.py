@@ -245,6 +245,7 @@ async def _handle(connection: Connection, message: ClientMessage) -> None:
                 device_id=connection.device_id,
                 ref=message.ref,
                 runtime=_runtime(connection),
+                auto=message.auto,
             )
         case RequestReject():
             await requests.reject(

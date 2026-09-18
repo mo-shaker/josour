@@ -9,8 +9,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import ConnectionRequest, Session, SessionKey
-from app.models.enums import RequestStatus, SessionStatus
+from app.models import ConnectionRequest, SecurityEvent, Session, SessionKey
+from app.models.enums import RequestStatus, SecurityEventType, SessionStatus
 from app.schemas.settings import AppSettings
 from app.services import requests as request_service
 from tests.conftest import Actor, ActorFactory, WsFactory
@@ -63,6 +63,8 @@ async def test_create_delivers_created_and_incoming(
     pair = await _pair(ws_connect, make_actor)
     request_id, incoming = await _open_request(pair)
 
+    assert incoming["guest_user_id"] == pair.guest.user_id
+    assert incoming["guest_device_id"] == pair.guest.device_id
     assert incoming["guest_name"] == "Guest"
     assert incoming["guest_device"] == "GUEST-PC"
     assert incoming["duration_min"] == 30
@@ -93,8 +95,18 @@ async def test_accept_creates_the_session_and_tells_both_parties(
     assert (guest_created["role"], host_created["role"]) == ("guest", "host")
     assert guest_created["secret_b64"] == host_created["secret_b64"]
     assert len(base64.b64decode(guest_created["secret_b64"])) == 32
-    assert guest_created["peer"] == {"user_display_name": "Hosty", "device_name": "OFFICE-PC"}
-    assert host_created["peer"] == {"user_display_name": "Guest", "device_name": "GUEST-PC"}
+    assert guest_created["peer"] == {
+        "user_id": pair.host.user_id,
+        "device_id": pair.host.device_id,
+        "user_display_name": "Hosty",
+        "device_name": "OFFICE-PC",
+    }
+    assert host_created["peer"] == {
+        "user_id": pair.guest.user_id,
+        "device_id": pair.guest.device_id,
+        "user_display_name": "Guest",
+        "device_name": "GUEST-PC",
+    }
     assert guest_created["peer_public_ip"] == "198.51.100.9"
     assert host_created["peer_public_ip"] == "203.0.113.10"
     assert guest_created["same_public_ip"] is False
@@ -397,3 +409,101 @@ async def test_guest_disconnect_ends_the_live_session_as_guest_disconnected(
     await db.rollback()
     session = await db.get(Session, uuid.UUID(session_id))
     assert session is not None and session.end_reason == "guest_disconnected"
+
+
+# ---------------------------------------------------------------- auto-accept (section 5a)
+
+
+async def _accepted_auto_events(db: AsyncSession) -> list[SecurityEvent]:
+    await db.rollback()
+    return list(
+        await db.scalars(
+            select(SecurityEvent).where(
+                SecurityEvent.type == SecurityEventType.REQUEST_AUTO_ACCEPTED
+            )
+        )
+    )
+
+
+async def test_auto_accept_settles_the_request_exactly_like_a_prompted_one(
+    ws_connect: WsFactory, make_actor: ActorFactory, db: AsyncSession
+) -> None:
+    """``auto: true`` is a statement about the host's UI, not a different kind of acceptance:
+    the guest cannot tell the two apart, and neither can the session."""
+    pair = await _pair(ws_connect, make_actor)
+    request_id, _ = await _open_request(pair, duration_min=20)
+
+    await pair.host_ws.send(
+        {"type": "request.accept", "ref": "h1", "request_id": request_id, "auto": True}
+    )
+
+    result = await pair.guest_ws.expect("request.result")
+    assert result["accepted"] is True
+    assert "auto" not in result
+    session_id = result["session_id"]
+    assert (await pair.guest_ws.expect("session.created"))["session_id"] == session_id
+    assert (await pair.host_ws.expect("session.created"))["session_id"] == session_id
+
+    session = await db.get(Session, uuid.UUID(session_id))
+    assert session is not None and session.status == SessionStatus.CONNECTING
+
+
+async def test_auto_accept_is_written_to_the_audit_trail(
+    ws_connect: WsFactory, make_actor: ActorFactory, db: AsyncSession
+) -> None:
+    pair = await _pair(ws_connect, make_actor)
+    request_id, _ = await _open_request(pair, duration_min=20)
+
+    await pair.host_ws.send(
+        {"type": "request.accept", "ref": "h1", "request_id": request_id, "auto": True}
+    )
+    session_id = (await pair.guest_ws.expect("request.result"))["session_id"]
+
+    events = await _accepted_auto_events(db)
+    assert len(events) == 1
+    event = events[0]
+    # Attributed to the host: it is the host's standing rule that answered.
+    assert str(event.user_id) == pair.host.user_id
+    assert str(event.device_id) == pair.host.device_id
+    assert event.details == {
+        "request_id": request_id,
+        "session_id": session_id,
+        "guest_user_id": pair.guest.user_id,
+        "guest_device_id": pair.guest.device_id,
+        "guest_display_name": "Guest",
+        "guest_device_name": "GUEST-PC",
+        "duration_min": 20,
+    }
+
+
+async def test_a_prompted_accept_leaves_no_auto_accept_event(
+    ws_connect: WsFactory, make_actor: ActorFactory, db: AsyncSession
+) -> None:
+    """The flag defaults to false, so an older client - which never sends it - is never recorded
+    as having skipped a prompt it did show."""
+    pair = await _pair(ws_connect, make_actor)
+    request_id, _ = await _open_request(pair)
+
+    await pair.host_ws.send({"type": "request.accept", "ref": "h1", "request_id": request_id})
+    await pair.guest_ws.expect("request.result")
+
+    assert await _accepted_auto_events(db) == []
+
+
+async def test_auto_accept_from_anyone_but_the_addressed_host_is_refused(
+    ws_connect: WsFactory, make_actor: ActorFactory, db: AsyncSession
+) -> None:
+    """``auto`` is not a way around the ownership check: the guest cannot accept its own request
+    by claiming the host had a rule for it."""
+    pair = await _pair(ws_connect, make_actor)
+    request_id, _ = await _open_request(pair)
+
+    await pair.guest_ws.send(
+        {"type": "request.accept", "ref": "g1", "request_id": request_id, "auto": True}
+    )
+
+    error = await pair.guest_ws.expect("error")
+    assert error["code"] == "forbidden"
+    assert await _accepted_auto_events(db) == []
+    row = await db.get(ConnectionRequest, uuid.UUID(request_id))
+    assert row is not None and row.status == RequestStatus.PENDING

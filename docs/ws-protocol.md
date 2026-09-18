@@ -45,7 +45,7 @@
 | `host.available` | `available` (bool), `listen_port` (int اختياري عند `true`) | يحدّث `presence.is_available_host`. مع `listen_port` يشغّل الخادم فحص قابلية الوصول |
 | `request.create` | `ref`, `host_device_id`, `duration_min` (1..max_session_minutes) | يرد `request.created {ref, request_id, expires_at}` ثم لاحقًا `request.result` |
 | `request.cancel` | `ref`, `request_id` | فقط بحالة `pending` |
-| `request.accept` | `ref`, `request_id` | من المضيف فقط |
+| `request.accept` | `ref`, `request_id`, `auto` (bool، افتراضه `false`) | من المضيف فقط. `auto: true` يعني أن المضيف طابق الطلب على قاعدة ضيف موثوق وضعها مسبقًا فلم يعرض نافذة ([القسم 5أ](#5أ-القبول-التلقائي-لضيف-موثوق)) |
 | `request.reject` | `ref`, `request_id` | من المضيف فقط |
 | `session.endpoint` | `session_id`, `cert_fp_sha256` (hex صغير، 64 حرفًا), `candidates` (مصفوفة `{type, ip, port}`؛ `type` من `lan`/`upnp`/`public`/`v6`) | من الطرفين بعد `session.created` |
 | `session.connected` | `session_id`, `winner_type`, `connect_ms`, `tls_version` (`1.2`/`1.3`) | **من المضيف فقط**؛ يحوّل الجلسة إلى `active` |
@@ -62,10 +62,10 @@
 | `hosts.snapshot` | `hosts`: مصفوفة `{device_id, user_display_name, device_name, reachable (true/false/null)}` | بعد `hello.ack` |
 | `hosts.update` | `hosts` (المصفوفة الكاملة الجديدة) | كل العملاء عند أي تغير |
 | `request.created` | `ref`, `request_id`, `expires_at` | المستخدم |
-| `request.incoming` | `request_id`, `guest_name`, `guest_device`, `duration_min`, `allowlist_version`, `expires_at` | المضيف |
+| `request.incoming` | `request_id`, `guest_user_id`, `guest_device_id`, `guest_name`, `guest_device`, `duration_min`, `allowlist_version`, `expires_at` | المضيف |
 | `request.result` | `request_id`, `accepted` (bool), `reason` (`rejected`/`expired`/`cancelled`/`host_unavailable` عند `false`), `session_id` (عند `true`) | المستخدم |
 | `request.expired` | `request_id` | المضيف: إطار «أغلق نافذة الطلب» عمومًا، يُرسل عند انتهاء المهلة وعند إلغاء المستخدم وعند انقطاعه |
-| `session.created` | `session_id`, `role` (`guest`/`host`), `secret_b64` (32 بايت Base64), `expires_at`, `allowlist_version`, `peer_public_ip`, `same_public_ip` (bool), `peer` (`{user_display_name, device_name}`), `relay` (`{address, port, token}` أو `null`) | الطرفان |
+| `session.created` | `session_id`, `role` (`guest`/`host`), `secret_b64` (32 بايت Base64), `expires_at`, `allowlist_version`, `peer_public_ip`, `same_public_ip` (bool), `peer` (`{user_id, device_id, user_display_name, device_name}`), `relay` (`{address, port, token}` أو `null`) | الطرفان |
 | `session.peer_endpoint` | `session_id`, `cert_fp_sha256`, `candidates` | الطرف الآخر لمن أرسل `session.endpoint` |
 | `session.active` | `session_id`, `expires_at` | الطرفان |
 | `session.terminate` | `session_id`, `reason` | الطرفان (أو الطرف الباقي) |
@@ -104,6 +104,41 @@ ended: حذف session_keys، حفظ الإحصاءات والنطاقات، إر
 - جلسة واحدة غير منتهية لكل مستخدم ولكل جهاز؛ أكواد فشل `request.create` مفصّلة في جدول القسم 2.
 - المضيف الذي لديه جلسة غير منتهية لا يظهر في `hosts.*` حتى تنتهي.
 - `session.connected` من المستخدم يُتجاهل مع `error(forbidden)`.
+
+## 5أ. القبول التلقائي لضيف موثوق
+
+المضيف يستطيع أن يجيب `request.incoming` **دون أن تُعرض نافذة**، إن طابق الطلب قاعدة ضيف موثوق
+كان قد وضعها بنفسه مسبقًا. الموافقة هنا حقيقية لا ملغاة: أُعطيت مرة واحدة قبل الطلب بدل أن تُعطى
+عنده. ما يتغيّر هو لحظة إعطائها لا وجودها.
+
+**القرار كله عند عميل المضيف.** الخادم لا يخزّن قوائم ثقة ولا يوافق نيابة عن أحد، ولا يملك رأيًا
+في قواعد المضيف. لو انقطع المضيف عن `/ws` فهو خارج `hosts.*` أصلًا ولا طلب يصله. هذا مقصود:
+«القبول التلقائي» يعني أن تطبيق المضيف يجيب بدل إنسانه، لا أن الخادم يجيب بدل جهازه.
+
+**مفتاح القاعدة هو الزوج `(guest_user_id, guest_device_id)`** من `request.incoming`. الاسمان
+المعروضان (`guest_name`, `guest_device`) يختارهما الضيف ويغيّرهما متى شاء وقد يتكرران بين
+مستخدمين، فقاعدة مكتوبة على اسم تُورّث قرارًا اتُّخذ في حق شخص إلى غريب أعاد التسمية. الجهاز جزء
+من المفتاح لا المستخدم وحده: ضيف يثبّت التطبيق على جهاز جديد يحصل على `device_id` جديد ويُسأل عنه
+من جديد، تمامًا كما يفعل `known_hosts`.
+
+يجب على عميل المضيف ألّا يقبل تلقائيًا إلا إذا تحقّق **كل** ما يلي، وإلا عرض النافذة كالمعتاد:
+
+| الشرط | لماذا |
+|---|---|
+| المفتاح العام للقبول التلقائي مُفعَّل | مطفأ افتراضيًا؛ إطفاؤه يوقف كل القواعد فورًا |
+| الزوج `(guest_user_id, guest_device_id)` في قائمة الثقة | القاعدة كُتبت في حق هذا الضيف على هذا الجهاز |
+| القاعدة لم تنتهِ صلاحيتها | ثقة بلا أجل تبقى بعد أن يزول سببها |
+| `duration_min` ≤ سقف المدة في القاعدة | المضيف وثق بجلسة قصيرة لا بيوم كامل |
+| `enforce_allowlist` مطفأ، أو `allowlist_version` هو نفسه المسجَّل وقت منح الثقة | القائمة تغيّرت فما يمنحه الطلب لم يعد ما وافق عليه المضيف |
+
+القبول التلقائي يرسل `request.accept` بـ `auto: true`. الخادم يسجّل حينها حدث أمن
+`request_auto_accepted` منسوبًا إلى **المضيف** (صاحب القاعدة) وتفاصيله هوية الضيف والمدة، لأن هذه
+هي الموافقة الوحيدة التي لم يشهدها أحد لحظة وقوعها فهي أولى الموافقات بأن تكون على السجل. ما عدا
+ذلك لا شيء يختلف: الجلسة تُنشأ وتُدار وتنتهي بالمسار نفسه في القسم 5.
+
+على المضيف أن **يُعلِم لا أن يستأذن**: إشعار غير حاجب يقول إن فلانًا اتصل تلقائيًا، وفيه إنهاء
+فوري للجلسة. قبولٌ صامت تمامًا يجعل المضيف يكتشف استعمال اتصاله من فاتورة أو من بطء، وهذا ليس ما
+وافق عليه.
 
 ## 6. فحص قابلية الوصول
 
