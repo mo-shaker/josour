@@ -13,6 +13,33 @@ public interface IOwnerPidChecker
     int? GetOwnerPid(IPEndPoint remoteEndPoint, IPEndPoint localEndPoint);
 }
 
+/// <summary>
+/// Which platforms can answer "which process opened this connection", and the checker for the running one.
+/// <para>
+/// This is the control that keeps the product from being a device-wide proxy: the local CONNECT proxy listens on
+/// loopback, so any program on the machine can reach it, and only the owner check tells the work browser apart from
+/// everything else. Acceptance criterion 10 — Teams and Outlook and the normal browser stay on the user's own
+/// connection — rests entirely on it.
+/// </para>
+/// <para>
+/// So a platform without an implementation has no guest role, and says so. It must never quietly become a platform
+/// where the check passes for everybody.
+/// </para>
+/// </summary>
+public static class OwnerPidCheckers
+{
+    /// <summary>True where a connection's owning process can actually be identified. Windows only, for now.</summary>
+    public static bool SupportedOnThisPlatform => OperatingSystem.IsWindows();
+
+    /// <summary>
+    /// The checker this machine has. Off Windows it is <see cref="PermissiveOwnerPidChecker"/>, which identifies
+    /// nobody — which is why <see cref="ConnectProxyOptions.RejectUnknownOwner"/> defaults to refusing, and why a
+    /// proxy wired for owner checks on such a platform refuses to start rather than admitting everything.
+    /// </summary>
+    public static IOwnerPidChecker ForCurrentPlatform() =>
+        OperatingSystem.IsWindows() ? WindowsOwnerPidChecker.Instance : PermissiveOwnerPidChecker.Instance;
+}
+
 /// <summary>لا يعرف شيئًا (غير Windows والاختبارات). قبول الاتصال يعتمد حينها على RejectUnknownOwner.</summary>
 public sealed class PermissiveOwnerPidChecker : IOwnerPidChecker
 {

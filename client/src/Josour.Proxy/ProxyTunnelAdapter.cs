@@ -77,12 +77,12 @@ public sealed class ProxyTunnelAdapter : ITunnelProxy
     }
 
     /// <summary>
-    /// The checker that can actually answer on this platform. Only Windows has one; elsewhere the
-    /// permissive checker is correct, and <see cref="ConnectProxyOptions.RejectUnknownOwner"/> defaults
-    /// to false there so "unknown" admits rather than refuses.
+    /// The checker that can actually answer on this platform (<see cref="OwnerPidCheckers.ForCurrentPlatform"/>).
+    /// Only Windows has one. Elsewhere this returns the permissive checker and the proxy then refuses to start,
+    /// which is the intended outcome: a guest role that cannot tell the work browser from the rest of the machine
+    /// is not a guest role, and pretending otherwise would hand the host's address to every program on it.
     /// </summary>
-    private static IOwnerPidChecker DefaultOwnerPidChecker()
-        => OperatingSystem.IsWindows() ? new WindowsOwnerPidChecker() : PermissiveOwnerPidChecker.Instance;
+    private static IOwnerPidChecker DefaultOwnerPidChecker() => OwnerPidCheckers.ForCurrentPlatform();
 
     /// <summary>الخادم الأصلي (العدّادات التفصيلية، وقت أول وصول لصفحة الفحص).</summary>
     public ConnectProxyServer Server => _server;

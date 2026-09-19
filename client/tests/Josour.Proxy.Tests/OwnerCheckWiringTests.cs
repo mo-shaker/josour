@@ -65,15 +65,50 @@ public class OwnerCheckWiringTests
         Assert.InRange(proxy.Port, 1, 65535);
     }
 
+    private static TunnelProxyContext Context() => new(
+        AllowlistMatcher.Parse(1, Array.Empty<string>()), new[] { 80, 443 }, DnsHostResolver.Instance,
+        "198.51.100.9", new FakeMux());
+
     [Fact]
-    public async Task TheAdapterInstallsAWorkingCheckerByDefault()
+    public async Task TheAdapterInstallsAWorkingCheckerWhereThePlatformHasOne()
     {
-        // The actual defect: the App calls this overload without a checker. On Windows the default has
-        // to be one that can answer, or the proxy is dead on arrival.
-        var context = new TunnelProxyContext(
-            AllowlistMatcher.Parse(1, Array.Empty<string>()), new[] { 80, 443 }, DnsHostResolver.Instance,
-            "198.51.100.9", new FakeMux());
-        await using var proxy = ProxyTunnelAdapter.Create(context, new FakeBrowser(), systemProxy: NoSystemProxy.Instance);
+        // The original defect: the App calls this overload without a checker. Where the platform can answer,
+        // the default has to be one that does, or the proxy is dead on arrival.
+        if (!OwnerPidCheckers.SupportedOnThisPlatform)
+        {
+            return;
+        }
+
+        await using var proxy = ProxyTunnelAdapter.Create(Context(), new FakeBrowser(), systemProxy: NoSystemProxy.Instance);
         Assert.InRange(proxy.Port, 1, 65535);
+    }
+
+    [Fact]
+    public void WhereThePlatformHasNoCheckerTheProxyRefusesToStart()
+    {
+        // This test used to pass everywhere, and that was the bug: off Windows the adapter installed a checker
+        // that identifies nobody while the default admitted unknown owners, so the proxy quietly served every
+        // process on the machine. A guest role that cannot tell the work browser from the rest of the machine
+        // must refuse to exist, not widen silently.
+        if (OwnerPidCheckers.SupportedOnThisPlatform)
+        {
+            return;
+        }
+
+        var error = Assert.Throws<ArgumentException>(
+            () => ProxyTunnelAdapter.Create(Context(), new FakeBrowser(), systemProxy: NoSystemProxy.Instance));
+        Assert.Contains("refuse every connection", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task UnknownOwnersAreRefusedByDefaultOnEveryPlatform()
+    {
+        // The default is fail-closed everywhere. "Admit everything" remains available to whoever says so.
+        await using var admitting = new ConnectProxyServer(
+            Options(new FakeBrowser(), PermissiveOwnerPidChecker.Instance, rejectUnknown: false));
+        Assert.InRange(admitting.Port, 1, 65535);
+
+        Assert.Throws<ArgumentException>(
+            () => new ConnectProxyServer(Options(new FakeBrowser(), PermissiveOwnerPidChecker.Instance, rejectUnknown: null)));
     }
 }

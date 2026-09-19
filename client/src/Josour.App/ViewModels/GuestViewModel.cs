@@ -9,6 +9,7 @@ using Josour.Core.Control;
 using Josour.Core.Session;
 using Josour.Infrastructure.Api;
 using Josour.Infrastructure.Session;
+using Josour.Proxy;
 
 namespace Josour.App.ViewModels;
 
@@ -105,11 +106,26 @@ public sealed partial class GuestViewModel : ObservableObject
 
     public bool HasHosts => Hosts.Count > 0;
 
+    /// <summary>
+    /// Whether this machine can be a guest at all.
+    /// <para>
+    /// It cannot unless the platform can tell which process opened a local connection: the proxy listens on
+    /// loopback, and without that check it would carry ANY program's traffic out through the host's address —
+    /// not the work browser's alone. The host agreed to lend a browser, not a machine. So where the check does
+    /// not exist the role is refused outright rather than offered in a weaker form, because a weaker form is
+    /// one the host was never asked about. See <c>docs/macos-port.md</c>, seam 6.
+    /// </para>
+    /// </summary>
+    public static bool IsGuestRoleSupported => OwnerPidCheckers.SupportedOnThisPlatform;
+
+    /// <summary>The inverse, for the warning bar that takes the page's place when the role is unavailable.</summary>
+    public static bool IsGuestRoleUnavailable => !IsGuestRoleSupported;
+
     public bool HasStatusMessage => StatusMessage.Length > 0;
 
     private bool CanRefresh() => !IsRefreshing;
 
-    private bool CanRequestConnection() => SelectedHost is not null && IsConnected && !IsWaitingForHost;
+    private bool CanRequestConnection() => IsGuestRoleSupported && SelectedHost is not null && IsConnected && !IsWaitingForHost;
 
     private bool CanCancelRequest() => IsWaitingForHost;
 

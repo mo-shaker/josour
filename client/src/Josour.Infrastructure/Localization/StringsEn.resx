@@ -815,4 +815,10 @@
   <data name="AboutCopyFailed" xml:space="preserve">
     <value>Could not copy: no window is open.</value>
   </data>
+  <data name="GuestRoleUnavailableTitle" xml:space="preserve">
+    <value>The guest role is not available on this system</value>
+  </data>
+  <data name="GuestRoleUnavailableMessage" xml:space="preserve">
+    <value>Josour can only guarantee that the work browser alone goes through the host on Windows. Without that guarantee everything on your machine could leave from the host's address, which is not what they agreed to. This machine can still be a host; being a guest needs Windows.</value>
+  </data>
 </root>

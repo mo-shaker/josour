@@ -815,4 +815,10 @@
   <data name="AboutCopyFailed" xml:space="preserve">
     <value>تعذّر النسخ: لا نافذة مفتوحة.</value>
   </data>
+  <data name="GuestRoleUnavailableTitle" xml:space="preserve">
+    <value>دور الضيف غير متاح على هذا النظام</value>
+  </data>
+  <data name="GuestRoleUnavailableMessage" xml:space="preserve">
+    <value>يستطيع Josour أن يضمن أن متصفح العمل وحده هو ما يمر عبر المضيف على Windows فقط. وبدون ذلك الضمان قد يخرج كل ما على جهازك من عنوان المضيف، وهو ليس ما وافق عليه. هذا الجهاز يصلح مضيفًا؛ ودور الضيف يحتاج جهاز Windows.</value>
+  </data>
 </root>

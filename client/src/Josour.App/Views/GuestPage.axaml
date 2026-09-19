@@ -15,7 +15,18 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Margin="0,0,0,12">
+        <!--
+            Where the platform cannot tell the work browser's connections from the rest of the machine's, there is
+            no guest role to offer. The bar says so before anything else on the page, and the request button stays
+            disabled: the host agreed to lend a browser, not a machine.
+        -->
+        <c:InfoBar Grid.Row="0" Margin="0,0,0,12" IsClosable="False" Severity="Warning"
+                   IsOpen="{x:Static vm:GuestViewModel.IsGuestRoleUnavailable}"
+                   Title="{x:Static app:Strings.GuestRoleUnavailableTitle}"
+                   Message="{x:Static app:Strings.GuestRoleUnavailableMessage}" />
+
+        <Grid Grid.Row="0" Margin="0,0,0,12"
+              IsVisible="{x:Static vm:GuestViewModel.IsGuestRoleSupported}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />

@@ -79,6 +79,8 @@ public static class UiStringKeys
     public const string GuestErrorHostUnavailable = "GuestErrorHostUnavailable";
     public const string GuestErrorSessionExists = "GuestErrorSessionExists";
     public const string GuestErrorRequestPending = "GuestErrorRequestPending";
+    public const string GuestRoleUnavailableTitle = "GuestRoleUnavailableTitle";
+    public const string GuestRoleUnavailableMessage = "GuestRoleUnavailableMessage";
     public const string GuestErrorRateLimited = "GuestErrorRateLimited";
     public const string GuestErrorNotConnected = "GuestErrorNotConnected";
     public const string GuestErrorGenericFormat = "GuestErrorGenericFormat";

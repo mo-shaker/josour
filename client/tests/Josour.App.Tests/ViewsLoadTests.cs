@@ -8,6 +8,7 @@ using Josour.App.Models;
 using Josour.App.ViewModels;
 using Josour.App.Views;
 using Josour.Infrastructure.Session;
+using Josour.Proxy;
 
 namespace Josour.App.Tests;
 
@@ -120,6 +121,24 @@ public class ViewsLoadTests
 
         Assert.Equal(UiFlow.Direction, window.FlowDirection);
         Assert.Equal(FlowDirection.RightToLeft, window.FlowDirection);
+    }
+
+    [AvaloniaFact]
+    public void The_guest_page_offers_the_role_only_where_the_platform_can_police_it()
+    {
+        // The proxy listens on loopback; without an owner check every program on the machine could leave
+        // through the host's address. So the page either offers the role or says why it cannot — never both,
+        // and never neither.
+        var page = new GuestPage();
+
+        using var rendered = Render(page);
+
+        var bars = rendered.Window.GetVisualDescendants().OfType<InfoBar>().ToList();
+        var warning = bars.SingleOrDefault(b => b.Title == Strings.GuestRoleUnavailableTitle);
+
+        Assert.NotNull(warning);
+        Assert.Equal(!OwnerPidCheckers.SupportedOnThisPlatform, warning!.IsVisible);
+        Assert.Equal(OwnerPidCheckers.SupportedOnThisPlatform, GuestViewModel.IsGuestRoleSupported);
     }
 
     [AvaloniaFact]

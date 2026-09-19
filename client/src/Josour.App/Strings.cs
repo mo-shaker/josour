@@ -89,6 +89,8 @@ public static class Strings
     public static string GuestErrorHostUnavailable => LocalizedStrings.Current[UiStringKeys.GuestErrorHostUnavailable];
     public static string GuestErrorSessionExists => LocalizedStrings.Current[UiStringKeys.GuestErrorSessionExists];
     public static string GuestErrorRequestPending => LocalizedStrings.Current[UiStringKeys.GuestErrorRequestPending];
+    public static string GuestRoleUnavailableTitle => LocalizedStrings.Current[UiStringKeys.GuestRoleUnavailableTitle];
+    public static string GuestRoleUnavailableMessage => LocalizedStrings.Current[UiStringKeys.GuestRoleUnavailableMessage];
     public static string GuestErrorRateLimited => LocalizedStrings.Current[UiStringKeys.GuestErrorRateLimited];
     public static string GuestErrorNotConnected => LocalizedStrings.Current[UiStringKeys.GuestErrorNotConnected];
     public static string GuestErrorGenericFormat => LocalizedStrings.Current[UiStringKeys.GuestErrorGenericFormat];

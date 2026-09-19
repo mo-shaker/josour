@@ -28,7 +28,19 @@ public sealed class ConnectProxyOptions
     /// (مستمع النفق نفسه، منفذ الـ Relay، خدمات 127.0.0.1). يُستبدل في الاختبارات داخل العملية فقط للسماح بـ loopback.
     /// </summary>
     public Func<IPAddress, bool>? AddressBlocker { get; init; }
-    /// <summary>عند وجود Browser: هل يُرفض اتصال لا يمكن تحديد مالكه؟ الافتراضي true على Windows (fail-closed) وfalse على غيره.</summary>
+    /// <summary>
+    /// عند وجود Browser: هل يُرفض اتصال لا يمكن تحديد مالكه؟ **الافتراضي `true` على كل نظام** (fail-closed).
+    /// <para>
+    /// كان الافتراض `OperatingSystem.IsWindows()`، أي «ارفض على Windows واقبل على غيره». ومع
+    /// <see cref="PermissiveOwnerPidChecker"/> — وهي كل ما يوجد خارج Windows — كان معنى ذلك أن الـ Proxy المحلي
+    /// **يقبل كل عملية على الجهاز**، لا متصفح العمل وحده. لم يكن ذلك قرارًا اتُّخذ، بل أثرًا جانبيًا لافتراض،
+    /// وكان يُسقط معيار القبول رقم 10 بصمت على أي نظام غير Windows.
+    /// </para>
+    /// <para>
+    /// من أراد «اقبل كل شيء» فليقل ذلك صراحةً بـ `false` — كما تفعل الاختبارات داخل العملية وأداة Spike. الفرق
+    /// بين اختيارٍ مُعلَن وافتراضٍ صامت هو كل الفرق هنا.
+    /// </para>
+    /// </summary>
     public bool? RejectUnknownOwner { get; init; }
     public TimeSpan DirectConnectTimeout { get; init; } = TimeSpan.FromSeconds(5);
     public TimeSpan RequestHeadTimeout { get; init; } = TimeSpan.FromSeconds(30);
@@ -94,7 +106,7 @@ public sealed class ConnectProxyServer : IAsyncDisposable
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         ArgumentNullException.ThrowIfNull(options.Allowlist);
-        _rejectUnknownOwner = options.RejectUnknownOwner ?? OperatingSystem.IsWindows();
+        _rejectUnknownOwner = options.RejectUnknownOwner ?? true;
         // A browser to check against, a checker that never identifies anyone, and a policy of refusing
         // whoever it cannot identify: that combination admits nothing, ever. It is not a strict policy,
         // it is a wiring mistake, and it shipped once - every connection the work browser made was
