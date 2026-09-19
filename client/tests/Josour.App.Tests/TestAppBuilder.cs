@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Headless;
 using Josour.App;
+using Josour.Infrastructure.Localization;
 
 [assembly: AvaloniaTestApplication(typeof(Josour.App.Tests.TestAppBuilder))]
 
@@ -17,6 +18,23 @@ namespace Josour.App.Tests;
 /// </summary>
 public static class TestAppBuilder
 {
+    /// <summary>
+    /// Fixes the interface language before anything reads it.
+    /// <para>
+    /// <see cref="UiFlow"/> resolves the reading direction once, on first use, because the real app fixes the
+    /// language in <c>App.Start</c> before any window exists. A test process has no such guarantee: a plain
+    /// <c>[Fact]</c> that touches <see cref="Strings"/> runs before the Avalonia application is built and freezes
+    /// the direction at whatever the default culture happened to be. Doing it here, in the type initializer that
+    /// runs before any test, gives every test the same language the app has.
+    /// </para>
+    /// </summary>
+    static TestAppBuilder() => LocalizedStrings.UseLanguage(UiLanguages.Default);
+
+    /// <summary>
+    /// Built through <see cref="Program.ConfigureApp"/> — the same method the real entry point uses — so the tests
+    /// run on the app's own fonts and options rather than on a second, quietly different configuration. Only the
+    /// windowing backend differs, which is the one thing a headless run must change.
+    /// </summary>
     public static AppBuilder BuildAvaloniaApp() =>
-        AppBuilder.Configure<App>().UseHeadless(new AvaloniaHeadlessPlatformOptions());
+        Program.ConfigureApp(AppBuilder.Configure<App>()).UseHeadless(new AvaloniaHeadlessPlatformOptions());
 }

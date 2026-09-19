@@ -7,6 +7,7 @@ using Josour.App.Controls;
 using Josour.App.Models;
 using Josour.App.ViewModels;
 using Josour.App.Views;
+using Josour.Infrastructure.Localization;
 using Josour.Infrastructure.Session;
 using Josour.Proxy;
 
@@ -112,15 +113,30 @@ public class ViewsLoadTests
     }
 
     [AvaloniaFact]
-    public void An_arabic_window_reads_right_to_left()
+    public void A_window_reads_in_the_direction_the_interface_language_asks_for()
     {
-        // The interface language is fixed before any window exists, and Arabic is the shipped default.
+        // What belongs to the window is that it follows UiFlow — which is the binding every view carries and the
+        // thing that would break if one were written without it.
+        //
+        // Not asserted here: that the direction is specifically RightToLeft. UiFlow resolves once, on first use,
+        // because the real app fixes the language in App.Start before any window exists; in a test process a plain
+        // [Fact] that touches Strings can get there first and freeze it. Pinning the absolute value would make this
+        // test pass or fail on which test ran before it, which is worse than not pinning it.
         using var viewModel = SampleViewModel();
         using var rendered = new Rendered(new IncomingRequestWindow(viewModel));
-        var window = rendered.Window;
 
-        Assert.Equal(UiFlow.Direction, window.FlowDirection);
-        Assert.Equal(FlowDirection.RightToLeft, window.FlowDirection);
+        Assert.Equal(UiFlow.Direction, rendered.Window.FlowDirection);
+    }
+
+    [Fact]
+    public void Arabic_is_the_shipped_default_and_it_is_read_right_to_left()
+    {
+        // The other half of the assertion above, asked of the language pack directly so no window and no test
+        // ordering is involved.
+        var arabic = LocalizedStrings.UseLanguage(UiLanguage.Arabic);
+
+        Assert.True(arabic.IsRightToLeft);
+        Assert.Equal(UiLanguage.Arabic, UiLanguages.Default);
     }
 
     [AvaloniaFact]

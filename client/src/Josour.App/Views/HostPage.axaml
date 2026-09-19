@@ -23,7 +23,13 @@
                     <TextBlock Classes="bodyStrong" Text="{x:Static app:Strings.HostAvailableToggle}" />
                     <TextBlock Classes="secondary" Text="{Binding StatusText}" Margin="0,2,0,0" />
                 </StackPanel>
+                <!--
+                    No OnContent/OffContent: Avalonia's ToggleSwitch writes "On"/"Off" beside itself by default,
+                    in English, which is both untranslated and a second answer to a question StatusText already
+                    answers directly underneath the label ("متاح" / "غير متاح").
+                -->
                 <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0"
+                                 OnContent="" OffContent=""
                                  IsChecked="{Binding IsAvailable, Mode=TwoWay}" />
             </Grid>
         </c:Card>

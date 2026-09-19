@@ -148,7 +148,7 @@ public class AdminPanelTests
     }
 
     [Fact]
-    public async Task The_create_form_will_not_submit_until_it_can_succeed()
+    public void The_create_form_will_not_submit_until_it_can_succeed()
     {
         var vm = Build(new FakeApi());
 
