@@ -136,3 +136,56 @@ internal sealed record ApiErrorBody(
     [property: JsonPropertyName("message")] string? Message);
 
 internal sealed record ApiErrorEnvelope([property: JsonPropertyName("error")] ApiErrorBody? Error);
+
+// ---------------------------------------------------------------- admin (role = admin)
+
+/// <summary>
+/// One account as <c>GET /admin/users</c> returns it: <see cref="UserDto"/> plus the state an administrator acts on.
+/// </summary>
+/// <param name="IsActive">False means the account is disabled: it cannot sign in, and its live control channels
+/// were closed when it was disabled.</param>
+/// <param name="FailedLogins">Consecutive failed sign-ins; reset by an unlock.</param>
+/// <param name="LockedUntil">Non-null while the account is locked out after repeated failures (ADR-0008).</param>
+public sealed record AdminUserDto(
+    [property: JsonPropertyName("id")] Guid Id,
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("display_name")] string DisplayName,
+    [property: JsonPropertyName("role")] string Role,
+    [property: JsonPropertyName("is_active")] bool IsActive,
+    [property: JsonPropertyName("failed_logins")] int FailedLogins,
+    [property: JsonPropertyName("locked_until")] DateTimeOffset? LockedUntil,
+    [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt)
+{
+    /// <summary>True while a lockout is still in force at <paramref name="now"/>.</summary>
+    public bool IsLockedAt(DateTimeOffset now) => LockedUntil is { } until && until > now;
+}
+
+/// <summary>Body of <c>POST /admin/users</c>.</summary>
+public sealed record AdminUserCreate(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("password")] string Password,
+    [property: JsonPropertyName("display_name")] string DisplayName,
+    [property: JsonPropertyName("role")] string Role);
+
+/// <summary>
+/// Body of <c>PATCH /admin/users/{id}</c>. Every field is optional and omitted fields are left alone; the server
+/// rejects unknown keys rather than ignoring them, so this record must not grow a property the contract lacks.
+/// </summary>
+public sealed record AdminUserPatch
+{
+    [JsonPropertyName("is_active")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? IsActive { get; init; }
+
+    [JsonPropertyName("password")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Password { get; init; }
+
+    [JsonPropertyName("display_name")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? DisplayName { get; init; }
+
+    [JsonPropertyName("unlock")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Unlock { get; init; }
+}

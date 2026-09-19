@@ -821,4 +821,94 @@
   <data name="GuestRoleUnavailableMessage" xml:space="preserve">
     <value>يستطيع Josour أن يضمن أن متصفح العمل وحده هو ما يمر عبر المضيف على Windows فقط. وبدون ذلك الضمان قد يخرج كل ما على جهازك من عنوان المضيف، وهو ليس ما وافق عليه. هذا الجهاز يصلح مضيفًا؛ ودور الضيف يحتاج جهاز Windows.</value>
   </data>
+  <data name="AdminWindowTitle" xml:space="preserve">
+    <value>إدارة المستخدمين</value>
+  </data>
+  <data name="AdminHeading" xml:space="preserve">
+    <value>المستخدمون</value>
+  </data>
+  <data name="AdminDescription" xml:space="preserve">
+    <value>إنشاء الحسابات وتعطيلها وفكّ قفلها وتغيير كلمات المرور. لا حذف: حذف حساب يمحو سجلّ كل جلسة كان طرفًا فيها، بما فيها نصيب المضيف الآخر — والتعطيل يُخرج الشخص من النظام كما يفعل الحذف ويُبقي سجلّ من شاركوه.</value>
+  </data>
+  <data name="AdminSearchPlaceholder" xml:space="preserve">
+    <value>ابحث ببريد أو اسم</value>
+  </data>
+  <data name="AdminRefresh" xml:space="preserve">
+    <value>حدّث</value>
+  </data>
+  <data name="AdminEmptyList" xml:space="preserve">
+    <value>لا مستخدمين مطابقين.</value>
+  </data>
+  <data name="AdminColumnState" xml:space="preserve">
+    <value>الحالة</value>
+  </data>
+  <data name="AdminStateActive" xml:space="preserve">
+    <value>مفعَّل</value>
+  </data>
+  <data name="AdminStateDisabled" xml:space="preserve">
+    <value>معطَّل</value>
+  </data>
+  <data name="AdminStateLocked" xml:space="preserve">
+    <value>مقفَل مؤقتًا</value>
+  </data>
+  <data name="AdminRoleAdmin" xml:space="preserve">
+    <value>مسؤول</value>
+  </data>
+  <data name="AdminDisable" xml:space="preserve">
+    <value>عطّل</value>
+  </data>
+  <data name="AdminEnable" xml:space="preserve">
+    <value>فعّل</value>
+  </data>
+  <data name="AdminUnlock" xml:space="preserve">
+    <value>افكك القفل</value>
+  </data>
+  <data name="AdminSelfNote" xml:space="preserve">
+    <value>لا يمكنك تعطيل حسابك أنت.</value>
+  </data>
+  <data name="AdminCreateSection" xml:space="preserve">
+    <value>حساب جديد</value>
+  </data>
+  <data name="AdminEmailLabel" xml:space="preserve">
+    <value>البريد</value>
+  </data>
+  <data name="AdminDisplayNameLabel" xml:space="preserve">
+    <value>الاسم المعروض</value>
+  </data>
+  <data name="AdminPasswordLabel" xml:space="preserve">
+    <value>كلمة المرور</value>
+  </data>
+  <data name="AdminMakeAdmin" xml:space="preserve">
+    <value>امنحه صلاحية مسؤول</value>
+  </data>
+  <data name="AdminCreate" xml:space="preserve">
+    <value>أنشئ</value>
+  </data>
+  <data name="AdminUserCreatedFormat" xml:space="preserve">
+    <value>أُنشئ الحساب {0}.</value>
+  </data>
+  <data name="AdminUserEnabledFormat" xml:space="preserve">
+    <value>فُعِّل حساب {0}.</value>
+  </data>
+  <data name="AdminUserDisabledFormat" xml:space="preserve">
+    <value>عُطِّل حساب {0}: سُحبت توكناته وأُغلقت قنواته الحيّة فورًا.</value>
+  </data>
+  <data name="AdminUserUnlockedFormat" xml:space="preserve">
+    <value>فُكّ قفل حساب {0}.</value>
+  </data>
+  <data name="AdminPasswordSetFormat" xml:space="preserve">
+    <value>غُيِّرت كلمة مرور {0}؛ ستحتاج أجهزته تسجيل الدخول من جديد.</value>
+  </data>
+  <data name="AdminPasswordTooShortFormat" xml:space="preserve">
+    <value>كلمة المرور لا تقل عن {0} محارف.</value>
+  </data>
+  <data name="AdminDisableWarning" xml:space="preserve">
+    <value>التعطيل ينفذ فورًا: تُسحب التوكنات، ويُمسح الحضور، وتُغلق كل قناة تحكم حيّة. وإن كان في جلسة الآن فستنقطع.</value>
+  </data>
+  <data name="TrayAdmin" xml:space="preserve">
+    <value>إدارة المستخدمين…</value>
+  </data>
+  <data name="MainAdminTooltip" xml:space="preserve">
+    <value>إدارة المستخدمين</value>
+  </data>
 </root>

@@ -41,6 +41,7 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <TextBlock Classes="caption secondary" Grid.Column="0"
                           Text="{Binding StatusText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
@@ -57,8 +58,16 @@
                 <c:Icon Symbol="Info" />
             </Button>
 
+            <!-- Only an administrator has anything to open here, so nobody else is shown a door they cannot use. -->
+            <Button Classes="transparent" Grid.Column="3" Padding="6" Margin="4,0,0,0"
+                       IsVisible="{Binding IsAdmin}"
+                       ToolTip.Tip="{x:Static app:Strings.MainAdminTooltip}"
+                       Command="{Binding ShowAdminCommand}" >
+                <c:Icon Symbol="Desktop" />
+            </Button>
+
             <!-- VersionText is bidi-isolated by the ViewModel, so "v0.1.0" reads left to right in either language. -->
-            <TextBlock Classes="caption tertiary" Grid.Column="3"
+            <TextBlock Classes="caption tertiary" Grid.Column="4"
                           Text="{Binding VersionText}" VerticalAlignment="Center" Margin="12,0,0,0" />
         </Grid>
     </Grid>

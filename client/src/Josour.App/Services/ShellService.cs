@@ -24,6 +24,7 @@ public sealed class ShellService : IShellService
     private FirstRunWindow? _firstRun;
     private SettingsWindow? _settings;
     private AboutWindow? _about;
+    private AdminWindow? _admin;
 
     public ShellService(IServiceProvider services, ILogger<ShellService> logger)
     {
@@ -67,6 +68,8 @@ public sealed class ShellService : IShellService
     public void ShowSettingsWindow() => OnUiThread(() => _settings = ShowSingle(_settings));
 
     public void ShowAboutWindow() => OnUiThread(() => _about = ShowSingle(_about));
+
+    public void ShowAdminWindow() => OnUiThread(() => _admin = ShowSingle(_admin));
 
     /// <summary>
     /// Opens a folder with the shell's own handler (<c>UseShellExecute</c>), creating it first: the log folder does not
@@ -194,6 +197,10 @@ public sealed class ShellService : IShellService
         else if (ReferenceEquals(_about, window))
         {
             _about = null;
+        }
+        else if (ReferenceEquals(_admin, window))
+        {
+            _admin = null;
         }
     }
 

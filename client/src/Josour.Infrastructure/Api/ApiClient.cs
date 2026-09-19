@@ -163,6 +163,32 @@ public sealed class ApiClient : IApiClient
 
     // ---------- plumbing ----------
 
+    // ---------------------------------------------------------------- admin
+
+    public Task<IReadOnlyList<AdminUserDto>> GetUsersAsync(string? query, CancellationToken ct)
+    {
+        var trimmed = query?.Trim();
+        var path = string.IsNullOrEmpty(trimmed)
+            ? "admin/users"
+            : "admin/users?q=" + Uri.EscapeDataString(trimmed);
+        return GetAsync<IReadOnlyList<AdminUserDto>>(path, ct);
+    }
+
+    public Task<AdminUserDto> CreateUserAsync(AdminUserCreate request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return PostAsync<AdminUserDto>("admin/users", request, anonymous: false, ct);
+    }
+
+    public async Task<AdminUserDto> PatchUserAsync(Guid userId, AdminUserPatch patch, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(patch);
+        using var response = await SendAsync(
+            HttpMethod.Patch, $"admin/users/{userId:D}", patch, anonymous: false, configure: null, ct).ConfigureAwait(false);
+        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+        return await ReadJsonAsync<AdminUserDto>(response, ct).ConfigureAwait(false);
+    }
+
     private async Task<T> GetAsync<T>(string path, CancellationToken ct)
     {
         using var response = await SendAsync(HttpMethod.Get, path, body: null, anonymous: false, configure: null, ct).ConfigureAwait(false);

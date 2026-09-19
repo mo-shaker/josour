@@ -53,4 +53,23 @@ public interface IApiClient
     /// server answers <c>404</c>/<c>403</c>.
     /// </summary>
     Task<DiagnosticsAccepted> PostDiagnosticsAsync(Guid? sessionId, string? role, IReadOnlyDictionary<string, object?> data, CancellationToken ct);
+
+    // ---------------------------------------------------------------- admin (role = admin)
+    // Every one of these answers 403 for a non-admin token. The app only shows the panel to an
+    // administrator, but that is a courtesy to the user: the server is what enforces it.
+
+    /// <summary><c>GET /admin/users</c>, newest first. <paramref name="query"/> filters by email or display name.</summary>
+    Task<IReadOnlyList<AdminUserDto>> GetUsersAsync(string? query, CancellationToken ct);
+
+    /// <summary><c>POST /admin/users</c> → <c>201</c> with the created account. <c>409</c> when the email is taken.</summary>
+    Task<AdminUserDto> CreateUserAsync(AdminUserCreate request, CancellationToken ct);
+
+    /// <summary>
+    /// <c>PATCH /admin/users/{id}</c>. Omitted fields are left alone; unknown ones are rejected by the server.
+    /// <para>
+    /// <c>IsActive = false</c> is not only a flag: the server revokes the account's refresh tokens, clears its
+    /// presence and closes its live control channels with 4403. It takes effect at once.
+    /// </para>
+    /// </summary>
+    Task<AdminUserDto> PatchUserAsync(Guid userId, AdminUserPatch patch, CancellationToken ct);
 }

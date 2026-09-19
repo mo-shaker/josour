@@ -821,4 +821,94 @@
   <data name="GuestRoleUnavailableMessage" xml:space="preserve">
     <value>Josour can only guarantee that the work browser alone goes through the host on Windows. Without that guarantee everything on your machine could leave from the host's address, which is not what they agreed to. This machine can still be a host; being a guest needs Windows.</value>
   </data>
+  <data name="AdminWindowTitle" xml:space="preserve">
+    <value>User management</value>
+  </data>
+  <data name="AdminHeading" xml:space="preserve">
+    <value>Users</value>
+  </data>
+  <data name="AdminDescription" xml:space="preserve">
+    <value>Create, disable, unlock and set passwords. There is no delete: deleting an account erases the record of every session it was part of, including the other party's half — and disabling removes the person just as completely while leaving the history of those they shared with intact.</value>
+  </data>
+  <data name="AdminSearchPlaceholder" xml:space="preserve">
+    <value>Search by email or name</value>
+  </data>
+  <data name="AdminRefresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="AdminEmptyList" xml:space="preserve">
+    <value>No matching users.</value>
+  </data>
+  <data name="AdminColumnState" xml:space="preserve">
+    <value>State</value>
+  </data>
+  <data name="AdminStateActive" xml:space="preserve">
+    <value>Active</value>
+  </data>
+  <data name="AdminStateDisabled" xml:space="preserve">
+    <value>Disabled</value>
+  </data>
+  <data name="AdminStateLocked" xml:space="preserve">
+    <value>Locked out</value>
+  </data>
+  <data name="AdminRoleAdmin" xml:space="preserve">
+    <value>Administrator</value>
+  </data>
+  <data name="AdminDisable" xml:space="preserve">
+    <value>Disable</value>
+  </data>
+  <data name="AdminEnable" xml:space="preserve">
+    <value>Enable</value>
+  </data>
+  <data name="AdminUnlock" xml:space="preserve">
+    <value>Unlock</value>
+  </data>
+  <data name="AdminSelfNote" xml:space="preserve">
+    <value>You cannot disable your own account.</value>
+  </data>
+  <data name="AdminCreateSection" xml:space="preserve">
+    <value>New account</value>
+  </data>
+  <data name="AdminEmailLabel" xml:space="preserve">
+    <value>Email</value>
+  </data>
+  <data name="AdminDisplayNameLabel" xml:space="preserve">
+    <value>Display name</value>
+  </data>
+  <data name="AdminPasswordLabel" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="AdminMakeAdmin" xml:space="preserve">
+    <value>Grant administrator rights</value>
+  </data>
+  <data name="AdminCreate" xml:space="preserve">
+    <value>Create</value>
+  </data>
+  <data name="AdminUserCreatedFormat" xml:space="preserve">
+    <value>Account {0} created.</value>
+  </data>
+  <data name="AdminUserEnabledFormat" xml:space="preserve">
+    <value>{0} is enabled.</value>
+  </data>
+  <data name="AdminUserDisabledFormat" xml:space="preserve">
+    <value>{0} is disabled: their tokens were revoked and their live channels closed immediately.</value>
+  </data>
+  <data name="AdminUserUnlockedFormat" xml:space="preserve">
+    <value>{0} is unlocked.</value>
+  </data>
+  <data name="AdminPasswordSetFormat" xml:space="preserve">
+    <value>{0}'s password was changed; their devices must sign in again.</value>
+  </data>
+  <data name="AdminPasswordTooShortFormat" xml:space="preserve">
+    <value>The password must be at least {0} characters.</value>
+  </data>
+  <data name="AdminDisableWarning" xml:space="preserve">
+    <value>Disabling takes effect at once: tokens are revoked, presence is cleared, and every live control channel is closed. A session in progress will be cut.</value>
+  </data>
+  <data name="TrayAdmin" xml:space="preserve">
+    <value>User management…</value>
+  </data>
+  <data name="MainAdminTooltip" xml:space="preserve">
+    <value>User management</value>
+  </data>
 </root>

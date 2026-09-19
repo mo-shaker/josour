@@ -304,4 +304,36 @@ public static class UiStringKeys
     public const string AutoAcceptTrustWeek = "AutoAcceptTrustWeek";
     public const string AutoAcceptTrustMonth = "AutoAcceptTrustMonth";
     public const string AutoAcceptTrustAlways = "AutoAcceptTrustAlways";
+
+    // ---- admin panel (user management in the app instead of manage.py) ----
+    public const string AdminWindowTitle = "AdminWindowTitle";
+    public const string AdminHeading = "AdminHeading";
+    public const string AdminDescription = "AdminDescription";
+    public const string AdminSearchPlaceholder = "AdminSearchPlaceholder";
+    public const string AdminRefresh = "AdminRefresh";
+    public const string AdminEmptyList = "AdminEmptyList";
+    public const string AdminColumnState = "AdminColumnState";
+    public const string AdminStateActive = "AdminStateActive";
+    public const string AdminStateDisabled = "AdminStateDisabled";
+    public const string AdminStateLocked = "AdminStateLocked";
+    public const string AdminRoleAdmin = "AdminRoleAdmin";
+    public const string AdminDisable = "AdminDisable";
+    public const string AdminEnable = "AdminEnable";
+    public const string AdminUnlock = "AdminUnlock";
+    public const string AdminSelfNote = "AdminSelfNote";
+    public const string AdminCreateSection = "AdminCreateSection";
+    public const string AdminEmailLabel = "AdminEmailLabel";
+    public const string AdminDisplayNameLabel = "AdminDisplayNameLabel";
+    public const string AdminPasswordLabel = "AdminPasswordLabel";
+    public const string AdminMakeAdmin = "AdminMakeAdmin";
+    public const string AdminCreate = "AdminCreate";
+    public const string AdminUserCreatedFormat = "AdminUserCreatedFormat";
+    public const string AdminUserEnabledFormat = "AdminUserEnabledFormat";
+    public const string AdminUserDisabledFormat = "AdminUserDisabledFormat";
+    public const string AdminUserUnlockedFormat = "AdminUserUnlockedFormat";
+    public const string AdminPasswordSetFormat = "AdminPasswordSetFormat";
+    public const string AdminPasswordTooShortFormat = "AdminPasswordTooShortFormat";
+    public const string AdminDisableWarning = "AdminDisableWarning";
+    public const string TrayAdmin = "TrayAdmin";
+    public const string MainAdminTooltip = "MainAdminTooltip";
 }

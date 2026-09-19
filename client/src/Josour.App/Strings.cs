@@ -304,4 +304,36 @@ public static class Strings
     public static string AutoAcceptTrustWeek => LocalizedStrings.Current[UiStringKeys.AutoAcceptTrustWeek];
     public static string AutoAcceptTrustMonth => LocalizedStrings.Current[UiStringKeys.AutoAcceptTrustMonth];
     public static string AutoAcceptTrustAlways => LocalizedStrings.Current[UiStringKeys.AutoAcceptTrustAlways];
+
+    // ---- admin panel (user management in the app instead of manage.py) ----
+    public static string AdminWindowTitle => LocalizedStrings.Current[UiStringKeys.AdminWindowTitle];
+    public static string AdminHeading => LocalizedStrings.Current[UiStringKeys.AdminHeading];
+    public static string AdminDescription => LocalizedStrings.Current[UiStringKeys.AdminDescription];
+    public static string AdminSearchPlaceholder => LocalizedStrings.Current[UiStringKeys.AdminSearchPlaceholder];
+    public static string AdminRefresh => LocalizedStrings.Current[UiStringKeys.AdminRefresh];
+    public static string AdminEmptyList => LocalizedStrings.Current[UiStringKeys.AdminEmptyList];
+    public static string AdminColumnState => LocalizedStrings.Current[UiStringKeys.AdminColumnState];
+    public static string AdminStateActive => LocalizedStrings.Current[UiStringKeys.AdminStateActive];
+    public static string AdminStateDisabled => LocalizedStrings.Current[UiStringKeys.AdminStateDisabled];
+    public static string AdminStateLocked => LocalizedStrings.Current[UiStringKeys.AdminStateLocked];
+    public static string AdminRoleAdmin => LocalizedStrings.Current[UiStringKeys.AdminRoleAdmin];
+    public static string AdminDisable => LocalizedStrings.Current[UiStringKeys.AdminDisable];
+    public static string AdminEnable => LocalizedStrings.Current[UiStringKeys.AdminEnable];
+    public static string AdminUnlock => LocalizedStrings.Current[UiStringKeys.AdminUnlock];
+    public static string AdminSelfNote => LocalizedStrings.Current[UiStringKeys.AdminSelfNote];
+    public static string AdminCreateSection => LocalizedStrings.Current[UiStringKeys.AdminCreateSection];
+    public static string AdminEmailLabel => LocalizedStrings.Current[UiStringKeys.AdminEmailLabel];
+    public static string AdminDisplayNameLabel => LocalizedStrings.Current[UiStringKeys.AdminDisplayNameLabel];
+    public static string AdminPasswordLabel => LocalizedStrings.Current[UiStringKeys.AdminPasswordLabel];
+    public static string AdminMakeAdmin => LocalizedStrings.Current[UiStringKeys.AdminMakeAdmin];
+    public static string AdminCreate => LocalizedStrings.Current[UiStringKeys.AdminCreate];
+    public static string AdminUserCreatedFormat => LocalizedStrings.Current[UiStringKeys.AdminUserCreatedFormat];
+    public static string AdminUserEnabledFormat => LocalizedStrings.Current[UiStringKeys.AdminUserEnabledFormat];
+    public static string AdminUserDisabledFormat => LocalizedStrings.Current[UiStringKeys.AdminUserDisabledFormat];
+    public static string AdminUserUnlockedFormat => LocalizedStrings.Current[UiStringKeys.AdminUserUnlockedFormat];
+    public static string AdminPasswordSetFormat => LocalizedStrings.Current[UiStringKeys.AdminPasswordSetFormat];
+    public static string AdminPasswordTooShortFormat => LocalizedStrings.Current[UiStringKeys.AdminPasswordTooShortFormat];
+    public static string AdminDisableWarning => LocalizedStrings.Current[UiStringKeys.AdminDisableWarning];
+    public static string TrayAdmin => LocalizedStrings.Current[UiStringKeys.TrayAdmin];
+    public static string MainAdminTooltip => LocalizedStrings.Current[UiStringKeys.MainAdminTooltip];
 }

@@ -86,6 +86,11 @@ public sealed class TrayService : IDisposable
         menu.Add(Item(Strings.TraySettings, _viewModel.ShowSettingsCommand));
         menu.Add(Item(Strings.TrayAbout, _viewModel.ShowAboutCommand));
 
+        // The menu is built once, at start-up, before anyone has signed in — so the admin entry is always
+        // present and its command's CanExecute decides whether it is usable. Rebuilding the native menu on
+        // every sign-in would be the alternative, and platform tray menus do not enjoy being rebuilt.
+        menu.Add(Item(Strings.TrayAdmin, _viewModel.ShowAdminCommand));
+
         if (_viewModel.IsDebugMenuVisible)
         {
             var debug = new NativeMenuItem(Strings.TrayDebug)

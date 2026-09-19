@@ -28,6 +28,9 @@ public interface IShellService
     /// <summary>Shows (or brings to front) the About / diagnostics window.</summary>
     void ShowAboutWindow();
 
+    /// <summary>The admin panel. Only offered to an administrator; the server enforces it regardless.</summary>
+    void ShowAdminWindow();
+
     /// <summary>
     /// Opens a folder in the file manager (the About window's "open the log folder"). False with a reason rather than an
     /// exception: a failure here is a message in the window, never a crash.

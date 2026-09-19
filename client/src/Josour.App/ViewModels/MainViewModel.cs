@@ -88,6 +88,18 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Hidden debug menu (Simulate incoming request): DEBUG builds or <c>--debug</c>.</summary>
     public bool IsDebugMenuVisible { get; }
 
+    /// <summary>
+    /// Whether the admin panel is offered. It follows the signed-in account's role, so it appears on sign-in and
+    /// goes away on sign-out without the window being rebuilt.
+    /// <para>
+    /// This is presentation only. Every admin endpoint answers 403 to a non-administrator whatever the app shows,
+    /// and it must stay that way: a client is not a place to enforce a permission.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ShowAdminCommand))]
+    private bool _isAdmin;
+
     /// <summary>Mirror of <see cref="HostViewModel.IsAvailable"/> for the tray menu; HostViewModel owns the state.</summary>
     public bool IsAvailable
     {
@@ -130,6 +142,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         var user = _auth.CurrentUser;
         IsSignedIn = user is not null;
+        IsAdmin = user is not null && string.Equals(user.Role, "admin", StringComparison.OrdinalIgnoreCase);
         UserDisplayName = user?.DisplayName ?? string.Empty;
 
         var connection = DescribeConnection();
@@ -153,6 +166,9 @@ public sealed partial class MainViewModel : ObservableObject
 
     [RelayCommand]
     private void ShowAbout() => _shell.ShowAboutWindow();
+
+    [RelayCommand(CanExecute = nameof(IsAdmin))]
+    private void ShowAdmin() => _shell.ShowAdminWindow();
 
     [RelayCommand(CanExecute = nameof(IsSignedIn))]
     private async Task SignOutAsync()

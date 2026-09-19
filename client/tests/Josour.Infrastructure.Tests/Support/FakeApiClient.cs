@@ -103,4 +103,18 @@ public sealed class FakeApiClient : IApiClient
 
         return Task.FromResult(new DiagnosticsAccepted(Guid.NewGuid()));
     }
+
+    // ---------------------------------------------------------------- admin
+    // Nothing in Josour.Infrastructure drives the admin panel — it lives in the app — so these exist only to
+    // satisfy the interface, and throw rather than returning something empty. A test that reached one of these
+    // by accident should say so loudly.
+
+    public Task<IReadOnlyList<AdminUserDto>> GetUsersAsync(string? query, CancellationToken ct) =>
+        throw new NotSupportedException("FakeApiClient does not serve the admin API.");
+
+    public Task<AdminUserDto> CreateUserAsync(AdminUserCreate request, CancellationToken ct) =>
+        throw new NotSupportedException("FakeApiClient does not serve the admin API.");
+
+    public Task<AdminUserDto> PatchUserAsync(Guid userId, AdminUserPatch patch, CancellationToken ct) =>
+        throw new NotSupportedException("FakeApiClient does not serve the admin API.");
 }

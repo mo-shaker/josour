@@ -377,6 +377,8 @@ public partial class App : Application
         services.AddTransient<SettingsWindow>();
         services.AddTransient<AboutViewModel>();
         services.AddTransient<AboutWindow>();
+        services.AddTransient<AdminViewModel>();
+        services.AddTransient<AdminWindow>();
     }
 
     private void OnExit(int exitCode)
