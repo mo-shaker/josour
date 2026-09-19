@@ -1,14 +1,16 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Path, Query, status
+from fastapi import APIRouter, Path, Query, Request, status
 
-from app.api.deps import AdminDep, DbDep
+from app.api.deps import AdminDep, DbDep, client_ip
 from app.api.openapi import errors
 from app.core.errors import NotFound
 from app.models import User
 from app.schemas.admin import AdminUserCreate, AdminUserOut, AdminUserPatch
 from app.services import users as user_service
+from app.ws import notify
+from app.ws.protocol import CloseCode
 
 router = APIRouter(prefix="/users")
 
@@ -69,18 +71,33 @@ async def list_users(
 async def patch_user(
     user_id: Annotated[uuid.UUID, Path(description="Account to update")],
     payload: AdminUserPatch,
-    _: AdminDep,
+    auth: AdminDep,
     db: DbDep,
+    request: Request,
 ) -> AdminUserOut:
     """Partial update; unknown fields are rejected rather than ignored.
 
-    `is_active: false` disables the account, `password` sets a new one - both revoke every live
-    refresh token, so the user's devices must sign in again - and `unlock: true` clears an active
-    lockout and resets the failure counter.
+    `password` sets a new one and `unlock: true` clears an active lockout and resets the failure
+    counter. Both `password` and `is_active: false` revoke every live refresh token, so the user's
+    devices must sign in again.
+
+    `is_active: false` also **takes effect immediately**: the user's presence is cleared and every
+    live control channel they hold is closed with WebSocket code 4403, the same way revoking a
+    single device works. Without that, revoking refresh tokens alone left a disabled account
+    browsing through somebody else's connection until its access token expired. A `user_deactivated`
+    row names the administrator who did it.
+
+    The devices themselves are not revoked: the account is disabled, not the hardware.
     """
     user = await db.get(User, user_id)
     if user is None:
         raise NotFound("User not found")
-    await user_service.update_user(db, user, payload)
+    disconnect = await user_service.update_user(
+        db, user, payload, actor_user_id=auth.user.id, ip=client_ip(request)
+    )
     await db.commit()
+    # After the commit, as with device revocation: the socket must never close before the row
+    # that justifies it is durable.
+    for device_id in disconnect:
+        await notify.close_device(device_id, CloseCode.NOT_ALLOWED)
     return AdminUserOut.model_validate(user)

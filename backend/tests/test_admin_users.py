@@ -7,7 +7,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clock import utcnow
-from app.models import RefreshToken, User
+from app.models import Device, Presence, RefreshToken, SecurityEvent, User
+from app.models.enums import DeviceStatus, SecurityEventType
+from app.ws.protocol import CloseCode
 from tests.conftest import PASSWORD, LoginBody
 
 USERS = "/api/v1/admin/users"
@@ -261,3 +263,101 @@ async def test_admin_can_login_with_password_from_fixture(
     me = await client.get("/api/v1/me", headers=admin_headers)
     assert me.status_code == 200 and me.json()["role"] == "admin"
     assert PASSWORD  # fixture sanity
+
+
+# ------------------------------------------------------------------ deactivation takes effect
+
+
+async def test_deactivating_closes_the_live_control_channel(
+    client: AsyncClient,
+    admin_headers: dict,
+    ws_connect: Any,
+    make_actor: Any,
+    db: AsyncSession,
+) -> None:
+    """Revoking refresh tokens is not enough on its own.
+
+    A refresh token is only consulted once an access token expires, so a disabled account used to
+    keep browsing through somebody else's connection for as long as its current access token
+    lasted: the administrator pressed the button and nothing observable happened.
+    """
+    actor = await make_actor("cutoff@example.com")
+    ws = await ws_connect(actor)
+    assert ws.hello_ack is not None
+
+    response = await client.patch(
+        f"{USERS}/{actor.user.id}", headers=admin_headers, json={"is_active": False}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["is_active"] is False
+    assert await ws.wait_closed() == CloseCode.NOT_ALLOWED
+
+
+async def test_deactivating_clears_presence_but_leaves_the_devices_alone(
+    client: AsyncClient,
+    admin_headers: dict,
+    ws_connect: Any,
+    make_actor: Any,
+    db: AsyncSession,
+) -> None:
+    """The account is disabled, not the hardware: re-activating must not leave the user
+    re-registering every machine they own."""
+    actor = await make_actor("presence@example.com")
+    ws = await ws_connect(actor)
+    await ws.send({"type": "host.available", "available": True})
+    await ws.drain(timeout=0.1)
+
+    await client.patch(f"{USERS}/{actor.user.id}", headers=admin_headers, json={"is_active": False})
+    await ws.wait_closed()
+
+    await db.rollback()
+    presence = await db.get(Presence, actor.device.id)
+    assert presence is not None
+    assert presence.connected is False
+    assert presence.is_available_host is False
+
+    device = await db.get(Device, actor.device.id)
+    assert device is not None
+    assert device.status == DeviceStatus.ACTIVE
+
+
+async def test_deactivating_names_the_administrator_in_the_audit_trail(
+    client: AsyncClient, admin_headers: dict, admin: User, make_actor: Any, db: AsyncSession
+) -> None:
+    actor = await make_actor("audited@example.com")
+
+    await client.patch(f"{USERS}/{actor.user.id}", headers=admin_headers, json={"is_active": False})
+
+    await db.rollback()
+    events = list(
+        await db.scalars(
+            select(SecurityEvent).where(SecurityEvent.type == SecurityEventType.USER_DEACTIVATED)
+        )
+    )
+    event = events[0] if len(events) == 1 else None
+    assert event is not None
+    assert event.user_id == actor.user.id
+    assert event.details is not None
+    assert event.details["actor_user_id"] == str(admin.id)
+
+
+async def test_reactivating_writes_no_deactivation_event_and_closes_nothing(
+    client: AsyncClient, admin_headers: dict, make_actor: Any, db: AsyncSession
+) -> None:
+    """Only the transition into "disabled" is an event. Setting is_active to a value it already
+    holds must not fill the audit trail with decisions nobody took."""
+    actor = await make_actor("noop@example.com")
+
+    for _ in range(2):
+        await client.patch(
+            f"{USERS}/{actor.user.id}", headers=admin_headers, json={"is_active": True}
+        )
+
+    await db.rollback()
+    events = list(
+        await db.scalars(
+            select(SecurityEvent).where(SecurityEvent.type == SecurityEventType.USER_DEACTIVATED)
+        )
+    )
+    assert events == []

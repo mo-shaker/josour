@@ -70,6 +70,9 @@ class SecurityEventType(enum.StrEnum):
     REFRESH_REUSE = "refresh_reuse"
     DEVICE_REVOKED = "device_revoked"
     SESSION_ADMIN_TERMINATED = "session_admin_terminated"
+    USER_DEACTIVATED = "user_deactivated"
+    """An administrator set ``is_active: false``. Written against the user, naming the administrator
+    who did it, so ``GET /admin/security-events`` can answer "who cut this person off, and when"."""
     REQUEST_AUTO_ACCEPTED = "request_auto_accepted"
     """A host answered ``request.accept`` with ``auto: true``: the request matched a trusted-guest
     rule the host had set up beforehand, so no prompt was shown. The consent is real - the host

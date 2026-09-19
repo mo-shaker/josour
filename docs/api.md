@@ -67,6 +67,10 @@
 
 - `POST /admin/users` `{ email, password, display_name, role }` → `201` المستخدم.
 - `GET /admin/users` → قائمة. `PATCH /admin/users/{id}` `{ is_active?, password?, display_name?, unlock?: true }`.
+  - `password` و`is_active: false` كلاهما يسحب توكنات التحديث.
+  - **`is_active: false` ينفذ فورًا**: يمسح حضور المستخدم ويغلق كل قناة تحكم حيّة له بالرمز `4403`، كما يفعل سحب جهاز. بدون ذلك كان سحب التوكنات وحده يترك حسابًا معطَّلًا يتصفّح عبر اتصال غيره حتى تنتهي صلاحية توكن وصوله. يُكتب صف `user_deactivated` يسمّي المسؤول الذي فعلها.
+  - الأجهزة نفسها **لا تُسحب**: الحساب هو المعطَّل لا العتاد، فإعادة التفعيل لا تترك المستخدم يسجّل أجهزته من جديد.
+  - لا يوجد حذف مستخدم: `sessions.guest_user_id` و`host_user_id` كلاهما `ON DELETE CASCADE`، فحذف مستخدم يمحو سجل كل جلسة كان طرفًا فيها — **بما فيها نصيب المضيف الآخر منها**.
 - `GET /admin/devices?user_id=` ، `POST /admin/devices/{id}/revoke` → `204`.
 - `GET /admin/domains` → `{ version, entries, updated_at }`.
 - `PUT /admin/domains` `{ "entries": [...] }` → إصدار جديد؛ يتحقق من صحة كل مدخل؛ يبث `allowlist.updated`.
