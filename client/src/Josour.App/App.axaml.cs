@@ -114,11 +114,10 @@ public partial class App : Application
                 string.IsNullOrEmpty(settings.Current.ServerUrl) ? "(not set)" : settings.Current.ServerUrl,
                 LoggingSetup.DefaultLogDirectory);
 
-            logger.LogInformation("Secrets are stored with {SecretStore}", SecretStores.CurrentKind);
-            if (!SecretStores.IsProtected)
-            {
-                logger.LogWarning("Secret store is using the plaintext development fallback: this is not a shipping configuration");
-            }
+            logger.LogInformation(
+                "Secrets are stored with {SecretStore} (encrypted at rest by the platform: {Encrypted})",
+                SecretStores.CurrentKind,
+                SecretStores.IsEncryptedAtRest);
 
             if (_instance is { CanReceiveShowWindow: false })
             {

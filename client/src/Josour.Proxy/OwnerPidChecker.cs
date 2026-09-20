@@ -28,16 +28,20 @@ public interface IOwnerPidChecker
 /// </summary>
 public static class OwnerPidCheckers
 {
-    /// <summary>True where a connection's owning process can actually be identified. Windows only, for now.</summary>
-    public static bool SupportedOnThisPlatform => OperatingSystem.IsWindows();
+    /// <summary>True where a connection's owning process can actually be identified.</summary>
+    public static bool SupportedOnThisPlatform => OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
 
     /// <summary>
     /// The checker this machine has. Off Windows it is <see cref="PermissiveOwnerPidChecker"/>, which identifies
     /// nobody — which is why <see cref="ConnectProxyOptions.RejectUnknownOwner"/> defaults to refusing, and why a
     /// proxy wired for owner checks on such a platform refuses to start rather than admitting everything.
     /// </summary>
-    public static IOwnerPidChecker ForCurrentPlatform() =>
-        OperatingSystem.IsWindows() ? WindowsOwnerPidChecker.Instance : PermissiveOwnerPidChecker.Instance;
+    public static IOwnerPidChecker ForCurrentPlatform() => true switch
+    {
+        _ when OperatingSystem.IsWindows() => WindowsOwnerPidChecker.Instance,
+        _ when OperatingSystem.IsMacOS() => MacOwnerPidChecker.Instance,
+        _ => PermissiveOwnerPidChecker.Instance,
+    };
 }
 
 /// <summary>لا يعرف شيئًا (غير Windows والاختبارات). قبول الاتصال يعتمد حينها على RejectUnknownOwner.</summary>

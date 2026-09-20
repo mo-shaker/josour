@@ -99,5 +99,6 @@ public sealed class WorkBrowserProvider : IWorkBrowserProvider
     /// down and closed at the next start-up (plan 8.5).
     /// </summary>
     public IBrowserSession Create(BrowserKind kind) =>
-        new MarkedBrowserSession(new BrowserLauncher(_registry, _locator), _markers, _processes, ProfileDirectory, _logger);
+        new MarkedBrowserSession(
+            BrowserSessions.ForCurrentPlatform(_registry, _locator), _markers, _processes, ProfileDirectory, _logger);
 }

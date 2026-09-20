@@ -1,6 +1,6 @@
 # ADR-0013: واجهة مشتركة على Avalonia، وmacOS نظامًا مدعومًا
 
-**الحالة:** مقترح بتاريخ 2026-09-18؛ **النقل منفَّذ** (كل الشاشات، والمفاصل عدا جانب الضيف والتوزيع — [macos-port.md](../macos-port.md)). **يَجُبّ [ADR-0001](0001-ui-framework-wpf.md)** (WPF على .NET 8) الذي كان لا يزال «مقترحًا».
+**الحالة:** مقترح بتاريخ 2026-09-18؛ **النقل منفَّذ**: كل الشاشات، والدوران معًا، والتوزيع بحزمة `.app` — [macos-port.md](../macos-port.md). يبقى قبل إغلاقه: جلسة حقيقية بين mac وWindows، وقرار التوقيع. **يَجُبّ [ADR-0001](0001-ui-framework-wpf.md)** (WPF على .NET 8) الذي كان لا يزال «مقترحًا».
 
 ## السياق
 
@@ -38,6 +38,16 @@
 - **عناصر WPF-UI الأحد عشر** صارت ثلاثة عناصر مكتوبة بأيدينا (`Icon`, `Card`, `InfoBar`) وبقيةً من عناصر Avalonia الأصلية. الأيقونات من العائلة نفسها (Fluent System Icons، MIT) مضمّنة هندسةً لا خطًّا ولا حزمة.
 - **شريط العنوان المخصّص وخلفية Mica سقطا**: النوافذ تستعمل شريط النظام الأصلي، وهو الصواب على macOS على أي حال.
 - **[ADR-0011](0011-no-code-signing-certificate.md) يتعقّد على mac.** Gatekeeper أشد من SmartScreen: تطبيق غير موقَّع ولا موثَّق يحتاج من المستخدم خطوة يدوية صريحة. توزيع mac يحتاج قرارًا منفصلًا؛ هذا الـ ADR لا يحسمه.
-- **الأسرار على mac في الـ Keychain** لا في ملف. نُفِّذ: [`KeychainSecretStore`](../../client/src/Josour.Infrastructure/Security/KeychainSecretStore.cs)، ومعه [`SecretStores.ForCurrentPlatform`](../../client/src/Josour.Infrastructure/Security/SecretStores.cs) فلا يبقى لكل موقع استدعاء رأيه في أين يعيش السر.
-- **فحص مالك الاتصال يحتاج تصميمًا جديدًا على mac.** لا Job Object هناك. البديل: التطبيق هو من يشغّل المتصفح، فيعرف مجموعة عملياته (`pgid`)، ويسأل `libproc` عن مالك المقبس. التفصيل في [macos-port.md](../macos-port.md).
+- **الأسرار على mac في ملف بصلاحية `0600`**، لا في الـ Keychain. جُرِّب الـ Keychain أولًا وسقط لسبب لم
+  يُحسب هنا: الـ Keychain تربط كل عنصر بهوية توقيع التطبيق الذي أنشأه، و[ADR-0011](0011-no-code-signing-certificate.md)
+  يقول «لا توقيع» — فكل بناء تطبيقٌ آخر عندها، وكل تحديث كان سيترك المستخدمين محرومين من أسرارهم هم
+  بـ `errSecInvalidOwnerEdit`. التفصيل وما يكلّفه البديل في
+  [`FileSecretStore`](../../client/src/Josour.Infrastructure/Security/FileSecretStore.cs)، والاختيار يقع في
+  [`SecretStores.ForCurrentPlatform`](../../client/src/Josour.Infrastructure/Security/SecretStores.cs) فلا يبقى
+  لكل موقع استدعاء رأيه في أين يعيش السر.
+- **فحص مالك الاتصال نُفِّذ بشكل مختلف عمّا تصوّره هذا الـ ADR.** لا Job Object على mac، وكان المقترح هنا
+  مجموعة عمليات (`setpgid`) و`libproc`. ما نُفِّذ فعلًا: `lsof` لمالك المقبس — لأن `libproc` يعني فكّ
+  `socket_fdinfo` بيدٍ لضابط أمني لا يجوز أن يخطئ بهدوء — و**شجرة العمليات** للملكية، لأن مجموعة العمليات
+  تتطلّب `setpgid` بين `fork` و`exec` وهو ما لا يتيحه `Process.Start`. التفصيل والقياسات في
+  [macos-port.md](../macos-port.md).
 - **جدول التنفيذ في [macos-port.md](../macos-port.md)**، ولا يُغلق هذا الـ ADR قبل أن تمر جلسة كاملة بين mac وWindows بالدورين.

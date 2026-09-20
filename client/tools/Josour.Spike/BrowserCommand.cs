@@ -33,7 +33,7 @@ public static class BrowserCommand
         var locator = new BrowserLocator(registry);
         var location = locator.Locate(kind);
         var policy = PolicyDetector.Detect(kind, registry);
-        var launcher = new BrowserLauncher(registry, locator);
+        var launcher = BrowserSessions.ForCurrentPlatform(registry, locator);
 
         var report = new Dictionary<string, object?>
         {
@@ -88,11 +88,14 @@ public static class BrowserCommand
                 ["failure"] = result.Failure?.ToString(),
                 ["detail"] = result.Detail,
                 ["launch_ms"] = launchClock.ElapsedMilliseconds,
-                ["pid"] = launcher.ProcessId,
-                ["handoff"] = launcher.InstanceHandoff,
-                ["exit_type_set"] = launcher.ExitTypeSet,
+                // Instance handoff and the profile's exit type are Windows notions — a second copy of Chrome
+                // handing the URL to the first, and the prefs key that stops the "restore tabs?" bubble. They are
+                // reported when the Windows launcher is what ran, and left null otherwise rather than invented.
+                ["pid"] = (launcher as BrowserLauncher)?.ProcessId,
+                ["handoff"] = (launcher as BrowserLauncher)?.InstanceHandoff,
+                ["exit_type_set"] = (launcher as BrowserLauncher)?.ExitTypeSet,
             };
-            Console.Error.WriteLine($"[browser] launch: success={result.Success} failure={result.Failure} handoff={launcher.InstanceHandoff} {result.Detail}");
+            Console.Error.WriteLine($"[browser] launch: success={result.Success} failure={result.Failure} {result.Detail}");
 
             if (result.Success)
             {

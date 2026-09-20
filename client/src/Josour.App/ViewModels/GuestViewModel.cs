@@ -113,7 +113,11 @@ public sealed partial class GuestViewModel : ObservableObject
     /// loopback, and without that check it would carry ANY program's traffic out through the host's address —
     /// not the work browser's alone. The host agreed to lend a browser, not a machine. So where the check does
     /// not exist the role is refused outright rather than offered in a weaker form, because a weaker form is
-    /// one the host was never asked about. See <c>docs/macos-port.md</c>, seam 6.
+    /// one the host was never asked about.
+    /// </para>
+    /// <para>
+    /// Windows and macOS both have an answer now — <c>GetExtendedTcpTable</c> and <c>lsof</c> — so this is false
+    /// only on a platform that has neither.
     /// </para>
     /// </summary>
     public static bool IsGuestRoleSupported => OwnerPidCheckers.SupportedOnThisPlatform;

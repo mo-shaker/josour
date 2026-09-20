@@ -68,11 +68,11 @@ public sealed class SessionStack : IAsyncDisposable
         var settings = new AppSettingsStore(Path.Combine(root, "settings.json"));
         await settings.SaveAsync(settings.Current with { ServerUrl = baseUri.ToString() }, ct).ConfigureAwait(false);
 
-        // The spike is how a mac host is driven before the Avalonia window exists (docs/macos-port.md), so it takes
-        // the same store the app takes: the Keychain on macOS, DPAPI on Windows.
-        ISecretStore secrets = OperatingSystem.IsMacOS()
-            ? new KeychainSecretStore()
-            : new DpapiSecretStore(secretsDirectory);
+        // The same store the app uses, chosen the same way — DPAPI on Windows, an owner-only file elsewhere — so
+        // a session driven from here and a session driven from the window are looking at the same secrets.
+        ISecretStore secrets = OperatingSystem.IsWindows()
+            ? new DpapiSecretStore(secretsDirectory)
+            : new FileSecretStore(secretsDirectory);
         var device = new DeviceInfoProvider(typeof(SessionStack).Assembly);
 
         AuthSession? auth = null;
