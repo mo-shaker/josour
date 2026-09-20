@@ -47,8 +47,22 @@ no router or firewall configuration at all.
 | `deploy/` | Production Docker Compose (Caddy + API + PostgreSQL + backups) and a **standalone relay** |
 | `docs/` | Implementation plan, the frozen contracts (REST / WebSocket / channel protocol), ADRs, runbook |
 
-**To self-host:** [docs/self-hosting.md](docs/self-hosting.md) — from nothing to a running server and an installed
-application.
+## Install it and use it
+
+**[docs/self-hosting.md](docs/self-hosting.md)** is the complete guide: from an empty VPS to a running server, then
+the app on two machines, then a session you can verify.
+
+**There is a Windows app and a macOS app**, and they are the same application — one codebase, one interface, both
+roles (host and guest) on both systems ([ADR-0013](docs/decisions/0013-avalonia-and-macos.md)):
+
+| | Windows | macOS |
+|---|---|---|
+| Build it | `scripts\publish-exe.ps1` → one `Josour.exe` | `scripts/publish-app.sh --dmg` → `Josour.app` + a `.dmg` |
+| Needs .NET installed on the user's machine? | No | No |
+| First launch, once per machine | SmartScreen: **More info → Run anyway** | Gatekeeper: **right-click → Open → Open** |
+
+Both are unsigned by decision ([ADR-0011](docs/decisions/0011-no-code-signing-certificate.md)); the Windows build
+prints a SHA-256 to check the file by.
 
 **Status:** a full session between two machines on different networks has been working since 2026-09-09 (milestone
 M2). Latest report: [docs/status-week7.md](docs/status-week7.md).
@@ -66,9 +80,9 @@ egress policy, and I do not have the time to do that properly. Fork it and chang
 **Nobody runs a public relay.** Anyone who wants to use this hosts their own server and relay; the complete guide
 is [docs/self-hosting.md](docs/self-hosting.md).
 
-**macOS is supported in both roles** — host and guest. What has not been tried yet: a real session between a Mac
-and a Windows machine, which needs two machines. The detail, and what remains, is in
-[docs/macos-port.md](docs/macos-port.md).
+**macOS is supported in both roles** — host and guest — and so is Windows. What has not been tried yet: a real
+session between a Mac and a Windows machine, which needs two machines; every piece of it is exercised separately.
+The detail, and what remains, is in [docs/macos-port.md](docs/macos-port.md).
 
 **Getting in touch:** issues and pull requests are closed, so anything you want to say comes by email —
 **me@mohamedshaker.com**. That is not a support channel and there is no response time; it is simply the one address
