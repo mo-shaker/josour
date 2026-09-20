@@ -1,183 +1,198 @@
-# أداء خدمة الـ Relay
+# The relay service's performance
 
-المالك: المسار A. ينفّذ البند الأخير في [ADR-0009](decisions/0009-relay-default.md): «**قياس مطلوب قبل
-الاعتماد**: إنتاجية الـ Relay وزمنه على الجهاز المختار، بالمنهج نفسه المتبع في
-[docs/performance-week5.md](performance-week5.md). لا يُعتمد رقم بلا قياس.»
+Owner: track A. Carries out the last item in [ADR-0009](decisions/0009-relay-default.md): "**a measurement is required
+before adoption**: the relay's throughput and latency on the chosen machine, by the same method used in
+[docs/performance-week5.md](performance-week5.md). No number is adopted without measurement."
 
-**الخلاصة في ثلاثة أسطر:** الـ Relay **ليس عنق الزجاجة**. سقفه المقيس نحو **2 Gbit/s** لجلسة واحدة، أي عشرة
-أضعاف أسرع ما قيس للنفق نفسه (224 Mbit/s في الأسبوع الخامس). وتكلفته الزمنية **دون مللي ثانية واحدة**، وهي أصغر
-من ضجيج القياس على وصلة مُحاكاة — أي أن ما يضيفه الـ Relay عمليًا هو **الجغرافيا وحدها**، لا البرمجية.
-والاقتران يكلّف **0.6 مللي ثانية**.
+**The conclusion in three lines:** the relay is **not the bottleneck**. Its measured ceiling is around **2 Gbit/s** for
+one session, that is ten times the fastest thing measured for the tunnel itself (224 Mbit/s in week five). And its cost
+in time is **below one millisecond**, smaller than the measurement noise on a simulated link — meaning what the relay
+adds in practice is **geography alone**, not software. And pairing costs **0.6 milliseconds**.
 
-**لكن هذا القياس لا يغلق تحفّظ ADR-0009 كاملًا.** جهاز القياس لا يبلّغ استهلاك المعالج ولا الذاكرة لكل عملية
-(القسم 2.3)، وهما بالضبط ما تحفّظ عليه القرار في ضخّ asyncio. يبقى مفتوحًا حتى يُشغَّل على مضيف النشر.
+**But this measurement does not close ADR-0009's reservation in full.** The measuring machine reports neither CPU nor
+memory per process (section 2.3), and those are exactly what the decision reserved judgement on in asyncio's pumping.
+It stays open until it is run on the deployment host.
 
 ---
 
-## 1. الاستعمال
+## 1. Usage
 
 ```bash
 cd relay
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]" psutil
 
-python -m bench                 # الكل، نحو دقيقتين
-python -m bench latency         # مجموعة واحدة
+python -m bench                 # everything, about two minutes
+python -m bench latency         # a single suite
 python -m bench throughput concurrency
 ```
 
-الأسطر المطبوعة تبدأ بـ `[env]` و`[latency]` و`[throughput]` و`[concurrent]` و`[pairing]`، وهي مصدر الجداول
-أدناه حرفيًا.
+The printed lines start with `[env]`, `[latency]`, `[throughput]`, `[concurrent]` and `[pairing]`, and they are the
+source of the tables below, verbatim.
 
-| الملف | الدور |
+| File | Role |
 |---|---|
-| `relay/bench/link.py` | خط التأخير (وصلة باتجاهين بزمن ذهاب وإياب مضبوط) وقياس RTT |
-| `relay/bench/__main__.py` | المجموعات الأربع وسطر البيئة |
+| `relay/bench/link.py` | The delay line (a bidirectional link with a set round-trip time) and RTT measurement |
+| `relay/bench/__main__.py` | The four suites and the environment line |
 
-الـ Relay يعمل في **عملية مستقلة** كما في الإنتاج، لا داخل عملية القياس.
+The relay runs in **its own process** as it does in production, not inside the measuring process.
 
 ---
 
-## 2. المنهج
+## 2. The method
 
-### 2.1 المقارنة العادلة: نفس السلك، بالقفزة وبدونها
+### 2.1 The fair comparison: the same wire, with and without the hop
 
-الـ Relay يضيف زمنًا **بحكم تعريفه**: يخزّن ويعيد الإرسال. لكن الجزء الأكبر من ذلك جغرافيا لا برمجية، ولا يقيسه
-حاسوب محمول. فما يُقاس هنا هو ما تضيفه البرمجية **فوق السلك**، وهو وحده ما يستطيع تغييرٌ في الكود أن يفسده.
+The relay adds time **by definition**: it stores and re-sends. But most of that is geography rather than software, and
+a laptop cannot measure it. So what is measured here is what the software adds **on top of the wire**, and that alone
+is what a change in the code can spoil.
 
-ولا تصحّ المقارنة إلا إذا حمل المساران **زمن السلك الكلي نفسه**. فلزمن ذهاب وإياب اسمي R:
+And the comparison is only valid if both paths carry **the same total wire time**. So for a nominal round-trip time of
+R:
 
 ```
-مباشر:  طرف ──(R كامل)── طرف
-Relay:  طرف ──(R/2)── Relay ──(R/2)── طرف
+Direct:  end ──(the whole R)── end
+Relay:   end ──(R/2)── relay ──(R/2)── end
 ```
 
-وهذه هي حالة الـ Relay المُحسن الموضع بالضبط: يقع **على** المسار، فساقاه تساويان تقريبًا الطريق المباشر
-(مصر ← جدة ← السعودية). الفارق الباقي بعد طرح السلك هو تكلفة البرمجية.
+And that is exactly the case of a well-placed relay: it sits **on** the path, so its two legs are roughly equal to the
+direct route (Egypt → Jeddah → Saudi Arabia). The difference that remains after subtracting the wire is the software's
+cost.
 
-### 2.2 معايرة الأداة نفسها
+### 2.2 Calibrating the tool itself
 
-أول تشغيل أعطى 50 ms لزمن اسمي قدره 40، و133 ms لزمن 120 — **للمسارين معًا**. السبب أن Windows يقسّم انتظار
-المؤقتات إلى شرائح **15.6 مللي ثانية**، وهي أكبر من كل ما يحاول هذا الملف قياسه: رقم الـ Relay كان أربع نومات
-مُقسَّمة لا أربع عمليات تمرير. بعد رفع الدقة إلى 1 ms عبر `timeBeginPeriod(1)`:
+The first run gave 50 ms for a nominal time of 40, and 133 ms for 120 — **on both paths**. The cause is that Windows
+splits timer waits into **15.6-millisecond** slices, which is larger than everything this file is trying to measure:
+the relay's number was four sliced sleeps rather than four forwarding operations. After raising the resolution to 1 ms
+with `timeBeginPeriod(1)`:
 
-| الزمن الاسمي | المقيس على المسار المباشر | الخطأ |
+| Nominal time | Measured on the direct path | Error |
 |---|---|---|
 | 0 ms | 0.40 ms | 0.40 ms |
 | 40 ms | 43.24 ms | +3.2 ms |
 | 120 ms | 124.38 ms | +4.4 ms |
 
-**هذا الخطأ (±4 ms) هو أرضية الضجيج في القسم 3**، وهو أكبر من التأثير المقيس نفسه. تُقرأ أرقام القسم 3 على هذا
-الأساس: الـ Relay أرخص من أن تقيسه هذه الأداة تحت تأخير مُحاكى.
+**That error (±4 ms) is the noise floor in section 3**, and it is larger than the measured effect itself. The numbers
+in section 3 are read on that basis: the relay is cheaper than this tool can measure under simulated delay.
 
-### 2.3 ما لا يستطيع هذا التشغيل قياسه — وهو مقصود ذكره
+### 2.3 What this run cannot measure — and saying so is deliberate
 
-جهاز القياس **لا يبلّغ استهلاك المعالج ولا الذاكرة لكل عملية**. ليس استنتاجًا بل مُختبَر:
+The measuring machine **reports neither CPU nor memory per process**. That is not an inference but a tested fact:
 
-- عملية أحرقت **4 ثوانٍ من المعالج** أبلغت `0.0` من `psutil` **ومن `GetProcessTimes` مباشرةً**.
-- عملية تحجز **300 ميغابايت** أبلغت `rss = 6.1 MB` ثابتة — وهي أقل من الحد الأدنى لعملية CPython أصلًا.
+- A process that burned **4 seconds of CPU** reported `0.0` from `psutil` **and from `GetProcessTimes` directly**.
+- A process holding **300 megabytes** reported a constant `rss = 6.1 MB` — which is below the floor for a CPython
+  process to begin with.
 
-فالأعمدة محذوفة، لا مملوءة بأصفار. والأداة **تفحص ذلك بنفسها** عند الإقلاع وتطبع النتيجة:
+So the columns are omitted rather than filled with zeros. And the tool **checks this itself** at startup and prints the
+result:
 
 ```
 [env] per_process_cpu=UNAVAILABLE per_process_rss=UNAVAILABLE
 ```
 
-فحين يُشغَّل هذا على مضيف النشر تظهر الأعمدة تلقائيًا بلا تعديل. **وهذا يعني أن تحفّظ ADR-0009 — كفاءة ضخّ
-asyncio في Python — لم يُغلق بعد.** ما أُغلق هو سؤال الإنتاجية والزمن، وهما ما كان يهدد قرار النقل.
+So when this is run on the deployment host the columns appear automatically with no change. **And that means ADR-0009's
+reservation — the efficiency of asyncio's pumping in Python — is not yet closed.** What is closed is the question of
+throughput and latency, which is what threatened the transport decision.
 
-### 2.4 البيئة
+### 2.4 The environment
 
-Windows 11 (بناء 26200)، ARM64، 12 نواة منطقية، Python 3.12.10، حلقة asyncio الافتراضية، loopback.
-الأرقام من تشغيل واحد كامل بتاريخ 2026-09-08.
+Windows 11 (build 26200), ARM64, 12 logical cores, Python 3.12.10, the default asyncio loop, loopback. The numbers come
+from one complete run on 2026-09-08.
 
-**حدود الأرقام:** جهاز واحد، ثلاث عمليات على loopback. لا مكدس TCP بين مدينتين، ولا ازدحام حقيقي، ولا خسارة
-حزم. خط التأخير يعطي زمنًا صادقًا لا شبكة صادقة. وسقف الإنتاجية أدناه سقف **البرمجية** لا سقف وصلة الـ VPS،
-التي ستكون هي القيد الفعلي في الإنتاج.
+**The numbers' limits:** one machine, three processes over loopback. No TCP stack between two cities, no real
+congestion, and no packet loss. The delay line gives an honest latency, not an honest network. And the throughput
+ceiling below is **the software's** ceiling, not the VPS's link, which is what will actually constrain production.
 
 ---
 
-## 3. الزمن الذي يضيفه الـ Relay
+## 3. The latency the relay adds
 
-`bench latency`. نفس زمن السلك الكلي في الحالتين، بالقفزة وبدونها.
+`bench latency`. The same total wire time in both cases, with and without the hop.
 
-| زمن الذهاب والإياب الاسمي | مباشر p50 | عبر Relay p50 | عبر Relay p99 | الفارق |
+| Nominal round-trip time | Direct p50 | Via relay p50 | Via relay p99 | The difference |
 |---|---|---|---|---|
 | 0 ms | 0.40 ms | 1.15 ms | 2.25 ms | **+0.75 ms** |
 | 40 ms | 43.24 ms | 46.79 ms | 50.10 ms | +3.55 ms |
 | 120 ms | 124.38 ms | 124.54 ms | 127.13 ms | **+0.16 ms** |
 
-**القراءة:** الصف الأول هو القياس النظيف الوحيد — بلا تأخير مُحاكى، فبلا ضجيج الأداة. تكلفة القفزة هناك
-**0.75 مللي ثانية** لدورة كاملة، أي نحو **0.19 ms لكل عملية تمرير** (الدورة تعبر الـ Relay أربع مرات).
+**The reading:** the first row is the only clean measurement — no simulated delay, so no tool noise. The hop's cost
+there is **0.75 milliseconds** for a full round trip, that is about **0.19 ms per forwarding operation** (the round trip
+crosses the relay four times).
 
-أما الصفان الآخران فيقولان شيئًا واحدًا: الفارق (0.16 و3.55) **يقع داخل أرضية ضجيج الأداة (±4 ms)** ولا
-يتزايد باطراد مع الزمن الاسمي. ولو كان للـ Relay تكلفة معتبرة لظهرت متسقة ومتصاعدة. أي أن **ما سيشعر به
-المستخدم من الـ Relay هو الجغرافيا وحدها.**
+The other two rows say one thing: the difference (0.16 and 3.55) **falls inside the tool's noise floor (±4 ms)** and
+does not grow steadily with the nominal time. Had the relay had an appreciable cost it would have appeared consistently
+and increasingly. That is, **what the user will feel from the relay is geography alone.**
 
-وهذا يجعل [قرار الموقع في ADR-0009](decisions/0009-relay-default.md) هو المتغير الحاكم فعلًا: relay في
-ألمانيا يجعل مسار مصر↔السعودية نحو 150 ms، وفي جدة نحو 40 — وهو فارق **يفوق تكلفة البرمجية بمئتي ضعف**.
+And that makes [the location decision in ADR-0009](decisions/0009-relay-default.md) the governing variable in practice:
+a relay in Germany makes the Egypt↔Saudi path about 150 ms, and one in Jeddah about 40 — a difference **two hundred
+times larger than the software's cost**.
 
 ---
 
-## 4. الإنتاجية
+## 4. Throughput
 
-`bench throughput`. جلسة واحدة، نقل ضخم، بلا تأخير مُصطنع: هذا سقف الضخّ نفسه.
+`bench throughput`. One session, a bulk transfer, with no artificial delay: this is the pumping's own ceiling.
 
-| الحجم | الزمن | المقيس |
+| Size | Time | Measured |
 |---|---|---|
 | 64 MB | 301 ms | **212.8 MB/s (1703 Mbit/s)** |
 | 256 MB | 1021 ms | **250.7 MB/s (2005 Mbit/s)** |
 
-**القراءة، وهي جواب التحفّظ الأهم:** أسرع ما قيس للنفق نفسه في الأسبوع الخامس هو **224 Mbit/s** على stream
-واحد بنافذة 4 MiB. سقف الـ Relay **نحو تسعة أضعاف ذلك**. فالضخّ في Python asyncio ليس عنق الزجاجة بأي هامش
-معقول — القيد سيكون وصلة الـ VPS ثم النافذة والـ RTT، لا هذه الخدمة.
+**The reading, which is the answer to the most important reservation:** the fastest thing measured for the tunnel
+itself in week five is **224 Mbit/s** on a single stream with a 4 MiB window. The relay's ceiling is **about nine times
+that**. So pumping in Python asyncio is not the bottleneck by any reasonable margin — the constraint will be the VPS's
+link, then the window and the RTT, not this service.
 
 ---
 
-## 5. جلسات متزامنة
+## 5. Concurrent sessions
 
-`bench concurrency`. كل جلسة تنقل 32 ميغابايت في آن واحد.
+`bench concurrency`. Every session transfers 32 megabytes at the same time.
 
-| جلسات | الإنتاجية الكلية | لكل جلسة | الأبطأ | الأسرع | التفاوت |
+| Sessions | Total throughput | Per session | The slowest | The fastest | The spread |
 |---|---|---|---|---|---|
 | 1 | 174.7 MB/s (1397 Mbit/s) | 174.7 MB/s | 183 ms | 183 ms | — |
 | 5 | 284.0 MB/s (2272 Mbit/s) | 56.8 MB/s | 563 ms | 563 ms | **0.0%** |
 | 10 | 299.4 MB/s (2395 Mbit/s) | 29.9 MB/s | 1069 ms | 1067 ms | **0.2%** |
 | 20 | 287.1 MB/s (2297 Mbit/s) | 14.4 MB/s | 2229 ms | 2224 ms | **0.2%** |
 
-**قراءتان:**
+**Two readings:**
 
-1. **الإنتاجية الكلية تستقر عند نحو 285 MB/s** من خمس جلسات فصاعدًا. هذا سقف الحلقة الواحدة (`asyncio` بخيط
-   واحد)، وقد بلغ عند خمس جلسات ولم يتدهور حتى عشرين — أي **لا انهيار تحت الحِمل**، بل توزيع لسقف ثابت.
-2. **العدالة تامة عمليًا.** الفارق بين أبطأ جلسة وأسرعها **0.2%**. لا جلسة تتضور. وهذه خاصية مهمة لمنتج تتشارك
-   فيه جلسات مستخدمين مختلفين خدمةً واحدة.
+1. **Total throughput settles at around 285 MB/s** from five sessions upwards. That is the single loop's ceiling
+   (single-threaded `asyncio`), and it was reached at five sessions and did not degrade through twenty — that is, **no
+   collapse under load**, but the sharing out of a fixed ceiling.
+2. **Fairness is practically perfect.** The difference between the slowest session and the fastest is **0.2%**. No
+   session starves. And that is an important property for a product where different users' sessions share one service.
 
-**عند حجم هذا الإصدار (5 مستخدمين):** لو تصفّح خمستهم في آن واحد وكل منهم يشبع وصلته، فحصة الجلسة الواحدة من
-سقف البرمجية **56.8 MB/s = 454 Mbit/s** — أي أضعاف ما يستطيع الـ VPS إخراجه أصلًا. الخدمة ليست القيد.
+**At this release's scale (5 users):** if all five browsed at once and each saturated their link, one session's share of
+the software's ceiling is **56.8 MB/s = 454 Mbit/s** — several times what the VPS can push out to begin with. The
+service is not the constraint.
 
 ---
 
-## 6. تكلفة الاقتران
+## 6. The cost of pairing
 
-`bench pairing`. من فتح المقبسين إلى وصول `paired` للطرفين، 50 عينة.
+`bench pairing`. From opening the two sockets to `paired` arriving at both ends, 50 samples.
 
-| p50 | p99 | الأقصى |
+| p50 | p99 | Max |
 |---|---|---|
 | **0.58 ms** | 1.62 ms | 1.62 ms |
 
-**القراءة:** الاقتران وتحقق التوكن (HS256) ومزاوجة الطرفين تكلّف أقل من مللي ثانية. نافذة الاتصال 30 ثانية،
-فهذا **خمسون ألفًا من واحد بالمئة منها**. لا يستحق تحسينًا، ويستحق أن يُقاس مرة ليُغلق السؤال.
+**The reading:** pairing, verifying the token (HS256) and matching the two ends cost less than a millisecond. The
+connect window is 30 seconds, so this is **fifty-thousandths of one percent of it**. It does not deserve optimisation,
+and it deserves to be measured once to close the question.
 
 ---
 
-## 7. ما يبقى مفتوحًا
+## 7. What stays open
 
-| البند | لماذا لم يُغلق | ما يغلقه |
+| Item | Why it is not closed | What closes it |
 |---|---|---|
-| **استهلاك المعالج لكل غيغابايت** | البيئة لا تبلّغ معالج العملية (القسم 2.3) — وهو نص تحفّظ ADR-0009 | تشغيل `python -m bench` على مضيف النشر؛ الأعمدة تظهر تلقائيًا |
-| **الذاكرة لكل جلسة** | البيئة لا تبلّغ ذاكرة العملية | نفسه |
-| **الإنتاجية على وصلة الـ VPS الحقيقية** | loopback يقيس البرمجية لا الشبكة | قياس بين مصر والسعودية عبر relay جدة |
-| **السلوك تحت خسارة حزم وازدحام حقيقي** | غير مُنمذَج، والنمذجة الناقصة أسوأ من غيابها | تشغيل حقيقي |
+| **CPU per gigabyte** | The environment does not report the process's CPU (section 2.3) — which is the substance of ADR-0009's reservation | Running `python -m bench` on the deployment host; the columns appear automatically |
+| **Memory per session** | The environment does not report the process's memory | The same |
+| **Throughput on the real VPS link** | Loopback measures the software, not the network | A measurement between Egypt and Saudi Arabia over a Jeddah relay |
+| **Behaviour under packet loss and real congestion** | Not modelled, and an incomplete model is worse than none | A real run |
 
-**ما أُغلق:** الـ Relay ليس عنق الزجاجة في الإنتاجية، ولا يضيف زمنًا محسوسًا، ولا ينهار ولا يظلم جلسة تحت
-الحِمل، والاقتران رخيص. وهذه هي المخاطر التي كانت تهدد قرار ADR-0009 بجعله النقل الافتراضي.
+**What is closed:** the relay is not a throughput bottleneck, adds no perceptible latency, neither collapses nor
+treats a session unfairly under load, and pairing is cheap. And those were the risks that threatened ADR-0009's
+decision to make it the default transport.

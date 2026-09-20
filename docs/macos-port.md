@@ -1,198 +1,223 @@
-# نقل Josour إلى macOS
+# Porting Josour to macOS
 
-القرار في [ADR-0013](decisions/0013-avalonia-and-macos.md): واجهة واحدة على Avalonia، وmacOS بالدورين — مضيفًا وضيفًا.
+The decision is in [ADR-0013](decisions/0013-avalonia-and-macos.md): one interface on Avalonia, and macOS in both
+roles — host and guest.
 
-هذه الوثيقة هي جرد ما يلزم فعلًا، مأخوذًا من الشيفرة لا من التوقّع، وحالة كل بند.
+This document is an inventory of what is actually needed, taken from the code rather than from expectation, and the
+state of each item.
 
-## ما يعمل على mac اليوم بلا تعديل
+## What works on a Mac today with no change
 
-بُني الحلّ كاملًا على macOS (`dotnet build Josour.sln`) ونجحت اختباراته. المكتبات التالية ليس فيها استدعاء واحد خاص بـ Windows:
+The whole solution was built on macOS (`dotnet build Josour.sln`) and its tests passed. The following libraries
+contain not one Windows-specific call:
 
-| المكتبة | الدور | ملاحظة |
+| Library | Role | Note |
 |---|---|---|
-| `Josour.Core` | الأنواع والسياسات | `FirewallDiagnostics` وحدها تحتاج فرعًا لـ mac |
-| `Josour.Tunnel` | النفق، TLS، المرشحون، Mux | مقابس و`Mono.Nat` — محمولة |
-| `Josour.Egress` | **جانب المضيف**: الخروج إلى الإنترنت | **محمولة بالكامل** |
-| `Josour.Proxy` | **جانب الضيف**: الـ Proxy المحلي | `OwnerPidChecker` وحده يحتاج mac |
-| `Josour.Infrastructure` | الخادم، القناة، الجلسة، الإعدادات | الأسرار ومعلومات الجهاز |
+| `Josour.Core` | The types and policies | `FirewallDiagnostics` alone needs a Mac branch |
+| `Josour.Tunnel` | The tunnel, TLS, the candidates, the mux | Sockets and `Mono.Nat` — portable |
+| `Josour.Egress` | **The host's side**: egress to the internet | **Entirely portable** |
+| `Josour.Proxy` | **The guest's side**: the local proxy | `OwnerPidChecker` alone needs a Mac |
+| `Josour.Infrastructure` | The server, the channel, the session, the settings | Secrets and device information |
 
-الأثر العملي: **دور المضيف أقرب بكثير إلى الجاهزية من دور الضيف**، لأن `Egress` — وهي كل ما يفعله المضيف بالبايتات — لا تحتاج شيئًا.
+The practical effect: **the host role is far closer to ready than the guest role**, because `Egress` — which is
+everything the host does with the bytes — needs nothing.
 
-## المفاصل
+## The seams
 
-| # | المفصل | على Windows | على macOS | الحالة |
+| # | Seam | On Windows | On macOS | State |
 |---|---|---|---|---|
-| 1 | تخزين الأسرار | DPAPI (`DpapiSecretStore`) | Keychain عبر `Security.framework` | ✅ (`KeychainSecretStore`, `SecretStores`) |
-| 2 | معلومات الجهاز | مفاتيح السجل | `sw_vers` | ✅ (`DeviceInfoProvider.ReadMacVersion`) |
-| 3 | تحديد مسار المتصفح | السجل | `/Applications` و`~/Applications` (`MacBrowserLocator`) | ✅ |
-| 4 | تشغيل متصفح العمل | `--proxy-server` + ملف تعريف معزول | نفس الوسائط؛ التنفيذ المباشر داخل الحزمة لا `open` (`MacBrowserSession`) | ✅ |
-| 5 | احتواء المتصفح | Job Object | شجرة العمليات: SIGTERM للشجرة ثم SIGKILL (`MacProcessTree`) | ✅ |
-| 6 | **فحص مالك الاتصال** | `iphlpapi!GetExtendedTcpTable` | `lsof` (`MacOwnerPidChecker`) + شجرة العمليات | ✅ **منفَّذ ومُختبَر بالحالتين** |
-| 7 | تشخيص جدار الحماية | `netsh advfirewall` | `socketfilterfw` | ✅ (`MacFirewallDiagnostics`) |
-| 8 | التشغيل مع الدخول | مفتاح `Run` | `LaunchAgent` في `~/Library/LaunchAgents` | ✅ (`StartupRegistration`) |
-| 9 | أيقونة الشريط | `H.NotifyIcon.Wpf` | `TrayIcon` في Avalonia (شريط القوائم) | ✅ (`TrayService`) |
-| 10 | الإشعارات | `Microsoft.Toolkit.Uwp.Notifications` | `osascript display notification` — **بلا أزرار** | ✅ (`MacNotifier`) |
-| 11 | الواجهة | WPF + WPF-UI | Avalonia | ✅ **كل الشاشات نُقلت** |
-| 12 | نسخة واحدة فقط | mutex + event مسمّيان | ملف قفل (`flock`) + مقبس Unix | ✅ (`SingleInstanceGuard`) |
-| 13 | استئناف بعد النوم | `SystemEvents.PowerModeChanged` | فارق الساعة عن مؤقّت رتيب | ✅ (`SystemConnectivitySignals`) |
-| 14 | الحافظة والصوت | WPF | `TopLevel.Clipboard` و`afplay` | ✅ (`ClipboardService`, `AttentionSound`) |
-| 15 | التوزيع | ملف واحد ([ADR-0011](decisions/0011-no-code-signing-certificate.md)) | `.app` داخل `.dmg` عبر [publish-app.sh](../scripts/publish-app.sh) | ✅ **للبناء**؛ ⬜ التوقيع وGatekeeper |
+| 1 | Secret storage | DPAPI (`DpapiSecretStore`) | A file with `0600` permissions (`FileSecretStore`) — the Keychain was tried first and fell, see [ADR-0013](decisions/0013-avalonia-and-macos.md) | ✅ (`FileSecretStore`, `SecretStores`) |
+| 2 | Device information | Registry keys | `sw_vers` | ✅ (`DeviceInfoProvider.ReadMacVersion`) |
+| 3 | Locating the browser's path | The registry | `/Applications` and `~/Applications` (`MacBrowserLocator`) | ✅ |
+| 4 | Launching the work browser | `--proxy-server` + an isolated profile | The same arguments; executing directly inside the bundle rather than `open` (`MacBrowserSession`) | ✅ |
+| 5 | Containing the browser | A Job Object | The process tree: SIGTERM to the tree then SIGKILL (`MacProcessTree`) | ✅ |
+| 6 | **The connection-owner check** | `iphlpapi!GetExtendedTcpTable` | `lsof` (`MacOwnerPidChecker`) + the process tree | ✅ **implemented and tested both ways** |
+| 7 | Firewall diagnostics | `netsh advfirewall` | `socketfilterfw` | ✅ (`MacFirewallDiagnostics`) |
+| 8 | Start on login | The `Run` key | A `LaunchAgent` in `~/Library/LaunchAgents` | ✅ (`StartupRegistration`) |
+| 9 | The tray icon | `H.NotifyIcon.Wpf` | Avalonia's `TrayIcon` (the menu bar) | ✅ (`TrayService`) |
+| 10 | Notifications | `Microsoft.Toolkit.Uwp.Notifications` | `osascript display notification` — **with no buttons** | ✅ (`MacNotifier`) |
+| 11 | The interface | WPF + WPF-UI | Avalonia | ✅ **every screen ported** |
+| 12 | A single instance only | A named mutex + event | A lock file (`flock`) + a Unix socket | ✅ (`SingleInstanceGuard`) |
+| 13 | Resuming after sleep | `SystemEvents.PowerModeChanged` | The clock's difference from a monotonic timer | ✅ (`SystemConnectivitySignals`) |
+| 14 | The clipboard and sound | WPF | `TopLevel.Clipboard` and `afplay` | ✅ (`ClipboardService`, `AttentionSound`) |
+| 15 | Distribution | One file ([ADR-0011](decisions/0011-no-code-signing-certificate.md)) | A `.app` inside a `.dmg` via [publish-app.sh](../scripts/publish-app.sh) | ✅ **for the build**; ⬜ signing and Gatekeeper |
 
-## المفصل 6: فحص مالك الاتصال — لماذا هو الأصعب
+## Seam 6: the connection-owner check — why it is the hardest
 
-الـ Proxy المحلي يخدم **متصفح العمل وحده**؛ هذا ما يمنع المنتج من أن يصير VPN على مستوى الجهاز، وهو معيار القبول رقم 10 ونتيجة صريحة في [ADR-0010](decisions/0010-route-all-through-host.md). على Windows ينفَّذ بسؤال `iphlpapi` عن مالك المقبس ثم التحقق من أنه داخل الـ Job Object.
+The local proxy serves **the work browser alone**; that is what keeps the product from becoming a device-wide VPN, and
+it is acceptance criterion 10 and an explicit consequence in
+[ADR-0010](decisions/0010-route-all-through-host.md). On Windows it is implemented by asking `iphlpapi` for the
+socket's owner and then checking that it is inside the Job Object.
 
-على macOS لا يوجد Job Object. وما هو موجود اليوم هو `PermissiveOwnerPidChecker` — التي تعني حرفيًا «لا أعرف»، وعلى Windows احتياطٌ نادر، وعلى mac ستكون **الحال الدائمة**. أي أن نقلًا ساذجًا يُسقط هذا الضابط بصمت.
+On macOS there is no Job Object. And what exists today is `PermissiveOwnerPidChecker` — which literally means "I do not
+know", and which on Windows is a rare fallback and on a Mac would be **the permanent state**. That is, a naive port
+drops this control silently.
 
-### ما فُعل الآن: الرفض بدل التمرير الصامت
+### What was done now: refusing instead of passing silently
 
-كان الافتراض `RejectUnknownOwner ?? OperatingSystem.IsWindows()` — أي «ارفض المجهول على Windows
-**واقبله على غيره**». ومع `PermissiveOwnerPidChecker`، وهي كل ما يوجد خارج Windows، كان معنى ذلك أن
-الـ Proxy المحلي **يقبل كل عملية على الجهاز**. لم يكن قرارًا اتُّخذ بل أثرًا جانبيًا لافتراض، وكان
-يُسقط معيار القبول رقم 10 بلا أن يقول أحد شيئًا.
+The default was `RejectUnknownOwner ?? OperatingSystem.IsWindows()` — that is, "refuse the unknown on Windows **and
+accept it everywhere else**". And with `PermissiveOwnerPidChecker`, which is all that exists off Windows, that meant
+the local proxy **accepted every process on the machine**. It was not a decision taken but the side effect of a
+default, and it dropped acceptance criterion 10 without anyone saying anything.
 
-الافتراض الآن **`true` على كل نظام** (fail-closed). ومن أراد «اقبل كل شيء» فليقل ذلك صراحةً — كما
-تفعل الاختبارات داخل العملية وأداة Spike. الفرق بين اختيارٍ مُعلَن وافتراضٍ صامت هو كل الفرق هنا.
+The default is now **`true` on every system** (fail-closed). And whoever wants "accept everything" must say so
+explicitly — as the in-process tests and the Spike tool do. The difference between a declared choice and a silent
+default is the whole difference here.
 
-وأثره على macOS أن الحارس القائم في `ConnectProxyServer` يُطلَق: الـ Proxy يرفض أن يُبنى أصلًا.
-وفوقه `GuestViewModel.IsGuestRoleSupported`، فصفحة الضيف تعرض السبب وزر الطلب معطّل — يعلم
-المستخدم قبل أن يطلب، لا باستثناء بعد أن تُنشأ جلسة.
+Its effect on macOS is that the existing guard in `ConnectProxyServer` fires: the proxy refuses to be constructed at
+all. And above it `GuestViewModel.IsGuestRoleSupported`, so the guest page shows the reason and the request button is
+disabled — the user knows before they ask, rather than by an exception after a session has been created.
 
-### كيف نُفِّذ، ولماذا بهذا الشكل
+### How it was implemented, and why in this shape
 
-**`lsof` لا `libproc`.** macOS بلا نداء عام يربط مقبسًا بعملية؛ الطريق الوحيد بالنظام هو `proc_listpids`
-ثم `proc_pidfdinfo` على كل واصف لكل عملية، بفكّ بنية `socket_fdinfo` الضخمة الحسّاسة للإصدار — بنية
-تُوضع بيدٍ لضابط أمني لا يجوز أن يكون خاطئًا بهدوء. و`lsof` يفعل ذلك المشي نفسه، ويشحن مع كل macOS،
-وبصيغة حقول موثّقة (`-F`). وهو ما يفعله المشروع أصلًا لحقائق المنصة (`netsh`، `socketfilterfw`، `sw_vers`).
+**`lsof`, not `libproc`.** macOS has no public call binding a socket to a process; the only route through the system
+is `proc_listpids` then `proc_pidfdinfo` on every descriptor of every process, unpacking the large,
+version-sensitive `socket_fdinfo` structure — a structure laid out by hand for a security control that may not be
+quietly wrong. And `lsof` does that same walk, ships with every macOS, and has a documented field format (`-F`). It is
+what the project already does for platform facts (`netsh`, `socketfilterfw`, `sw_vers`).
 
-**بلا تخزين مؤقّت.** قياسًا: 20 مللي ثانية للنداء، وهو رخيص بما يكفي للسؤال في كل اتصال. وجدول مُخزَّن
-يفتح ثغرة حقيقية: منفذ عابر أفلته المتصفح قد تلتقطه عملية أخرى داخل نافذة التخزين، فيقبلها صفٌّ قديم.
-عشرون مللي ثانية ثمن أقلّ من جواب يخطئ أحيانًا.
+**No caching.** Measured: 20 milliseconds per call, cheap enough to ask on every connection. And a cached table opens a
+real hole: an ephemeral port the browser released may be picked up by another process inside the caching window, so an
+old row accepts it. Twenty milliseconds is a smaller price than an answer that is sometimes wrong.
 
-**الملكية من شجرة العمليات.** Chrome لا يفتح المقابس من العملية التي أُطلقت بل من ابن لها، فمقارنة الـ PID
-المُطلَق وحده كانت سترفض كل اتصال يصنعه المتصفح. والشجرة تُقرأ في كل مرة لا مرة واحدة: مجموعة مُخزَّنة
-مع إعادة استعمال أرقام العمليات طريقٌ لقبول عملية لم يطلقها أحد.
+**Ownership from the process tree.** Chrome does not open sockets from the process that was launched but from a child
+of it, so comparing the launched PID alone would have refused every connection the browser makes. And the tree is read
+every time rather than once: a cached set, with process ids being reused, is a route to accepting a process nobody
+launched.
 
-**والمتصفح يُشغَّل من داخل حزمته لا بـ `open`:** `open` يسلّم الطلب لنسخة قائمة ويعود، فلا تبقى عملية
-نملكها ولا ننتظرها ولا نقتلها — وفحص المالك يحتاج عملية من عندنا.
+**And the browser is launched from inside its bundle rather than with `open`:** `open` hands the request to an existing
+instance and returns, so no process remains that we own, wait for or kill — and the owner check needs a process of our
+own.
 
-### ما جُرِّب
+### What was exercised
 
 | | |
 |---|---|
-| الحالة الإيجابية | تشغيل المكدّس فعليًا بأداة `Spike`: Chrome انطلق، وصفحة الفحص وصلت، والعدّادات `accepted: 19، rejected_by_owner: 0` — عكس العطل التاريخي `33/33` المسجَّل في الشيفرة |
-| الحالة السلبية | اختبار تكامل: الـ Proxy الحقيقي + فاحص `lsof` الحقيقي + متصفح لا يملك شيئًا ⇒ `RejectedByOwner: 1، Tunneled: 0` |
-| أن الرفض قرار لا عجز | اختبار يثبت أن الفاحص **يسمّي عملية الاختبار بالذات** — رفضٌ سببه تعذّر التعرّف كان سيبدو مطابقًا، ويعني أن الضابط لا يعمل |
+| The positive case | Actually running the stack with the `Spike` tool: Chrome started, the check page arrived, and the counters read `accepted: 19, rejected_by_owner: 0` — the opposite of the historic `33/33` failure recorded in the code |
+| The negative case | An integration test: the real proxy + the real `lsof` checker + a browser that owns nothing ⇒ `RejectedByOwner: 1, Tunneled: 0` |
+| That the refusal is a decision, not an inability | A test proving the checker **names the test's own process** — a refusal caused by failing to identify anything would have looked identical, and would mean the control does not work |
 
-**لم يُجرَّب:** جلسة حقيقية mac ↔ Windows بالدورين. تحتاج جهازين.
+**Not exercised:** a real mac ↔ Windows session in both roles. It needs two machines.
 
-## الواجهة: ما تغيّر فعليًا
+## The interface: what actually changed
 
-`Josour.App` صار `net8.0` و`net8.0-windows10.0.19041.0` معًا. الهدفان ليسا ترفًا: حزمة إشعارات Windows
-(`Microsoft.Toolkit.Uwp.Notifications`) لا تُحلّ إلا على هدف Windows، وإسقاطها كان سيأخذ زرَّي «اقبل» و«ارفض»
-من إشعار Windows — قدرةٌ لم يُطلب من النقل أن ينفقها. كل ما عدا ذلك، وكل شاشة، يُبنى مرة واحدة من المصدر نفسه.
+`Josour.App` now targets `net8.0` and `net8.0-windows10.0.19041.0` together. The two targets are not a luxury: the
+Windows notifications package (`Microsoft.Toolkit.Uwp.Notifications`) only resolves on a Windows target, and dropping
+it would have taken the "Accept" and "Reject" buttons out of the Windows notification — a capability the port was not
+asked to spend. Everything else, and every screen, is built once from the same source.
 
-**ما حلّ محلّ WPF-UI.** الواجهة كانت تستعمل أحد عشر عنصرًا منه. ثلاثة كُتبت بأيدينا — `Icon` و`Card` و`InfoBar`
-في `client/src/Josour.App/Controls/` — والبقية عناصر Avalonia الأصلية. والأيقونات بقيت **من العائلة نفسها**
-(Fluent System Icons من مايكروسوفت، رخصة MIT) لكنها مضمّنة هندسةً في `Controls/Icons.axaml` بدل حزمة أو خط:
-أربع عشرة أيقونة لا تستحق اعتمادية، وخط أيقونات أصلٌ أصليٌّ آخر عليه أن ينجو من النشر بملف واحد على نظامين.
+**What replaced WPF-UI.** The interface used eleven of its controls. Three were written by hand — `Icon`, `Card` and
+`InfoBar` in `client/src/Josour.App/Controls/` — and the rest are Avalonia's own. And the icons stayed **from the same
+family** (Fluent System Icons from Microsoft, MIT licence) but are embedded as geometry in `Controls/Icons.axaml`
+instead of a package or a font: fourteen icons do not deserve a dependency, and an icon font is another native asset
+that would have to survive single-file publishing on two systems.
 
-**ما رُبح.** لم يكن للواجهة مشروع اختبار قط — وكانت نافذة الطلب، التي تُؤخذ عليها موافقة المضيف، هي الشاشة
-الوحيدة التي لا يفحصها شيء. منصّة Avalonia بلا رأس أتاحت ذلك: `tests/Josour.App.Tests` تحمّل الـ XAML نفسه
-وتطبّق السمات نفسها وتشغّل الارتباطات نفسها بلا شاشة. ٣٨ اختبارًا، منها أن كل رمز أيقونة يُحلّ فعلًا، وأن كل
-درجة خطورة في `InfoBar` لها **أيقونة مختلفة لا لونًا مختلفًا فحسب**، وأن خانة الثقة في نافذة الطلب تبدأ
-**غير مؤشَّرة**.
+**What was gained.** The interface never had a test project — and the request window, where the host's consent is
+taken, was the one screen nothing checked. Avalonia's headless platform made it possible: `tests/Josour.App.Tests`
+loads the same XAML, applies the same themes and runs the same bindings with no screen. Thirty-eight tests, among them
+that every icon key actually resolves, that every severity in `InfoBar` has **a different icon and not merely a
+different colour**, and that the trust checkbox in the request window starts **unchecked**.
 
-**ما فُقد.** شريط عنوان WPF-UI المخصّص (`ExtendsContentIntoTitleBar` وخلفية Mica): النوافذ صارت تستعمل شريط
-النظام الأصلي، وهو ما يبدو صحيحًا على macOS على أي حال.
+**What was lost.** WPF-UI's custom title bar (`ExtendsContentIntoTitleBar` and the Mica background): the windows now
+use the system's own bar, which looks right on macOS anyway.
 
-## الخطوط على macOS — عطل يستحق التوثيق
+## Fonts on macOS — a failure worth documenting
 
-نُقلت الواجهة وهي مكسورة، ومرّت من ١٤٥٩ اختبارًا سليمة، ووجدها إنسان نظر إلى الشاشة.
+The interface was ported broken, passed 1459 sound tests, and was found by a human looking at the screen.
 
-**العَرَض:** العناوين والتبويبات وكل نص عريض يظهر **مربّعات فارغة**، والنص العادي بجانبه سليم. يبدو عطلًا في
-نصوص بعينها، وهو عطل في خط.
+**The symptom:** headings, tabs and every bold string appear as **empty boxes**, while ordinary text beside them is
+fine. It looks like a failure in particular strings, and it is a failure in a font.
 
-**السبب، بالقياس لا بالتخمين:**
+**The cause, by measurement rather than by guesswork:**
 
-1. استُدعي `WithInterFont()` — السطر الذي يشحنه قالب Avalonia — و**Inter بلا حرف عربي واحد**. أُزيل.
-2. وبعد إزالته بقي العطل: خط Avalonia الافتراضي على macOS هو **`Helvetica`، وهو بلا عربية أيضًا**. الرجوع
-   لكل حرف عند الرسم ينقذ الوزن العادي ويعجز عن `SemiBold` — فينكسر العريض وحده.
+1. `WithInterFont()` was called — the line Avalonia's template ships — and **Inter has not one Arabic character**. It
+   was removed.
+2. And after removing it the failure remained: Avalonia's default font on macOS is **`Helvetica`, which has no Arabic
+   either**. Per-glyph fallback while drawing rescues the regular weight and cannot manage `SemiBold` — so the bold
+   alone breaks.
 
-**الإصلاح:** `FontFallbacks` صريح إلى **`Geeza Pro`** على macOS وحده (موجود على كل Mac، وبوزنَي Regular وBold
-أي الوزنين اللذين تستعملهما الواجهة). Windows لا يحتاج شيئًا: Segoe UI فيها عربية بكل الأوزان.
+**The fix:** an explicit `FontFallbacks` to **`Geeza Pro`** on macOS only (present on every Mac, in Regular and Bold —
+the two weights the interface uses). Windows needs nothing: Segoe UI there has Arabic in every weight.
 
-**ولماذا لا اختبار يمنع عودته:** جُرّبت أربع طرق وفشلت كلها لأسباب مختلفة —
-`FontManager.DefaultFontFamily` لا تتغيّر بـ `WithInterFont` أصلًا؛ وفحص تغطية الحروف يمرّ لأن الرجوع لكل حرف
-يرسم العربية رغم خط لا يملكها؛ ومقارنة البكسل مع Skia حقيقي بلا رأس تمرّ لأن **الرجوع ينجح هناك ويفشل في
-النافذة الحقيقية** (قياسًا: حبر 4860 مقابل 2153 للمربّعات، أي نصّ سليم)؛ واسم الخط تسمّيه `FluentTheme`
-بـ `Inter` سواء وُجد أو لا. العطل يعيش في مسار رسم نافذة macOS، والبيئة بلا رأس لا تسلكه.
+**And why there is no test preventing its return:** four approaches were tried and all failed for different reasons —
+`FontManager.DefaultFontFamily` does not change with `WithInterFont` at all; checking glyph coverage passes because
+per-glyph fallback draws the Arabic despite a font that does not have it; a pixel comparison under real headless Skia
+passes because **the fallback succeeds there and fails in the real window** (measured: 4860 of ink against 2153 for the
+boxes, that is, real text); and the font's name is set to `Inter` by `FluentTheme` whether it exists or not. The
+failure lives in the macOS window's drawing path, and the headless environment does not take it.
 
-**فالخلاصة التي تبقى:** صنف الأعطال هذا لا يجده إلا إنسان يفتح التطبيق وينظر. أُضيف إلى
-[قائمة القبول](acceptance-checklist.md) بندًا صريحًا لذلك.
+**So the conclusion that remains:** this class of failure is found only by a human who opens the application and looks.
+An explicit item was added to the [acceptance list](acceptance-checklist.md) for it.
 
-## ما جُرِّب فعلًا على هذا الجهاز
+## What was actually exercised on this machine
 
-- بناء الهدفين، و`dotnet test Josour.sln` أخضر.
-- تشغيل التطبيق على macOS 26.6.2 بالعربية والإنجليزية: السجل يؤكد `Secrets are stored with keychain`،
-  و`Tray icon created`، و`sw_vers` يعطي `macOS 26.6.2 (build 25G83)`، ونافذة البدء الأول تُفتح.
-- نسخة ثانية من التطبيق خرجت فورًا بالرمز 0 وبقيت الأولى تعمل: قفل `flock` والمقبس يعملان.
-- نشر Windows (`-f net8.0-windows10.0.19041.0 -r win-x64`) ينتج `Josour.exe`.
+- Building both targets, and `dotnet test Josour.sln` green.
+- Running the application on macOS 26.6.2 in Arabic and in English: the log confirms
+  `Secrets are stored with file-0600`, and `Tray icon created`, and `sw_vers` gives
+  `macOS 26.6.2 (build 25G83)`, and the first-run window opens.
+- A second copy of the application exited at once with code 0 while the first kept running: the `flock` lock and the
+  socket work.
+- A Windows publish (`-f net8.0-windows10.0.19041.0 -r win-x64`) produces `Josour.exe`.
 
-- نشر **قائم بذاته بملف واحد** لـ `osx-arm64`: ٤٠ ميغابايت تعمل على mac بلا .NET مثبّت (السجل يؤكد بدء التشغيل
-  كاملًا)، وهو ما تعنيه [ADR-0011](decisions/0011-no-code-signing-certificate.md) بـ«ملف واحد يُنسخ ويُضغط عليه».
+- A **self-contained single-file** publish for `osx-arm64`: 40 megabytes that run on a Mac with no .NET installed (the
+  log confirms a complete startup), which is what
+  [ADR-0011](decisions/0011-no-code-signing-certificate.md) means by "one file that is copied and hashed".
 
-**لم يُجرَّب:** جلسة حقيقية بين mac وWindows — تحتاج جهازين. وواجهة mac **لم يرها إنسان بعد**: التحقّق كله
-بالاختبارات بلا رأس وبسجل التشغيل، لأن التقاط الشاشة على هذا الجهاز يحتاج إذنًا غير ممنوح وكان سيلتقط سطح
-مكتب المستخدم كاملًا. أول ما ينبغي فعله هو فتح التطبيق والنظر إليه.
+**Not exercised:** a real session between a Mac and a Windows machine — it needs two machines. And the Mac interface
+**has not yet been seen by a human**: all the verification is headless tests and the startup log, because taking a
+screenshot on this machine needs a permission that was not granted and would have captured the user's whole desktop.
+The first thing to do is open the application and look at it.
 
-## بناء نسخة قابلة للتسليم
+## Building a deliverable copy
 
 ```bash
-scripts/publish-app.sh --dmg              # لهذا الجهاز
-scripts/publish-app.sh --arch x64 --dmg   # لأجهزة Intel
+scripts/publish-app.sh --dmg              # for this machine
+scripts/publish-app.sh --arch x64 --dmg   # for Intel machines
 ```
 
-ثلاث ملاحظات عن السكربت، كلها ثمن أخطاء وقعت فيها أثناء كتابته:
+Three notes about the script, all of them the price of mistakes made while writing it:
 
-- **لا `PublishSingleFile`.** على Windows يوجد العَلَم لأن المُسلَّم هو ملف `.exe` واحد يُنسخ فعلًا. هنا
-  المُسلَّم **حزمة**، وهي مجلد يسحبه المستخدم كأيقونة واحدة، فوقت التشغيل والمكتبات الأصلية تعيش داخلها حيث
-  يتوقّعها `dyld`. النسخة الأولى استعملت العَلَم واحتفظت بالملف التنفيذي وحده فرمت `libSkiaSharp.dylib`:
-  حزمة تُبنى نظيفة وتموت قبل أن ترسم نافذة.
-- **السكربت يشغّل ما بناه.** يتحقّق من وجود `libSkiaSharp` و`libHarfBuzzSharp`، ثم **ينفّذ** الملف فعلًا
-  (`--uninstall-notifications` يخرج فورًا) ويفشل البناء إن لم يعمل. فحص عدّ الملفات لا يلتقط شيئًا من هذا.
-- **الأيقونة ناعمة فوق 64 بكسل**: مصدرها `josour.ico` بحجم 64×64. ملف 1024×1024 في `Assets` يصلحها.
+- **No `PublishSingleFile`.** On Windows the flag exists because the deliverable is a single `.exe` that really is
+  copied. Here the deliverable is **a bundle**, a directory the user drags as one icon, so the runtime and the native
+  libraries live inside it where `dyld` expects them. The first version used the flag and kept only the executable, so
+  it threw away `libSkiaSharp.dylib`: a bundle that assembles cleanly and dies before drawing a window.
+- **The script runs what it built.** It checks that `libSkiaSharp` and `libHarfBuzzSharp` are present, then actually
+  **executes** the file (`--uninstall-notifications` exits at once) and fails the build if it does not work. A
+  file-count check catches none of this.
+- **The icon is soft above 64 pixels**: its source is `josour.ico` at 64×64. A 1024×1024 file in `Assets` fixes it.
 
-## تشغيل نسخة mac
+## Running the Mac build
 
-الـ SDK هنا في `~/.dotnet` وليس على `PATH`، ومُضيف التطبيق يحتاج `DOTNET_ROOT` ليجد وقت التشغيل:
+The SDK here is in `~/.dotnet` and not on `PATH`, and the app host needs `DOTNET_ROOT` to find the runtime:
 
 ```bash
 export PATH="$HOME/.dotnet:$PATH" DOTNET_ROOT="$HOME/.dotnet"
 cd client && dotnet run --project src/Josour.App -f net8.0 -- --mock
 ```
 
-`--mock` يشغّل خادمًا محاكى داخل التطبيق، فلا حاجة إلى خلفية. ونشرٌ **قائم بذاته** (`--self-contained true`)
-يحمل وقت التشغيل معه فلا يحتاج `DOTNET_ROOT` على جهاز المستخدم.
+`--mock` runs a simulated server inside the application, so no backend is needed. And a **self-contained** publish
+(`--self-contained true`) carries the runtime with it, so it needs no `DOTNET_ROOT` on the user's machine.
 
-## الترتيب المقترح
+## The proposed order
 
-- ~~**المرحلة أ — مضيف mac.** المفاصل 1 و2 و7.~~ **تمّت.**
-- ~~**المرحلة ج — الواجهة.** المفاصل 11 و8 و9 و10.~~ **تمّت**، ومعها 12 و13 و14.
-- ~~**المرحلة ب — ضيف mac.** المفاصل 3 و4 و5 و6.~~ **تمّت.**
-- **المرحلة د — التوزيع.** `scripts/publish-app.sh` يبني `Josour.app` و`.dmg` قائمين بذاتهما (لا يحتاجان .NET
-  مثبّتًا). يبقى **التوقيع**: الحزمة غير موقَّعة، فأول تشغيل على جهاز آخر يحتاج «زر يمين ← Open» مرة واحدة، وهو
-  ما يتركه [ADR-0011](decisions/0011-no-code-signing-certificate.md) مفتوحًا على macOS تحديدًا لأن Gatekeeper
-  أشدّ من SmartScreen.
-- **التحقّق الميداني.** جلسة mac ↔ Windows بالدورين، بجهازين.
+- ~~**Stage A — a Mac host.** Seams 1, 2 and 7.~~ **Done.**
+- ~~**Stage C — the interface.** Seams 11, 8, 9 and 10.~~ **Done**, along with 12, 13 and 14.
+- ~~**Stage B — a Mac guest.** Seams 3, 4, 5 and 6.~~ **Done.**
+- **Stage D — distribution.** `scripts/publish-app.sh` builds a self-contained `Josour.app` and `.dmg` (neither needs
+  .NET installed). **Signing** remains: the bundle is unsigned, so the first run on another machine needs a
+  "right-click → Open" once, which [ADR-0011](decisions/0011-no-code-signing-certificate.md) leaves open on macOS
+  specifically, because Gatekeeper is stricter than SmartScreen.
+- **Field verification.** A mac ↔ Windows session in both roles, on two machines.
 
-## كيف يُبنى على mac اليوم
+## How it is built on a Mac today
 
-الـ SDK موجود في `~/.dotnet` وليس على `PATH`:
+The SDK is in `~/.dotnet` and not on `PATH`:
 
 ```bash
 export PATH="$HOME/.dotnet:$PATH"
 cd client && dotnet build Josour.sln && dotnet test Josour.sln
 ```
 
-`Josour.App` (WPF) يُبنى على mac بفضل `EnableWindowsTargeting` ولا يعمل عليه. هذا يبقى صحيحًا حتى تكتمل المرحلة ج.
+`Josour.App` is now Avalonia targeting `net8.0` alongside `net8.0-windows10.0.19041.0`, and it builds **and runs** on a
+Mac. The Windows target is kept for the toast notifications alone, and it builds on a Mac thanks to
+`EnableWindowsTargeting`.

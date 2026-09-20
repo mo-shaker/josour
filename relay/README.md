@@ -1,59 +1,60 @@
-# خدمة الـ Relay
+# The relay service
 
-تزاوج طرفَي جلسة بمعرّفها ثم تضخّ بينهما بايتات معتمة. تنفيذ الجانب الخادم من
-[ADR-0009](../docs/decisions/0009-relay-default.md)؛ الجانب العميلي في
+It pairs the two ends of a session by its id and then pumps opaque bytes between them. The server-side implementation
+of [ADR-0009](../docs/decisions/0009-relay-default.md); the client side is in
 `client/src/Josour.Tunnel/Transport/`.
 
-## ما لا تفعله الخدمة — وهو جوهر تصميمها
+## What the service does not do — and that is the heart of its design
 
-لا تنهي TLS، ولا تحتفظ بحالة جلسة، ولا تقرأ قاعدة بيانات، ولا تفهم بايتًا واحدًا مما تمرّره.
-مصافحة TLS بين الجهازين وتثبيت الشهادة و`AUTH1`/`AUTH2` كلها تجري **داخل** هذا المجرى
-(`docs/protocol.md` القسمان 3 و4). مشغّل الـ Relay — أو من يخترقه — يرى نصًا مشفّرًا وأحجام حركة
-فقط. هذا ما يجعل ادعاء المنتج بعد ADR-0009 «**لا يستطيع الخادم قراءة بيانات التصفح**» صحيحًا
-وقابلًا للإثبات.
+It does not terminate TLS, keep session state, read a database, or understand a single byte of what it passes through.
+The TLS handshake between the two machines, the certificate pinning and `AUTH1`/`AUTH2` all run **inside** this stream
+(`docs/protocol.md` sections 3 and 4). Whoever runs the relay — or whoever compromises it — sees ciphertext and traffic
+sizes only. That is what makes the product's claim after ADR-0009, "**the server cannot read browsing data**", true and
+provable.
 
-## عقد السلك
+## The wire contract
 
-المصدر الملزم `client/src/Josour.Tunnel/Transport/RelayProtocol.cs`، و`relay/protocol.py` نصفه
-الآخر:
+The binding source is `client/src/Josour.Tunnel/Transport/RelayProtocol.cs`, with `relay/protocol.py` as its other
+half:
 
 ```
-المقدمة (العميل ← Relay): 24 بايت ثابتة + التوكن
+The preamble (client → relay): a fixed 24 bytes + the token
   4B  magic = "RBRL"
   u8  version = 1
   u8  role (0 = guest, 1 = host)
-  16B session_id (بايتات UUID big-endian)
+  16B session_id (UUID bytes, big-endian)
   u16 token_length (1..1024)
   NB  token
 
-الرد (Relay ← العميل): بايتان
+The reply (relay → client): two bytes
   u8  version = 1
   u8  status
 ```
 
-| الحالة | الرقم | متى |
+| Status | Number | When |
 |---|---|---|
-| `paired` | 0 | وصل الطرفان بدورين مختلفين؛ ما بعده بايتات معتمة |
-| `unauthorized` | 1 | توقيع التوكن أو جلسته أو دوره لا يطابق |
-| `unknown_session` | 2 | **غير مستخدم عمدًا**: الخدمة بلا حالة، فالتوكن الصالح يعرّف جلسته بنفسه |
-| `no_peer` | 3 | لم يصل الطرف الآخر خلال `PAIR_TIMEOUT_SECONDS` |
-| `busy` | 4 | الدور نفسه مسجَّل لهذه الجلسة بالفعل؛ الأول يحتفظ بمكانه |
-| `protocol_error` | 5 | مقدمة مشوّهة أو صمت حتى المهلة |
-| `internal` | 6 | امتلأ جدول الجلسات أو حدّ العنوان الواحد، أو عطل غير متوقع |
+| `paired` | 0 | Both sides arrived with different roles; everything after this is opaque bytes |
+| `unauthorized` | 1 | The token's signature, or its session, or its role does not match |
+| `unknown_session` | 2 | **Deliberately unused**: the service is stateless, so a valid token identifies its own session |
+| `no_peer` | 3 | The other side did not arrive within `PAIR_TIMEOUT_SECONDS` |
+| `busy` | 4 | The same role is already registered for this session; the first keeps its place |
+| `protocol_error` | 5 | A malformed preamble, or silence until the timeout |
+| `internal` | 6 | The session table or the per-address limit filled up, or an unexpected failure |
 
-## التوكن
+## The token
 
-الخدمة بلا قاعدة بيانات: لا تعرف أي جلسات موجودة. الخادم الخلفي يعرف، فيقول ذلك في توكن موقَّع
-(HS256) بالمطالبات `sid` و`role` و`exp`، والـ Relay يتحقق من التوقيع فقط. يبقيها ذلك عديمة الحالة
-ورخيصة، ويعني أن اختراقها **لا يمنح** القدرة على إصدار وصول لجلسة — فقط على التحقق.
+The service has no database: it does not know which sessions exist. The backend server does, so it says so in a signed
+token (HS256) with the claims `sid`, `role` and `exp`, and the relay verifies the signature only. That keeps it
+stateless and cheap, and it means compromising it **does not grant** the ability to issue access to a session — only to
+verify it.
 
-`RELAY_SECRET` **منفصل عن `JWT_SECRET`** عمدًا: الثاني يوقّع رموز دخول المستخدمين، ونسخة منه على
-خدمة مكشوفة للإنترنت تعني أن اختراقها يصير اختراق تسجيل الدخول.
+`RELAY_SECRET` is **deliberately separate from `JWT_SECRET`**: the second signs users' access tokens, and a copy of it
+on a service exposed to the internet would mean compromising it becomes compromising sign-in.
 
-والتوكن مربوط بالدور لا بالجلسة وحدها: بدون ذلك يستطيع من يحمل توكنًا واحدًا فتح الطرفين
-والاقتران بنفسه، فيحتل الجلسة ويحرم الطرف الحقيقي منها.
+And the token is bound to the role rather than to the session alone: without that, the holder of one token could open
+both ends and pair with themselves, seizing the session and depriving the real party of it.
 
-## التشغيل محليًا
+## Running it locally
 
 ```bash
 cd relay
@@ -64,45 +65,46 @@ ruff check . && ruff format --check .
 RELAY_SECRET="$(openssl rand -base64 48)" RELAY_PORT=8443 python -m relay
 ```
 
-## النشر
+## Deployment
 
-على مضيف مستقل في الخليج ([ADR-0009](../docs/decisions/0009-relay-default.md) البند 4): الـ Relay
-يقع على المسار بين الطرفين، فمصر ↔ السعودية عبر جدة نحو 40 مللي ثانية وعبر أوروبا نحو 150.
+On a separate host in the Gulf ([ADR-0009](../docs/decisions/0009-relay-default.md) item 4): the relay sits on the path
+between the two sides, so Egypt ↔ Saudi Arabia via Jeddah is about 40 milliseconds and via Europe about 150.
 
 ```bash
 cd deploy
-cp .env.relay.example .env      # RELAY_SECRET نفسه الموجود على الخادم الخلفي
+cp .env.relay.example .env      # the same RELAY_SECRET that is on the backend server
 docker compose -f docker-compose.relay.yml up -d --build
 ```
 
-الحاوية تستمع على 8443 بمستخدم غير جذر (لا يستطيع الارتباط بما دون 1024) وتُنشر على 443 من
-المضيف. **لا شيء ينهي TLS أمامها**: البايتات مشفّرة بين الجهازين أصلًا، فالوسيط يضيف قفزة لا يقرأ
-شيئًا.
+The container listens on 8443 as a non-root user (which cannot bind below 1024) and is published on 443 from the host.
+**Nothing terminates TLS in front of it**: the bytes are already encrypted between the two machines, so an intermediary
+adds a hop and reads nothing.
 
-## الحدود
+## The limits
 
-| الإعداد | الافتراضي | ما يحميه |
+| Setting | Default | What it protects |
 |---|---|---|
-| `PREAMBLE_TIMEOUT_SECONDS` | 5 | ماسح يتصل ولا يقول شيئًا يحتجز مكانًا |
-| `PAIR_TIMEOUT_SECONDS` | 30 | مقيس على مهلة الاتصال في الخادم الخلفي |
-| `IDLE_TIMEOUT_SECONDS` | 120 | النفق ينبض كل 20 ث، فالجلسة الحية لا تقترب منه |
-| `MAX_SESSION_SECONDS` | 7200 | سقف صلب فوق `max_session_minutes` (120) |
-| `MAX_SESSIONS` | 64 | جدول الجلسات المتزامنة |
-| `MAX_CONNECTIONS_PER_IP` | 16 | مصدر واحد لا يستنزف الجدول |
-| `MAX_BYTES_PER_SESSION` | 0 (بلا حد) | ضبط تكلفة |
+| `PREAMBLE_TIMEOUT_SECONDS` | 5 | A scanner that connects and says nothing holds a slot |
+| `PAIR_TIMEOUT_SECONDS` | 30 | Calibrated against the backend server's connect timeout |
+| `IDLE_TIMEOUT_SECONDS` | 120 | The tunnel beats every 20 s, so a live session never approaches it |
+| `MAX_SESSION_SECONDS` | 7200 | A hard ceiling above `max_session_minutes` (120) |
+| `MAX_SESSIONS` | 64 | The table of concurrent sessions |
+| `MAX_CONNECTIONS_PER_IP` | 16 | One source cannot exhaust the table |
+| `MAX_BYTES_PER_SESSION` | 0 (no limit) | Cost control |
 
-الأرقام مقاسة على خمسة مستخدمين ([ADR-0009](../docs/decisions/0009-relay-default.md)). ترفع
-**بقياس** لا بتقدير.
+The numbers are sized for five users ([ADR-0009](../docs/decisions/0009-relay-default.md)). They are raised **by
+measurement**, not by estimate.
 
-## الأداء
+## Performance
 
-مقيس في [docs/performance-relay.md](../docs/performance-relay.md): الإنتاجية نحو 2 Gbit/s لجلسة واحدة،
-والزمن المضاف دون مللي ثانية، والاقتران 0.6 ms، والعدالة بين الجلسات ضمن 0.2%. شغّله بـ `python -m bench`.
+Measured in [docs/performance-relay.md](../docs/performance-relay.md): throughput around 2 Gbit/s for one session,
+added latency below a millisecond, pairing at 0.6 ms, and fairness between sessions within 0.2%. Run it with
+`python -m bench`.
 
-## الحالة
+## Status
 
-الخدمة **موصولة من طرف إلى طرف**: الخادم الخلفي يصدر توكنًا لكل طرف عند إنشاء الجلسة ويرسله في
-`session.created.relay`، والعميل يبني منه `RelayTransport` ويسابق به المسار المباشر.
+The service is **wired end to end**: the backend server issues a token per side when the session is created and sends
+it in `session.created.relay`, and the client builds a `RelayTransport` from it and races it against the direct path.
 
-يبقى قبل الاعتماد الكامل: تشغيل المقياس على مضيف النشر لإغلاق تحفّظ استهلاك المعالج
-([docs/performance-relay.md](../docs/performance-relay.md) القسم 7).
+What remains before full adoption: running the benchmark on the deployment host to close the CPU-consumption
+reservation ([docs/performance-relay.md](../docs/performance-relay.md) section 7).
