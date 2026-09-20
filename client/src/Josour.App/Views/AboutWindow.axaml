@@ -68,6 +68,9 @@
                 <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding LogDirectory}" Margin="0,0,0,6" TextWrapping="Wrap" />
             </Grid>
 
+            <Button Margin="0,12,0,0" Content="{x:Static app:Strings.AboutLicenses}"
+                    Click="ShowLicenses" HorizontalAlignment="Left" />
+
             <c:InfoBar Margin="0,12,0,0" IsClosable="False" Severity="Informational"
                         IsOpen="True" Message="{x:Static app:Strings.AboutSecretsNote}" />
 

@@ -1,0 +1,20 @@
+name: ci-licenses
+
+on: [push, pull_request]
+
+jobs:
+  legal-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/check-license-files.py
+      - run: pip install build
+      - name: Build Python distributions
+        run: |
+          python -m build backend --outdir /tmp/packages/backend
+          python -m build relay --outdir /tmp/packages/relay
+      - name: Verify packaged legal texts and metadata
+        run: python scripts/check-python-licenses.py /tmp/packages

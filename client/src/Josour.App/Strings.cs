@@ -18,6 +18,9 @@ namespace Josour.App;
 /// </summary>
 public static class Strings
 {
+    public static string AboutLicenses => LocalizedStrings.Current[UiStringKeys.AboutLicenses];
+    public static string LicenseSummary => LocalizedStrings.Current[UiStringKeys.LicenseSummary];
+
     // ---- product ----
     public static string AppName => LocalizedStrings.Current[UiStringKeys.AppName];
     public static string VersionFormat => LocalizedStrings.Current[UiStringKeys.VersionFormat];

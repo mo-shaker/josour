@@ -911,4 +911,10 @@
   <data name="MainAdminTooltip" xml:space="preserve">
     <value>إدارة المستخدمين</value>
   </data>
+  <data name="AboutLicenses" xml:space="preserve">
+    <value>الترخيص وإشعارات الحقوق</value>
+  </data>
+  <data name="LicenseSummary" xml:space="preserve">
+    <value>نُشر المشروع خدمةً للمجتمع تحت رخصة Apache-2.0. يُسمح بالنسخ والتعديل والاستخدام التجاري وفق شروط الرخصة. يُقدَّم كما هو، دون ضمان أو التزام بالدعم، مع تحديد المسؤولية بالقدر الذي يسمح به القانون. تحتفظ مكونات الأطراف الأخرى بتراخيصها.</value>
+  </data>
 </root>

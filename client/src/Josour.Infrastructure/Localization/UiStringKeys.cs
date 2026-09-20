@@ -8,6 +8,9 @@ namespace Josour.Infrastructure.Localization;
 /// </summary>
 public static class UiStringKeys
 {
+    public const string AboutLicenses = "AboutLicenses";
+    public const string LicenseSummary = "LicenseSummary";
+
     // ---- product ----
     public const string AppName = "AppName";
     public const string VersionFormat = "VersionFormat";

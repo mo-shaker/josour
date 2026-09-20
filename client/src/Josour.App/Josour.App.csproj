@@ -45,6 +45,9 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets/**" />
+    <!-- Embedded so notices travel with the standalone EXE and every app bundle. -->
+    <EmbeddedResource Include="../../../LICENSE" LogicalName="Josour.Legal.LICENSE" />
+    <EmbeddedResource Include="../../../NOTICE" LogicalName="Josour.Legal.NOTICE" />
   </ItemGroup>
 
   <ItemGroup>

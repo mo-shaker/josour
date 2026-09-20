@@ -7,7 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY pyproject.toml ./
+COPY pyproject.toml LICENSE NOTICE ./
 COPY app ./app
 RUN pip install . && rm -rf build *.egg-info
 

@@ -911,4 +911,10 @@
   <data name="MainAdminTooltip" xml:space="preserve">
     <value>User management</value>
   </data>
+  <data name="AboutLicenses" xml:space="preserve">
+    <value>License and notices</value>
+  </data>
+  <data name="LicenseSummary" xml:space="preserve">
+    <value>Published for the community under Apache-2.0. Copying, modification and commercial use are permitted subject to the licence. Provided as is, without warranty or support. Liability is limited to the extent permitted by law. Third-party components retain their own licences.</value>
+  </data>
 </root>

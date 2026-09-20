@@ -37,6 +37,19 @@ connection is impossible — which is the normal case between two mobile network
 a relay that does not understand them ([ADR-0009](docs/decisions/0009-relay-default.md)), so a session works with
 no router or firewall configuration at all.
 
+## License and reuse
+
+Josour is published as a service to the community under the [Apache License 2.0](LICENSE).
+You may use, copy, modify, fork and redistribute it, including commercially and in proprietary products,
+subject to that licence. You do not have to publish your changes or pay the original author.
+When redistributing, include the licence, preserve applicable notices and mark modified files.
+Third-party components keep their own licences.
+
+The software is provided **as is, without warranty or a promise of support**. The licence limits the liability
+of its contributors to the extent permitted by applicable law; it does not override liability that the law
+does not allow to be excluded. No additional permission is needed for uses allowed by the licence.
+See [licensing and distribution](docs/licensing.md) for details and an Arabic summary.
+
 ## Layout
 
 | Directory | Contents |
