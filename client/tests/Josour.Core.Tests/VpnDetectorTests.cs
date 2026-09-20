@@ -3,7 +3,7 @@ using Josour.Core.Net;
 
 namespace Josour.Core.Tests;
 
-/// <summary>مصدر واجهات ملفَّق: يجعل قواعد <see cref="VpnDetector"/> قابلة للاختبار بلا شبكة حقيقية.</summary>
+/// <summary>A fake interface source: it makes <see cref="VpnDetector"/>'s rules testable with no real network.</summary>
 internal sealed class FakeAdapterSource : INetworkAdapterSource
 {
     private readonly List<NetworkAdapterInfo> _adapters = new();
@@ -71,7 +71,7 @@ public class VpnDetectorTests
     [Fact]
     public void VpnThatMerelyExists_IsLowConfidence()
     {
-        // الواجهة عاملة لكن الخروج من بطاقة الشبكة العادية: لا تحذير.
+        // The interface is up but egress goes through the ordinary network card: no warning.
         var source = Ordinary().Add("utun4", "WireGuard Tunnel", tunnelType: true, address: "10.7.0.2");
 
         var result = VpnDetector.Detect(source);
@@ -113,8 +113,8 @@ public class VpnDetectorTests
     }
 
     [Theory]
-    // أنفاق النظام التي ليست VPN: Windows يصنّفها NetworkInterfaceType.Tunnel وهي تحمل عناوين وتخرج منها حركة.
-    // بدون هذه الاستثناءات يصير التحذير كاذبًا ودائمًا على أجهزة Windows عادية.
+    // System tunnels that are not VPNs: Windows classifies them as NetworkInterfaceType.Tunnel and they carry addresses with traffic leaving through them.
+    // Without these exclusions the warning becomes false and permanent on ordinary Windows machines.
     [InlineData("Teredo Tunneling Pseudo-Interface", "Teredo Tunneling Pseudo-Interface")]
     [InlineData("isatap.{GUID}", "Microsoft ISATAP Adapter")]
     [InlineData("6to4 Adapter", "Microsoft 6to4 Adapter")]
@@ -127,7 +127,7 @@ public class VpnDetectorTests
     }
 
     [Theory]
-    // بطاقات عادية تحوي المقاطع القصيرة (tun/tap/wg) داخل كلمات أخرى: لا تُطابَق إلا على حدود الكلمات.
+    // Ordinary cards containing the short fragments (tun/tap/wg) inside other words: matched on word boundaries only.
     [InlineData("Fortune Adapter", "Fortune Networks Gigabit Adapter")]
     [InlineData("Ethernet 9", "Realtek Adaptap Bridge Miniport")]
     [InlineData("Ethernet 10", "Broadcom NetXtreme Gigabit Ethernet")]
@@ -142,7 +142,7 @@ public class VpnDetectorTests
     [Fact]
     public void UnknownTunnelType_StillCounts()
     {
-        // نوع Tunnel بلا رمز معروف وبلا استثناء: VPN بمُعرِّف "tunnel-type".
+        // A Tunnel type with no known marker and no exclusion: a VPN with the identifier "tunnel-type".
         var source = Ordinary().Add("Ethernet 12", "Contoso Secure Access Adapter", tunnelType: true, address: "10.9.0.2");
         var result = VpnDetector.Detect(source);
         Assert.True(result.IsVpn);
@@ -153,8 +153,8 @@ public class VpnDetectorTests
     public void HighConfidenceWins_OverAnotherLowConfidenceAdapter()
     {
         var source = Ordinary()
-            .Add("utun1", "utun", address: "10.1.0.2")                      // موجودة فقط
-            .Add("wg0", "WireGuard Tunnel", address: "10.7.0.2");           // تحمل الخروج
+            .Add("utun1", "utun", address: "10.1.0.2")                      // merely present
+            .Add("wg0", "WireGuard Tunnel", address: "10.7.0.2");           // holds the egress
         source.Outbound = IPAddress.Parse("10.7.0.2");
 
         var result = VpnDetector.Detect(source);
@@ -166,7 +166,7 @@ public class VpnDetectorTests
     [Fact]
     public void UnknownOutboundAddress_DegradesToLow_NotHigh()
     {
-        // تعذّر معرفة مسار الخروج (مقبس الفحص فشل): نحذّر بثقة منخفضة، لا نزعم اليقين.
+        // The egress route could not be determined (the probe socket failed): we warn at low confidence rather than claiming certainty.
         var source = Ordinary().Add("wg0", "WireGuard Tunnel", address: "10.7.0.2");
         source.Outbound = null;
         Assert.Equal(VpnConfidence.Low, VpnDetector.Detect(source).Confidence);
@@ -195,7 +195,7 @@ public class VpnDetectorTests
     [Fact]
     public void SystemSource_NeverThrows()
     {
-        // يُشغَّل على الجهاز الحقيقي: القيمة تختلف بالبيئة، لكن الاستدعاء لا يرمي ولا يعلّق.
+        // Run on the real machine: the value varies with the environment, but the call neither throws nor hangs.
         var adapters = SystemNetworkAdapterSource.Instance.GetAdapters();
         Assert.NotNull(adapters);
         var result = VpnDetector.Detect(SystemNetworkAdapterSource.Instance);

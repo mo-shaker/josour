@@ -9,7 +9,7 @@ using Josour.Tunnel.Tests.Mux;
 
 namespace Josour.Tunnel.Tests.Perf;
 
-/// <summary>زوج Mux فوق TLS فوق وصلة مُحاكاة (RTT/نطاق)، كما في MuxPair لكن عبر الوصلة.</summary>
+/// <summary>A mux pair over TLS over a simulated link (RTT/bandwidth), as in MuxPair but through the link.</summary>
 internal sealed class WanPair : IAsyncDisposable
 {
     private WanPair(MuxPair pair, SimulatedLink link, int window)
@@ -45,7 +45,7 @@ internal sealed class WanPair : IAsyncDisposable
         return new WanPair(pair, link, window);
     }
 
-    /// <summary>RTT الفعلي كما يقيسه PING عبر المحاكي (أفضل من الاسمي: يشمل خطأ المؤقّتات وTLS).</summary>
+    /// <summary>The effective RTT as PING measures it through the simulator (better than the nominal one: it includes the timers' error and TLS).</summary>
     public async Task<TimeSpan> MeasureRttAsync(int samples = 5)
     {
         var best = TimeSpan.MaxValue;
@@ -59,16 +59,16 @@ internal sealed class WanPair : IAsyncDisposable
         return total / samples;
     }
 
-    /// <summary>السقف النظري لـ stream واحد = النافذة ÷ RTT (بايت/ث).</summary>
+    /// <summary>The theoretical ceiling for one stream = the window ÷ the RTT (bytes/s).</summary>
     public static double CeilingBytesPerSecond(int window, TimeSpan rtt) => window / rtt.TotalSeconds;
 
     public async ValueTask DisposeAsync() => await Pair.DisposeAsync();
 }
 
 /// <summary>
-/// «أصل» بسيط على جانب المضيف يتكلم بروتوكول طلب/رد ثابت الطول، ويعيش على نفس الاتصال لعدة طلبات
-/// (نظير keep-alive): العميل يكتب 8 بايت big-endian بطول الرد المطلوب، والخادم يكتب هذا العدد بالضبط.
-/// طلب بطول 0 = إغلاق.
+/// A simple "origin" on the host's side that speaks a fixed-length request/reply protocol, and lives on the same connection for several requests
+/// (the equivalent of keep-alive): the client writes 8 big-endian bytes with the requested reply's length, and the server writes exactly that many.
+/// A request of length 0 = a close.
 /// </summary>
 internal static class ResourceProtocol
 {
@@ -94,7 +94,7 @@ internal static class ResourceProtocol
         }
     }
 
-    /// <summary>يخدم الطلبات على stream حتى EOF. يُستعمل على جانب المضيف (وجهة الـ mux) وعلى المسار المباشر.</summary>
+    /// <summary>It serves requests on a stream until EOF. Used on the host's side (the mux's destination) and on the direct path.</summary>
     public static async Task ServeAsync(Stream stream, CancellationToken ct)
     {
         var head = new byte[RequestBytes];
@@ -126,8 +126,8 @@ internal static class ResourceProtocol
 }
 
 /// <summary>
-/// وجهة على جانب المضيف تتكلم <see cref="ResourceProtocol"/> فوق أنبوبين داخليين: الـ mux يضخ فيها
-/// (StreamPump) وهي ترد. لا مقابس ولا شبكة خلفها؛ الأصل «فوري».
+/// A destination on the host's side that speaks <see cref="ResourceProtocol"/> over two internal pipes: the mux pumps into it
+/// (StreamPump) and it replies. There are no sockets and no network behind it; the origin is "instant".
 /// </summary>
 internal sealed class ResourceTarget : Stream, IHalfClosable
 {
@@ -143,7 +143,7 @@ internal sealed class ResourceTarget : Stream, IHalfClosable
         _server = Task.Run(async () =>
         {
             try { await ResourceProtocol.ServeAsync(serverSide, _cts.Token).ConfigureAwait(false); }
-            catch (Exception) { /* أُغلقت القناة */ }
+            catch (Exception) { /* the channel was closed */ }
             finally
             {
                 _fromServer.Writer.Complete();
@@ -202,13 +202,13 @@ internal sealed class ResourceTarget : Stream, IHalfClosable
 
     protected override void Dispose(bool disposing)
     {
-        // الـ Mux يملك الوجهة ويتخلص منها؛ الاختبار قد يتخلص منها أيضًا. التخلص عديم التكرار.
+        // The mux owns the destination and disposes of it; the test may dispose of it too. The disposal is idempotent.
         if (disposing && Interlocked.Exchange(ref _disposed, 1) == 0)
         {
             _cts.Cancel();
             _toServer.Writer.Complete();
             _fromServer.Reader.Complete();
-            try { _server.Wait(TimeSpan.FromSeconds(1)); } catch { /* تجاهل */ }
+            try { _server.Wait(TimeSpan.FromSeconds(1)); } catch { /* ignore */ }
             _cts.Dispose();
         }
         base.Dispose(disposing);
@@ -216,8 +216,8 @@ internal sealed class ResourceTarget : Stream, IHalfClosable
 }
 
 /// <summary>
-/// مصنع اتصالات مباشرة تتشارك سلكًا واحدًا في كل اتجاه: خط الأساس لمقارنة «نفس الجلب مباشرةً»،
-/// بنفس الـ RTT ونفس عنق الزجاجة. كل اتصال يدفع RTT واحدًا لمصافحة TCP قبل أول طلب.
+/// A factory of direct connections sharing one wire in each direction: the baseline for comparing "the same fetch, directly",
+/// at the same RTT and with the same bottleneck. Every connection pays one RTT for the TCP handshake before its first request.
 /// </summary>
 internal sealed class DirectLinkFactory : IAsyncDisposable
 {
@@ -237,7 +237,7 @@ internal sealed class DirectLinkFactory : IAsyncDisposable
 
     public LinkProfile Profile { get; }
 
-    /// <summary>اتصال جديد إلى «أصل» يتكلم ResourceProtocol، بعد دفع RTT مصافحة TCP.</summary>
+    /// <summary>A new connection to an "origin" speaking ResourceProtocol, after paying the TCP handshake's RTT.</summary>
     public async Task<Stream> ConnectAsync(CancellationToken ct)
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -262,7 +262,7 @@ internal sealed class DirectLinkFactory : IAsyncDisposable
         var serverTask = Task.Run(async () =>
         {
             try { await ResourceProtocol.ServeAsync(server, _cts.Token).ConfigureAwait(false); }
-            catch (Exception) { /* الاتصال أُغلق */ }
+            catch (Exception) { /* the connection was closed */ }
         }, CancellationToken.None);
 
         lock (_gate)
@@ -272,7 +272,7 @@ internal sealed class DirectLinkFactory : IAsyncDisposable
             _servers.Add(serverTask);
         }
 
-        // مصافحة TCP = RTT واحد قبل أن يستطيع العميل إرسال أول بايت.
+        // The TCP handshake = one RTT before the client can send its first byte.
         await Task.Delay(Profile.Rtt, ct).ConfigureAwait(false);
         return client;
     }
@@ -284,15 +284,15 @@ internal sealed class DirectLinkFactory : IAsyncDisposable
         lock (_gate) owned = _owned.ToArray();
         foreach (var item in owned)
         {
-            try { await item.DisposeAsync().ConfigureAwait(false); } catch { /* تجاهل */ }
+            try { await item.DisposeAsync().ConfigureAwait(false); } catch { /* ignore */ }
         }
         _cts.Dispose();
     }
 }
 
 /// <summary>
-/// وجهة تنتج بمعدل بت ثابت (نظير بث فيديو): تسلّم قطعة كل <see cref="ChunkInterval"/> حتى تنقضي المدة ثم EOF.
-/// تبتلع ما يُكتب إليها.
+/// A destination producing at a constant bit rate (the equivalent of a video stream): it hands over a chunk every <see cref="ChunkInterval"/> until the duration elapses, then EOF.
+/// It swallows whatever is written to it.
 /// </summary>
 internal sealed class PacedTarget : Stream, IHalfClosable
 {
@@ -350,12 +350,12 @@ internal sealed class PacedTarget : Stream, IHalfClosable
     public override void SetLength(long value) => throw new NotSupportedException();
 }
 
-/// <summary>ملف صفحة ثقيلة: مستند واحد ثم موارد فرعية بأحجام مختلطة (وسيط أرشيف HTTP تقريبًا).</summary>
+/// <summary>A heavy page's profile: one document then subresources of mixed sizes (roughly the median of an HTTP archive).</summary>
 internal static class PageProfile
 {
     public const long DocumentBytes = 60 * 1024;
 
-    /// <summary>80 موردًا فرعيًا: 8 سكربتات كبيرة، 6 أنماط، 40 صورة، 20 خطًا/أيقونة، 6 XHR.</summary>
+    /// <summary>80 subresources: 8 large scripts, 6 stylesheets, 40 images, 20 fonts/icons, 6 XHR.</summary>
     public static IReadOnlyList<long> SubResources { get; } = Build();
 
     public static long TotalBytes => DocumentBytes + SubResources.Sum();
@@ -368,7 +368,7 @@ internal static class PageProfile
         for (var i = 0; i < 40; i++) list.Add(25 * 1024);
         for (var i = 0; i < 20; i++) list.Add(12 * 1024);
         for (var i = 0; i < 6; i++) list.Add(8 * 1024);
-        // ترتيب متناوب: المتصفح لا يجلب الموارد مرتبة بالحجم.
+        // An interleaved order: the browser does not fetch resources sorted by size.
         var ordered = new long[list.Count];
         var lo = 0;
         var hi = list.Count - 1;
@@ -376,7 +376,7 @@ internal static class PageProfile
         return ordered;
     }
 
-    /// <summary>يوزّع الموارد على <paramref name="lanes"/> اتصالًا بالتناوب (كما يفعل المتصفح مع keep-alive).</summary>
+    /// <summary>It spreads the resources over <paramref name="lanes"/> connections in turn (as the browser does with keep-alive).</summary>
     public static List<long>[] Split(int lanes)
     {
         var result = new List<long>[lanes];
@@ -403,7 +403,7 @@ internal static class Perf
         return sorted[Math.Clamp(index, 0, sorted.Count - 1)];
     }
 
-    /// <summary>ذاكرة مُدارة مستقرة بعد جمع كامل.</summary>
+    /// <summary>Settled managed memory after a full collection.</summary>
     public static long SettledMemory()
     {
         GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);

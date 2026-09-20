@@ -7,7 +7,7 @@ namespace Josour.Tunnel.Tests;
 
 internal static class Loopback
 {
-    /// <summary>زوج NetworkStream متصلين عبر 127.0.0.1. كل stream يملك مقبسه.</summary>
+    /// <summary>A pair of NetworkStreams connected over 127.0.0.1. Each stream owns its socket.</summary>
     public static async Task<(Stream A, Stream B)> CreatePairAsync()
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -27,7 +27,7 @@ internal static class Loopback
         }
     }
 
-    /// <summary>منفذ لا يستمع عليه أحد (يُفتح ثم يُغلق فورًا).</summary>
+    /// <summary>A port nobody is listening on (opened and then closed at once).</summary>
     public static int ClosedPort()
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -48,7 +48,7 @@ internal static class TestMaterial
 
 internal static class StreamAssert
 {
-    /// <summary>يؤكد أن لا بايت يصل خلال المهلة (القراءة تنتهي بالإلغاء لا بالبيانات).</summary>
+    /// <summary>It asserts that no byte arrives within the timeout (the read ends on cancellation rather than on data).</summary>
     public static async Task NothingReadableAsync(Stream stream, TimeSpan within)
     {
         using var cts = new CancellationTokenSource(within);
@@ -60,7 +60,7 @@ internal static class StreamAssert
         }
         catch (OperationCanceledException)
         {
-            // المتوقع: لا بيانات
+            // Expected: no data
         }
     }
 

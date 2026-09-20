@@ -24,7 +24,7 @@ public class ConnectProxyServerTests
 
         await client.SendAsync("CONNECT Allowed.Example:443 HTTP/1.1\r\nHost: allowed.example:443\r\nProxy-Connection: keep-alive\r\n\r\n");
 
-        // لا 200 قبل OPEN_OK
+        // No 200 before OPEN_OK
         using (var cts = new CancellationTokenSource(400))
         {
             var one = new byte[1];
@@ -106,10 +106,10 @@ public class ConnectProxyServerTests
         using var far = await accept.WaitAsync(Timeout);
         var buffer = new byte[5];
         await far.ReceiveAsync(buffer, SocketFlags.None).WaitAsync(Timeout);
-        Assert.Equal("early", Encoding.ASCII.GetString(buffer)); // البايتات التي تلت الرأس تُمرر
+        Assert.Equal("early", Encoding.ASCII.GetString(buffer)); // the bytes that followed the head are passed through
 
         far.Shutdown(SocketShutdown.Send);
-        Assert.Empty(await client.ReadToEndAsync()); // إغلاق الأصل ينتقل إلى المتصفح
+        Assert.Empty(await client.ReadToEndAsync()); // the origin closing propagates to the browser
     }
 
     [Theory]
@@ -225,7 +225,7 @@ public class ConnectProxyServerTests
         var head = await client.ReadHeadAsync();
         Assert.Equal(200, head.Status);
         Assert.Equal("hello from origin", Encoding.UTF8.GetString(await client.ReadBodyAsync(head)));
-        Assert.True(await client.ClosedWithoutDataAsync()); // اتصال واحد = طلب واحد
+        Assert.True(await client.ClosedWithoutDataAsync()); // one connection = one request
         await serve.WaitAsync(Timeout);
 
         Assert.NotNull(origin.ReceivedHead);
@@ -270,8 +270,8 @@ public class ConnectProxyServerTests
         browser.Owned.Add(1);
         var checker = new FakePidChecker { Pid = 4242 };
         await using var proxy = Proxies.Start(new FakeMux(), browser: browser, checker: checker);
-        // الرفض يغلق المقبس فورًا؛ قد يصل FIN أو RST، وقد يضرب RST عند الاتصال نفسه تحت الحمل.
-        // العدّادات هي التأكيد الحقيقي: طُلب الفحص مرة، ورُفض الاتصال، ولم تُخدَم صفحة الفحص.
+        // The refusal closes the socket at once; a FIN or an RST may arrive, and an RST may strike at the connect itself under load.
+        // The counters are the real confirmation: the check was requested once, the connection was refused, and the check page was not served.
         try
         {
             await using var client = await ProxyClient.ConnectAsync(proxy.Port);
@@ -280,7 +280,7 @@ public class ConnectProxyServerTests
             catch (SocketException) { }
             Assert.True(await client.ClosedWithoutDataAsync());
         }
-        catch (SocketException) { /* أُعيد ضبط الاتصال فورًا: النتيجة نفسها */ }
+        catch (SocketException) { /* the connection was reset at once: the same result */ }
 
         await Proxies.WaitForAsync(() => proxy.Counters.RejectedByOwner == 1);
         Assert.Equal(1, checker.Calls);
@@ -316,7 +316,7 @@ public class ConnectProxyServerTests
             return;
         }
 
-        // الرفض يغلق المقبس فورًا: قد يصل FIN أو RST، وقد يضرب RST عند الاتصال نفسه تحت الحمل.
+        // The refusal closes the socket at once: a FIN or an RST may arrive, and an RST may strike at the connect itself under load.
         try
         {
             await using var client = await ProxyClient.ConnectAsync(proxy.Port);
@@ -325,7 +325,7 @@ public class ConnectProxyServerTests
             catch (SocketException) { }
             Assert.True(await client.ClosedWithoutDataAsync());
         }
-        catch (SocketException) { /* أُعيد ضبط الاتصال فورًا: النتيجة نفسها */ }
+        catch (SocketException) { /* the connection was reset at once: the same result */ }
     }
 
     [Fact]

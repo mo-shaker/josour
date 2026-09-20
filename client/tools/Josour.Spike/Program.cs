@@ -5,8 +5,8 @@ using Josour.Spike;
 using Josour.Tunnel.Certificates;
 using Josour.Tunnel.Tls;
 
-// أداة الأسبوع 1 لمسار B: اختبار الشهادة، جمع المرشحين، الاتصال المتماثل بين جهازين، وفحص قابلية الوصول.
-// الأسطر البشرية على stderr، وJSON على stdout ليسهل النسخ واللصق أو إعادة التوجيه إلى ملف.
+// Track B's week-1 tool: testing the certificate, gathering the candidates, the symmetric connection between two machines, and the reachability probe.
+// The human lines go to stderr and the JSON to stdout, so it is easy to copy and paste or redirect to a file.
 
 if (args.Length == 0 || args[0] is "-h" or "--help" or "help")
 {
@@ -118,7 +118,7 @@ static async Task<int> CertTestAsync(CancellationToken ct)
     Console.WriteLine($"key:                {cert.Certificate.GetECDsaPublicKey()?.KeySize ?? 0}-bit ECDSA");
     Console.WriteLine($"os:                 {System.Runtime.InteropServices.RuntimeInformation.OSDescription}");
 
-    // مصافحة TLS على loopback بالشهادة نفسها: هذا ما يثبت أن Schannel يقبل المفتاح على Windows.
+    // A TLS handshake on loopback with the same certificate: this is what proves Schannel accepts the key on Windows.
     try
     {
         var (server, client) = await Loopback.CreatePairAsync(ct);

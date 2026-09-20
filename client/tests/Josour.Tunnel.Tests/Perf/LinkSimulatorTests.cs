@@ -4,8 +4,8 @@ using System.Diagnostics;
 namespace Josour.Tunnel.Tests.Perf;
 
 /// <summary>
-/// أداة القياس تُقاس أولًا: هذه الاختبارات تثبت أن <see cref="LatencyStream"/> يضيف التأخير الذي يدّعيه،
-/// يحترم سقف النطاق، لا يعيد الترتيب، ولا يُفسد البايتات عند نمذجة الفقد. بلا وسم Benchmark: سريعة.
+/// The measuring instrument is measured first: these tests prove that <see cref="LatencyStream"/> adds the delay it claims,
+/// respects the bandwidth ceiling, does not reorder, and does not corrupt the bytes when modelling loss. Without the Benchmark tag: they are fast.
 /// </summary>
 public class LinkSimulatorTests
 {
@@ -39,7 +39,7 @@ public class LinkSimulatorTests
     [Fact]
     public async Task Bandwidth_IsCapped()
     {
-        // 8 Mbit/s ⇒ 1 MB/s ⇒ 256 KiB تحتاج نحو 262 ms على السلك.
+        // 8 Mbit/s => 1 MB/s => 256 KiB needs about 262 ms on the wire.
         var (sender, receiver) = await LinkAsync(new LinkProfile { BitsPerSecond = 8_000_000 });
         await using (sender)
         await using (receiver)
@@ -92,7 +92,7 @@ public class LinkSimulatorTests
     [Fact]
     public async Task Loss_AddsDelay_ButNeverCorruptsOrDrops()
     {
-        // فقد مؤكد لكل حزمة: التيار يصل كاملًا وسليمًا، لكن متأخرًا بعقوبة إعادة الإرسال.
+        // Certain loss for every packet: the stream arrives complete and intact, but late by the retransmission penalty.
         var profile = new LinkProfile
         {
             LossRate = 1.0,
@@ -122,7 +122,7 @@ public class LinkSimulatorTests
     [Fact]
     public async Task SharedMedium_SharesTheBottleneck()
     {
-        // اتصالان يتشاركان سلكًا بـ 8 Mbit/s: 2 × 128 KiB تستغرق نحو زمن 256 KiB لا نصفه.
+        // Two connections sharing a wire at 8 Mbit/s: 2 x 128 KiB take about the time of 256 KiB rather than half of it.
         var medium = new LinkMedium(new LinkProfile { BitsPerSecond = 8_000_000 });
         var (a1, b1) = await Loopback.CreatePairAsync();
         var (a2, b2) = await Loopback.CreatePairAsync();
@@ -147,7 +147,7 @@ public class LinkSimulatorTests
     [Fact]
     public async Task MeasuredRttThroughTheMux_MatchesTheProfile()
     {
-        // التحقق من طرف إلى طرف: PING/PONG عبر TLS+Mux فوق الوصلة يعطي الـ RTT المطلوب.
+        // End-to-end verification: a PING/PONG over TLS+the mux on the link gives the requested RTT.
         await using var wan = await WanPair.CreateAsync(LinkProfile.FromRtt(80));
         var rtt = await wan.MeasureRttAsync(3);
         Assert.True(rtt >= TimeSpan.FromMilliseconds(70), $"measured RTT {rtt.TotalMilliseconds:F1} ms is below the 80 ms profile");

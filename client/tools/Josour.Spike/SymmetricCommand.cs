@@ -12,7 +12,7 @@ using Josour.Tunnel.Transport;
 
 namespace Josour.Spike;
 
-/// <summary>الشكل نفسه الذي يحمله session.endpoint / session.peer_endpoint في docs/ws-protocol.md.</summary>
+/// <summary>The same shape session.endpoint / session.peer_endpoint carry in docs/ws-protocol.md.</summary>
 public sealed record EndpointJson(
     [property: JsonPropertyName("cert_fp_sha256")] string CertFpSha256,
     [property: JsonPropertyName("candidates")] List<CandidateDto> Candidates);
@@ -143,7 +143,7 @@ public static class SymmetricCommand
                         var parsed = TryParse(text);
                         if (parsed is not null) return parsed;
                     }
-                    catch (IOException) { /* الملف قيد الكتابة */ }
+                    catch (IOException) { /* the file is being written */ }
                 }
                 await Task.Delay(1000, ct);
             }
@@ -183,7 +183,7 @@ public static class SymmetricCommand
         }
     }
 
-    // Guest يرسل "hello"، Host يرد "hello-ack". يثبت أن الـ stream المصادَق يعمل في الاتجاهين.
+    // The guest sends "hello" and the host replies "hello-ack". It proves the authenticated stream works in both directions.
     private static async Task<bool> HelloExchangeAsync(Stream stream, TunnelRole role, string roleText, CancellationToken ct)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);

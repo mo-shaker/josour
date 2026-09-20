@@ -32,7 +32,7 @@ public sealed class SessionPhaseTrackerTests
 
         private readonly List<SessionPhase> _phases = new();
 
-        /// <summary>لقطة آمنة: الأطوار تُضاف من حلقة توزيع الرسائل بينما يقرأ الاختبار.</summary>
+        /// <summary>A safe snapshot: the phases are appended from the message dispatch loop while the test reads.</summary>
         public SessionPhase[] Phases { get { lock (_phases) return _phases.ToArray(); } }
 
         public async Task ConnectAsync()
@@ -76,8 +76,8 @@ public sealed class SessionPhaseTrackerTests
 
         await rig.Channel.SendAsync(new SessionEndpointMessage(session.SessionId, Fp, new[] { new CandidateDto("lan", "192.168.1.2", 45000) }), None);
         await rig.Messages.NextAsync<SessionPeerEndpointMessage>();
-        // القناة المحاكية تتقدّم إلى session.active من تلقائها، فتأكيد الطور اللحظي هنا سباق.
-        // وجود Connecting في السجل يثبت حدوث الانتقال، وترتيبه يتأكد في تأكيد التسلسل أدناه.
+        // The simulated channel advances to session.active of its own accord, so asserting the instantaneous phase here is a race.
+        // Connecting being present in the log proves the transition happened, and its ordering is confirmed in the sequence assertion below.
         Assert.Contains(SessionPhase.Connecting, rig.Phases);
 
         await rig.Messages.NextAsync<SessionActiveMessage>();
@@ -121,8 +121,8 @@ public sealed class SessionPhaseTrackerTests
 
         await rig.Channel.SendAsync(new SessionEndpointMessage(session.SessionId, Fp, new[] { new CandidateDto("public", "203.0.113.55", 45000) }), None);
         await rig.Messages.NextAsync<SessionPeerEndpointMessage>();
-        // القناة المحاكية تتقدّم إلى session.active من تلقائها، فتأكيد الطور اللحظي هنا سباق.
-        // وجود Connecting في السجل يثبت حدوث الانتقال، وترتيبه يتأكد في تأكيد التسلسل أدناه.
+        // The simulated channel advances to session.active of its own accord, so asserting the instantaneous phase here is a race.
+        // Connecting being present in the log proves the transition happened, and its ordering is confirmed in the sequence assertion below.
         Assert.Contains(SessionPhase.Connecting, rig.Phases);
 
         await rig.Channel.SendAsync(new SessionConnectedMessage(session.SessionId, "public", 120, "1.3"), None);

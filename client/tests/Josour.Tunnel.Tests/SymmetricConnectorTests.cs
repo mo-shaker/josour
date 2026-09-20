@@ -60,12 +60,12 @@ public class SymmetricConnectorTests
         Assert.False(host.Listener.IsRunning);
         Assert.False(guest.Listener.IsRunning);
 
-        // اتصال واحد بالضبط اجتاز المصادقة في كل طرف
+        // Exactly one connection passed authentication at each side
         Assert.Equal(1, Rows(hostOutcome).Count(r => (string?)r["stage"] == "ok"));
         Assert.Equal(1, Rows(guestOutcome).Count(r => (string?)r["stage"] == "ok"));
         Assert.Equal("lan", hostOutcome.Diagnostics["winner_type"]);
 
-        // hello/hello-ack على الـ stream المصادَق يثبت أن الطرفين يحملان طرفي الاتصال نفسه
+        // hello/hello-ack on the authenticated stream proves both sides hold the two ends of the same connection
         await using var hostStream = hostOutcome.Connection!.Stream;
         await using var guestStream = guestOutcome.Connection!.Stream;
         await WriteLineAsync(guestStream, "hello");

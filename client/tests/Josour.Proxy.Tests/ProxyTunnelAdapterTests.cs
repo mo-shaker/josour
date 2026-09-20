@@ -7,7 +7,7 @@ using Josour.Tunnel.Mux;
 
 namespace Josour.Proxy.Tests;
 
-/// <summary>الجسر بين <see cref="TunnelSession"/> والـ Proxy المحلي: المنفذ، رابط الفحص، إشارة الوصول، وخطوات الإيقاف.</summary>
+/// <summary>The bridge between <see cref="TunnelSession"/> and the local proxy: the port, the check URL, the arrival signal, and the stopping steps.</summary>
 public class ProxyTunnelAdapterTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
@@ -25,7 +25,7 @@ public class ProxyTunnelAdapterTests
 
         adapter.Start();
         await using var client = await ProxyClient.ConnectAsync(adapter.Port);
-        // IP حرفي محلي يُرفض قبل النفق (دفاع في العمق على جانب المستخدم)
+        // A local address literal is refused before the tunnel (defence in depth on the user's side)
         await client.SendAsync("CONNECT 192.168.0.5:443 HTTP/1.1\r\n\r\n");
         Assert.Equal(403, (await client.ReadHeadAsync()).Status);
     }
@@ -84,12 +84,12 @@ public class ProxyTunnelAdapterTests
     [Fact]
     public async Task Create_WithBrowser_AppliesOwnerPidCheck()
     {
-        var browser = new FakeBrowser(); // لا يملك أي PID
+        var browser = new FakeBrowser(); // it owns no PID
         var checker = new FakePidChecker { Pid = 4242 };
         await using var adapter = ProxyTunnelAdapter.Create(Context(new FakeMux()), browser, checker);
         adapter.Start();
 
-        // الرفض يغلق المقبس فورًا؛ قد تفشل الكتابة أو الاتصال نفسه بإعادة ضبط، والعدّادات هي التأكيد.
+        // The refusal closes the socket at once; the write or the connect itself may fail with a reset, and the counters are the confirmation.
         try
         {
             await using var client = await ProxyClient.ConnectAsync(adapter.Port);

@@ -7,8 +7,8 @@ using Josour.Proxy.Tests;
 namespace Josour.E2E.Tests;
 
 /// <summary>
-/// المكدس كاملًا مع Proxy إجباري على شبكة الضيف (الخطة 8.5): القسمة تبقى كما هي —
-/// المسموح به يخرج من عند <b>المضيف</b> عبر النفق، وغير المسموح به يخرج من عند <b>الضيف</b> عبر Proxy شبكته.
+/// The whole stack with a mandatory proxy on the guest's network (plan 8.5): the division stays as it is —
+/// what is allowed leaves from <b>the host</b> through the tunnel, and what is not leaves from <b>the guest</b> through its network's proxy.
 /// </summary>
 public class SystemProxyE2ETests : IAsyncLifetime
 {

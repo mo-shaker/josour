@@ -4,21 +4,21 @@ using Josour.Core.Net;
 namespace Josour.Core.Tests;
 
 /// <summary>
-/// تقوية سياسة العناوين (الأسبوع 4). هذه آخر بوابة قبل <c>Socket.ConnectAsync</c> على المضيف، فأي عنوان يفلت منها
-/// هو اتصال حقيقي من شبكة الشركة إلى حيث يريد الضيف. ما تثبته هذه الاختبارات:
+/// Hardening the address policy (week 4). This is the last gate before <c>Socket.ConnectAsync</c> on the host, so any address that gets past it
+/// is a real connection from the company's network to wherever the guest wants. What these tests prove:
 ///
 /// <list type="number">
-///   <item><b>كل حدّ لكل نطاق:</b> لكل مدى في docs/protocol.md القسم 6 القاعدة 6 يُفحص أول عنوان وآخر عنوان
-///     (محظوران) والعنوان الذي قبله والذي بعده (غير محظورين، ما لم يقعا في مدى آخر). خطأ بمقدار واحد في قناع
-///     البتات لا يمكن أن ينجو من هذه المصفوفة.</item>
-///   <item><b>التغليفات العدائية:</b> كل صيغة IPv6 تحمل IPv4 داخلها (mapped، NAT64، 6to4، Teredo، والصيغة
-///     المهجورة <c>::a.b.c.d</c>) تُفك ويُفحص المضمَّن — بما فيها التغليف المزدوج والحواف.</item>
-///   <item><b>عناوين المضيف نفسه:</b> تُحظر بكل أشكالها المغلِّفة مهما كان الشكل الذي وصل به العنوان.</item>
+///   <item><b>Every edge of every range:</b> for every range in docs/protocol.md section 6 rule 6, the first address and the last address are checked
+///     (both blocked) together with the one before and the one after (both unblocked, unless they fall in another range). An off-by-one in a bit
+///     mask cannot survive this matrix.</item>
+///   <item><b>The hostile wrappings:</b> every IPv6 form carrying an IPv4 inside it (mapped, NAT64, 6to4, Teredo, and the deprecated
+///     <c>::a.b.c.d</c>) is unwrapped and the embedded address checked — double wrapping and the edges included.</item>
+///   <item><b>The host's own addresses:</b> blocked in every wrapping form, whatever form the address arrived in.</item>
 /// </list>
 /// </summary>
 public class IpRangePolicyHardeningTests
 {
-    /// <summary>كل نطاق IPv4 محظور في العقد: (أول عنوان، آخر عنوان).</summary>
+    /// <summary>Every IPv4 range blocked in the contract: (the first address, the last address).</summary>
     public static TheoryData<string, string> V4Ranges => new()
     {
         { "0.0.0.0", "0.255.255.255" },
@@ -44,7 +44,7 @@ public class IpRangePolicyHardeningTests
         Assert.True(IpRangePolicy.IsBlockedRange(IPAddress.Parse(first)), first);
         Assert.True(IpRangePolicy.IsBlockedRange(IPAddress.Parse(last)), last);
 
-        // الجار الأدنى والأعلى: غير محظورين إلا إن وقعا في مدى آخر من الجدول (224/4 و240/4 متلاصقان مثلًا).
+        // The lower and upper neighbours: unblocked unless they fall in another range from the table (224/4 and 240/4 are adjacent, for instance).
         var below = Step(first, -1);
         var above = Step(last, +1);
         AssertNeighbour(below, first, last);
@@ -66,21 +66,21 @@ public class IpRangePolicyHardeningTests
     }
 
     [Theory]
-    // الحدود الدقيقة لكل مدى IPv6 مذكور في العقد
+    // The exact boundaries of every IPv6 range named in the contract
     [InlineData("::", true)]
     [InlineData("::1", true)]
-    [InlineData("::2", true)]                                                  // ::/96 المهجور → 0.0.0.2 → 0.0.0.0/8
-    [InlineData("fbff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", false)]             // قبل fc00::/7
+    [InlineData("::2", true)]                                                  // the deprecated ::/96 -> 0.0.0.2 -> 0.0.0.0/8
+    [InlineData("fbff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", false)]             // before fc00::/7
     [InlineData("fc00::", true)]
-    [InlineData("fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", true)]              // آخر fc00::/7
-    [InlineData("fe00::", false)]                                              // بعد fc00::/7 وقبل fe80::/10
+    [InlineData("fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", true)]              // the last of fc00::/7
+    [InlineData("fe00::", false)]                                              // after fc00::/7 and before fe80::/10
     [InlineData("fe7f:ffff:ffff:ffff:ffff:ffff:ffff:ffff", false)]
     [InlineData("fe80::", true)]
-    [InlineData("febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff", true)]              // آخر fe80::/10
-    [InlineData("fec0::", false)]                                              // بعد fe80::/10
+    [InlineData("febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff", true)]              // the last of fe80::/10
+    [InlineData("fec0::", false)]                                              // after fe80::/10
     [InlineData("feff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", false)]
     [InlineData("ff00::", true)]
-    [InlineData("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", true)]              // آخر ff00::/8
+    [InlineData("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", true)]              // the last of ff00::/8
     public void V6RangeBoundaries(string ip, bool blocked)
     {
         Assert.Equal(blocked, IpRangePolicy.IsBlockedRange(IPAddress.Parse(ip)));
@@ -88,45 +88,45 @@ public class IpRangePolicyHardeningTests
     }
 
     [Theory]
-    // ::ffff:0:0/96 — أول وآخر العنوان المغلَّف
+    // ::ffff:0:0/96 — the first and last wrapped address
     [InlineData("::ffff:0.0.0.0", true)]
     [InlineData("::ffff:255.255.255.255", true)]
     [InlineData("::ffff:0.255.255.255", true)]
     [InlineData("::ffff:1.0.0.0", false)]
-    // النظير قبل البادئة مباشرة وبعدها: ليست تغليفًا، ولا تُفَك
+    // The neighbours immediately before and after the prefix: not a wrapping, and not unwrapped
     [InlineData("::fffe:8.8.8.8", false)]
     [InlineData("0:0:0:0:1:ffff:0808:0808", false)]
-    // 64:ff9b::/96 — الحواف
+    // 64:ff9b::/96 — the edges
     [InlineData("64:ff9b::0.0.0.0", true)]
     [InlineData("64:ff9b::255.255.255.255", true)]
     [InlineData("64:ff9b::1.0.0.0", false)]
-    [InlineData("64:ff9a::7f00:1", false)]                                     // بادئة مجاورة: لا تُفَك
+    [InlineData("64:ff9a::7f00:1", false)]                                     // an adjacent prefix: not unwrapped
     [InlineData("64:ff9c::7f00:1", false)]
-    // 2002::/16 — البتات 16-47 هي الـ v4
+    // 2002::/16 — bits 16-47 are the v4
     [InlineData("2002::", true)]                                               // 0.0.0.0
     [InlineData("2002:7f00:0001::", true)]                                     // 127.0.0.1
     [InlineData("2002:ffff:ffff::", true)]                                     // 255.255.255.255
     [InlineData("2002:0100:0000::", false)]                                    // 1.0.0.0
-    [InlineData("2001:0100:0000::", false)]                                    // بادئة مجاورة
+    [InlineData("2001:0100:0000::", false)]                                    // an adjacent prefix
     [InlineData("2003:7f00:0001::", false)]
-    // 2001::/32 Teredo — آخر 32 بت XOR 0xFFFFFFFF
+    // 2001::/32 Teredo — the last 32 bits XOR 0xFFFFFFFF
     [InlineData("2001:0:0:0:0:0:80ff:fffe", true)]                             // 127.0.0.1
     [InlineData("2001:0:0:0:0:0:ffff:ffff", true)]                             // 0.0.0.0
     [InlineData("2001:0:0:0:0:0:0:0", true)]                                   // 255.255.255.255 → 240.0.0.0/4
     [InlineData("2001:0:0:0:0:0:feff:ffff", false)]                            // 1.0.0.0
-    [InlineData("2001:1:0:0:0:0:80ff:fffe", false)]                            // خارج 2001::/32: لا فك
-    [InlineData("2001:0:1:0:0:0:80ff:fffe", true)]                             // داخل 2001::/32 مهما كان الوسط
+    [InlineData("2001:1:0:0:0:0:80ff:fffe", false)]                            // outside 2001::/32: no unwrapping
+    [InlineData("2001:0:1:0:0:0:80ff:fffe", true)]                             // inside 2001::/32 whatever the middle holds
     public void EmbeddedV4_Wrappers_AreUnwrappedAtTheirEdges(string ip, bool blocked)
     {
         Assert.Equal(blocked, IpRangePolicy.IsBlockedRange(IPAddress.Parse(ip)));
     }
 
     [Theory]
-    // الصيغة المهجورة ::a.b.c.d (RFC 4291 §2.5.5.1): محلل DNS خبيث قد يعيدها للالتفاف على فحص v4.
+    // The deprecated ::a.b.c.d form (RFC 4291 §2.5.5.1): a malicious DNS resolver could return it to get around the v4 check.
     [InlineData("::127.0.0.1", true)]
     [InlineData("::10.0.0.1", true)]
     [InlineData("::192.168.1.1", true)]
-    [InlineData("::169.254.169.254", true)]                                    // بيانات وصفية سحابية
+    [InlineData("::169.254.169.254", true)]                                    // cloud metadata
     [InlineData("::8.8.8.8", false)]
     [InlineData("::1.1.1.1", false)]
     public void DeprecatedIPv4CompatibleForm_IsUnwrapped(string ip, bool blocked)
@@ -138,7 +138,7 @@ public class IpRangePolicyHardeningTests
     [Fact]
     public void CloudMetadataAddress_IsBlockedInEveryForm()
     {
-        // 169.254.169.254 هو الهدف الأول لأي SSRF؛ يجب أن يسقط بكل تغليف.
+        // 169.254.169.254 is the first target of any SSRF; it must fall in every wrapping.
         foreach (var address in new[]
                  {
                      IPAddress.Parse("169.254.169.254"),
@@ -156,9 +156,9 @@ public class IpRangePolicyHardeningTests
     [Fact]
     public void LocalAddresses_AreBlockedThroughEveryWrapper_InBothDirections()
     {
-        // العنوان العام كما يراه الخادم (docs/protocol.md القسم 6 القاعدة 6): عام في المدى لكنه ممنوع لأنه المضيف نفسه.
+        // The public address as the server sees it (docs/protocol.md section 6 rule 6): public within the ranges but forbidden because it is the host itself.
         var ours = "203.0.113.9";
-        // ‏203.0.113.0/24 محظور أصلًا كمدى وثائقي، فنستخدم عنوانًا عامًا حقيقيًا لعزل قاعدة "عناوين المضيف".
+        // 203.0.113.0/24 is already blocked as a documentation range, so we use a genuinely public address to isolate the "the host's addresses" rule.
         ours = "198.51.99.9";
         var locals = new[] { IPAddress.Parse(ours) };
 
@@ -167,7 +167,7 @@ public class IpRangePolicyHardeningTests
             Assert.True(IpRangePolicy.IsBlocked(form, locals), $"{form} against {ours}");
         }
 
-        // والعكس: العنوان المحلي معطًى بشكل مغلَّف يجب أن يحظر الشكل الصريح.
+        // And the reverse: a local address given in a wrapped form must block the plain form.
         foreach (var wrapped in new[] { Mapped(ours), Nat64(ours), V4Compatible(ours) })
         {
             Assert.True(IpRangePolicy.IsBlocked(IPAddress.Parse(ours), new[] { wrapped }), $"{ours} against {wrapped}");
@@ -179,7 +179,7 @@ public class IpRangePolicyHardeningTests
     [Fact]
     public void NonIpFamilies_AreBlocked()
     {
-        // عائلة غير IP لا تُطلب أبدًا؛ الافتراضي حظر لا تمرير.
+        // A non-IP family is never requested; the default is to block rather than to pass.
         var unix = new IPAddress(new byte[4]).MapToIPv6();
         Assert.True(IpRangePolicy.IsBlockedRange(unix)); // ::ffff:0.0.0.0
         Assert.True(IpRangePolicy.IsBlocked(IPAddress.Any));
@@ -192,7 +192,7 @@ public class IpRangePolicyHardeningTests
     [Fact]
     public void Fuzz_EveryV4Address_AgreesWithAReferenceImplementation()
     {
-        // مرجع مستقل مكتوب من الجدول في العقد مباشرة، مقابل التنفيذ بالأقنعة.
+        // An independent reference written straight from the table in the contract, against the mask-based implementation.
         var random = new Random(4242);
         var bytes = new byte[4];
         for (var i = 0; i < 200_000; i++)
@@ -201,7 +201,7 @@ public class IpRangePolicyHardeningTests
             var address = new IPAddress(bytes);
             var expected = ReferenceBlockedV4((uint)((bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3]));
             Assert.Equal(expected, IpRangePolicy.IsBlockedRange(address));
-            // ونفس النتيجة عبر كل تغليف IPv6.
+            // And the same result through every IPv6 wrapping.
             Assert.Equal(expected, IpRangePolicy.IsBlockedRange(address.MapToIPv6()));
             Assert.Equal(expected, IpRangePolicy.IsBlockedRange(Nat64(address.ToString())));
         }
@@ -221,7 +221,7 @@ public class IpRangePolicyHardeningTests
             Assert.Equal(blocked, IpRangePolicy.IsBlocked(address));
             Assert.True(IpRangePolicy.IsBlocked(address, new[] { address }));
 
-            // إن فُك تغليفه، فالنتيجة لا تكون "مسموح" بينما المضمَّن محظور.
+            // If it is unwrapped, the result is not "allowed" while the embedded address is blocked.
             var embedded = IpRangePolicy.ExtractEmbeddedIPv4(address);
             if (embedded is not null && IpRangePolicy.IsBlockedRange(embedded)) Assert.True(blocked, address.ToString());
         }
@@ -239,17 +239,17 @@ public class IpRangePolicyHardeningTests
     }
 
     [Theory]
-    // ‏getaddrinfo وinet_addr يقرآن هذه كـ 127.0.0.1، بينما IPAddress.TryParse في .NET الحديثة ترفضها،
-    // فلا تسقط في الخطوة 1 (ip_literal) بل تمر كاسم. هذا مقصود ومقبول: الخطوة 6 هي الشبكة التي تمسكها
-    // بعد الحل مهما كان الشكل — وهذا ما يثبته هذا الاختبار.
+    // getaddrinfo and inet_addr read these as 127.0.0.1, while IPAddress.TryParse in modern .NET refuses them,
+    // so they do not fall at step 1 (ip_literal) but pass as a name. That is deliberate and acceptable: step 6 is the net that catches them
+    // after resolution, whatever the form — and that is what this test proves.
     [InlineData("2130706433")]
     [InlineData("0x7f000001")]
     [InlineData("017700000001")]
     [InlineData("127.1")]
     public void NumericHostSpellings_SurviveTheLiteralCheck_ButNotThePostResolutionCheck(string host)
     {
-        _ = IpRangePolicy.IsIpLiteral(host); // أيًا كانت النتيجة، لا نعتمد عليها
-        // ما يعتمد عليه العقد: العنوان الذي يعيده أي محلل لهذه الأشكال محظور.
+        _ = IpRangePolicy.IsIpLiteral(host); // whatever the result, we do not rely on it
+        // What the contract does rely on: the address any resolver returns for these forms is blocked.
         Assert.True(IpRangePolicy.IsBlocked(IPAddress.Parse("127.0.0.1")));
         Assert.True(IpRangePolicy.IsBlocked(IPAddress.Parse("::ffff:127.0.0.1")));
     }
@@ -258,7 +258,7 @@ public class IpRangePolicyHardeningTests
 
     private static void AssertNeighbour(IPAddress? neighbour, string first, string last)
     {
-        if (neighbour is null) return; // خارج مدى IPv4
+        if (neighbour is null) return; // outside the IPv4 range
         var alsoInAnotherRange = V4Ranges.Cast<object[]>()
             .Any(row => (string)row[0] != first && InRange(neighbour, (string)row[0], (string)row[1]));
         Assert.Equal(alsoInAnotherRange, IpRangePolicy.IsBlockedRange(neighbour));
@@ -310,7 +310,7 @@ public class IpRangePolicyHardeningTests
         return new IPAddress(bytes);
     }
 
-    /// <summary>مرجع مكتوب من جدول docs/protocol.md مباشرة (مقارنات عددية، بلا أقنعة بت).</summary>
+    /// <summary>A reference written straight from the table in docs/protocol.md (numeric comparisons, with no bit masks).</summary>
     private static bool ReferenceBlockedV4(uint a)
     {
         (string First, string Last)[] ranges =

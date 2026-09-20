@@ -8,9 +8,9 @@ using Josour.Tunnel.Transport;
 namespace Josour.Tunnel.Tests.Transport;
 
 /// <summary>
-/// Relay وهمي داخل العملية: يقرأ مقدمة <see cref="RelayProtocol"/> من كل طرف، يزاوج الطرفين بـ session_id، يرد
-/// <see cref="RelayStatus.Paired"/> للاثنين ثم يضخ البايتات بينهما بلا تفسير. يكفي لإثبات أن جانب العميل صحيح؛
-/// الخدمة الحقيقية (تحقق التوكن، الحدود، القياس) من عمل الأسبوع 5/6 إن أغلقت بوابة ADR-0003.
+/// A fake in-process relay: it reads a <see cref="RelayProtocol"/> preamble from each side, pairs the two by session_id, answers
+/// <see cref="RelayStatus.Paired"/> to both, then pumps the bytes between them with no interpretation. It is enough to prove the client side is correct;
+/// the real service (token verification, the limits, the measurements) is week 5/6's work if the ADR-0003 gate closes.
 /// </summary>
 internal sealed class FakeRelay : IAsyncDisposable
 {
@@ -33,10 +33,10 @@ internal sealed class FakeRelay : IAsyncDisposable
 
     public int Port { get; }
 
-    /// <summary>حالة تُرد دائمًا بدل الاقتران (لاختبار الرفض).</summary>
+    /// <summary>A status always returned instead of pairing (to test the refusal).</summary>
     public RelayStatus? ForcedStatus { get; set; }
 
-    /// <summary>توكن متوقَّع؛ أي غيره يرد unauthorized.</summary>
+    /// <summary>The expected token; anything else is answered with unauthorized.</summary>
     public string? ExpectedToken { get; set; }
 
     public IReadOnlyList<RelayPreamble> Received
@@ -89,7 +89,7 @@ internal sealed class FakeRelay : IAsyncDisposable
 
         var slot = _waiting.GetOrAdd(preamble.SessionId, _ => new TaskCompletionSource<Waiting>(TaskCreationOptions.RunContinuationsAsynchronously));
         if (slot.TrySetResult(new Waiting(preamble, stream)))
-            return; // أول الواصلين: الثاني هو من يزاوج ويضخ؛ الـ stream يبقى حيًا في الفتحة
+            return; // the first to arrive: the second is what pairs and pumps; the stream stays alive in the slot
 
         var first = await slot.Task;
         _waiting.TryRemove(preamble.SessionId, out _);
@@ -103,7 +103,7 @@ internal sealed class FakeRelay : IAsyncDisposable
         await ReplyAsync(first.Stream, RelayStatus.Paired, ct);
         await ReplyAsync(stream, RelayStatus.Paired, ct);
         try { await StreamPump.RunAsync(first.Stream, stream, ct); }
-        catch { /* أحد الطرفين أغلق */ }
+        catch { /* one of the two sides closed */ }
         finally
         {
             await first.Stream.DisposeAsync();
@@ -118,19 +118,19 @@ internal sealed class FakeRelay : IAsyncDisposable
             await stream.WriteAsync(RelayProtocol.BuildReply(status), ct);
             await stream.FlushAsync(ct);
         }
-        catch { /* الطرف الآخر أغلق */ }
+        catch { /* the other side closed */ }
     }
 
     public async ValueTask DisposeAsync()
     {
         _cts.Cancel();
-        try { _listener.Close(); } catch { /* تجاهل */ }
-        try { await _acceptLoop; } catch { /* تجاهل */ }
+        try { _listener.Close(); } catch { /* ignore */ }
+        try { await _acceptLoop; } catch { /* ignore */ }
         foreach (var waiting in _waiting.Values)
         {
             if (waiting.Task.IsCompletedSuccessfully) await waiting.Task.Result.Stream.DisposeAsync();
         }
-        try { await Task.WhenAll(_handlers.Keys); } catch { /* المعالجات تبتلع أخطاءها */ }
+        try { await Task.WhenAll(_handlers.Keys); } catch { /* the handlers swallow their own errors */ }
         _listener.Dispose();
         _cts.Dispose();
     }

@@ -7,39 +7,39 @@ using Josour.Infrastructure.Session;
 namespace Josour.Spike;
 
 /// <summary>
-/// المكافئ بلا واجهة لتطبيق WPF: يقود المكدّس الحقيقي كاملًا (ApiClient ← AuthSession ← ControlChannel على WSS ←
-/// SessionCoordinator ← TunnelSession ← Egress/Proxy) حتى يستطيع QA تشغيل جلسة حقيقية بين جهازي Windows.
+/// The headless equivalent of the WPF application: it drives the entire real stack (ApiClient -> AuthSession -> ControlChannel over WSS ->
+/// SessionCoordinator -> TunnelSession -> Egress/Proxy) so QA can run a real session between two Windows machines.
 ///
 /// <para>
-/// الأمر <b>سائق رفيع</b> عمدًا: كل ما بعد <c>session.created</c> يملكه <see cref="SessionCoordinator"/> في
-/// <c>Josour.Infrastructure</c> — وهو نفسه ما يقوده تطبيق WPF — وكل ترتيب التنظيف يملكه <c>TunnelSession</c>.
-/// ما يبقى هنا هو ما يخص الأداة وحدها: تحليل المعاملات، الدخول، <c>host.available</c>، دورة الطلب (قبول تلقائي أو
-/// إنشاء)، وطباعة الأحداث؛ وما يخص الأداة من تركيب النفق وأحداثه في <see cref="SessionDriver"/>.
-/// إن كبر هذا الملف بمنطق جلسة، فمكانه <c>SessionCoordinator</c> لا هنا.
+/// The command is deliberately <b>a thin driver</b>: everything after <c>session.created</c> is owned by <see cref="SessionCoordinator"/> in
+/// <c>Josour.Infrastructure</c> — the very code the WPF application drives — and the whole cleanup order is owned by <c>TunnelSession</c>.
+/// What remains here is what belongs to the tool alone: parsing the arguments, signing in, <c>host.available</c>, the request cycle (automatic acceptance or
+/// creation), and printing the events; and what belongs to the tool in building the tunnel and its events is in <see cref="SessionDriver"/>.
+/// If this file grows session logic, its place is <c>SessionCoordinator</c> rather than here.
 /// </para>
 ///
-/// <para>المخرجات: سطر JSON لكل حدث على stdout (JSONL)، وملخص بشري على stderr. الأكواد في <see cref="ExitCodes"/>.</para>
+/// <para>The output: one JSON line per event on stdout (JSONL), and a human summary on stderr. The codes are in <see cref="ExitCodes"/>.</para>
 /// </summary>
 public static class SessionCommand
 {
     public static class ExitCodes
     {
-        /// <summary>الجلسة عملت وانتهت نهاية متوقَّعة (إنهاء أحد الطرفين، انتهاء المدة، Ctrl+C)، أو <c>--list-hosts</c> نجح.</summary>
+        /// <summary>The session worked and ended as expected (one side ending it, the duration running out, Ctrl+C), or <c>--list-hosts</c> succeeded.</summary>
         public const int Success = 0;
 
-        /// <summary>سوء استعمال: معاملات ناقصة أو متناقضة، أو مضيف مطلوب غير موجود.</summary>
+        /// <summary>Misuse: missing or contradictory arguments, or a requested host that does not exist.</summary>
         public const int Usage = 1;
 
-        /// <summary>لم يقم نفق: فشل الاتصال المتماثل، أو رُفض الطلب، أو انتهت مهلته، أو المضيف غير متاح.</summary>
+        /// <summary>No tunnel stood up: the symmetric connection failed, or the request was rejected, or it timed out, or the host is unavailable.</summary>
         public const int ConnectFailed = 2;
 
-        /// <summary>النفق قام ثم مات (انقطاع الطرف الآخر، أو سقوط قناة التحكم أثناء الجلسة).</summary>
+        /// <summary>The tunnel stood up and then died (the other side dropping, or the control channel falling during the session).</summary>
         public const int TunnelDied = 3;
 
-        /// <summary>فشل المصادقة أو خرق للعقد من الخادم.</summary>
+        /// <summary>An authentication failure or a breach of the contract by the server.</summary>
         public const int ProtocolOrAuth = 4;
 
-        /// <summary>Ctrl+C قبل قيام الجلسة.</summary>
+        /// <summary>Ctrl+C before the session stood up.</summary>
         public const int Interrupted = 130;
     }
 
@@ -82,7 +82,7 @@ public static class SessionCommand
 
         await using var stack = await SessionStack.CreateAsync(api, stateDirectory, args.Has("reset-device"), null, ct);
 
-        // ---------- 1. الدخول ----------
+        // ---------- 1. Signing in ----------
         try
         {
             await stack.Auth.SignInAsync(email, password, ct);
@@ -105,7 +105,7 @@ public static class SessionCommand
             ("device_id", deviceId), ("device_name", stack.Device.DeviceName), ("app_version", stack.Device.AppVersion)),
             $"signed in as {user.DisplayName} <{user.Email}> on device {stack.Device.DeviceName} ({deviceId})");
 
-        // ---------- 2. قناة التحكم ----------
+        // ---------- 2. The control channel ----------
         await using var driver = new SessionDriver(args, log, curlTest, wantsBrowser) { Role = isHost ? TunnelRole.Host : TunnelRole.Guest };
 
         stack.Channel.StateChanged += state =>
@@ -124,8 +124,8 @@ public static class SessionCommand
             driver.OnFrameReceived(message);
         };
 
-        // المنسّق يشترك في القناة من الآن — قبل ConnectAsync — حتى يرى hello.ack (المنافذ المسموحة والـ IP العام)
-        // وكل إطار بعده بلا فجوة، تمامًا كما يفعل التطبيق عند الإقلاع.
+        // The coordinator subscribes to the channel from now — before ConnectAsync — so it sees hello.ack (the allowed ports and the public IP)
+        // and every frame after it with no gap, exactly as the application does at startup.
         await using var channel = driver.Wrap(stack.Channel);
         using var coordinator = new SessionCoordinator(channel, stack.Api, driver, driver.Browser, time: TimeProvider.System, options: SessionCoordinatorOptions.Default with
         {
@@ -156,8 +156,8 @@ public static class SessionCommand
             ("log_domains", ack.Settings.LogDomains)),
             $"connected; our public ip is {ack.PublicIp}, allowed ports {string.Join(",", ack.Settings.AllowedPorts)}, allowlist v{ack.AllowlistVersion}");
 
-        // ---------- 3. قائمة المواقع ----------
-        // للحدث وحده: المنسّق يحمّل القائمة بنفسه عند session.created بإصدار الجلسة (نفس المحلل ونفس المصدر).
+        // ---------- 3. The site list ----------
+        // For the event alone: the coordinator loads the list itself at session.created at the session's version (the same parser and the same source).
         try
         {
             var (parsed, version, skipped) = await stack.LoadAllowlistAsync(ct);
@@ -170,8 +170,8 @@ public static class SessionCommand
             return ExitCodes.ProtocolOrAuth;
         }
 
-        // ---------- 4. الدور ----------
-        // (‏حدث session.created نفسه يصدره SessionDriver من الإطار الوارد، قبل أن يبدأ المنسّق التجهيز.)
+        // ---------- 4. The role ----------
+        // (The session.created event itself is emitted by SessionDriver from the inbound frame, before the coordinator starts preparing.)
         using var interrupt = CancellationTokenSource.CreateLinkedTokenSource(ct);
         try
         {
@@ -186,10 +186,10 @@ public static class SessionCommand
             return ExitCodes.Interrupted;
         }
 
-        // ---------- 5. الجلسة ----------
-        // من هنا فصاعدًا لا شيء يجري في هذا الملف: المنسّق رأى session.created على القناة نفسها ويقود الباقي.
+        // ---------- 5. The session ----------
+        // From here on nothing happens in this file: the coordinator saw session.created on the same channel and drives the rest.
 
-        // Ctrl+C أثناء الجلسة = إنهاء مقصود بترتيب التنظيف الكامل، لا قتل للعملية.
+        // Ctrl+C during the session = a deliberate end with the full cleanup order, not killing the process.
         void OnCancelKey(object? sender, ConsoleCancelEventArgs e)
         {
             e.Cancel = true;
@@ -220,15 +220,15 @@ public static class SessionCommand
         return exit;
     }
 
-    // ---------- الإشارة الأمنية للمستمع ----------
+    // ---------- The listener's security signal ----------
 
     /// <summary>
-    /// يرفع محاولات الوصول غير المصرَّح بها على مستمع النفق إلى <c>POST /api/v1/diagnostics</c> عند نهاية الجلسة،
-    /// بالمفاتيح المحجوزة في <c>docs/api.md</c>. مستمع النفق هو الموضع الوحيد الذي يرى فيه النظام محاولة كهذه،
-    /// والخادم لا يستطيع رصدها بنفسه، فإن لم يرفعها العميل لم تُرصد أبدًا.
+    /// It reports the unauthorised access attempts on the tunnel's listener to <c>POST /api/v1/diagnostics</c> at the session's end,
+    /// under the keys reserved in <c>docs/api.md</c>. The tunnel's listener is the only place where the system sees such an attempt,
+    /// and the server cannot observe it itself, so if the client does not report it, it is never observed.
     ///
-    /// <para>أفضل جهد بحت: لا يرمي، ولا يغيّر رمز الخروج، ومهلته مستقلة عن رمز الإلغاء لأن السبب المعتاد لبلوغ
-    /// هذه النقطة هو Ctrl+C (فالرمز ملغى بالفعل، والتقرير ما زال مطلوبًا). يُعطَّل بـ <c>--no-diagnostics</c>.</para>
+    /// <para>Purely best effort: it does not throw, does not change the exit code, and its timeout is independent of the cancellation token, because the usual reason for reaching
+    /// this point is Ctrl+C (so the token is already cancelled and the report is still wanted). It is disabled with <c>--no-diagnostics</c>.</para>
     /// </summary>
     private static async Task ReportListenerProbesAsync(SessionStack stack, string apiBase, SessionDriver driver, EventLog log, Args args, string role)
     {
@@ -261,7 +261,7 @@ public static class SessionCommand
         }
     }
 
-    // ---------- المضيف ----------
+    // ---------- The host ----------
 
     private readonly record struct Pending(SessionCreatedMessage? Created, int? ExitCode);
 
@@ -269,11 +269,11 @@ public static class SessionCommand
     {
         var autoReject = args.Has("auto-reject");
 
-        // ‏host.available هو الافتراضي (بدونه لا يظهر هذا الجهاز في قائمة أي مستخدم فالانتظار عبثي)؛
-        // ‏--available شكل صريح للافتراضي، و--no-available يبقي المضيف متصلًا وغير معلن (اختبار القناة وحدها).
+        // host.available is the default (without it this machine appears in no user's list, so waiting is pointless);
+        // --available is an explicit form of the default, and --no-available keeps the host connected and unannounced (testing the channel alone).
         var announce = !args.Has("no-available");
-        // ‏listen_port اختياري: مع قيمة يشغّل الخادم فحص قابلية الوصول (docs/ws-protocol.md القسم 6). نمرر
-        // نفس المنفذ الذي سيربطه مستمع النفق (--listen-port) حتى يكون الفحص ذا معنى.
+        // listen_port is optional: with a value the server runs the reachability probe (docs/ws-protocol.md section 6). We pass
+        // the same port the tunnel's listener will bind (--listen-port) so the probe is meaningful.
         var listenPort = args.GetInt("listen-port", 0);
         if (announce)
         {
@@ -315,7 +315,7 @@ public static class SessionCommand
         }
     }
 
-    // ---------- المستخدم ----------
+    // ---------- The user ----------
 
     private static async Task<Pending> CreateRequestAsync(
         SessionStack stack,
@@ -334,7 +334,7 @@ public static class SessionCommand
         }
         catch (TimeoutException)
         {
-            // القناة لم ترسل اللقطة بعد hello.ack: نسقط إلى REST بالشكل نفسه والتصفية نفسها (docs/api.md).
+            // The channel did not send the snapshot after hello.ack: we fall back to REST with the same shape and the same filtering (docs/api.md).
             log.Note("no hosts.snapshot within 10 s; falling back to GET /hosts");
             hosts = await stack.Api.GetHostsAsync(ct);
         }
@@ -375,7 +375,7 @@ public static class SessionCommand
             var reply = await stack.Channel.RequestAsync(new RequestCreateMessage(ControlRef.Next(), target.DeviceId, minutes), ReplyTimeout, ct);
             if (reply is ErrorMessage error)
             {
-                // القناة المحاكية تعيد الإطار؛ الحقيقية ترمي. نتعامل مع الاثنين حتى تُسحب المحاكية.
+                // The simulated channel returns the frame; the real one throws. We handle both until the simulated one is withdrawn.
                 log.Emit("request.rejected_by_server", EventLog.Fields(("code", error.Code), ("message", error.Message)), $"request.create refused: {error.Code}");
                 return new Pending(null, ExitCodes.ConnectFailed);
             }
@@ -406,7 +406,7 @@ public static class SessionCommand
         return new Pending((SessionCreatedMessage)await createdTask.WaitAsync(ReplyTimeout, ct), null);
     }
 
-    /// <summary>معرّف الجهاز، أو تطابق تام على اسم الجهاز/المستخدم، ثم تطابق جزئي وحيد. الغموض = لا اختيار.</summary>
+    /// <summary>The device id, or an exact match on the device/user name, then a single partial match. Ambiguity = no choice.</summary>
     public static HostInfoDto? ResolveHost(IReadOnlyList<HostInfoDto> hosts, string wanted)
     {
         ArgumentNullException.ThrowIfNull(hosts);
@@ -426,7 +426,7 @@ public static class SessionCommand
         return partial.Count == 1 ? partial[0] : null;
     }
 
-    // ---------- الترجمة ----------
+    // ---------- The translation ----------
 
     public static int ExitFor(SessionOutcomeKind kind) => kind switch
     {
@@ -453,7 +453,7 @@ public static class SessionCommand
 
     private static string? Summarize(ControlMessage message) => message switch
     {
-        // ping/pong كل 20 ثانية: في JSON نعم، على الشاشة لا.
+        // ping/pong every 20 seconds: yes in the JSON, no on the screen.
         PingMessage or PongMessage => null,
         HostsMessage m => $"← {m.Type}: {m.Hosts.Count} host(s)",
         ErrorMessage m => $"← error {m.Code}: {m.Message}",

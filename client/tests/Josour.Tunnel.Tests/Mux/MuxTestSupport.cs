@@ -7,7 +7,7 @@ using Josour.Tunnel.Tls;
 
 namespace Josour.Tunnel.Tests.Mux;
 
-/// <summary>زوج Mux فوق TLS حقيقي على loopback (كما ينتجه SymmetricConnector): Guest هو TLS Client، Host هو TLS Server.</summary>
+/// <summary>A mux pair over real TLS on loopback (as SymmetricConnector produces it): the guest is the TLS client, the host is the TLS server.</summary>
 internal sealed class MuxPair : IAsyncDisposable
 {
     private readonly SessionCertificate _cert;
@@ -23,14 +23,14 @@ internal sealed class MuxPair : IAsyncDisposable
 
     public NerdbankMux Guest { get; }
     public NerdbankMux Host { get; }
-    /// <summary>الإصدار المتفاوَض عليه ("1.2"/"1.3")؛ يُسجَّل مع أرقام الأداء.</summary>
+    /// <summary>The negotiated version ("1.2"/"1.3"); recorded with the performance numbers.</summary>
     public string TlsVersion { get; }
-    /// <summary>الـ stream الخام لجانب Guest (قبل TLS) إن طُلب التحكم به.</summary>
+    /// <summary>The raw stream of the guest's side (before TLS) if control over it is wanted.</summary>
     public BlackholeStream? GuestRaw { get; }
 
-    /// <param name="wrapGuest">غلاف اختياري على النقل الخام لجانب Guest قبل TLS (محاكي الوصلة في اختبارات الأداء).</param>
-    /// <param name="wrapHost">مثله لجانب Host.</param>
-    /// <param name="handshakeTimeout">مهلة مصافحة TLS؛ ترتفع عند وجود RTT مُحاكى.</param>
+    /// <param name="wrapGuest">An optional wrapper over the guest side's raw transport before TLS (the link simulator in the performance tests).</param>
+    /// <param name="wrapHost">The same for the host's side.</param>
+    /// <param name="handshakeTimeout">The TLS handshake timeout; it is raised when there is a simulated RTT.</param>
     public static async Task<MuxPair> CreateAsync(
         MuxOptions? guestOptions = null,
         MuxOptions? hostOptions = null,
@@ -65,8 +65,8 @@ internal sealed class MuxPair : IAsyncDisposable
 }
 
 /// <summary>
-/// وجهة اختبار على المضيف: تبتلع الكتابات (بعد بوابة اختيارية). إن كان produce > 0 تنتج هذا القدر عند القراءة ثم EOF
-/// (خادم يغلق بعد الرد)؛ وإلا تعطي EOF عندما يصلها الإغلاق النصفي (خادم يغلق بعد انتهاء الطلب).
+/// A test destination on the host: it swallows the writes (after an optional gate). If produce > 0 it produces that much on read and then EOF
+/// (a server that closes after replying); otherwise it gives EOF when the half-close reaches it (a server that closes when the request ends).
 /// </summary>
 internal sealed class TestTarget : Stream, IHalfClosable
 {
@@ -83,7 +83,7 @@ internal sealed class TestTarget : Stream, IHalfClosable
 
     public TaskCompletionSource? Gate { get; }
     public long Received => Volatile.Read(ref _received);
-    /// <summary>ما سلّمته للقراءة فعلًا (يتوقف عند نافذة استقبال الطرف الآخر إن لم يقرأ).</summary>
+    /// <summary>What it actually handed over to be read (it stops at the other side's receiving window if it is not reading).</summary>
     public long Produced => Volatile.Read(ref _produced);
     public bool PeerHalfClosed { get; private set; }
     public bool Disposed { get; private set; }
@@ -144,7 +144,7 @@ internal sealed class TestTarget : Stream, IHalfClosable
     }
 }
 
-/// <summary>غلاف يستطيع ابتلاع كل حركة المرور بصمت (لمحاكاة نفق ميت بلا إغلاق TCP).</summary>
+/// <summary>A wrapper that can swallow all the traffic silently (to simulate a dead tunnel with no TCP close).</summary>
 internal sealed class BlackholeStream : Stream
 {
     private readonly Stream _inner;
@@ -194,7 +194,7 @@ internal sealed class BlackholeStream : Stream
     }
 }
 
-/// <summary>مقبس TCP حقيقي كوجهة: يعيد SocketStream لجانب المضيف والمقبس البعيد للاختبار.</summary>
+/// <summary>A real TCP socket as a destination: it returns a SocketStream for the host's side and the far socket for the test.</summary>
 internal static class TcpTarget
 {
     public static async Task<(SocketStream Target, Socket Far)> CreateAsync()

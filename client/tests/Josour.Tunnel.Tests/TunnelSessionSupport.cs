@@ -6,7 +6,7 @@ using Josour.Tunnel.Transport;
 
 namespace Josour.Tunnel.Tests;
 
-/// <summary>مصدر مرشحين ثابت بلا شبكة ولا UPnP: يعطي lan 127.0.0.1:&lt;منفذ المستمع&gt; ويحصي استدعاءات إزالة التعيين.</summary>
+/// <summary>A fixed candidate source with no network and no UPnP: it gives lan 127.0.0.1:&lt;the listener's port&gt; and counts the mapping-removal calls.</summary>
 internal sealed class StaticCandidateSource : ICandidateSource
 {
     private readonly bool _withCandidate;
@@ -49,7 +49,7 @@ internal sealed class StaticCandidateSource : ICandidateSource
     }
 }
 
-/// <summary>نقل مباشر يحتفظ بالـ streams التي أنشأها ليستطيع الاختبار قتل النقل تحت TLS (نفق ميت بلا GOAWAY).</summary>
+/// <summary>A direct transport that keeps the streams it created so the test can kill the transport under TLS (a dead tunnel with no GOAWAY).</summary>
 internal sealed class RecordingTransport : ITunnelTransport
 {
     private readonly ITunnelTransport _inner = new DirectTransport();
@@ -58,8 +58,8 @@ internal sealed class RecordingTransport : ITunnelTransport
     private readonly TimeSpan _connectDelay;
 
     /// <param name="connectDelay">
-    /// تأخير داخل نافذة قياس <c>connect_ms</c> (بعد اتصال TCP وقبل TLS): وصلة بطيئة مُحاكاة لاختبار
-    /// اشتقاق النافذة من الـ RTT. loopback وحده يعطي connect_ms ≈ 0 وهو الرقم الذي يعدّه العقد فاسدًا.
+    /// A delay inside the <c>connect_ms</c> measurement window (after the TCP connect and before TLS): a simulated slow link for testing
+    /// the window's derivation from the RTT. Loopback alone gives connect_ms ≈ 0, which is the number the contract counts as corrupt.
     /// </param>
     public RecordingTransport(TimeSpan? connectDelay = null) => _connectDelay = connectDelay ?? TimeSpan.Zero;
 
@@ -74,19 +74,19 @@ internal sealed class RecordingTransport : ITunnelTransport
         return stream;
     }
 
-    /// <summary>يغلق المقبس تحت TLS بلا GOAWAY: الطرفان يريان النفق ميتًا.</summary>
+    /// <summary>It closes the socket under TLS with no GOAWAY: both sides see the tunnel as dead.</summary>
     public void KillAll()
     {
         Stream[] streams;
         lock (_gate) streams = _streams.ToArray();
         foreach (var stream in streams)
         {
-            try { stream.Dispose(); } catch { /* مقتول أصلًا */ }
+            try { stream.Dispose(); } catch { /* already killed */ }
         }
     }
 }
 
-/// <summary>سياسة خروج وهمية: تسجّل الربط والتخلص وتعطي أعدادًا ثابتة.</summary>
+/// <summary>A fake egress policy: it records the wiring and the disposal and returns fixed counts.</summary>
 internal sealed class FakeEgress : ITunnelEgress
 {
     private readonly List<string> _log;
@@ -114,7 +114,7 @@ internal sealed class FakeEgress : ITunnelEgress
     }
 }
 
-/// <summary>Proxy وهمي: يسجّل ترتيب خطوات الإيقاف ويسمح برفع إشارة صفحة الفحص يدويًا.</summary>
+/// <summary>A fake proxy: it records the order of the stopping steps and allows the check-page signal to be raised by hand.</summary>
 internal sealed class FakeProxy : ITunnelProxy
 {
     public IReadOnlyDictionary<string, long> Counters { get; } = new Dictionary<string, long>(StringComparer.Ordinal);
@@ -157,7 +157,7 @@ internal sealed class FakeProxy : ITunnelProxy
     }
 }
 
-/// <summary>جلستان (مضيف + ضيف) على loopback داخل العملية، بمرشحين ثابتين وقطع وهمية. المضيف هو الذي يتصل.</summary>
+/// <summary>Two sessions (a host + a guest) on loopback inside the process, with fixed candidates and fake pieces. The host is the one that connects.</summary>
 internal sealed class TunnelSessionPair : IAsyncDisposable
 {
     private TunnelSessionPair(TunnelSession host, TunnelSession guest, FakeEgress egress, FakeProxy proxy, RecordingTransport hostTransport, List<string> log)
@@ -178,9 +178,9 @@ internal sealed class TunnelSessionPair : IAsyncDisposable
     public List<string> Log { get; }
     public TunnelConnectResult HostResult { get; private set; } = null!;
     public TunnelConnectResult GuestResult { get; private set; } = null!;
-    /// <summary>السياق كما بناه المضيف لمصنع الخروج (يحمل حد الـ streams المشتق من النافذة).</summary>
+    /// <summary>The context as the host built it for the egress factory (it carries the window-derived stream limit).</summary>
     public TunnelEgressContext? EgressContext { get; private set; }
-    /// <summary>الـ Mux كما مُرِّر إلى مصنع الـ Proxy على جانب الضيف (الواجهة لا تكشفه).</summary>
+    /// <summary>The mux as it was passed to the proxy factory on the guest's side (the interface does not expose it).</summary>
     public IMuxConnection? GuestMux { get; private set; }
     public List<TunnelState> HostStates { get; } = new();
     public List<TunnelState> GuestStates { get; } = new();
@@ -209,8 +209,8 @@ internal sealed class TunnelSessionPair : IAsyncDisposable
                 CandidateSource = () => new StaticCandidateSource(),
                 Transport = hostTransport,
                 HostEgress = context => { egressContext = context; return egress; },
-                // حيوية قصيرة بدل تعطيلها: المسار الأساسي لكشف الموت هو EOF، وهذه شبكة أمان
-                // تجعل الكشف حتميًا داخل مهلة الاختبار بدل انتظار 60 ثانية الافتراضية.
+                // A short liveness rather than disabling it: the main death-detection path is EOF, and this is a safety net
+                // that makes the detection deterministic within the test's timeout instead of waiting out the default 60 seconds.
                 Mux = muxOverride ?? new MuxOptions { PingInterval = TimeSpan.FromSeconds(2), DeadAfter = TimeSpan.FromSeconds(8) },
             });
         IMuxConnection? guestMux = null;
@@ -222,8 +222,8 @@ internal sealed class TunnelSessionPair : IAsyncDisposable
                 CandidateSource = () => new StaticCandidateSource(),
                 GuestProxy = ctx => { guestMux = ctx.Mux; return proxy; },
                 CloseBrowserAsync = guestCloseBrowser,
-                // حيوية قصيرة بدل تعطيلها: المسار الأساسي لكشف الموت هو EOF، وهذه شبكة أمان
-                // تجعل الكشف حتميًا داخل مهلة الاختبار بدل انتظار 60 ثانية الافتراضية.
+                // A short liveness rather than disabling it: the main death-detection path is EOF, and this is a safety net
+                // that makes the detection deterministic within the test's timeout instead of waiting out the default 60 seconds.
                 Mux = muxOverride ?? new MuxOptions { PingInterval = TimeSpan.FromSeconds(2), DeadAfter = TimeSpan.FromSeconds(8) },
             });
 
@@ -235,7 +235,7 @@ internal sealed class TunnelSessionPair : IAsyncDisposable
         var guestLocal = await guest.PrepareAsync(CancellationToken.None);
         var window = timeout ?? TimeSpan.FromSeconds(20);
 
-        // المضيف هو المتصل (الضيف بلا مرشحين للطرف الآخر)، فيملك الاختبار مقبس النقل ويستطيع قتله.
+        // The host is the connector (the guest has no candidates for the other side), so the test owns the transport socket and can kill it.
         var hostTask = host.ConnectAsync(new PeerEndpointInfo(guestLocal.CertFingerprintSha256Hex, guestLocal.Candidates), window, CancellationToken.None);
         var guestTask = guest.ConnectAsync(new PeerEndpointInfo(hostLocal.CertFingerprintSha256Hex, Array.Empty<CandidateEndpoint>()), window, CancellationToken.None);
         pair.HostResult = await hostTask;
@@ -254,7 +254,7 @@ internal sealed class TunnelSessionPair : IAsyncDisposable
 
 internal static class Wait
 {
-    /// <summary>ينتظر شرطًا حتى المهلة (للأحداث التي تصل من خيوط أخرى).</summary>
+    /// <summary>It waits for a condition until the timeout (for events arriving from other threads).</summary>
     public static async Task<bool> UntilAsync(Func<bool> condition, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;

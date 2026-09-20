@@ -4,7 +4,7 @@ using Xunit.Abstractions;
 
 namespace Josour.Tunnel.Tests.Mux;
 
-/// <summary>معايير ADR-0006 فوق TLS محلي. الأرقام تُطبع في مخرجات الاختبار وتُسجَّل في الـ ADR.</summary>
+/// <summary>The ADR-0006 benchmarks over local TLS. The numbers are printed in the test output and recorded in the ADR.</summary>
 [Trait("Category", "Benchmark")]
 public class MuxBenchmarks
 {
@@ -15,7 +15,7 @@ public class MuxBenchmarks
 
     public MuxBenchmarks(ITestOutputHelper output) => _output = output;
 
-    // (a) مستهلك بطيء على القناة A لا يعطل القناة B: A متوقفة 3 ثوانٍ، نقيس ما تنقله B خلالها.
+    // (a) A slow consumer on channel A does not stall channel B: A is stopped for 3 seconds, and we measure what B carries during them.
     [Fact]
     public async Task SlowConsumerOnA_DoesNotStallB()
     {
@@ -32,7 +32,7 @@ public class MuxBenchmarks
         var aWriter = Task.Run(async () =>
         {
             var chunk = new byte[64 * 1024];
-            for (var i = 0; i < 64 * 16; i++) // 64 MiB إن لم يكن هناك ضغط عكسي
+            for (var i = 0; i < 64 * 16; i++) // 64 MiB if there were no backpressure
             {
                 await a.WriteAsync(chunk);
                 Interlocked.Add(ref writtenToA, chunk.Length);
@@ -69,7 +69,7 @@ public class MuxBenchmarks
         await b.DisposeAsync();
     }
 
-    // (c) 100 MB على قناة واحدة في الاتجاهين.
+    // (c) 100 MB on a single channel in both directions.
     [Fact]
     public async Task Throughput_100MB_SingleChannel_BothDirections()
     {
@@ -82,7 +82,7 @@ public class MuxBenchmarks
         var clock = Stopwatch.StartNew();
         await StreamIo.WriteAllAsync(upStream, size);
         await ((IHalfClosable)upStream).CompleteWritingAsync(CancellationToken.None);
-        await StreamIo.ReadToEndAsync(upStream).WaitAsync(Timeout); // EOF يعود بعد أن استهلك المضيف كل شيء
+        await StreamIo.ReadToEndAsync(upStream).WaitAsync(Timeout); // the EOF comes back after the host has consumed everything
         var upElapsed = clock.Elapsed;
         Assert.Equal(size, up.Received);
         await upStream.DisposeAsync();
@@ -101,7 +101,7 @@ public class MuxBenchmarks
         Assert.True(downElapsed < TimeSpan.FromSeconds(60));
     }
 
-    // (d) 256 قناة متزامنة تنقل كل منها 1 MB صعودًا و1 MB هبوطًا.
+    // (d) 256 concurrent channels, each carrying 1 MB up and 1 MB down.
     [Fact]
     public async Task Concurrent_256Channels_1MB_Each()
     {
@@ -143,7 +143,7 @@ public class MuxBenchmarks
         Assert.True(total < TimeSpan.FromSeconds(60));
     }
 
-    // 1000 فتح متتالٍ (خطة القسم 11): لا تسريب في عدّاد الـ streams.
+    // 1000 sequential opens (plan section 11): no leak in the stream counter.
     [Fact]
     public async Task Sequential_1000Opens_NoLeak()
     {

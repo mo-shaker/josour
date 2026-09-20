@@ -3,27 +3,27 @@ using Josour.Tunnel.Mux;
 namespace Josour.Tunnel.Tests.Mux;
 
 /// <summary>
-/// جدول الشرائح في docs/protocol.md القسم 5 عند حدوده بالضبط، والملاذ عند قياس فاسد، وميزانية الذاكرة.
-/// دالة صرفة بلا مقابس، فهي أسرع اختبارات هذه التجميعة.
+/// The band table in docs/protocol.md section 5 at its exact boundaries, the fallback on a corrupt measurement, and the memory budget.
+/// A pure function with no sockets, so these are the fastest tests in this assembly.
 /// </summary>
 public class MuxWindowTests
 {
     private const int MiB = 1024 * 1024;
 
-    // الحدود حرفيًا: ≤ 60 ms ⇒ 1 MiB/256، ≤ 150 ms ⇒ 2 MiB/128، فوقها ⇒ 4 MiB/64.
+    // The boundaries literally: <= 60 ms => 1 MiB/256, <= 150 ms => 2 MiB/128, above that => 4 MiB/64.
     [Theory]
     [InlineData(0.001, 1, 256)]
     [InlineData(1, 1, 256)]
     [InlineData(20, 1, 256)]
     [InlineData(59.999, 1, 256)]
-    [InlineData(60, 1, 256)]          // الحد الأعلى للشريحة الدنيا داخلها
-    [InlineData(60.001, 2, 128)]      // وأول ما بعده في الوسطى
+    [InlineData(60, 1, 256)]          // the lowest band's upper boundary, inside it
+    [InlineData(60.001, 2, 128)]      // and the first thing past it, in the middle band
     [InlineData(61, 2, 128)]
-    [InlineData(150, 2, 128)]         // الحد الأعلى للوسطى داخلها
-    [InlineData(150.001, 4, 64)]      // وأول ما بعده في العليا
+    [InlineData(150, 2, 128)]         // the middle band's upper boundary, inside it
+    [InlineData(150.001, 4, 64)]      // and the first thing past it, in the highest band
     [InlineData(200, 4, 64)]
     [InlineData(300, 4, 64)]
-    [InlineData(5000, 4, 64)]         // آخر رقم معقول
+    [InlineData(5000, 4, 64)]         // the last plausible number
     public void ForRoundTrip_PicksTierAtExactBoundaries(double rttMs, int expectedMiB, int expectedStreams)
     {
         var window = MuxWindow.ForRoundTrip(TimeSpan.FromMilliseconds(rttMs));
@@ -34,7 +34,7 @@ public class MuxWindowTests
         Assert.Contains(rttMs.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture), window.Reason);
     }
 
-    // قياس فاسد (حقل مفقود، ساعة قفزت، مهلة اتصال طويلة) لا يختار نافذة من قمامة ولا يرمي: الشريحة الوسطى وسبب مكتوب.
+    // A corrupt measurement (a missing field, a clock that jumped, a long connect timeout) does not choose a window from rubbish and does not throw: the middle band with a written reason.
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
@@ -42,7 +42,7 @@ public class MuxWindowTests
     [InlineData(-5_000_000)]
     [InlineData(5000.001)]
     [InlineData(30_000)]
-    [InlineData(2_147_483_647.0)] // connect_ms عند أقصى int
+    [InlineData(2_147_483_647.0)] // connect_ms at int's maximum
     public void ForRoundTrip_WithImplausibleValue_FallsBackToMiddleTier_AndSaysWhy(double rttMs)
     {
         var window = MuxWindow.ForRoundTrip(TimeSpan.FromMilliseconds(rttMs));
@@ -65,7 +65,7 @@ public class MuxWindowTests
         Assert.True(window.IsFallback);
     }
 
-    // سبب الاختيار يُسجَّل في تشخيص الجلسة، فلا يجوز أن يكون فارغًا في أي مسار.
+    // The reason for the choice is recorded in the session's diagnostics, so it may not be empty on any path.
     [Theory]
     [InlineData(10)]
     [InlineData(100)]
@@ -77,7 +77,7 @@ public class MuxWindowTests
         Assert.False(string.IsNullOrWhiteSpace(reason));
     }
 
-    // العلة الأصلية للجدول: الحاصل ثابت عند 256 MiB في كل شريحة (docs/protocol.md القسم 5، حد الذاكرة).
+    // The table's original reason: the product is fixed at 256 MiB in every band (docs/protocol.md section 5, the memory limit).
     [Theory]
     [InlineData(30)]
     [InlineData(120)]
@@ -89,9 +89,9 @@ public class MuxWindowTests
         Assert.Equal(MuxWindow.MemoryBudget, window.WorstCaseBytes);
     }
 
-    // السقف = النافذة ÷ RTT: هذا هو سبب وجود الجدول أصلًا، ولا شريحة تنزل تحت 110 Mbit/s في مداها.
+    // The ceiling = the window ÷ the RTT: this is why the table exists at all, and no band falls below 110 Mbit/s within its range.
     [Theory]
-    [InlineData(60, 139.8)]  // «≥ 140 Mbit/s» في العقد تقريب لـ 139.81 = 1 MiB ÷ 60 ms
+    [InlineData(60, 139.8)]  // ">= 140 Mbit/s" in the contract is a rounding of 139.81 = 1 MiB ÷ 60 ms
     [InlineData(150, 110)]
     [InlineData(300, 110)]
     public void EveryTier_KeepsThePerStreamCeilingAboveTheTarget(double rttMs, double minMegabits)
@@ -102,12 +102,12 @@ public class MuxWindowTests
     }
 
     [Theory]
-    [InlineData(64 * 1024, 256)]      // نافذة صغيرة لا ترفع السقف فوق 256
+    [InlineData(64 * 1024, 256)]      // a small window does not raise the ceiling above 256
     [InlineData(1 * MiB, 256)]
     [InlineData(2 * MiB, 128)]
     [InlineData(4 * MiB, 64)]
     [InlineData(8 * MiB, 32)]
-    [InlineData(512 * MiB, 1)]        // نافذة أكبر من الميزانية كلها: stream واحد لا صفر
+    [InlineData(512 * MiB, 1)]        // a window larger than the whole budget: one stream, not zero
     public void ForWindow_DerivesTheStreamLimitFromTheBudget(int window, int expectedStreams)
         => Assert.Equal(expectedStreams, MuxWindow.ForWindow(window).MaxConcurrentStreams);
 
@@ -137,7 +137,7 @@ public class MuxWindowTests
         Assert.False(MuxWindow.Default.IsFallback);
     }
 
-    // ---------- MuxOptions.Resolve: التجاوز الصريح يفوز على الاشتقاق ----------
+    // ---------- MuxOptions.Resolve: the explicit override beats the derivation ----------
 
     [Fact]
     public void Resolve_WithoutOverrides_UsesTheDerivedWindow()
@@ -157,7 +157,7 @@ public class MuxWindowTests
         var resolved = new MuxOptions { ReceiveWindow = 4 * MiB }.Resolve(MuxWindow.ForRoundTrip(TimeSpan.FromMilliseconds(20)));
 
         Assert.Equal(4 * MiB, resolved.ReceiveWindow);
-        Assert.Equal(64, resolved.MaxConcurrentStreams); // الحد يتبع النافذة المفروضة أيضًا
+        Assert.Equal(64, resolved.MaxConcurrentStreams); // the limit follows the imposed window too
         Assert.Contains("explicit", resolved.Reason);
     }
 

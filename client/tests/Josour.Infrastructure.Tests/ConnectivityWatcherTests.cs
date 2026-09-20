@@ -5,7 +5,7 @@ using Josour.Infrastructure.Tests.Support;
 namespace Josour.Infrastructure.Tests;
 
 /// <summary>
-/// Plan 8.5 (نوم الجهاز / تغيير الشبكة): waking up or changing network makes the control channel look at its connection
+/// Plan 8.5 (the machine sleeping / the network changing): waking up or changing network makes the control channel look at its connection
 /// at once instead of waiting out a backoff that was budgeted for a different problem.
 /// </summary>
 public sealed class ConnectivityWatcherTests

@@ -4,53 +4,53 @@ using System.Threading.Channels;
 namespace Josour.Tunnel.Tests.Perf;
 
 /// <summary>
-/// خصائص وصلة شبكة واحدة باتجاه واحد. الوصلة كاملة الازدواج: <see cref="LinkMedium"/> واحد لكل اتجاه.
+/// The properties of one network link in one direction. The link is full duplex: one <see cref="LinkMedium"/> per direction.
 /// </summary>
 /// <remarks>
-/// <para><b>ما يُنمذَج ولماذا:</b> ما تحته وما فوقه تيار بايتات TCP موثوق ومرتّب، فالنمذجة تقع على ما يراه
-/// المستقبل <i>بعد</i> إعادة تجميع TCP:</para>
+/// <para><b>What is modelled and why:</b> what is below and above it is a reliable, ordered TCP byte stream, so the modelling falls on what the
+/// receiver sees <i>after</i> TCP's reassembly:</para>
 /// <list type="bullet">
-///   <item><b>التأخير</b> (<see cref="OneWayLatency"/>): نصف الـ RTT في كل اتجاه. هذا هو المتغير الحاكم لبروتوكول
-///     ذي نافذة: السقف لكل stream = النافذة ÷ RTT.</item>
-///   <item><b>سقف النطاق</b> (<see cref="BitsPerSecond"/>): طابور تسلسل (serialization) مشترك؛ الكتابة الثانية
-///     لا تبدأ قبل أن تفرغ الأولى من السلك. مشاركة نفس <see cref="LinkMedium"/> بين عدة streams تعطي
-///     عنق زجاجة واحدًا مشتركًا كما في وصلة حقيقية.</item>
-///   <item><b>الارتجاف</b> (<see cref="Jitter"/>): تباين في زمن الوصول، <b>بلا</b> إعادة ترتيب — المستقبل خلف TCP
-///     لا يرى إعادة ترتيب أبدًا، بل تباينًا في وقت تسليم البايتات. الوصول مقيَّد بالرتابة لهذا السبب.</item>
-///   <item><b>الفقد</b> (<see cref="LossRate"/>): لا يمكن «إسقاط» بايتات من تيار موثوق دون إفساده. الفقد يظهر
-///     للطبقة الأعلى كـ <b>حجب رأس الطابور</b>: الحزمة المفقودة تؤخر كل ما بعدها حتى تُعاد. لذلك يُنمذَج
-///     كتأخير تراكمي (<see cref="LossPenalty"/> لكل حزمة مفقودة) يصيب البايتات التالية كلها.</item>
+///   <item><b>The delay</b> (<see cref="OneWayLatency"/>): half the RTT in each direction. This is the governing variable for a windowed
+///     protocol: the per-stream ceiling = the window ÷ the RTT.</item>
+///   <item><b>The bandwidth ceiling</b> (<see cref="BitsPerSecond"/>): a shared serialisation queue; the second write
+///     does not start before the first has left the wire. Sharing the same <see cref="LinkMedium"/> between several streams gives
+///     one shared bottleneck, as on a real link.</item>
+///   <item><b>The jitter</b> (<see cref="Jitter"/>): variation in the arrival time, <b>with no</b> reordering — the receiver behind TCP
+///     never sees reordering, but variation in when the bytes are delivered. Arrival is constrained to be monotonic for that reason.</item>
+///   <item><b>The loss</b> (<see cref="LossRate"/>): bytes cannot be "dropped" from a reliable stream without corrupting it. Loss appears
+///     to the layer above as <b>head-of-line blocking</b>: the lost packet delays everything after it until it is retransmitted. So it is modelled
+///     as a cumulative delay (<see cref="LossPenalty"/> per lost packet) affecting all the following bytes.</item>
 /// </list>
-/// <para><b>ما لا يُنمذَج:</b> نافذة ازدحام TCP وبدؤها البطيء (slow start). أي أن الأرقام <i>متفائلة</i> بمقدار
-/// أول بضع RTT من كل اتصال TCP؛ ذلك يصب في مصلحة القياس المحافظ لأن النفق اتصال واحد طويل العمر
-/// (يدفع بدء بطيء واحدًا) بينما المسار المباشر يفتح اتصالًا لكل مورد (يدفعه لكل مورد).</para>
+/// <para><b>What is not modelled:</b> TCP's congestion window and its slow start. That is, the numbers are <i>optimistic</i> by the first few RTTs
+/// of every TCP connection; that favours a conservative measurement, because the tunnel is one long-lived connection
+/// (paying one slow start) while the direct path opens a connection per resource (paying it per resource).</para>
 /// </remarks>
 internal sealed record LinkProfile
 {
-    /// <summary>تأخير الاتجاه الواحد = RTT ÷ 2.</summary>
+    /// <summary>The one-way delay = the RTT ÷ 2.</summary>
     public TimeSpan OneWayLatency { get; init; } = TimeSpan.Zero;
 
-    /// <summary>تباين موحّد ± حول التأخير. لا يعيد الترتيب (انظر ملاحظات النوع).</summary>
+    /// <summary>A uniform ± variation around the delay. It does not reorder (see the type's notes).</summary>
     public TimeSpan Jitter { get; init; } = TimeSpan.Zero;
 
-    /// <summary>سقف النطاق بالبت/الثانية؛ 0 = بلا سقف.</summary>
+    /// <summary>The bandwidth ceiling in bits/second; 0 = no ceiling.</summary>
     public long BitsPerSecond { get; init; }
 
-    /// <summary>احتمال فقد الحزمة (لكل <see cref="PacketBytes"/> بايت)؛ 0 = بلا فقد.</summary>
+    /// <summary>The packet loss probability (per <see cref="PacketBytes"/> bytes); 0 = no loss.</summary>
     public double LossRate { get; init; }
 
-    /// <summary>عقوبة إعادة الإرسال لكل حزمة مفقودة (RTO). الافتراضي 200 ms كأدنى RTO في TCP.</summary>
+    /// <summary>The retransmission penalty per lost packet (an RTO). The default is 200 ms, TCP's minimum RTO.</summary>
     public TimeSpan LossPenalty { get; init; } = TimeSpan.FromMilliseconds(200);
 
-    /// <summary>حجم «الحزمة» لحساب الفقد (MSS نموذجي).</summary>
+    /// <summary>The "packet" size used to compute the loss (a typical MSS).</summary>
     public int PacketBytes { get; init; } = 1460;
 
-    /// <summary>أقصى امتلاء لطابور السلك قبل أن يُبطَّأ الكاتب (نمذجة مخزن محدود بدل نمو بلا حد).</summary>
+    /// <summary>The largest the wire's queue may fill before the writer is slowed (modelling a bounded buffer rather than unbounded growth).</summary>
     public TimeSpan MaxQueue { get; init; } = TimeSpan.FromSeconds(1);
 
     public TimeSpan Rtt => OneWayLatency * 2;
 
-    /// <summary>ملف بـ RTT بالمللي ثانية (يُقسَم على الاتجاهين) وسقف نطاق اختياري بالميغابت/الثانية.</summary>
+    /// <summary>A profile with an RTT in milliseconds (split between the two directions) and an optional bandwidth ceiling in megabits/second.</summary>
     public static LinkProfile FromRtt(double rttMs, double megabitsPerSecond = 0) => new()
     {
         OneWayLatency = TimeSpan.FromMilliseconds(rttMs / 2.0),
@@ -67,12 +67,12 @@ internal sealed record LinkProfile
     }
 }
 
-/// <summary>ما يُحسب لكتابة واحدة: متى تصل، وكم يبلغ امتلاء طابور السلك وقتها.</summary>
+/// <summary>What is computed for one write: when it arrives, and how full the wire's queue is at that moment.</summary>
 internal readonly record struct LinkSchedule(double ArrivalMs, double QueueMs);
 
 /// <summary>
-/// السلك نفسه باتجاه واحد: ساعة مشتركة، طابور تسلسل مشترك، وتأخير تراكمي من الفقد.
-/// عدة <see cref="LatencyStream"/> تتشارك نسخة واحدة ⇒ تتشارك عنق الزجاجة نفسه.
+/// The wire itself in one direction: a shared clock, a shared serialisation queue, and a cumulative delay from the loss.
+/// Several <see cref="LatencyStream"/>s sharing one instance => they share the same bottleneck.
 /// </summary>
 internal sealed class LinkMedium
 {
@@ -96,7 +96,7 @@ internal sealed class LinkMedium
     public long BytesScheduled { get { lock (_gate) return _bytes; } }
     public long LossEvents { get { lock (_gate) return _lossEvents; } }
 
-    /// <summary>يحجز السلك لهذه الكتابة ويعيد وقت وصولها المطلق على ساعة السلك.</summary>
+    /// <summary>It reserves the wire for this write and returns its absolute arrival time on the wire's clock.</summary>
     public LinkSchedule Schedule(int bytes, double nowMs)
     {
         lock (_gate)
@@ -120,7 +120,7 @@ internal sealed class LinkMedium
                 ? (_random.NextDouble() * 2 - 1) * Profile.Jitter.TotalMilliseconds
                 : 0;
             var arrival = _freeAtMs + Profile.OneWayLatency.TotalMilliseconds + _lossDelayMs + jitterMs;
-            // تيار بايتات لا يعيد الترتيب: الوصول رتيب مهما فعل الارتجاف.
+            // A byte stream does not reorder: the arrival is monotonic whatever the jitter does.
             if (arrival < _lastArrivalMs) arrival = _lastArrivalMs;
             _lastArrivalMs = arrival;
             _bytes += bytes;
@@ -130,9 +130,9 @@ internal sealed class LinkMedium
 }
 
 /// <summary>
-/// غلاف <see cref="Stream"/> يحوّل وصلة loopback إلى وصلة واسعة النطاق: الكتابة تُجدوَل على
-/// <see cref="LinkMedium"/> وتُسلَّم إلى الـ stream الداخلي في وقتها؛ القراءة تمرّ كما هي (التأخير مطبَّق
-/// بالفعل على الطرف الكاتب). التركيب: مقبس خام ← LatencyStream ← TLS ← Mux.
+/// A <see cref="Stream"/> wrapper that turns a loopback link into a wide-area one: the write is scheduled on
+/// <see cref="LinkMedium"/> and delivered to the inner stream at its time; the read passes through as it is (the delay was already applied
+/// at the writing end). The composition: a raw socket -> LatencyStream -> TLS -> the mux.
 /// </summary>
 internal sealed class LatencyStream : Stream
 {
@@ -171,7 +171,7 @@ internal sealed class LatencyStream : Stream
         if (buffer.Length == 0) return;
         var schedule = _medium.Schedule(buffer.Length, _medium.NowMs);
         var overflowMs = schedule.QueueMs - _medium.Profile.MaxQueue.TotalMilliseconds;
-        // مخزن محدود: الكاتب يُبطَّأ بدل أن ينمو الطابور بلا حد (كما يفعل ضغط TCP العكسي).
+        // A bounded buffer: the writer is slowed rather than the queue growing without bound (as TCP's backpressure does).
         if (overflowMs > 0) await Task.Delay(TimeSpan.FromMilliseconds(overflowMs), cancellationToken).ConfigureAwait(false);
         if (!_queue.Writer.TryWrite(new Segment(buffer.ToArray(), schedule.ArrivalMs)))
             throw new IOException("link is closed");
@@ -189,7 +189,7 @@ internal sealed class LatencyStream : Stream
             {
                 while (_queue.Reader.TryRead(out var segment))
                 {
-                    // أوقات الوصول مطلقة، فخطأ مؤقّت واحد لا يتراكم على ما بعده.
+                    // The arrival times are absolute, so one timer error does not accumulate onto what follows.
                     var waitMs = segment.ArrivalMs - _medium.NowMs;
                     if (waitMs > 0.5) await Task.Delay(TimeSpan.FromMilliseconds(waitMs), ct).ConfigureAwait(false);
                     await _inner.WriteAsync(segment.Data, ct).ConfigureAwait(false);
@@ -198,7 +198,7 @@ internal sealed class LatencyStream : Stream
             }
         }
         catch (OperationCanceledException) { }
-        catch (Exception) { /* الطرف الآخر أغلق المقبس */ }
+        catch (Exception) { /* the other side closed the socket */ }
     }
 
     public override void Flush() { }
@@ -208,7 +208,7 @@ internal sealed class LatencyStream : Stream
     public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
     public override void SetLength(long value) => throw new NotSupportedException();
 
-    /// <summary>يُفرِّغ ما تبقى في السلك (بحد أقصى) ثم يغلق.</summary>
+    /// <summary>It drains what is left on the wire (with a ceiling) and then closes.</summary>
     public async Task DrainAsync(TimeSpan timeout)
     {
         _queue.Writer.TryComplete();
@@ -220,10 +220,10 @@ internal sealed class LatencyStream : Stream
         if (disposing && Interlocked.Exchange(ref _disposed, 1) == 0)
         {
             _queue.Writer.TryComplete();
-            // مهلة قصيرة لتسليم ما في السلك، ثم إسقاط النقل.
-            try { _pump.Wait(TimeSpan.FromMilliseconds(250)); } catch { /* تجاهل */ }
+            // A short timeout to deliver what is on the wire, then the transport is dropped.
+            try { _pump.Wait(TimeSpan.FromMilliseconds(250)); } catch { /* ignore */ }
             _cts.Cancel();
-            if (_ownsInner) { try { _inner.Dispose(); } catch { /* تجاهل */ } }
+            if (_ownsInner) { try { _inner.Dispose(); } catch { /* ignore */ } }
             _cts.Dispose();
         }
         base.Dispose(disposing);
@@ -234,16 +234,16 @@ internal sealed class LatencyStream : Stream
         if (Interlocked.Exchange(ref _disposed, 1) == 0)
         {
             _queue.Writer.TryComplete();
-            try { await _pump.WaitAsync(TimeSpan.FromMilliseconds(250)).ConfigureAwait(false); } catch { /* تجاهل */ }
+            try { await _pump.WaitAsync(TimeSpan.FromMilliseconds(250)).ConfigureAwait(false); } catch { /* ignore */ }
             _cts.Cancel();
-            if (_ownsInner) { try { await _inner.DisposeAsync().ConfigureAwait(false); } catch { /* تجاهل */ } }
+            if (_ownsInner) { try { await _inner.DisposeAsync().ConfigureAwait(false); } catch { /* ignore */ } }
             _cts.Dispose();
         }
         GC.SuppressFinalize(this);
     }
 }
 
-/// <summary>وصلة كاملة الازدواج: وسطان (اتجاه لكل طرف) يُغلِّفان طرفَي زوج مقابس.</summary>
+/// <summary>A full-duplex link: two media (one direction per side) wrapping the two ends of a socket pair.</summary>
 internal sealed class SimulatedLink
 {
     public SimulatedLink(LinkProfile profile, int seed = 20260905)
@@ -254,7 +254,7 @@ internal sealed class SimulatedLink
     }
 
     public LinkProfile Profile { get; }
-    /// <summary>السلك من الطرف A إلى B (يُطبَّق على كتابات A).</summary>
+    /// <summary>The wire from end A to B (applied to A's writes).</summary>
     public LinkMedium AtoB { get; }
     public LinkMedium BtoA { get; }
 

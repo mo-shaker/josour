@@ -6,7 +6,7 @@ using Josour.Tunnel.Transport;
 
 namespace Josour.Tunnel.Tests.Transport;
 
-/// <summary>مقدمة الـ Relay ورده: الترميز والتحليل وحالات الرفض (ADR-0003 البند 5).</summary>
+/// <summary>The relay's preamble and its reply: the encoding, the parsing and the refusal cases (ADR-0003 item 5).</summary>
 public class RelayProtocolTests
 {
     private const string Token = "eyJhbGciOiJIUzI1NiJ9.relay-session-token";
@@ -23,7 +23,7 @@ public class RelayProtocolTests
         Assert.True(bytes.AsSpan(0, 4).SequenceEqual("RBRL"u8));
         Assert.Equal(RelayProtocol.Version, bytes[4]);
         Assert.Equal(roleByte, bytes[5]);
-        // معرّف الجلسة بترتيب AUTH1 نفسه (RFC 4122 big-endian) لا ترتيب Guid الافتراضي
+        // The session id in AUTH1's own order (RFC 4122 big-endian) rather than Guid's default order
         Assert.True(bytes.AsSpan(6, 16).SequenceEqual(AuthHandshake.SessionIdBytes(sessionId)));
 
         Assert.True(RelayProtocol.TryParsePreamble(bytes, out var parsed, out var error));

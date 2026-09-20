@@ -6,11 +6,11 @@ using Josour.Tunnel.Transport;
 namespace Josour.Tunnel.Tests.Transport;
 
 /// <summary>
-/// الفرق بين النقلين فرق <b>مصدر العنوان</b> لا فرق تشدد، وهذه الاختبارات تثبّت الطرفين معًا.
+/// The difference between the two transports is a difference of <b>where the address comes from</b> rather than of strictness, and these tests pin both sides.
 ///
-/// <para>عنوان الـ Relay يأتي من خادمنا في <c>session.created.relay</c> وهو اسم مضيف بحكم التصميم؛ أما
-/// المرشحون فيأتون من النظير ويشترط العقد أن يكونوا عناوين حرفية. توسيع <see cref="DirectTransport"/> ليقبل
-/// الأسماء كان سيجعل النظير قادرًا على دفعنا لحلّ ما يختاره، فبقي صارمًا وأُضيف نقل ثانٍ.</para>
+/// <para>The relay's address comes from our server in <c>session.created.relay</c> and is a hostname by design; the
+/// candidates, however, come from the peer and the contract requires them to be address literals. Widening <see cref="DirectTransport"/> to accept
+/// names would have let the peer make us resolve whatever it chose, so it stayed strict and a second transport was added.</para>
 /// </summary>
 public class ResolvingTransportTests
 {

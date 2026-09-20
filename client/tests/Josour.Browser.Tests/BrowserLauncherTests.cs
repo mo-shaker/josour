@@ -8,7 +8,7 @@ public class BrowserLauncherTests
     [Fact]
     public async Task NonWindows_LaunchFailsWithClearMessage()
     {
-        if (OperatingSystem.IsWindows()) return; // على Windows هذا يشغّل متصفحًا فعليًا؛ يُغطى بأداة Spike browser
+        if (OperatingSystem.IsWindows()) return; // on Windows this launches a real browser; it is covered by the Spike browser tool
         await using var launcher = new BrowserLauncher(NullRegistryReader.Instance);
         Assert.False(launcher.IsRunning);
         Assert.False(launcher.OwnsProcess(Environment.ProcessId));
@@ -20,7 +20,7 @@ public class BrowserLauncherTests
         Assert.Contains("Windows-only", result.Detail);
         Assert.False(launcher.IsRunning);
         Assert.False(launcher.InstanceHandoff);
-        await launcher.CloseAsync(TimeSpan.FromSeconds(1), CancellationToken.None); // لا شيء يُغلق ولا يرمي
+        await launcher.CloseAsync(TimeSpan.FromSeconds(1), CancellationToken.None); // nothing to close, and it does not throw
     }
 
     [Fact]

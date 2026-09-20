@@ -68,7 +68,7 @@ public class EgressPolicyTests
     [Fact]
     public async Task DnsFailure_IsDnsFailed()
     {
-        var resolver = new StubResolver(); // لا يعرف شيئًا
+        var resolver = new StubResolver(); // it knows nothing
         var policy = Create(resolver);
         var result = await policy.OpenAsync("allowed.example", 443, CancellationToken.None);
         Assert.Equal(OpenFailReason.DnsFailed, result.Reason);

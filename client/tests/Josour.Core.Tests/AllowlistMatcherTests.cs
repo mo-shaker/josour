@@ -151,7 +151,7 @@ public class AllowlistMatcherTests
     [Fact]
     public void IsAllowed_FailsClosedForUnnormalizedHost()
     {
-        // العقد: الاسم مطبَّع قبل الاستدعاء. اسم غير مطبَّع لا يطابق (لا يُمنح صلاحية بالخطأ).
+        // The contract: the name is normalised before the call. An unnormalised name does not match (no permission is granted by mistake).
         var matcher = AllowlistMatcher.Parse(1, new[] { "example.com" });
         Assert.False(matcher.IsAllowed("EXAMPLE.COM", 443, DefaultPorts));
         Assert.False(matcher.IsAllowed("example.com.", 443, DefaultPorts));

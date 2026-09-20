@@ -99,7 +99,7 @@ public class NerdbankMuxTests
         await stream.WriteAsync(Encoding.ASCII.GetBytes("GET"));
         await ((IHalfClosable)stream).CompleteWritingAsync(CancellationToken.None);
 
-        // الطرف البعيد يرى البيانات ثم FIN (Shutdown(Send) على المضيف) ويستطيع الرد بعدها
+        // The far end sees the data then a FIN (Shutdown(Send) at the host) and can reply afterwards
         var buffer = new byte[16];
         var n = await far.ReceiveAsync(buffer, SocketFlags.None).WaitAsync(Timeout);
         Assert.Equal("GET", Encoding.ASCII.GetString(buffer, 0, n));
@@ -172,14 +172,14 @@ public class NerdbankMuxTests
     [Fact]
     public async Task TransportDies_WithoutGoAway_FaultsCompletion()
     {
-        // انقطاع شبكة أو موت عملية الطرف الآخر: لا GOAWAY، النقل ينتهي فجأة.
-        // يجب أن يظهر عطلًا حتى لا يبلّغ التطبيق الخادم بإنهاء عادي.
+        // A network drop or the other side's process dying: no GOAWAY, the transport ends abruptly.
+        // It must surface as a fault so the application does not tell the server of an ordinary end.
         await using var pair = await MuxPair.CreateAsync(blackholeGuest: true);
-        pair.GuestRaw!.Dispose(); // قطع المقبس فجأة: لا GOAWAY ولا إغلاق مرتب
+        pair.GuestRaw!.Dispose(); // cutting the socket abruptly: no GOAWAY and no orderly close
 
         var e = await Assert.ThrowsAsync<MuxClosedException>(() => pair.Host.Completion.WaitAsync(Timeout));
-        // أيّ المسارات سبق (حلقة التحكم، أو نهاية النقل بلا GOAWAY، أو عطل قراءة على المقبس المقطوع)
-        // فالنتيجة عطل لا إغلاق نظيف. المهم أن Completion لا يكتمل بنجاح.
+        // Whichever path got there first (the control loop, or the transport ending with no GOAWAY, or a read fault on the cut socket),
+        // the result is a fault rather than a clean close. What matters is that Completion does not complete successfully.
         Assert.True(e.Message.Contains("closed by peer", StringComparison.OrdinalIgnoreCase)
                     || e.Message.Contains("dead", StringComparison.OrdinalIgnoreCase)
                     || e.Message.Contains("faulted", StringComparison.OrdinalIgnoreCase), e.Message);
@@ -189,8 +189,8 @@ public class NerdbankMuxTests
     [Fact]
     public async Task Liveness_DeclaresTunnelDead_WhenPongsStop()
     {
-        // حيوية على المضيف وحده: لو فحص Guest حيويته أيضًا لأغلق نقله أولًا،
-        // فيصل المضيف إلى EOF قبل أن تنضج مهلة الـ PONG ويصير الاختبار سباقًا.
+        // Liveness on the host alone: if the guest checked its liveness too it would close its transport first,
+        // so the host would reach EOF before the PONG timeout matured and the test would become a race.
         var hostOptions = new MuxOptions { PingInterval = TimeSpan.FromMilliseconds(100), DeadAfter = TimeSpan.FromMilliseconds(600) };
         var guestOptions = new MuxOptions { EnableLiveness = false };
         await using var pair = await MuxPair.CreateAsync(guestOptions, hostOptions, blackholeGuest: true);
@@ -214,7 +214,7 @@ public class NerdbankMuxTests
         await ((IHalfClosable)stream).CompleteWritingAsync(CancellationToken.None);
         Assert.Equal(100_000, await StreamIo.ReadToEndAsync(stream).WaitAsync(Timeout));
 
-        // ما يرصده المضيف (استلامه، الإغلاق النصفي، وعدّاداته) يستقر بعد اكتمال قراءتنا بقليل.
+        // What the host observes (its receipt, the half-close, and its counters) settles shortly after our read completes.
         var deadline = DateTime.UtcNow.AddSeconds(5);
         while (DateTime.UtcNow < deadline
                && !(target.PeerHalfClosed && target.Received == 50_000
@@ -258,7 +258,7 @@ public class NerdbankMuxTests
         await Assert.ThrowsAsync<ArgumentException>(() => pair.Guest.OpenStreamAsync("::1", 443, CancellationToken.None));
     }
 
-    // ---------- النافذة وحد الـ streams (docs/protocol.md القسم 5 بعد تعديل الأسبوع 5) ----------
+    // ---------- The window and the stream limit (docs/protocol.md section 5 after the week-5 amendment) ----------
 
     [Fact]
     public async Task Window_WithoutDerivation_IsTheContractDefault()
@@ -279,8 +279,8 @@ public class NerdbankMuxTests
     }
 
     /// <summary>
-    /// حجز مكان الـ stream عند الضيف قبل العرض: ما يتجاوز الحد يُرد فورًا بـ limit ولا يزعج المضيف،
-    /// والمكان يعود عند التخلص من الـ stream. (حد المضيف على السلك يفرضه StreamLimiter في Egress.)
+    /// Reserving the stream's slot at the guest before offering: what exceeds the limit is answered immediately with limit and does not trouble the host,
+    /// and the slot comes back when the stream is disposed. (The host's limit on the wire is enforced by StreamLimiter in Egress.)
     /// </summary>
     [Fact]
     public async Task Open_BeyondTheStreamLimit_IsRejectedLocally_AndRecoversAfterClose()
@@ -302,7 +302,7 @@ public class NerdbankMuxTests
         Assert.True(second.IsOpen);
         Assert.False(third.IsOpen);
         Assert.Equal(OpenFailReason.Limit, third.Reason);
-        Assert.Equal(2, Volatile.Read(ref reachedHost)); // الثالث لم يصل إلى المضيف أصلًا
+        Assert.Equal(2, Volatile.Read(ref reachedHost)); // the third never reached the host at all
         Assert.Equal(2, pair.Guest.Stats.OpenStreams);
 
         await first.Stream!.DisposeAsync();
@@ -323,15 +323,15 @@ public class NerdbankMuxTests
         for (var i = 0; i < 5; i++)
         {
             var open = await pair.Guest.OpenStreamAsync("blocked.test", 443, CancellationToken.None).WaitAsync(Timeout);
-            Assert.Equal(OpenFailReason.NotAllowed, open.Reason); // لا limit: الحجز يعود في كل مرة
+            Assert.Equal(OpenFailReason.NotAllowed, open.Reason); // no limit: the reservation comes back every time
         }
         Assert.Equal(0, pair.Guest.Stats.OpenStreams);
     }
 
     /// <summary>
-    /// الأساس الذي يسمح لكل طرف باشتقاق نافذته من قياسه هو: نافذة الاستقبال في بروتوكول Nerdbank 3 خاصية
-    /// <b>المستقبل</b> وتُعلَن في إطار العرض/القبول، فالضغط العكسي في كل اتجاه يتبع نافذة مستقبله لا نافذة مرسله.
-    /// هنا الشريحتان مختلفتان عمدًا: الضيف 1 MiB والمضيف 4 MiB.
+    /// The basis that lets each side derive its window from its own measurement: the receiving window in Nerdbank protocol 3 is the
+    /// <b>receiver's</b> property and is announced in the offer/accept frame, so the backpressure in each direction follows its receiver's window rather than its sender's.
+    /// Here the two bands are deliberately different: the guest 1 MiB and the host 4 MiB.
     /// </summary>
     [Fact]
     public async Task Windows_AreAdvertisedPerReceiver_SoTheTwoSidesMayDiffer()
@@ -342,12 +342,12 @@ public class NerdbankMuxTests
             new MuxOptions { EnableLiveness = false, ReceiveWindow = guestWindow },
             new MuxOptions { EnableLiveness = false, ReceiveWindow = hostWindow });
 
-        // القناة المزروعة (PING/PONG/GOAWAY) تعمل في الاتجاهين رغم اختلاف الشريحتين.
+        // The seeded channel (PING/PONG/GOAWAY) works in both directions despite the different bands.
         await pair.Guest.PingAsync(CancellationToken.None).WaitAsync(Timeout);
         await pair.Host.PingAsync(CancellationToken.None).WaitAsync(Timeout);
 
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var target = new TestTarget(produce: 32 * 1024 * 1024, gate: gate); // مستهلك متوقف + منتج بلا توقف
+        var target = new TestTarget(produce: 32 * 1024 * 1024, gate: gate); // a stalled consumer + a producer that does not stop
         pair.Host.OpenRequested = (_, _) => Task.FromResult(MuxOpenDecision.Ok(target));
         var open = await pair.Guest.OpenStreamAsync("both.test", 443, CancellationToken.None).WaitAsync(Timeout);
         var stream = open.Stream!;
@@ -363,13 +363,13 @@ public class NerdbankMuxTests
             }
         });
 
-        // الاتجاهان يتوقفان عند نافذة مستقبلهما؛ ننتظر استقرار الرقمين معًا (ولا نقرأ نحن شيئًا).
+        // Both directions stop at their receiver's window; we wait for both numbers to settle (and we read nothing ourselves).
         var guestToHost = await Plateau(() => Volatile.Read(ref written));
         var hostToGuest = await Plateau(() => target.Produced);
 
-        // Guest → Host محكوم بنافذة المضيف (4 MiB) لا بنافذة الضيف (1 MiB).
+        // Guest -> Host is governed by the host's window (4 MiB), not the guest's (1 MiB).
         Assert.InRange(guestToHost, 3 * 1024L * 1024, 8 * 1024L * 1024);
-        // Host → Guest محكوم بنافذة الضيف (1 MiB) لا بنافذة المضيف.
+        // Host -> Guest is governed by the guest's window (1 MiB), not the host's.
         Assert.InRange(hostToGuest, 1024L * 1024, 3 * 1024L * 1024);
         Assert.True(guestToHost > hostToGuest, $"{guestToHost} vs {hostToGuest}");
 
@@ -378,7 +378,7 @@ public class NerdbankMuxTests
         await Task.WhenAny(writer, Task.Delay(Timeout));
     }
 
-    /// <summary>ينتظر توقف عدّاد عن النمو (نقطة الضغط العكسي) ثم يعيد قيمته.</summary>
+    /// <summary>It waits for a counter to stop growing (the backpressure point) and then returns its value.</summary>
     private static async Task<long> Plateau(Func<long> counter)
     {
         var last = counter();
@@ -390,7 +390,7 @@ public class NerdbankMuxTests
             var now = counter();
             stable = now == last ? stable + 1 : 0;
             last = now;
-            if (stable >= 4) return now; // 400 ms بلا حركة = وقف تام
+            if (stable >= 4) return now; // 400 ms with no movement = a full stop
         }
         return last;
     }

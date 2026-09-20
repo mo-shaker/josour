@@ -3,7 +3,7 @@ using Josour.Core.Net;
 
 namespace Josour.Core.Tests;
 
-/// <summary>IWebProxy ملفَّق: يمثل ما يعيده WinHTTP على Windows أو متغيرات البيئة على غيرها.</summary>
+/// <summary>A fake IWebProxy: it stands in for what WinHTTP returns on Windows or the environment variables elsewhere.</summary>
 internal sealed class FakeWebProxy : IWebProxy
 {
     private readonly Uri? _proxy;
@@ -73,7 +73,7 @@ public class SystemProxyResolverTests
     [Fact]
     public void PrivateOrLoopbackProxyAddress_IsAllowed()
     {
-        // Proxy الشركات يسكن عادةً 10.x أو 127.0.0.1؛ مصدره إعداد الجهاز لا الطلب، فلا يخضع لحظر العناوين الخاصة.
+        // A corporate proxy usually lives on 10.x or 127.0.0.1; its source is the machine's configuration rather than the request, so it is not subject to the private-address block.
         Assert.Equal("10.0.0.8", Resolver(new FakeWebProxy("http://10.0.0.8:3128")).Resolve(new Uri("https://news.example/"))!.Host);
         Assert.Equal("127.0.0.1", Resolver(new FakeWebProxy("http://127.0.0.1:8888")).Resolve(new Uri("https://news.example/"))!.Host);
     }
@@ -81,7 +81,7 @@ public class SystemProxyResolverTests
     [Fact]
     public void NonHttpProxyScheme_IsIgnored()
     {
-        // SOCKS لا يتكلمه هذا المسار؛ التظاهر بأنه HTTP يعطي فشلًا صامتًا.
+        // SOCKS is not spoken on this path; pretending it is HTTP gives a silent failure.
         Assert.Null(Resolver(new FakeWebProxy("socks5://proxy.corp.example:1080")).Resolve(new Uri("https://news.example/")));
     }
 
@@ -119,7 +119,7 @@ public class SystemProxyResolverTests
     [Fact]
     public void DefaultResolver_NeverThrows()
     {
-        // يقرأ إعدادات الجهاز الحقيقية: القيمة تختلف بالبيئة، لكن لا يرمي.
+        // It reads the machine's real settings: the value varies with the environment, but it does not throw.
         var endpoint = SystemProxyResolver.Default.Resolve(new Uri("https://example.com/"));
         Assert.True(endpoint is null || endpoint.Port is > 0 and <= 65535);
     }

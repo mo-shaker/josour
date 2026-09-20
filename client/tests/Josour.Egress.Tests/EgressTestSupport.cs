@@ -4,7 +4,7 @@ using Josour.Core.Net;
 
 namespace Josour.Egress.Tests;
 
-/// <summary>محلل أسماء ثابت للاختبارات: اسم → عناوين، أو استثناء.</summary>
+/// <summary>A fixed name resolver for the tests: a name -> addresses, or an exception.</summary>
 internal sealed class StubResolver : IHostResolver
 {
     private readonly Dictionary<string, IPAddress[]> _map = new(StringComparer.Ordinal);
@@ -25,7 +25,7 @@ internal sealed class StubResolver : IHostResolver
     }
 }
 
-/// <summary>مستمع TCP محلي يمثل الموقع الوجهة.</summary>
+/// <summary>A local TCP listener standing in for the destination site.</summary>
 internal sealed class LocalOrigin : IDisposable
 {
     private readonly TcpListener _listener;
@@ -55,6 +55,6 @@ internal sealed class LocalOrigin : IDisposable
 
 internal static class Policies
 {
-    /// <summary>يسمح بـ loopback فقط داخل الاختبارات (سياسة النطاقات الحقيقية تحظره).</summary>
+    /// <summary>It permits loopback only inside the tests (the real range policy blocks it).</summary>
     public static readonly Func<IPAddress, bool> AllowLoopbackOnly = a => !IPAddress.IsLoopback(a) && IpRangePolicy.IsBlocked(a);
 }

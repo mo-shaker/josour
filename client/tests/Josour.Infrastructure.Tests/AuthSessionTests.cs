@@ -372,7 +372,7 @@ public sealed class AuthSessionTests
         Assert.Equal(AuthSession.MaxDeviceNameLength, device.GetProperty("name").GetString()!.Length);
         Assert.Equal(AuthSession.MaxOsVersionLength, device.GetProperty("os_version").GetString()!.Length);
         Assert.Equal(AuthSession.MaxOsBuildLength, device.GetProperty("os_build").GetString()!.Length);
-        // مشتق من المصدر لا مثبّت يدويًا: الحد يطابق طول عمود os_version في قاعدة البيانات (100).
+        // Derived from the source rather than pinned by hand: the limit matches the os_version column's length in the database (100).
         var provider = new LongDeviceInfoProvider();
         Assert.Equal(provider.OsVersion[..AuthSession.MaxOsVersionLength], device.GetProperty("os_version").GetString());
         Assert.Equal(provider.DeviceName[..AuthSession.MaxDeviceNameLength], device.GetProperty("name").GetString());

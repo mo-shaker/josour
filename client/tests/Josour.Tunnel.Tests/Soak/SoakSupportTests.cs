@@ -1,8 +1,8 @@
 namespace Josour.Tunnel.Tests.Soak;
 
 /// <summary>
-/// وحدات أداة التحمّل نفسها. تعمل في ثوانٍ وتبقى في المجموعة الافتراضية عمدًا: أداة قياس لا يقيسها أحد تصدأ
-/// بصمت، فتعطي «لا تسريب» لأنها لا ترى شيئًا. هنا يُثبت أنها ترى نموًّا حين يوجد، وتراه صفرًا حين لا يوجد.
+/// Units for the soak tool itself. They run in seconds and stay in the default suite deliberately: a measuring instrument nobody measures rusts
+/// silently, and then reports "no leak" because it sees nothing. Here it is proved that it sees growth when there is growth, and sees zero when there is none.
 /// </summary>
 public class SoakSupportTests
 {
@@ -23,7 +23,7 @@ public class SoakSupportTests
     [Fact]
     public void Trend_OnAMonotonicSeries_ReportsTheGrowthAndTheHourlySlope()
     {
-        // مليون بايت في كل عيّنة، وعيّنة كل 15 ثانية ⇒ 240 مليون بايت في الساعة.
+        // A million bytes per sample, with a sample every 15 seconds => 240 million bytes an hour.
         var samples = Enumerable.Range(0, 20).Select(i => At(i * 15, 10_000_000 + i * 1_000_000d)).ToList();
         var trend = Trend.Of(samples, s => s.ManagedHeapBytes);
 
@@ -34,8 +34,8 @@ public class SoakSupportTests
     }
 
     /// <summary>
-    /// تذبذب محدود (تخصيص وجمع) لا يُقرأ تسريبًا: النصفان متساويان، والميل أصغر بمرتبة على الأقل من ميل نموّ
-    /// حقيقي بالسعة نفسها. المقارنة بميل مرجعي لا برقم مطلق، لأن استقراء «لكل ساعة» من نافذة دقائق يضخّم أي بقية.
+    /// A bounded oscillation (allocating and collecting) is not read as a leak: the two halves are equal, and the slope is at least an order of magnitude smaller than a real
+    /// growth's slope at the same amplitude. The comparison is against a reference slope rather than an absolute number, because extrapolating "per hour" from a window of minutes magnifies any remainder.
     /// </summary>
     [Fact]
     public void Trend_OnAnOscillatingSeries_IsNotReadAsGrowth()
@@ -83,7 +83,7 @@ public class SoakSupportTests
         Assert.True(defaults.RttMs >= 0);
     }
 
-    /// <summary>عدّاد الموارد يعطي رقمًا معقولًا على هذا النظام، وإلا كان «لا نمو» جملة بلا مصدر.</summary>
+    /// <summary>The resource counter returns a plausible number on this system, otherwise "no growth" would be a sentence with no source.</summary>
     [Fact]
     public void ProcessProbe_ReadsSomethingOnThisPlatform()
     {

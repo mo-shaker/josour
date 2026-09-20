@@ -6,8 +6,8 @@ using Josour.Tunnel.Mux;
 namespace Josour.Tunnel.Tests;
 
 /// <summary>
-/// دورة حياة <see cref="TunnelSession"/> بقطع وهمية (بلا Egress ولا Proxy حقيقيين؛ هذان في اختبارات E2E):
-/// التجهيز، الحالات، موت النفق، وترتيب التنظيف في docs/protocol.md القسم 7.
+/// <see cref="TunnelSession"/>'s lifecycle with fake pieces (no real Egress and no real Proxy; those are in the E2E tests):
+/// the preparation, the states, the tunnel dying, and the cleanup order in docs/protocol.md section 7.
 /// </summary>
 public class TunnelSessionTests
 {
@@ -51,14 +51,14 @@ public class TunnelSessionTests
         Assert.Equal(new[] { TunnelState.Listening }, states);
         Assert.False(session.CertificateDisposed);
 
-        // المستمع يقبل اتصالًا فعلًا
+        // The listener really does accept a connection
         using var probe = new TcpClient();
         await probe.ConnectAsync(IPAddress.Loopback, session.ListenPort).WaitAsync(Timeout);
         Assert.True(probe.Connected);
 
         Assert.Equal("198.51.100.9", source.LastOptions!.BackendPublicIp);
         Assert.True(source.LastOptions.SamePublicIp);
-        // عمر التعيين = المدة المتبقية + 5 دقائق (docs/protocol.md القسم 2)
+        // The mapping's lifetime = the remaining duration + 5 minutes (docs/protocol.md section 2)
         Assert.InRange(source.LastOptions.MappingLifetime, TimeSpan.FromMinutes(34), TimeSpan.FromMinutes(35.1));
         Assert.NotNull(session.GatherDiagnostics);
         Assert.Contains("gather", session.Diagnostics.Keys);
@@ -152,7 +152,7 @@ public class TunnelSessionTests
         Assert.Equal(dead.Port, row["port"]);
         Assert.NotNull(row["error"]);
         Assert.Equal("guest", connect["role"]);
-        // الحالة تبقى Connecting حتى EndAsync؛ المستمع أغلقه الموصّل.
+        // The state stays Connecting until EndAsync; the connector closed the listener.
         Assert.Equal(TunnelState.Connecting, session.State);
     }
 
@@ -212,7 +212,7 @@ public class TunnelSessionTests
         await Assert.ThrowsAnyAsync<SocketException>(() => probe.ConnectAsync(IPAddress.Loopback, port));
     }
 
-    // ---------- زوج متصل ----------
+    // ---------- A connected pair ----------
 
     [Fact]
     public async Task Pair_Connects_BothRoles_AndExposesProxyAndStats()
@@ -232,13 +232,13 @@ public class TunnelSessionTests
         Assert.Equal("http://check.josour/", pair.Guest.Proxy.ProbeUrl);
         Assert.True(pair.Proxy.Started);
 
-        // المضيف يبلّغ حمولة المواقع (العدّاد)، والضيف بايتات النقل.
+        // The host reports the sites' payload (the counter), and the guest reports the transport's bytes.
         Assert.Equal(11, pair.Host.Stats.BytesUp);
         Assert.Equal(22, pair.Host.Stats.BytesDown);
         Assert.Contains("example.test", pair.Host.DomainsSeen);
         Assert.Empty(pair.Guest.DomainsSeen);
 
-        // إحصاءات الضيف تأتي من النقل نفسه: PING/PONG وحدهما يحركان العدّادين.
+        // The guest's statistics come from the transport itself: PING/PONG alone move the two counters.
         await pair.GuestMux!.PingAsync(CancellationToken.None).WaitAsync(Timeout);
         Assert.True(pair.Guest.Stats.BytesUp > 0);
         Assert.True(pair.Guest.Stats.BytesDown > 0);
@@ -305,11 +305,11 @@ public class TunnelSessionTests
             $"host={hostReason} guest={guestReason} | guest connected={pair.GuestResult.Connected} ({pair.GuestResult.FailureReason}) " +
             $"state={pair.Guest.State} mux_completion={pair.Guest.Diagnostics.GetValueOrDefault("mux_completion")} " +
             $"death={pair.Guest.Diagnostics.GetValueOrDefault("death")} window={pair.Guest.Diagnostics.GetValueOrDefault("mux_window")}");
-        // كل طرف يسمّي من اختفى: المضيف يرى الضيف انقطع، والضيف يرى المضيف انقطع.
+        // Each side names whoever vanished: the host sees the guest disconnect, and the guest sees the host disconnect.
         Assert.Equal(TunnelEndReason.GuestDisconnected, hostReason);
         Assert.Equal(TunnelEndReason.HostDisconnected, guestReason);
         Assert.Equal("faulted", pair.Host.Diagnostics["mux_completion"]);
-        // الموت ليس إنهاءً: الحالة تبقى Connected حتى يقرر التطبيق EndAsync.
+        // A death is not an end: the state stays Connected until the application decides on EndAsync.
         Assert.Equal(TunnelState.Connected, pair.Host.State);
     }
 
@@ -348,7 +348,7 @@ public class TunnelSessionTests
         Assert.True(pair.Proxy.Disposed);
         Assert.True(pair.Egress.Disposed);
 
-        // ترتيب docs/protocol.md القسم 7: إيقاف القبول ← المتصفح ← GOAWAY وإغلاق النفق ← إيقاف الـ Proxy ← الشهادة.
+        // The docs/protocol.md section 7 order: stop accepting -> the browser -> GOAWAY and closing the tunnel -> stopping the proxy -> the certificate.
         var log = pair.Log;
         var stopAccepting = log.IndexOf("proxy.stop_accepting");
         var browser = log.IndexOf("browser");
@@ -357,7 +357,7 @@ public class TunnelSessionTests
         Assert.False(certificateDisposedAtBrowserStep);
         Assert.False(muxClosedAtBrowserStep);
 
-        // الإحصاءات النهائية محفوظة بعد الإنهاء (لرسالة session.end)
+        // The final statistics are kept after the end (for the session.end message)
         Assert.Equal(11, pair.Host.Stats.BytesUp);
         Assert.Equal(0, pair.Host.Stats.OpenStreams);
         Assert.Contains("example.test", pair.Host.DomainsSeen);
@@ -386,11 +386,11 @@ public class TunnelSessionTests
         Assert.Equal(OpenFailReason.NotAllowed, open.Reason);
     }
 
-    // ---------- النافذة المشتقة من الـ RTT (docs/protocol.md القسم 5) ----------
+    // ---------- The RTT-derived window (docs/protocol.md section 5) ----------
 
     /// <summary>
-    /// وصلة بطيئة (200 ms داخل نافذة قياس connect_ms) ⇒ الشريحة العليا: نافذة 4 MiB وحد 64 stream،
-    /// والحد يصل إلى سياسة الخروج في سياق المضيف لا يبقى 256 مثبتًا.
+    /// A slow link (200 ms inside the connect_ms measurement window) => the highest band: a 4 MiB window and a limit of 64 streams,
+    /// and the limit reaches the egress policy in the host's context rather than staying pinned at 256.
     /// </summary>
     [Fact]
     public async Task Pair_OnASlowLink_DerivesTheLargeWindow_AndTheMatchingStreamLimit()
@@ -398,20 +398,20 @@ public class TunnelSessionTests
         await using var pair = await TunnelSessionPair.CreateAsync(connectDelay: TimeSpan.FromMilliseconds(200));
 
         Assert.True(pair.HostResult.Connected, pair.HostResult.FailureReason);
-        Assert.InRange(pair.HostResult.ConnectMs, 151, 5000); // القياس فعلًا في مدى الشريحة العليا
+        Assert.InRange(pair.HostResult.ConnectMs, 151, 5000); // the measurement really is in the highest band's range
         Assert.Equal(4 * 1024 * 1024, pair.Host.Diagnostics["mux_window"]);
         Assert.Equal(64, pair.Host.Diagnostics["mux_max_streams"]);
         Assert.Equal(64, pair.EgressContext!.MaxConcurrentStreams);
 
-        // الطرفان يقيسان الرقم نفسه تقريبًا فيقعان في الشريحة نفسها (وكل طرف يحجّم نافذة استقباله وحده).
+        // Both sides measure roughly the same number so they land in the same band (and each side sizes its own receiving window).
         Assert.Equal(4 * 1024 * 1024, pair.Guest.Diagnostics["mux_window"]);
         Assert.Equal(64, pair.Guest.Diagnostics["mux_max_streams"]);
         Assert.Contains("> 150 ms", (string)pair.Host.Diagnostics["mux_window_reason"]!);
     }
 
     /// <summary>
-    /// وصلة قريبة (20 ms) ⇒ الشريحة الدنيا: 1 MiB و256 stream كما كان العقد قبل التعديل.
-    /// إن فشل هذا على جهاز محمّل فانظر connect_ms المطبوع: مصافحة loopback أبطأ من 40 ms تخرج من الشريحة.
+    /// A near link (20 ms) => the lowest band: 1 MiB and 256 streams as the contract had it before the amendment.
+    /// If this fails on a loaded machine, look at the connect_ms printed: a loopback handshake slower than 40 ms leaves the band.
     /// </summary>
     [Fact]
     public async Task Pair_OnANearLink_KeepsTheOneMiBWindow_And256Streams()
@@ -425,7 +425,7 @@ public class TunnelSessionTests
         Assert.Equal(256, pair.EgressContext!.MaxConcurrentStreams);
     }
 
-    /// <summary>التجاوز الصريح (اختبارات، أداة Spike) يفوز على الاشتقاق، والحد يتبع النافذة المفروضة.</summary>
+    /// <summary>The explicit override (the tests, the Spike tool) beats the derivation, and the limit follows the imposed window.</summary>
     [Fact]
     public async Task Pair_ExplicitWindowOverride_BeatsTheDerivation()
     {
@@ -439,7 +439,7 @@ public class TunnelSessionTests
         Assert.Contains("explicit", (string)pair.Host.Diagnostics["mux_window_reason"]!);
     }
 
-    /// <summary>loopback بلا تأخير يعطي connect_ms ≈ 0 وهو ما يعدّه العقد قياسًا فاسدًا: الشريحة الوسطى وسبب مكتوب.</summary>
+    /// <summary>Loopback with no delay gives connect_ms ≈ 0, which the contract counts as a corrupt measurement: the middle band with a written reason.</summary>
     [Fact]
     public async Task Pair_WithAnImplausibleMeasurement_FallsBackToTheMiddleTier()
     {
@@ -456,7 +456,7 @@ public class TunnelSessionTests
         }
         else
         {
-            // مصافحة loopback قد تستغرق مللي ثانية أو اثنتين: شريحة صحيحة لا ملاذ.
+            // A loopback handshake may take a millisecond or two: a correct band rather than the fallback.
             Assert.Equal(1024 * 1024, window);
             Assert.Equal(256, streams);
         }

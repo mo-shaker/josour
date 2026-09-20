@@ -6,8 +6,8 @@ using Josour.Tunnel.Mux;
 namespace Josour.Proxy.Tests;
 
 /// <summary>
-/// المسار المباشر خلف Proxy إجباري (الخطة 8.5): CONNECT إلى Proxy النظام لطلبات النفق، وabsolute-URI
-/// لطلبات http العادية، مع قائمة التجاوز. المسار المسموح به لا يمر من هنا إطلاقًا.
+/// The direct path behind a mandatory proxy (plan 8.5): CONNECT to the system proxy for the tunnel's requests, and an absolute-URI
+/// for ordinary http requests, with the bypass list. The allowed path never goes through here.
 /// </summary>
 public class SystemProxyPathTests
 {
@@ -48,7 +48,7 @@ public class SystemProxyPathTests
         var accept = origin.AcceptAsync();
         await using var upstream = new FakeUpstreamProxy();
         var resolver = new StubResolver().Map("direct.test", "127.0.0.1");
-        // لا Proxy مضبوط: السلوك كما كان قبل هذا الأسبوع.
+        // No proxy configured: the behaviour is as it was before this week.
         await using var proxy = Proxies.Start(new FakeMux(), resolver, systemProxy: NoSystemProxy.Instance);
         await using var client = await ProxyClient.ConnectAsync(proxy.Port);
 
@@ -81,7 +81,7 @@ public class SystemProxyPathTests
     [Fact]
     public async Task Connect_AllowlistedHost_NeverTouchesTheSystemProxy()
     {
-        // العقد: ما يمر عبر النفق يخرج من عند المضيف، ولا شأن لـ Proxy جهاز المستخدم به.
+        // The contract: what goes through the tunnel leaves from the host, and the user's machine's proxy has nothing to do with it.
         await using var upstream = new FakeUpstreamProxy();
         var (near, far) = await TcpPair.CreateAsync();
         using (far)
@@ -133,7 +133,7 @@ public class SystemProxyPathTests
         var resolver = new StubResolver().Map("direct.test", "127.0.0.1");
         await using var proxy = Proxies.Start(new FakeMux(), resolver, systemProxy: upstream.AsResolver());
 
-        // 1) بلا بيانات اعتماد: يصل 407 ومعه Proxy-Authenticate كي يعرف المتصفح كيف يصادق.
+        // 1) With no credentials: a 407 arrives with Proxy-Authenticate so the browser knows how to authenticate.
         await using (var first = await ProxyClient.ConnectAsync(proxy.Port))
         {
             await first.SendAsync($"CONNECT direct.test:{origin.Port} HTTP/1.1\r\n\r\n");
@@ -142,7 +142,7 @@ public class SystemProxyPathTests
             Assert.Equal("Basic realm=\"corp\"", head.Headers["Proxy-Authenticate"]);
         }
 
-        // 2) المتصفح يعيد المحاولة بـ Proxy-Authorization؛ نمررها إلى الـ Proxy الأعلى فينجح.
+        // 2) The browser retries with Proxy-Authorization; we pass it to the upstream proxy and it succeeds.
         await using var second = await ProxyClient.ConnectAsync(proxy.Port);
         await second.SendAsync($"CONNECT direct.test:{origin.Port} HTTP/1.1\r\nProxy-Authorization: Basic dTpw\r\n\r\n");
         Assert.Equal(200, (await second.ReadHeadAsync()).Status);
@@ -176,7 +176,7 @@ public class SystemProxyPathTests
         Assert.Equal("SRV", Encoding.ASCII.GetString(seen));
     }
 
-    // ---------- http:// عادي ----------
+    // ---------- Ordinary http:// ----------
 
     [Fact]
     public async Task Http_NotAllowlisted_GoesThroughTheSystemProxyInAbsoluteUriForm()
@@ -191,9 +191,9 @@ public class SystemProxyPathTests
         Assert.Equal(200, head.Status);
         Assert.Equal("served by the corporate proxy", Encoding.UTF8.GetString(await client.ReadBodyAsync(head)));
 
-        // الهدف يبقى absolute-URI (الـ Proxy الأعلى يحتاجه)، وProxy-Connection يُحذف.
+        // The target stays an absolute-URI (the upstream proxy needs it), and Proxy-Connection is removed.
         Assert.Equal("GET http://direct.test/hello?x=1 HTTP/1.1", Assert.Single(upstream.RequestLines));
-        Assert.Equal(0, resolver.Calls); // لا حل اسم للوجهة: الـ Proxy هو من يحلها
+        Assert.Equal(0, resolver.Calls); // no name resolution for the destination: the proxy is what resolves it
         Assert.Equal(1, proxy.Counters.ViaSystemProxy);
         Assert.Equal(1, proxy.Counters.DirectHttpRequests);
     }
@@ -214,7 +214,7 @@ public class SystemProxyPathTests
     [Fact]
     public async Task Http_AllowlistedHost_StillRedirectsLocallyToHttps()
     {
-        // القاعدة القديمة تبقى: لا بايتات نصية عبر النفق، ولا مرور بـ Proxy النظام.
+        // The old rule stands: no plaintext bytes through the tunnel, and no going through the system proxy.
         await using var upstream = new FakeUpstreamProxy();
         await using var proxy = Proxies.Start(new FakeMux(), systemProxy: upstream.AsResolver());
         await using var client = await ProxyClient.ConnectAsync(proxy.Port);
@@ -255,7 +255,7 @@ public class SystemProxyPathTests
     [Fact]
     public async Task Http_ProxyAuthorization_IsForwardedUpstream_ButNeverToAnOrigin()
     {
-        // مع Proxy: الترويسة موجّهة إليه فتُمرَّر. بلا Proxy: لا مُخاطَب لها فتُحذف (السلوك القائم).
+        // With a proxy: the header is addressed to it, so it is passed through. With no proxy: there is nobody for it to address, so it is removed (the existing behaviour).
         await using var upstream = new FakeUpstreamProxy();
         await using (var proxy = Proxies.Start(new FakeMux(), systemProxy: upstream.AsResolver()))
         await using (var client = await ProxyClient.ConnectAsync(proxy.Port))
@@ -278,12 +278,12 @@ public class SystemProxyPathTests
         Assert.DoesNotContain("Proxy-Authorization", origin.ReceivedHead ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
-    // ---------- بناء الرأس ----------
+    // ---------- Building the head ----------
 
     [Fact]
     public void BuildProxyFormHead_UsesTheNormalisedHost_NotTheRawTarget()
     {
-        // الهدف يُبنى من الاسم المطبَّع، فلا يمر ما كتبه المتصفح حرفيًا إلى الـ Proxy الأعلى.
+        // The target is built from the normalised name, so what the browser wrote does not pass literally to the upstream proxy.
         var request = HttpRequestParser.Parse(
             Encoding.ASCII.GetBytes("GET http://EXAMPLE.test/a%20b?q=1 HTTP/1.1\r\nHost: EXAMPLE.test\r\nProxy-Connection: keep-alive\r\nKeep-Alive: 5\r\nConnection: keep-alive\r\nProxy-Authorization: Basic x\r\nAccept: */*\r\n\r\n"),
             Array.Empty<byte>());
@@ -295,7 +295,7 @@ public class SystemProxyPathTests
         Assert.Contains("Proxy-Authorization: Basic x\r\n", head, StringComparison.Ordinal);
         Assert.Contains("Accept: */*\r\n", head, StringComparison.Ordinal);
         Assert.EndsWith("Connection: close\r\n\r\n", head, StringComparison.Ordinal);
-        // ترويسة Connection واحدة فقط: أصل المتصفح حُذف وحلّ محله close.
+        // One Connection header only: the browser's original was removed and close took its place.
         Assert.Equal(1, head.Split("\r\nConnection: ").Length - 1);
     }
 

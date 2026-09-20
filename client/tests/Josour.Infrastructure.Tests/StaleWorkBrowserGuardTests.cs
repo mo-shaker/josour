@@ -4,7 +4,7 @@ using Josour.Infrastructure.Tests.Support;
 namespace Josour.Infrastructure.Tests;
 
 /// <summary>
-/// Plan 8.5 (انهيار التطبيق): a work browser that survived an unclean exit is still pointing at a proxy that died with
+/// Plan 8.5 (the application crashing): a work browser that survived an unclean exit is still pointing at a proxy that died with
 /// the process. The next start-up closes it before anything else happens — and, just as important, does not close a
 /// process that merely inherited the same id.
 /// </summary>

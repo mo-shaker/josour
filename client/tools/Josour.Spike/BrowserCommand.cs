@@ -9,7 +9,7 @@ using Josour.Proxy;
 
 namespace Josour.Spike;
 
-/// <summary>أداة مصفوفة المتصفح (Chrome/Edge × مُدار/غير مُدار × Win10/11). كل شيء في JSON على stdout.</summary>
+/// <summary>The browser-matrix tool (Chrome/Edge x managed/unmanaged x Win10/11). Everything goes out as JSON on stdout.</summary>
 public static class BrowserCommand
 {
     private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(10);
@@ -61,11 +61,11 @@ public static class BrowserCommand
         {
             proxy = new ConnectProxyServer(new ConnectProxyOptions
             {
-                Allowlist = AllowlistMatcher.Parse(0, Array.Empty<string>()), // كل شيء مباشر
+                Allowlist = AllowlistMatcher.Parse(0, Array.Empty<string>()), // everything direct
                 PeerPublicIp = "(self-hosted: your own IP)",
                 Browser = launcher,
                 OwnerPidChecker = OperatingSystem.IsWindows() ? WindowsOwnerPidChecker.Instance : PermissiveOwnerPidChecker.Instance,
-                RejectUnknownOwner = false, // الأداة تقيس ولا تمنع؛ العدّادات تُبلّغ
+                RejectUnknownOwner = false, // the tool measures rather than blocks; the counters report
             });
             proxy.ProbeHit += t => probeHit.TrySetResult(t);
             proxy.Start();

@@ -6,15 +6,15 @@ using Josour.Core.Net;
 namespace Josour.Proxy.Tests;
 
 /// <summary>
-/// تقوية المحلل (الأسبوع 4). العقد الذي تثبته هذه الاختبارات ثلاثة بنود، وكلها أمنية لا تجميلية:
+/// Hardening the parser (week 4). The contract these tests prove has three items, all of them security rather than cosmetics:
 ///
 /// <list type="number">
-///   <item><b>لا يرمي شيئًا غير متوقَّع:</b> كل مدخل، مهما كان تالفًا، ينتهي إما بـ <see cref="ProxyRequest"/> أو
-///     <see cref="HttpParseException"/> (يترجمها <see cref="ConnectProxyServer"/> إلى 400). أي استثناء آخر يقتل
-///     معالج الاتصال ويظهر عدّاد <c>Errors</c> بدل رد صادق.</item>
-///   <item><b>لا يعلّق:</b> رأس ناقص أو موزّع على قراءات بايت واحد ينتهي بمهلة أو باستثناء، لا بانتظار أبدي.</item>
-///   <item><b>لا يمرّر ما يجب رفضه:</b> ما يخرج من المحلل يُعاد بناؤه حرفيًا نحو الأصل، فأي CR/LF داخل هدف أو قيمة
-///     رأس يعني طلبًا ثانيًا مهرَّبًا. والهدف الناتج لا يجوز أن يوجّه إلى النفق إن كان عنوانًا حرفيًا أو اسمًا محليًا.</item>
+///   <item><b>It throws nothing unexpected:</b> every input, however malformed, ends either as a <see cref="ProxyRequest"/> or as an
+///     <see cref="HttpParseException"/> (which <see cref="ConnectProxyServer"/> translates into a 400). Any other exception kills
+///     the connection handler and shows up in the <c>Errors</c> counter instead of a truthful reply.</item>
+///   <item><b>It does not hang:</b> a truncated head, or one spread over single-byte reads, ends in a timeout or an exception, never in an endless wait.</item>
+///   <item><b>It does not pass on what must be refused:</b> what comes out of the parser is rebuilt literally towards the origin, so any CR/LF inside a target or a header
+///     value means a second smuggled request. And the resulting target may not be routed to the tunnel if it is an address literal or a local name.</item>
 /// </list>
 /// </summary>
 public class HttpRequestParserHardeningTests
@@ -22,30 +22,30 @@ public class HttpRequestParserHardeningTests
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
     private static readonly int[] DefaultPorts = { 80, 443 };
 
-    // ---------- 1. حقن الرؤوس وتهريب الطلبات ----------
+    // ---------- 1. Header injection and request smuggling ----------
 
     [Theory]
-    // LF مجرّد داخل قيمة رأس: عندنا سطر واحد، وعند الأصل سطران.
+    // A bare LF inside a header value: one line here, and two at the origin.
     [InlineData("GET http://a.example/ HTTP/1.1\r\nHost: a.example\r\nX: b\nHost: evil.example\r\n\r\n")]
     [InlineData("GET http://a.example/ HTTP/1.1\r\nX: b\nGET /admin HTTP/1.1\r\n\r\n")]
-    // CR مجرّد داخل قيمة رأس.
+    // A bare CR inside a header value.
     [InlineData("GET http://a.example/ HTTP/1.1\r\nX: b\rHost: evil.example\r\n\r\n")]
-    // NUL داخل قيمة رأس (قطع عند مكتبات C).
+    // A NUL inside a header value (a truncation point in C libraries).
     [InlineData("GET http://a.example/ HTTP/1.1\r\nX: a\0b\r\n\r\n")]
-    // LF مجرّد داخل الهدف: parts.Length يبقى 3 والهدف يحمل سطرًا كاملًا.
+    // A bare LF inside the target: parts.Length stays 3 and the target carries a whole line.
     [InlineData("GET http://a.example/\nX-Injected:\x20yes HTTP/1.1\r\n\r\n")]
-    // LF مجرّد داخل الإصدار: يبدأ بـ HTTP/1. ومع ذلك يحمل سطرًا.
+    // A bare LF inside the version: it starts with HTTP/1. and still carries a line.
     [InlineData("GET /p HTTP/1.1\nX-Injected: yes\r\nHost: a.example\r\n\r\n")]
-    // obs-fold: سطر متابعة يبدأ بمسافة/HTAB — الوسطاء تختلف في طيّه (ناقل تهريب معروف).
+    // obs-fold: a continuation line starting with a space/HTAB — intermediaries differ on folding it (a known smuggling vector).
     [InlineData("GET http://a.example/ HTTP/1.1\r\nX: b\r\n Host: evil.example\r\n\r\n")]
     [InlineData("GET http://a.example/ HTTP/1.1\r\nX: b\r\n\tevil\r\n\r\n")]
-    // مسافة قبل النقطتين: "Foo " عند طرف و"Foo" عند آخر.
+    // A space before the colon: "Foo " at one end and "Foo" at the other.
     [InlineData("GET http://a.example/ HTTP/1.1\r\nContent-Length : 5\r\n\r\n")]
     [InlineData("GET http://a.example/ HTTP/1.1\r\nHost\t: a.example\r\n\r\n")]
-    // Host مكرَّر: نوجّه بالأول ويقرأ الأصل الأخير.
+    // A repeated Host: we route by the first and the origin reads the last.
     [InlineData("GET / HTTP/1.1\r\nHost: a.example\r\nHost: evil.example\r\n\r\n")]
     [InlineData("CONNECT a.example:443 HTTP/1.1\r\nHost: a.example:443\r\nhost: evil.example:443\r\n\r\n")]
-    // Content-Length مع Transfer-Encoding: طول غامض (RFC 7230 §3.3.3).
+    // Content-Length together with Transfer-Encoding: an ambiguous length (RFC 7230 §3.3.3).
     [InlineData("POST http://a.example/ HTTP/1.1\r\nHost: a.example\r\nContent-Length: 5\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n")]
     [InlineData("POST http://a.example/ HTTP/1.1\r\nTransfer-Encoding: chunked\r\ncontent-length: 0\r\n\r\n")]
     public void SmugglingVectors_AreRejected(string head)
@@ -56,7 +56,7 @@ public class HttpRequestParserHardeningTests
     [Fact]
     public void AbsurdHeaderCount_IsRejected_BeforeTheHeadLimit()
     {
-        // 16 KiB تكفي لآلاف الرؤوس القصيرة؛ الحد على العدد هو ما يوقفها.
+        // 16 KiB is enough for thousands of short headers; the limit on the count is what stops them.
         var head = new StringBuilder("GET http://a.example/ HTTP/1.1\r\n");
         for (var i = 0; i <= HttpRequestParser.MaxHeaders; i++) head.Append("h").Append(i).Append(":v\r\n");
         head.Append("\r\n");
@@ -87,11 +87,11 @@ public class HttpRequestParserHardeningTests
     }
 
     [Theory]
-    // obs-text (≥ 0x80) مسموح في القيم كما في RFC 7230؛ الرفض يقتصر على محارف التحكم.
+    // obs-text (>= 0x80) is allowed in values as in RFC 7230; the refusal is limited to control characters.
     [InlineData("GET http://a.example/ HTTP/1.1\r\nHost: a.example\r\nX: café\r\n\r\n")]
-    // HTAB داخل القيمة مسموح.
+    // An HTAB inside the value is allowed.
     [InlineData("GET http://a.example/ HTTP/1.1\r\nHost: a.example\r\nX: a\tb\r\n\r\n")]
-    // قيمة فارغة مسموحة.
+    // An empty value is allowed.
     [InlineData("GET http://a.example/ HTTP/1.1\r\nHost: a.example\r\nX:\r\n\r\n")]
     public void LegitimateOddities_AreStillAccepted(string head)
     {
@@ -99,7 +99,7 @@ public class HttpRequestParserHardeningTests
         AssertNoInjectedLines(request, "/");
     }
 
-    // ---------- 2. لا يرمي شيئًا غير متوقَّع، مهما كان المدخل ----------
+    // ---------- 2. It throws nothing unexpected, whatever the input ----------
 
     [Fact]
     public void Fuzz_Parse_OnlyEverThrowsHttpParseException()
@@ -122,7 +122,7 @@ public class HttpRequestParserHardeningTests
                 Assert.Fail($"unexpected {e.GetType().Name} for {Describe(head)}: {e.Message}");
             }
 
-            // قُبل: إذًا لا سطر مهرَّب في إعادة البناء، ولا توجيه إلى النفق لما يجب رفضه.
+            // Accepted: so there is no smuggled line in the rebuild, and nothing that must be refused is routed to the tunnel.
             AssertNoInjectedLines(request!, "/");
             AssertRoutingIsSafe(request!);
         }
@@ -136,12 +136,12 @@ public class HttpRequestParserHardeningTests
         var clock = Stopwatch.StartNew();
         foreach (var head in Corpus(seed: 7, count: 300))
         {
-            // كل بايت في قراءة مستقلة: أسوأ حالة للتقسيم عبر عدة قراءات.
+            // Every byte in its own read: the worst case for splitting across several reads.
             using var stream = new TrickleStream(head);
             var expected = Outcome(() => HttpRequestParser.Parse(head, Array.Empty<byte>()));
             var actual = await OutcomeAsync(() => HttpRequestParser.ReadAsync(stream, CancellationToken.None).WaitAsync(Timeout));
 
-            // الفارق الوحيد المسموح: رأس ناقص (بلا CRLFCRLF) — Parse يقبله على أنه كل ما وصل بينما ReadAsync ينتظر EOF ثم يشكو.
+            // The one permitted difference: a truncated head (with no CRLFCRLF) — Parse accepts it as everything that arrived, while ReadAsync waits for EOF and then complains.
             if (expected == actual) continue;
             Assert.Equal("HttpParseException", actual);
         }
@@ -152,8 +152,8 @@ public class HttpRequestParserHardeningTests
     [Fact]
     public async Task ReadAsync_HeadSplitIntoSingleBytes_ParsesAndLosesNoBody()
     {
-        // العقد: Remainder هو ما وصل في القراءة نفسها فقط؛ الباقي يبقى في الـ stream ليضخه الـ Proxy.
-        // ما يجب ألا يحدث أبدًا: ضياع بايت من الجسم أو ابتلاع بايت زائد مع الرأس.
+        // The contract: Remainder is only what arrived in the same read; the rest stays in the stream for the proxy to pump.
+        // What must never happen: losing a byte of the body, or swallowing an extra byte with the head.
         const string head = "CONNECT a.example:443 HTTP/1.1\r\nHost: a.example:443\r\n\r\n";
         const string body = "\x16\x03\x01tls";
         using var stream = new TrickleStream(Encoding.Latin1.GetBytes(head + body));
@@ -167,7 +167,7 @@ public class HttpRequestParserHardeningTests
     [Fact]
     public async Task ReadAsync_SlowStreamThatNeverCompletesTheHead_IsCancellable()
     {
-        // يثبت أن الانتظار محكوم بالـ token لا بحسن نية الطرف الآخر (الـ Proxy يربطه بـ RequestHeadTimeout).
+        // It proves the wait is governed by the token rather than by the other side's good faith (the proxy binds it to RequestHeadTimeout).
         using var stalled = new StalledStream();
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
@@ -183,7 +183,7 @@ public class HttpRequestParserHardeningTests
     [InlineData(7)]
     public async Task ReadAsync_HeadEndSplitAcrossReads_IsFound_AndTheBodyIsIntact(int chunk)
     {
-        // CRLFCRLF موزّعة على عدة قراءات: يثبت تداخل نافذة البحث (scanFrom - 3) لكل محاذاة.
+        // A CRLFCRLF spread over several reads: it proves the search window overlaps (scanFrom - 3) for every alignment.
         var bytes = Encoding.Latin1.GetBytes("GET http://a.example/ HTTP/1.1\r\nHost: a.example\r\n\r\nbody");
         using var stream = new ChunkedStream(bytes, chunk);
         var request = await HttpRequestParser.ReadAsync(stream, CancellationToken.None).WaitAsync(Timeout);
@@ -201,7 +201,7 @@ public class HttpRequestParserHardeningTests
         return sb.ToString();
     }
 
-    // ---------- 3. الصيغ التي يرسلها المتصفح فعلًا ----------
+    // ---------- 3. The forms the browser actually sends ----------
 
     [Theory]
     [InlineData("CONNECT [2001:db8::1]:443 HTTP/1.1\r\n\r\n", "2001:db8::1", 443)]
@@ -213,17 +213,17 @@ public class HttpRequestParserHardeningTests
         Assert.True(HttpRequestParser.TryParseAuthority(request.Target, 443, out var parsedHost, out var parsedPort));
         Assert.Equal(host, parsedHost);
         Assert.Equal(port, parsedPort);
-        // عنوان حرفي: مرفوض محليًا قبل أي حل أو اتصال، ولا يُدرج في القائمة أصلًا.
+        // An address literal: refused locally before any resolution or connection, and it cannot be listed to begin with.
         var route = ProxyRouter.Decide(parsedHost, parsedPort, EverythingAllowlist, DefaultPorts);
         Assert.Equal(RouteKind.Reject, route.Kind);
         Assert.Equal("ip_literal", route.Reason);
     }
 
     [Theory]
-    // شكل absolute-URI بمضيف حرفي: لا يوجّه أيضًا.
+    // An absolute-URI form with a literal host: also not routed.
     [InlineData("http://127.0.0.1/x")]
     [InlineData("http://[::1]/x")]
-    [InlineData("http://2130706433/x")]      // 127.0.0.1 بالصيغة العشرية
+    [InlineData("http://2130706433/x")]      // 127.0.0.1 in decimal form
     [InlineData("http://0x7f.0.0.1/x")]
     [InlineData("http://127.1/x")]
     public void AbsoluteUriWithLiteralHost_NeverRoutesToTheTunnel(string target)
@@ -233,8 +233,8 @@ public class HttpRequestParserHardeningTests
     }
 
     [Theory]
-    [InlineData("GET / HTTP/1.1\r\n\r\n")]                                     // origin-form بلا Host
-    [InlineData("GET / HTTP/1.1\r\nHost:\r\n\r\n")]                            // Host فارغ
+    [InlineData("GET / HTTP/1.1\r\n\r\n")]                                     // origin-form with no Host
+    [InlineData("GET / HTTP/1.1\r\nHost:\r\n\r\n")]                            // an empty Host
     [InlineData("GET / HTTP/1.1\r\nHost:    \r\n\r\n")]
     public void OriginFormWithoutUsableHost_YieldsNoAuthority(string head)
     {
@@ -257,17 +257,17 @@ public class HttpRequestParserHardeningTests
         AssertNoInjectedLines(request, "/");
     }
 
-    // ---------- الثوابت ----------
+    // ---------- The constants ----------
 
-    /// <summary>قائمة تسمح بكل ما يمكن أن يُدرج: تجعل "لم يوجَّه إلى النفق" نتيجة السياسة لا نتيجة قائمة فارغة.</summary>
+    /// <summary>A list that allows everything that could be listed: it makes "it was not routed to the tunnel" the policy's result rather than an empty list's.</summary>
     private static readonly IAllowlist EverythingAllowlist = AllowlistMatcher.Parse(1, new[] { "example", "com", "net", "org", "test", "localhost", "local" });
 
-    /// <summary>ما يخرج من إعادة البناء يجب أن يحمل سطرًا واحدًا لكل رأس أبقيناه، لا أكثر.</summary>
+    /// <summary>What comes out of the rebuild must carry one line per header we kept, and no more.</summary>
     private static void AssertNoInjectedLines(ProxyRequest request, string path)
     {
         var head = Encoding.Latin1.GetString(ConnectProxyServer.BuildOriginFormHead(request, path));
         var lines = head.Split("\r\n");
-        // سطر الطلب + الرؤوس المُبقاة + "Connection: close" + سطران فارغان من النهاية.
+        // The request line + the kept headers + "Connection: close" + two empty lines at the end.
         var kept = request.Headers.Count(h => !IsHopByHop(h.Key));
         Assert.Equal(kept + 4, lines.Length);
         foreach (var line in lines)
@@ -284,7 +284,7 @@ public class HttpRequestParserHardeningTests
         || name.Equals("Connection", StringComparison.OrdinalIgnoreCase)
         || name.Equals("Keep-Alive", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>هدف مقبول لا يجوز أن يصير Tunnel إن كان عنوانًا حرفيًا أو اسمًا محليًا أو اسمًا لا يُطبَّع.</summary>
+    /// <summary>An acceptable target that may not become Tunnel if it is an address literal, a local name, or a name that does not normalise.</summary>
     private static void AssertRoutingIsSafe(ProxyRequest request)
     {
         string? host = null;
@@ -307,10 +307,10 @@ public class HttpRequestParserHardeningTests
 
         Assert.False(IpRangePolicy.IsIpLiteral(host), $"an IP literal was routed to the tunnel: {host}");
         Assert.False(ProxyRouter.IsLocalName(route.Host), $"a local name was routed to the tunnel: {route.Host}");
-        Assert.Equal(route.Host, AllowlistMatcher.NormalizeHost(route.Host)); // مطبَّع ومستقر
+        Assert.Equal(route.Host, AllowlistMatcher.NormalizeHost(route.Host)); // normalised and stable
     }
 
-    // ---------- مولّد المدخلات ----------
+    // ---------- The input generator ----------
 
     private static IEnumerable<byte[]> Corpus(int seed, int count)
     {
@@ -331,16 +331,16 @@ public class HttpRequestParserHardeningTests
             byte[] bytes;
             switch (i % 4)
             {
-                case 0: // بايتات عشوائية بالكامل
+                case 0: // entirely random bytes
                     bytes = new byte[random.Next(0, 400)];
                     random.NextBytes(bytes);
                     break;
-                case 1: // بذرة صحيحة + طفرات بايت
+                case 1: // a valid seed + byte mutations
                     bytes = Encoding.Latin1.GetBytes(seeds[random.Next(seeds.Length)]);
                     for (var m = random.Next(1, 6); m > 0 && bytes.Length > 0; m--)
                         bytes[random.Next(bytes.Length)] = nasty[random.Next(nasty.Length)];
                     break;
-                case 2: // بذرة صحيحة + إدراج محارف خبيثة
+                case 2: // a valid seed + inserting malicious characters
                 {
                     var text = seeds[random.Next(seeds.Length)];
                     var at = random.Next(text.Length);
@@ -348,7 +348,7 @@ public class HttpRequestParserHardeningTests
                     bytes = Encoding.Latin1.GetBytes(text[..at] + injected + text[at..]);
                     break;
                 }
-                default: // رأس مبني من قطع عشوائية
+                default: // a head built from random pieces
                 {
                     var head = new StringBuilder();
                     head.Append(Token(random)).Append(' ').Append(Token(random)).Append(' ').Append(Token(random)).Append("\r\n");
@@ -389,7 +389,7 @@ public class HttpRequestParserHardeningTests
 
     // ---------- streams ----------
 
-    /// <summary>يعيد بايتًا واحدًا لكل قراءة ثم EOF.</summary>
+    /// <summary>Returns one byte per read, then EOF.</summary>
     private sealed class TrickleStream : Stream
     {
         private readonly byte[] _data;
@@ -416,7 +416,7 @@ public class HttpRequestParserHardeningTests
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
-    /// <summary>يعيد <c>chunk</c> بايتات لكل قراءة ثم EOF.</summary>
+    /// <summary>Returns <c>chunk</c> bytes per read, then EOF.</summary>
     private sealed class ChunkedStream : Stream
     {
         private readonly byte[] _data;
@@ -450,7 +450,7 @@ public class HttpRequestParserHardeningTests
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
-    /// <summary>لا يعيد شيئًا أبدًا ولا يغلق: يمثل نظيرًا يفتح الاتصال ثم يصمت.</summary>
+    /// <summary>It never returns anything and never closes: it stands in for a peer that opens the connection and then goes silent.</summary>
     private sealed class StalledStream : Stream
     {
         public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)

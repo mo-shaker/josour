@@ -7,8 +7,8 @@ using Xunit.Abstractions;
 namespace Josour.Tunnel.Tests.Perf;
 
 /// <summary>
-/// أرقام الأسبوع 5: نفس مكدس ADR-0006 (TLS ← NerdbankMux) لكن فوق <see cref="SimulatedLink"/> بـ RTT دولي
-/// بدل loopback ذي الـ 0 ms. المخرجات تُنسخ إلى <c>docs/performance-week5.md</c>.
+/// Week five's numbers: the same ADR-0006 stack (TLS -> NerdbankMux) but over a <see cref="SimulatedLink"/> with an international RTT
+/// instead of loopback's 0 ms. The output is copied into <c>docs/performance-week5.md</c>.
 /// </summary>
 [Trait("Category", "Benchmark")]
 public class WanBenchmarks
@@ -19,7 +19,7 @@ public class WanBenchmarks
 
     public WanBenchmarks(ITestOutputHelper output) => _output = output;
 
-    // ---------- 1) سقف الإنتاجية لكل stream = النافذة ÷ RTT ----------
+    // ---------- 1) The per-stream throughput ceiling = the window ÷ the RTT ----------
 
     [Theory]
     [InlineData(50, 1)]
@@ -34,7 +34,7 @@ public class WanBenchmarks
         var measuredRtt = await wan.MeasureRttAsync();
         var ceiling = WanPair.CeilingBytesPerSecond(window, measuredRtt);
 
-        // زمن فتح stream واحد (تكلفة OPEN بالـ RTT؛ يدفعها المتصفح لكل CONNECT جديد).
+        // The time to open one stream (OPEN's cost in RTTs; the browser pays it for every new CONNECT).
         wan.Host.OpenRequested = (_, _) => Task.FromResult(MuxOpenDecision.Ok(new TestTarget(produce: 0)));
         var openClock = Perf.Start();
         var warm = await wan.Guest.OpenStreamAsync("warm.test", 443, CancellationToken.None);
@@ -62,18 +62,18 @@ public class WanBenchmarks
             $"ceiling window/RTT = {ceiling / Perf.MB:F2} MB/s ({ceiling * 8 / Perf.MB:F1} Mbit/s) | " +
             $"efficiency {actual / ceiling:P0}");
 
-        // نصف السقف حد أدنى محافظ: يثبت أن السقف هو النافذة/RTT لا شيء آخر.
+        // Half the ceiling is a conservative floor: it proves the ceiling is the window/RTT and nothing else.
         Assert.True(actual >= ceiling * 0.5, $"only {actual / Perf.MB:F2} MB/s of a {ceiling / Perf.MB:F2} MB/s ceiling");
-        // ولا يتجاوزه بهامش معقول (خطأ القياس + مخزن الوصلة).
+        // and that it is not exceeded beyond a reasonable margin (measurement error + the link's buffer).
         Assert.True(actual <= ceiling * 1.6, $"{actual / Perf.MB:F2} MB/s exceeds the window/RTT ceiling {ceiling / Perf.MB:F2} MB/s");
     }
 
-    // ---------- 1ب) السقف بعد التعديل: النافذة مشتقة من الـ RTT بدل 1 MiB الثابتة ----------
+    // ---------- 1b) The ceiling after the amendment: the window derived from the RTT instead of a fixed 1 MiB ----------
 
     /// <summary>
-    /// نفس قياس القسم 3 لكن النافذة يختارها <see cref="MuxWindow.ForRoundTrip"/> كما تختارها الجلسة في الإنتاج.
-    /// الغرض: إثبات أن سقف التنزيل الواحد لم يعد 56 Mbit/s عند 150 ms ولا 28 عند 300، مع طباعة سقف الذاكرة
-    /// الذي اشتُري به ذلك. الأرقام تُنسخ إلى docs/performance-week5.md القسم «بعد التعديل».
+    /// The same measurement as section 3 but with the window chosen by <see cref="MuxWindow.ForRoundTrip"/> as the session chooses it in production.
+    /// The purpose: to prove the single-download ceiling is no longer 56 Mbit/s at 150 ms nor 28 at 300, while printing the memory ceiling
+    /// that bought it. The numbers are copied into docs/performance-week5.md, the "after the amendment" section.
     /// </summary>
     [Theory]
     [InlineData(50, 1, 256, 0.9)]
@@ -88,7 +88,7 @@ public class WanBenchmarks
         await using var wan = await WanPair.CreateAsync(LinkProfile.FromRtt(rttMs), derived.ReceiveWindow);
         var measuredRtt = await wan.MeasureRttAsync();
         var ceiling = WanPair.CeilingBytesPerSecond(derived.ReceiveWindow, measuredRtt);
-        var before = WanPair.CeilingBytesPerSecond(MuxWindow.NearWindow, measuredRtt); // 1 MiB الثابتة قبل التعديل
+        var before = WanPair.CeilingBytesPerSecond(MuxWindow.NearWindow, measuredRtt); // the fixed 1 MiB before the amendment
 
         var size = (long)Math.Clamp(ceiling * 4, 8 * Perf.MB, 96 * Perf.MB);
         var target = new TestTarget(produce: size);
@@ -111,17 +111,17 @@ public class WanBenchmarks
             $"ceiling {ceiling * 8 / Perf.MB:F1} Mbit/s | efficiency {actual / ceiling:P0} | " +
             $"before the amendment (1 MiB) {before * 8 / Perf.MB:F1} Mbit/s => x{actual / before:F1}");
 
-        // السبب الذي عُدّل العقد من أجله: تنزيل واحد فوق 100 Mbit/s حتى 300 ms (كان 56 و28).
+        // The reason the contract was amended: a single download above 100 Mbit/s up to 300 ms (it was 56 and 28).
         Assert.True(actual * 8 / Perf.MB >= 100, $"single download capped at {actual * 8 / Perf.MB:F1} Mbit/s");
-        // والزيادة تتحقق فعلًا لا نظريًا: النافذة الأكبر تُترجَم إنتاجية بالنسبة المتوقعة.
+        // And the gain is real rather than theoretical: the larger window translates into throughput at the expected ratio.
         Assert.True(actual / before >= minGain, $"only x{actual / before:F1} over the 1 MiB ceiling (expected x{minGain})");
         Assert.True(actual >= ceiling * 0.8, $"only {actual / Perf.MB:F2} MB/s of a {ceiling / Perf.MB:F2} MB/s ceiling");
         Assert.True(actual <= ceiling * 1.6, $"{actual / Perf.MB:F2} MB/s exceeds the window/RTT ceiling {ceiling / Perf.MB:F2} MB/s");
-        // وسقف الذاكرة لم يتحرك: النافذة × الحد = 256 MiB في كل شريحة.
+        // And the memory ceiling has not moved: the window x the limit = 256 MiB in every band.
         Assert.Equal(MuxWindow.MemoryBudget, derived.WorstCaseBytes);
     }
 
-    // ---------- 2) صفحة ثقيلة: مستند + 80 موردًا على 30 مسارًا متزامنًا ----------
+    // ---------- 2) A heavy page: a document + 80 resources over 30 concurrent paths ----------
 
     [Theory]
     [InlineData(50, 0)]
@@ -135,15 +135,15 @@ public class WanBenchmarks
         var profile = LinkProfile.FromRtt(rttMs, megabitsPerSecond);
         var lanePlans = PageProfile.Split(lanes);
 
-        // (أ) عبر النفق: stream لكل مسار، يُعاد استعماله لموارده بالتتابع (نظير keep-alive).
-        // الساعة تتوقف عند آخر بايت مورد، لا بعد تفكيك الاتصالات (زمن تحميل الصفحة كما يراه المستخدم).
+        // (a) Through the tunnel: a stream per path, reused for its resources in sequence (the equivalent of keep-alive).
+        // The clock stops at the last resource byte, not after the connections are torn down (the page load time as the user sees it).
         TimeSpan tunnelElapsed;
         TimeSpan tunnelDocument;
         TimeSpan tunnelFirstOpen;
         TimeSpan tunnelWarmRoundTrip;
         await using (var wan = await WanPair.CreateAsync(profile))
         {
-            // الـ Mux يملك الوجهة ويتخلص منها عند إغلاق القناة.
+            // The mux owns the destination and disposes of it when the channel closes.
             wan.Host.OpenRequested = (_, _) => Task.FromResult(MuxOpenDecision.Ok(new ResourceTarget()));
 
             var clock = Perf.Start();
@@ -169,7 +169,7 @@ public class WanBenchmarks
             })).WaitAsync(Limit);
             tunnelElapsed = clock.Elapsed;
 
-            // خارج الساعة: ذهاب وإياب على stream دافئ بحمولة تافهة، يفصل تكلفة الطلب/الرد عن الفتح والحجم.
+            // Outside the clock: a round trip on a warm stream with a trivial payload, which separates the request/reply cost from the open and the size.
             var warm = Perf.Start();
             for (var i = 0; i < 5; i++)
             {
@@ -182,7 +182,7 @@ public class WanBenchmarks
             foreach (var stream in laneStreams) await stream.DisposeAsync();
         }
 
-        // (ب) مباشرةً: نفس الوصلة ونفس عنق الزجاجة، اتصال TCP لكل مسار (يدفع RTT مصافحة) وبلا mux.
+        // (b) Directly: the same link and the same bottleneck, a TCP connection per path (paying a handshake RTT) and no mux.
         await using var direct = new DirectLinkFactory(profile);
         var directClock = Perf.Start();
         var docLink = await direct.ConnectAsync(CancellationToken.None);
@@ -214,7 +214,7 @@ public class WanBenchmarks
         Assert.True(directElapsed < TimeSpan.FromMinutes(2));
     }
 
-    // ---------- 3) بث فيديو مستمر مع 20 stream آخر ----------
+    // ---------- 3) A sustained video stream with 20 other streams ----------
 
     [Fact]
     public async Task SustainedVideoStream_NoStall_NoMemoryGrowth()
@@ -251,7 +251,7 @@ public class WanBenchmarks
                     await Task.Delay(200, backgroundCts.Token);
                 }
             }
-            catch (Exception) { /* أُلغيت مع نهاية القياس */ }
+            catch (Exception) { /* cancelled with the end of the measurement */ }
             return moved;
         })).ToArray();
 
@@ -287,25 +287,25 @@ public class WanBenchmarks
             $"managed memory {baseline / 1024.0 / 1024:F1} → {midMemory / 1024.0 / 1024:F1} (mid) → {settled / 1024.0 / 1024:F1} MiB");
 
         Assert.Equal(video.TotalBytes, received);
-        // لا توقف: الوصلة تحتمل 5 Mbit/s بفارق كبير، فأي فجوة تتجاوز ثانيتين توقف حقيقي.
+        // No stall: the link carries 5 Mbit/s with a large margin, so any gap beyond two seconds is a real stall.
         Assert.True(maxGap < 2000, $"stall: {maxGap:F0} ms without data");
-        // البث انتهى في زمنه لا بعده بكثير (لم يتراكم تأخير).
+        // The stream finished in its time rather than well after it (no delay accumulated).
         Assert.True(elapsed < duration + TimeSpan.FromSeconds(10), $"video took {elapsed.TotalSeconds:F1} s for a {seconds} s stream");
-        // لا نمو غير محدود: النافذة 1 MiB لكل stream و21 stream ⇒ سقف نظري 21 MiB مخزنًا.
+        // No unbounded growth: a 1 MiB window per stream and 21 streams => a theoretical ceiling of 21 MiB buffered.
         Assert.True(settled - baseline < 64 * MiB, $"managed memory grew by {(settled - baseline) / (double)MiB:F1} MiB");
         Assert.True(wan.Host.Stats.OpenStreams <= background + 1, $"stream leak: {wan.Host.Stats.OpenStreams} open on the host");
     }
 
-    // ---------- 4) 256 stream متزامن على RTT 150 ms مع مستهلكين بطيئين ----------
+    // ---------- 4) 256 concurrent streams at an RTT of 150 ms with slow consumers ----------
 
     [Fact]
     public async Task Concurrent256Streams_SlowConsumersDoNotStarveTheRest()
     {
         const int rttMs = 150;
-        const int total = 256;      // حد المضيف في docs/protocol.md القسم 5
-        const int stalled = 32;     // منها: مستهلك متوقف على الوجهة
+        const int total = 256;      // the host's limit in docs/protocol.md section 5
+        const int stalled = 32;     // of which: a stalled consumer at the destination
         const long size = 256 * 1024;
-        const long pushIntoStalled = 8 * MiB;   // أكبر بكثير من النافذة: لو لم تكن هناك نافذة لمرّت كلها
+        const long pushIntoStalled = 8 * MiB;   // far larger than the window: with no window it would all have gone through
 
         await using var wan = await WanPair.CreateAsync(LinkProfile.FromRtt(rttMs));
         var measuredRtt = await wan.MeasureRttAsync(3);
@@ -332,7 +332,7 @@ public class WanBenchmarks
         Assert.All(opens, o => Assert.True(o.IsOpen, o.Reason?.ToString()));
         Assert.Equal(total, wan.Guest.Stats.OpenStreams);
 
-        // لا شيء يتحرك قبل هذه اللحظة: الوجهات السليمة لا ترد إلا على طلب.
+        // Nothing moves before this moment: the healthy destinations only answer a request.
         var clock = Perf.Start();
         var stalledWritten = new long[stalled];
         var stalledWriters = Enumerable.Range(0, stalled).Select(i => Task.Run(async () =>
@@ -354,7 +354,7 @@ public class WanBenchmarks
         })).WaitAsync(Limit);
         var healthyElapsed = clock.Elapsed;
 
-        // لقطة أثناء توقف المستهلكين: كم قبِلت الـ streams المتوقفة، وكم استلمت وجهاتها.
+        // A snapshot while the consumers are stalled: how much the stalled streams accepted, and how much their destinations received.
         var perStalled = stalledWritten.Sum() / (double)stalled;
         var receivedByStalledSinks = stalledTargets.Sum(t => t.Received);
         Assert.False(stalledWriters.Any(t => t.IsCompleted), "the stalled streams drained without their consumer moving");
@@ -377,10 +377,10 @@ public class WanBenchmarks
             $"({healthyElapsed.TotalMilliseconds / measuredRtt.TotalMilliseconds:F1} RTT) = {Perf.Rate(healthyBytes, healthyElapsed)} | " +
             $"stalled drained after release at {drainedElapsed.TotalMilliseconds:F0} ms");
 
-        // عزل النافذة: المستهلك المتوقف لم يستلم شيئًا، والمرسل توقف عند نافذة واحدة تقريبًا لا عند 8 MiB.
+        // Window isolation: the stalled consumer received nothing, and the sender stopped at about one window rather than at 8 MiB.
         Assert.Equal(0, receivedByStalledSinks);
         Assert.True(perStalled <= 4 * MiB, $"no isolation: each stalled stream accepted {perStalled / MiB:F1} MiB");
-        // والباقي أنهى عمله كاملًا أثناء ذلك، في زمن يحكمه الـ RTT لا التوقف.
+        // And the rest finished their work in full during it, in a time governed by the RTT rather than by the stall.
         Assert.Equal(total - stalled, healthy.Count);
         Assert.True(healthyElapsed < TimeSpan.FromSeconds(10), $"healthy streams took {healthyElapsed.TotalSeconds:F1} s");
     }

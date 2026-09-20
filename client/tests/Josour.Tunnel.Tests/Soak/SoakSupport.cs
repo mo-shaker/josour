@@ -6,12 +6,12 @@ using System.Text.Json;
 namespace Josour.Tunnel.Tests.Soak;
 
 /// <summary>
-/// إعداد تشغيل التحمّل، كله من متغيرات البيئة حتى يعمل بلا مراقبة ولا إعادة ترجمة:
+/// The soak run's configuration, all of it from environment variables so it runs unattended with no recompile:
 /// <code>
-///   ROUTEBRIDGE_SOAK_MINUTES   المدة بالدقائق (الافتراضي 30؛ 240 وأكثر مدعومة)
-///   ROUTEBRIDGE_SOAK_SAMPLE_S  الفاصل بين العيّنات بالثواني (الافتراضي 15)
-///   ROUTEBRIDGE_SOAK_RTT_MS    زمن الذهاب والإياب على الوصلة المُحاكاة (الافتراضي 150)
-///   ROUTEBRIDGE_SOAK_OUT       مجلد يُكتب فيه &lt;اسم التشغيل&gt;.jsonl و&lt;اسم التشغيل&gt;.summary.json
+///   ROUTEBRIDGE_SOAK_MINUTES   the duration in minutes (30 by default; 240 and more are supported)
+///   ROUTEBRIDGE_SOAK_SAMPLE_S  the interval between samples in seconds (15 by default)
+///   ROUTEBRIDGE_SOAK_RTT_MS    the round-trip time on the simulated link (150 by default)
+///   ROUTEBRIDGE_SOAK_OUT       a directory where &lt;run name&gt;.jsonl and &lt;run name&gt;.summary.json are written
 /// </code>
 /// </summary>
 internal sealed record SoakOptions(TimeSpan Duration, TimeSpan SampleInterval, double RttMs, string? OutputDirectory)
@@ -33,7 +33,7 @@ internal sealed record SoakOptions(TimeSpan Duration, TimeSpan SampleInterval, d
         => double.TryParse(Environment.GetEnvironmentVariable(name), NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ? value : fallback;
 }
 
-/// <summary>عيّنة واحدة. كل حقل رقم واحد حتى يصير السطر JSON قابلًا للرسم مباشرة.</summary>
+/// <summary>One sample. Every field is a single number so the line is JSON that can be plotted directly.</summary>
 internal sealed record SoakSample(
     double ElapsedSeconds,
     long ManagedHeapBytes,
@@ -58,9 +58,9 @@ internal sealed record SoakSample(
 }
 
 /// <summary>
-/// يقرأ حالة العملية. <see cref="OpenHandles"/> ليس رقمًا واحدًا في كل نظام:
-/// <c>Process.HandleCount</c> غير مدعوم على macOS، فالبديل عدّ واصفات الملفات المفتوحة من نظام الملفات.
-/// المهم في التحمّل هو <b>الاتجاه</b> لا القيمة المطلقة، وكلا المصدرين يعطي الاتجاه نفسه.
+/// It reads the process's state. <see cref="OpenHandles"/> is not one number on every system:
+/// <c>Process.HandleCount</c> is unsupported on macOS, so the alternative is counting the open file descriptors from the file system.
+/// What matters in a soak is the <b>trend</b> rather than the absolute value, and both sources give the same trend.
 /// </summary>
 internal static class ProcessProbe
 {
@@ -69,16 +69,16 @@ internal static class ProcessProbe
     private static int _forcedGen2;
 
     /// <summary>
-    /// عمليات الجمع التي أجراها <see cref="Settled()"/> نفسه. تُطرح من عدّادات الجمع في العيّنة، وإلا كان العمود
-    /// قياسًا للمقياس لا لضغط التخصيص: قياس الذاكرة المستقرة يفرض ثلاث عمليات جمع كاملة في كل عيّنة، وعلى نفق
-    /// خامل تكون هي <b>كل</b> ما يظهر في العمود.
+    /// The collections <see cref="Settled()"/> itself performed. They are subtracted from the sample's collection counters, otherwise the column would be
+    /// a measurement of the probe rather than of allocation pressure: measuring settled memory forces three full collections per sample, and on an idle
+    /// tunnel they are <b>all</b> that appears in the column.
     /// </summary>
     public static (int Gen0, int Gen1, int Gen2) ForcedCollections
         => (Volatile.Read(ref _forcedGen0), Volatile.Read(ref _forcedGen1), Volatile.Read(ref _forcedGen2));
 
     public static long ManagedHeap(bool settle) => settle ? Settled() : GC.GetTotalMemory(forceFullCollection: false);
 
-    /// <summary>ذاكرة مدارة بعد جمع كامل: الرقم الوحيد الذي يفرّق بين قمامة لم تُجمع بعد وبين تسريب.</summary>
+    /// <summary>Managed memory after a full collection: the only number that tells uncollected garbage apart from a leak.</summary>
     public static long Settled()
     {
         var g0 = GC.CollectionCount(0);
@@ -106,7 +106,7 @@ internal static class ProcessProbe
         catch (Exception) { return 0; }
     }
 
-    /// <summary>عدد المقابس والملفات المفتوحة. صفر = لا مصدر متاح على هذا النظام (لا «لا تسريب»).</summary>
+    /// <summary>The number of open sockets and files. Zero = no source is available on this system (not "no leak").</summary>
     public static int OpenHandles()
     {
         foreach (var directory in new[] { "/proc/self/fd", "/dev/fd" })
@@ -115,7 +115,7 @@ internal static class ProcessProbe
             {
                 if (Directory.Exists(directory)) return Directory.GetFileSystemEntries(directory).Length;
             }
-            catch (Exception) { /* جرّب التالي */ }
+            catch (Exception) { /* try the next one */ }
         }
         try { using var process = Process.GetCurrentProcess(); return process.HandleCount; }
         catch (Exception) { return 0; }
@@ -123,8 +123,8 @@ internal static class ProcessProbe
 }
 
 /// <summary>
-/// خط اتجاه على سلسلة عيّنات: الميل بالانحدار الخطي، ومقارنة النصف الأول بالنصف الثاني. المعيار المعلن في
-/// مهمة الأسبوع 6: <b>«كل ما ينمو رتيبًا تسريب»</b>، فالحكم على النمو عبر المدة لا على قمة لحظية.
+/// A trend line over a series of samples: the slope by linear regression, and comparing the first half with the second. The criterion declared in
+/// week six's task: <b>"anything that grows monotonically is a leak"</b>, so the verdict on growth is over the duration rather than on an instantaneous peak.
 /// </summary>
 internal readonly record struct Trend(double SlopePerHour, double FirstHalfMedian, double SecondHalfMedian, double Min, double Max, int Count)
 {
@@ -165,7 +165,7 @@ internal readonly record struct Trend(double SlopePerHour, double FirstHalfMedia
             $"{FirstHalfMedian / scale:F2} → {SecondHalfMedian / scale:F2} {unit} (min {Min / scale:F2}, max {Max / scale:F2}, slope {SlopePerHour / scale:F2} {unit}/h)");
 }
 
-/// <summary>يجمع العيّنات، يكتبها JSONL أثناء التشغيل (فلا يضيع شيء إن قُطع)، ويبني جدول الاتجاهات في النهاية.</summary>
+/// <summary>It gathers the samples, writes them as JSONL during the run (so nothing is lost if it is cut off), and builds the trend table at the end.</summary>
 internal sealed class SoakRecorder : IDisposable
 {
     private readonly List<SoakSample> _samples = new();
@@ -179,7 +179,7 @@ internal sealed class SoakRecorder : IDisposable
         Directory.CreateDirectory(options.OutputDirectory);
         JsonlPath = Path.Combine(options.OutputDirectory, runName + ".jsonl");
         SummaryPath = Path.Combine(options.OutputDirectory, runName + ".summary.json");
-        // بلا BOM: السطر الأول يجب أن يكون JSON صالحًا لأي قارئ، لا JSON مسبوقًا بثلاثة بايتات.
+        // With no BOM: the first line must be valid JSON to any reader, not JSON preceded by three bytes.
         _writer = new StreamWriter(JsonlPath, append: false, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)) { AutoFlush = true };
     }
 
@@ -195,7 +195,7 @@ internal sealed class SoakRecorder : IDisposable
         _writer?.WriteLine(sample.ToJsonLine());
     }
 
-    /// <summary>الاتجاهات التي تُقرأ بالعين في مخرجات الاختبار، وتُنسخ إلى <c>docs/soak-and-fuzz-week6.md</c>.</summary>
+    /// <summary>The trends read by eye in the test output, and copied into <c>docs/soak-and-fuzz-week6.md</c>.</summary>
     public IReadOnlyList<(string Metric, Trend Trend, string Text)> Trends()
     {
         const double MiB = 1024 * 1024;
@@ -223,7 +223,7 @@ internal sealed class SoakRecorder : IDisposable
         return (metric, trend, trend.Describe(unit, scale));
     }
 
-    /// <summary>ملخص آلي بجانب الـ JSONL: كل ما تحتاجه لوحة أو سكربت بلا إعادة حساب.</summary>
+    /// <summary>A machine-readable summary beside the JSONL: everything a dashboard or a script needs with no recomputation.</summary>
     public void WriteSummary(IReadOnlyDictionary<string, object?> extra)
     {
         if (SummaryPath is null) return;
@@ -254,7 +254,7 @@ internal sealed class SoakRecorder : IDisposable
     public void Dispose() => _writer?.Dispose();
 }
 
-/// <summary>زمن الفتح إلى أول بايت لكل stream خلال نافذة عيّنة واحدة. يُفرَّغ بعد كل عيّنة.</summary>
+/// <summary>The open-to-first-byte time for every stream within one sample's window. It is cleared after each sample.</summary>
 internal sealed class LatencyWindow
 {
     private readonly List<double> _values = new();

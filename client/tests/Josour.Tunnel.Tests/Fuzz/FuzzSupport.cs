@@ -9,18 +9,18 @@ using Josour.Tunnel.Tests.Mux;
 namespace Josour.Tunnel.Tests.Fuzz;
 
 /// <summary>
-/// كل حالة fuzz مبذورة (seeded) فتُعاد بحرفيتها: الفشل يُعاد إنتاجه بتمرير البذرة نفسها. لا عشوائية غير مبذورة
-/// في أي مكان من هذا المجلد.
+/// Every fuzz case is seeded, so it repeats literally: a failure is reproduced by passing the same seed. There is no unseeded randomness
+/// anywhere in this directory.
 /// </summary>
 internal static class FuzzSeed
 {
-    /// <summary>البذرة الجذر. تغييرها يغيّر كل الحالات، فلا تُغيَّر إلا عمدًا.</summary>
+    /// <summary>The root seed. Changing it changes every case, so it is changed only deliberately.</summary>
     public const int Root = 20260906;
 
     public static Random For(string scope, int iteration)
         => new(HashCode.Combine(Root, StringComparer.Ordinal.GetHashCode(scope), iteration));
 
-    /// <summary>عدد الحالات: <paramref name="quick"/> في المجموعة الافتراضية، ويرفعه متغير البيئة للتشغيل الطويل.</summary>
+    /// <summary>The number of cases: <paramref name="quick"/> in the default suite, raised by the environment variable for a long run.</summary>
     public static int Cases(int quick)
     {
         var text = Environment.GetEnvironmentVariable("ROUTEBRIDGE_FUZZ_CASES");
@@ -28,7 +28,7 @@ internal static class FuzzSeed
     }
 }
 
-/// <summary>تحويلات على مخزن بايتات مسجَّل من جلسة حقيقية. كلها حتمية بالنسبة إلى <see cref="Random"/> المعطى.</summary>
+/// <summary>Transformations on a byte corpus recorded from a real session. All of them are deterministic with respect to the <see cref="Random"/> given.</summary>
 internal static class Mutate
 {
     public static byte[] Random(Random rng, int length)
@@ -50,11 +50,11 @@ internal static class Mutate
         return copy;
     }
 
-    /// <summary>قطع في موضع عشوائي: إطار نصفي على السلك.</summary>
+    /// <summary>Truncation at a random position: a half frame on the wire.</summary>
     public static byte[] Truncate(byte[] input, Random rng)
         => input.Length == 0 ? input : input[..rng.Next(input.Length)];
 
-    /// <summary>حذف شريحة من الوسط: أطوال تعلن أكثر مما وصل.</summary>
+    /// <summary>Deleting a slice from the middle: lengths that declare more than arrived.</summary>
     public static byte[] Delete(byte[] input, Random rng)
     {
         if (input.Length < 4) return input;
@@ -66,7 +66,7 @@ internal static class Mutate
         return copy;
     }
 
-    /// <summary>تكرار شريحة: إطار مُعاد أو نصف إطار مُقحَم.</summary>
+    /// <summary>Repeating a slice: a replayed frame, or half a frame inserted.</summary>
     public static byte[] Duplicate(byte[] input, Random rng)
     {
         if (input.Length < 4) return input;
@@ -79,7 +79,7 @@ internal static class Mutate
         return copy;
     }
 
-    /// <summary>‏0xFF على شريحة: أي حقل طول داخلها يصير أكبر ما يمكن (طلب تخصيص ضخم).</summary>
+    /// <summary>0xFF over a slice: any length field inside it becomes the largest it can be (a huge allocation request).</summary>
     public static byte[] Saturate(byte[] input, Random rng)
     {
         var copy = (byte[])input.Clone();
@@ -90,7 +90,7 @@ internal static class Mutate
         return copy;
     }
 
-    /// <summary>إعادة ترتيب كتل: إطارات كاملة تصل بغير ترتيبها.</summary>
+    /// <summary>Reordering blocks: whole frames arriving out of order.</summary>
     public static byte[] Reorder(byte[] input, Random rng)
     {
         if (input.Length < 8) return input;
@@ -110,7 +110,7 @@ internal static class Mutate
         return blocks.SelectMany(b => b).ToArray();
     }
 
-    /// <summary>يختار تحويلًا واحدًا بحسب البذرة، ويعيد اسمه مع الناتج (الاسم يظهر في رسالة الفشل).</summary>
+    /// <summary>It picks one transformation by the seed and returns its name with the result (the name appears in the failure message).</summary>
     public static (string Name, byte[] Bytes) Any(byte[] corpus, Random rng)
         => rng.Next(8) switch
         {
@@ -125,7 +125,7 @@ internal static class Mutate
         };
 }
 
-/// <summary>غلاف يمرر كل شيء ويحتفظ بنسخة من كل ما كُتب: يبني مخزن الـ fuzz من حركة مرور حقيقية لا من التخمين.</summary>
+/// <summary>A wrapper that passes everything through and keeps a copy of everything written: it builds the fuzz corpus from real traffic rather than from guesswork.</summary>
 internal sealed class RecordingStream : Stream
 {
     private readonly Stream _inner;
@@ -172,8 +172,8 @@ internal sealed class RecordingStream : Stream
 }
 
 /// <summary>
-/// الحالة النهائية المقبولة لأي <see cref="NerdbankMux"/> بعد إدخال معادٍ: إما اكتمال نظيف (GOAWAY متبادل)،
-/// وإما عطل بـ <see cref="MuxClosedException"/> وحده. أي نوع استثناء آخر، أو عدم الاكتمال، عيب.
+/// The acceptable final state of any <see cref="NerdbankMux"/> after a hostile input: either a clean completion (a mutual GOAWAY),
+/// or a fault with <see cref="MuxClosedException"/> alone. Any other exception type, or not completing, is a defect.
 /// </summary>
 internal readonly record struct MuxVerdict(bool Completed, bool Faulted, Exception? Error)
 {
@@ -181,8 +181,8 @@ internal readonly record struct MuxVerdict(bool Completed, bool Faulted, Excepti
 }
 
 /// <summary>
-/// ضحية fuzz: <see cref="NerdbankMux"/> فوق طرف من زوج مقابس، والطرف الآخر بيد الاختبار يكتب فيه ما يشاء.
-/// مضخة تفريغ دائمة على جانب المهاجم حتى لا تتوقف كتابات الضحية على مخزن ممتلئ فيبدو التعليق تعليقًا وهو ليس منه.
+/// A fuzz victim: a <see cref="NerdbankMux"/> over one end of a socket pair, with the other end in the test's hand to write whatever it likes.
+/// A permanent drain pump on the attacker's side so the victim's writes do not stall on a full buffer and make a non-hang look like a hang.
 /// </summary>
 internal sealed class MuxVictim : IAsyncDisposable
 {
@@ -220,12 +220,12 @@ internal sealed class MuxVictim : IAsyncDisposable
         return new MuxVictim(mux, attackerSide);
     }
 
-    /// <summary>يكتب الحمولة دفعة واحدة.</summary>
+    /// <summary>It writes the payload in one go.</summary>
     public Task FeedAsync(byte[] payload) => _attacker.WriteAsync(payload, _cts.Token).AsTask();
 
     /// <summary>
-    /// يكتب الحمولة على قطع صغيرة (1..<paramref name="maxChunk"/> بايت) مع دفع بعد كل قطعة: هذا هو الشكل الذي
-    /// يجبر أي محلل على التعامل مع إطار مقسوم على عدة قراءات.
+    /// It writes the payload in small chunks (1..<paramref name="maxChunk"/> bytes) with a flush after each: this is the shape that
+    /// forces any parser to handle a frame split across several reads.
     /// </summary>
     public async Task FeedFragmentedAsync(byte[] payload, Random rng, int maxChunk = 3)
     {
@@ -239,15 +239,15 @@ internal sealed class MuxVictim : IAsyncDisposable
         }
     }
 
-    /// <summary>يقطع السلك (EOF عند الضحية) ثم ينتظر استقرار <see cref="NerdbankMux.Completion"/>.</summary>
+    /// <summary>It cuts the wire (EOF at the victim) and then waits for <see cref="NerdbankMux.Completion"/> to settle.</summary>
     public async Task<MuxVerdict> CloseAndSettleAsync(TimeSpan? within = null)
     {
-        try { await _attacker.FlushAsync(CancellationToken.None).ConfigureAwait(false); } catch { /* أُغلق */ }
-        try { _attacker.Dispose(); } catch { /* أُغلق */ }
+        try { await _attacker.FlushAsync(CancellationToken.None).ConfigureAwait(false); } catch { /* closed */ }
+        try { _attacker.Dispose(); } catch { /* closed */ }
         return await SettleAsync(within).ConfigureAwait(false);
     }
 
-    /// <summary>ينتظر اكتمال <see cref="NerdbankMux.Completion"/> بلا قطع السلك.</summary>
+    /// <summary>It waits for <see cref="NerdbankMux.Completion"/> to complete without cutting the wire.</summary>
     public async Task<MuxVerdict> SettleAsync(TimeSpan? within = null)
     {
         try
@@ -277,23 +277,23 @@ internal sealed class MuxVictim : IAsyncDisposable
                 Interlocked.Add(ref _drained, n);
             }
         }
-        catch (Exception) { /* أُغلق السلك */ }
+        catch (Exception) { /* the wire was closed */ }
     }
 
     public async ValueTask DisposeAsync()
     {
         _cts.Cancel();
-        try { await Mux.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(15)).ConfigureAwait(false); } catch { /* تجاهل */ }
-        try { _attacker.Dispose(); } catch { /* تجاهل */ }
-        try { await _drain.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false); } catch { /* تجاهل */ }
+        try { await Mux.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(15)).ConfigureAwait(false); } catch { /* ignore */ }
+        try { _attacker.Dispose(); } catch { /* ignore */ }
+        try { await _drain.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false); } catch { /* ignore */ }
         _cts.Dispose();
     }
 }
 
 /// <summary>
-/// طرف معادٍ يتكلم بروتوكول Nerdbank 3 الصحيح لكنه يكذب فوقه: يكتب على قناة التحكم المزروعة ما يشاء، ويعرض
-/// قنوات بأسماء لا يقبلها العقد، ويرد ببايتات حالة غير موجودة. هذا هو حد المسؤولية في ADR-0006: الإطارات
-/// تملكها المكتبة، وما داخلها (PING/PONG/GOAWAY وبايت الحالة واسم <c>host:port</c>) نملكه نحن.
+/// A hostile peer that speaks Nerdbank protocol 3 correctly but lies on top of it: it writes whatever it likes on the seeded control channel, offers
+/// channels with names the contract does not accept, and answers with status bytes that do not exist. This is the boundary of responsibility in ADR-0006: the frames
+/// are owned by the library, and what is inside them (PING/PONG/GOAWAY, the status byte and the <c>host:port</c> name) is ours.
 /// </summary>
 internal sealed class RawMuxPeer : IAsyncDisposable
 {
@@ -316,27 +316,27 @@ internal sealed class RawMuxPeer : IAsyncDisposable
         _controlDrain = Task.Run(DrainControlAsync);
     }
 
-    /// <summary>الضحية: <see cref="NerdbankMux"/> حقيقي بكل حلقاته.</summary>
+    /// <summary>The victim: a real <see cref="NerdbankMux"/> with all its loops.</summary>
     public NerdbankMux Victim { get; }
 
-    /// <summary>القناة المزروعة (المعرّف 0) كما يراها المعادي: مكان إطارات PING/PONG/GOAWAY.</summary>
+    /// <summary>The seeded channel (id 0) as the attacker sees it: where the PING/PONG/GOAWAY frames live.</summary>
     public MultiplexingStream.Channel Control { get; }
 
     public MultiplexingStream Mx => _mx;
 
-    /// <summary>ما وصل من الضحية على قناة التحكم، مصنَّفًا بنوع الإطار في عقدنا.</summary>
+    /// <summary>What arrived from the victim on the control channel, classified by the frame type in our contract.</summary>
     public int PongsReceived => Volatile.Read(ref _pongs);
     public int PingsReceived => Volatile.Read(ref _pings);
     public int GoAwaysReceived => Volatile.Read(ref _goAways);
     public int UnknownFramesReceived => Volatile.Read(ref _unknown);
 
-    /// <summary>سبب آخر GOAWAY وصل من الضحية (بايت الحمولة الأول كما هو على السلك).</summary>
+    /// <summary>The reason of the last GOAWAY that arrived from the victim (the first payload byte as it is on the wire).</summary>
     public byte? LastGoAwayReason { get; private set; }
 
-    /// <summary>هل يرد المعادي على PING بـ PONG؟ لازم لأي اختبار يستدعي <c>Victim.PingAsync</c>.</summary>
+    /// <summary>Does the attacker answer a PING with a PONG? Required by any test that calls <c>Victim.PingAsync</c>.</summary>
     public bool AnswerPings { get; set; }
 
-    /// <summary>ينتظر وصول GOAWAY من الضحية.</summary>
+    /// <summary>It waits for a GOAWAY to arrive from the victim.</summary>
     public async Task<bool> WaitForGoAwayAsync(TimeSpan within)
     {
         var deadline = DateTime.UtcNow + within;
@@ -360,8 +360,8 @@ internal sealed class RawMuxPeer : IAsyncDisposable
     }
 
     /// <summary>
-    /// يقبل كل قناة تعرضها الضحية ويكتب فيها بايت الحالة الذي يعيده <paramref name="statusFor"/>
-    /// (‏<c>null</c> = لا يكتب شيئًا ويغلق فورًا). هكذا يُختبر جانب Guest من بروتوكول بايت الحالة.
+    /// It accepts every channel the victim offers and writes into it the status byte <paramref name="statusFor"/> returns
+    /// (<c>null</c> = it writes nothing and closes at once). This is how the guest's side of the status-byte protocol is exercised.
     /// </summary>
     public void AcceptOffersWith(Func<string, byte?> statusFor)
     {
@@ -386,13 +386,13 @@ internal sealed class RawMuxPeer : IAsyncDisposable
                 }
                 catch (Exception)
                 {
-                    try { channel.Dispose(); } catch { /* تجاهل */ }
+                    try { channel.Dispose(); } catch { /* ignore */ }
                 }
             });
         };
     }
 
-    /// <summary>يقرأ قناة التحكم ويصنّف كل إطار تسعة بايتات (1 PING، 2 PONG، 3 GOAWAY).</summary>
+    /// <summary>It reads the control channel and classifies every nine-byte frame (1 PING, 2 PONG, 3 GOAWAY).</summary>
     private async Task DrainControlAsync()
     {
         var reader = Control.Input;
@@ -422,7 +422,7 @@ internal sealed class RawMuxPeer : IAsyncDisposable
                 if (result.IsCompleted || result.IsCanceled) return;
             }
         }
-        catch (Exception) { /* أُغلقت القناة */ }
+        catch (Exception) { /* the channel was closed */ }
     }
 
     public static async Task<RawMuxPeer> CreateAsync(TunnelRole victimRole = TunnelRole.Host, MuxOptions? victimOptions = null)
@@ -447,7 +447,7 @@ internal sealed class RawMuxPeer : IAsyncDisposable
             StartSuspended = true,
             TraceSource = new TraceSource("Josour.Fuzz", SourceLevels.Off),
         };
-        // نفس القناة المزروعة بنفس النافذة: الطرفان يتفقان على وجودها لا على ما يُكتب فيها.
+        // The same seeded channel with the same window: the two sides agree on its existence, not on what is written into it.
         options.SeededChannels.Add(new MultiplexingStream.ChannelOptions { ChannelReceivingWindowSize = MuxWindow.DistantWindow });
 
         var mx = MultiplexingStream.Create(peerSide, options);
@@ -456,16 +456,16 @@ internal sealed class RawMuxPeer : IAsyncDisposable
         return new RawMuxPeer(mx, control, peerSide, victim);
     }
 
-    /// <summary>يكتب بايتات خامًا على قناة التحكم (إطار سليم أو نصف إطار أو هراء).</summary>
+    /// <summary>It writes raw bytes on the control channel (a valid frame, half a frame, or nonsense).</summary>
     public async Task WriteControlAsync(ReadOnlyMemory<byte> bytes)
     {
-        // ‏GetSpan/Advance صراحةً: امتداد Write في Nerdbank.Streams يتنازع مع الذي في System.Buffers.
+        // GetSpan/Advance explicitly: Nerdbank.Streams's Write extension collides with the one in System.Buffers.
         bytes.Span.CopyTo(Control.Output.GetSpan(bytes.Length));
         Control.Output.Advance(bytes.Length);
         await Control.Output.FlushAsync().ConfigureAwait(false);
     }
 
-    /// <summary>إطار تحكم من عقدنا: <c>u8 type | 8 بايت حمولة</c>.</summary>
+    /// <summary>A control frame from our contract: <c>u8 type | 8 payload bytes</c>.</summary>
     public Task WriteControlFrameAsync(byte type, ReadOnlySpan<byte> payload8)
     {
         var frame = new byte[9];
@@ -474,7 +474,7 @@ internal sealed class RawMuxPeer : IAsyncDisposable
         return WriteControlAsync(frame);
     }
 
-    /// <summary>يعرض قناة بالاسم المعطى ويعيد بايت الحالة الذي يرد به الضحية (‏<c>0</c> = OPEN_OK).</summary>
+    /// <summary>It offers a channel with the given name and returns the status byte the victim answers with (<c>0</c> = OPEN_OK).</summary>
     public async Task<byte?> OfferAndReadStatusAsync(string name, TimeSpan timeout)
     {
         using var cts = new CancellationTokenSource(timeout);
@@ -522,26 +522,26 @@ internal sealed class RawMuxPeer : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        // ترتيب مقصود: يموت نقل المعادي أولًا. لو تخلصنا من الضحية أولًا لانتظر GoAwayDrainTimeout كاملًا في كل
-        // حالة (نصف ثانية × مئات الحالات) بلا فائدة، لأن لا أحد يغلق الطرف الآخر.
+        // A deliberate order: the attacker's transport dies first. Had we disposed of the victim first, every case would have waited out the whole GoAwayDrainTimeout
+        // (half a second x hundreds of cases) for nothing, because nobody is closing the other end.
         _cts.Cancel();
-        try { await _mx.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false); } catch { /* تجاهل */ }
-        try { await _transport.DisposeAsync().ConfigureAwait(false); } catch { /* تجاهل */ }
-        try { await Victim.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(15)).ConfigureAwait(false); } catch { /* تجاهل */ }
-        try { await _controlDrain.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false); } catch { /* تجاهل */ }
+        try { await _mx.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false); } catch { /* ignore */ }
+        try { await _transport.DisposeAsync().ConfigureAwait(false); } catch { /* ignore */ }
+        try { await Victim.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(15)).ConfigureAwait(false); } catch { /* ignore */ }
+        try { await _controlDrain.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false); } catch { /* ignore */ }
         _cts.Dispose();
     }
 }
 
-/// <summary>مخزن الـ fuzz: بايتات جلسة نفق حقيقية كما خرجت من <see cref="NerdbankMux"/> على السلك.</summary>
+/// <summary>The fuzz corpus: the bytes of a real tunnel session as they came out of <see cref="NerdbankMux"/> on the wire.</summary>
 internal static class MuxCorpus
 {
     private static byte[]? _cached;
     private static readonly SemaphoreSlim Gate = new(1, 1);
 
     /// <summary>
-    /// يسجّل جلسة كاملة: فتح ناجح ببيانات في الاتجاهين، فتح مرفوض بكل الأسباب، PING، إغلاق نصفي، ثم GOAWAY.
-    /// الناتج يحمل إطارات العرض والقبول والمحتوى وتحديث النافذة والإغلاق، وإطارات التحكم التسعة بايتات.
+    /// It records a complete session: a successful open with data in both directions, a refused open with every reason, a PING, a half-close, then a GOAWAY.
+    /// The result carries the offer, accept, content, window-update and close frames, and the nine-byte control frames.
     /// </summary>
     public static async Task<byte[]> GetAsync()
     {
@@ -594,12 +594,12 @@ internal static class MuxCorpus
 }
 
 /// <summary>
-/// يراقب استثناءات المهام غير المُلاحَظة أثناء نطاق fuzz (تجميعة الاختبارات لا تتوازى، فما يُلتقط من هذا التشغيل).
+/// It watches for unobserved task exceptions during a fuzz scope (the test assembly does not run in parallel, so what is caught is from this run).
 ///
-/// <para>يُصنَّف المُلتقَط إلى ما نصنعه نحن (<see cref="IsOurs"/>: نوع في فضاء أسماء Josour) وما تصنعه
-/// <c>Nerdbank.Streams</c> في مهامها الداخلية. الأول عيب يجب أن يكون صفرًا؛ الثاني ضجيج طرف ثالث لا نملك إصلاحه
-/// (‏<c>Channel.AutoCloseOnPipesClosureAsync</c> يعطل بـ IOException حين يموت النقل أثناء كتابة صادرة) فيُبلَّغ عنه
-/// عددًا ويُوثَّق في <c>docs/soak-and-fuzz-week6.md</c>.</para>
+/// <para>What is caught is classified into what we make (<see cref="IsOurs"/>: a type in the Josour namespace) and what
+/// <c>Nerdbank.Streams</c> makes in its internal tasks. The first is a defect that must be zero; the second is third-party noise we cannot fix
+/// (<c>Channel.AutoCloseOnPipesClosureAsync</c> faults with an IOException when the transport dies during an outbound write), so it is reported
+/// as a count and documented in <c>docs/soak-and-fuzz-week6.md</c>.</para>
 /// </summary>
 internal sealed class UnobservedExceptionWatch : IDisposable
 {
@@ -608,7 +608,7 @@ internal sealed class UnobservedExceptionWatch : IDisposable
 
     public UnobservedExceptionWatch() => TaskScheduler.UnobservedTaskException += OnUnobserved;
 
-    /// <summary>الاستثناءات الداخلية مسطَّحة، بعد جمع كامل وتشغيل المنهيات (الحدث لا يُرفع قبلهما).</summary>
+    /// <summary>The inner exceptions flattened, after a full collection and running the finalisers (the event is not raised before them).</summary>
     public IReadOnlyList<Exception> Drain()
     {
         GC.Collect(2, GCCollectionMode.Forced, blocking: true);
@@ -617,7 +617,7 @@ internal sealed class UnobservedExceptionWatch : IDisposable
         lock (_gate) return _seen.SelectMany(e => e is AggregateException a ? a.Flatten().InnerExceptions.AsEnumerable() : new[] { e }).ToArray();
     }
 
-    /// <summary>هل الاستثناء من صنعنا (نوع في Josour) لا من مهام المكتبة الداخلية؟</summary>
+    /// <summary>Is the exception ours (a type in Josour) rather than from the library's internal tasks?</summary>
     public static bool IsOurs(Exception e)
         => e.GetType().Namespace?.StartsWith("Josour", StringComparison.Ordinal) == true;
 

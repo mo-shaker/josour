@@ -6,20 +6,20 @@ using Josour.Tunnel.Mux;
 namespace Josour.Proxy.Tests;
 
 /// <summary>
-/// المسار المباشر على جانب الضيف بسياسة العناوين الحقيقية (بلا استثناء loopback الذي تستعمله بقية الاختبارات).
+/// The direct path on the guest's side with the real address policy (without the loopback exemption the other tests use).
 ///
 /// <para>
-/// لماذا يهم: <see cref="ProxyRouter"/> يرفض العنوان الحرفي، لكن الاسم الذي <b>يحلّ</b> إلى عنوان داخلي كان يمر
-/// إلى <c>Socket.ConnectAsync</c> قبل تقوية الأسبوع 4. الـ Proxy يسمع على 127.0.0.1 ويقبل من أي عملية محلية
-/// (فحص المالك يعمل فقط حين يُمرَّر متصفح)، فكان يصلح جسرًا نحو ما يسمعه هذا الجهاز نفسه: مستمع النفق أثناء
-/// نافذة الاتصال، منفذ الـ Relay، وأي خدمة على 127.0.0.1. الآن يُرفض بعد الحل وقبل أي مقبس.
+/// Why it matters: <see cref="ProxyRouter"/> refuses an address literal, but a name that <b>resolves</b> to an internal address used to pass
+/// through to <c>Socket.ConnectAsync</c> before week four's hardening. The proxy listens on 127.0.0.1 and accepts from any local process
+/// (the owner check only works when a browser is passed), so it made a bridge towards whatever this machine itself is listening on: the tunnel's listener during
+/// the connect window, the relay's port, and any service on 127.0.0.1. Now it is refused after resolution and before any socket.
 /// </para>
 /// </summary>
 public class ConnectProxyServerBlockedAddressTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
 
-    /// <summary>مستمع يمثل ما يسمعه هذا الجهاز نفسه (مستمع النفق أو منفذ Relay محلي). يجب ألا يقبل شيئًا أبدًا.</summary>
+    /// <summary>A listener standing in for what this machine itself is listening on (the tunnel's listener or a local relay port). It must never accept anything.</summary>
     private sealed class Victim : IDisposable
     {
         private readonly TcpListener _listener;
@@ -40,7 +40,7 @@ public class ConnectProxyServerBlockedAddressTests
                         Interlocked.Increment(ref _accepted);
                     }
                 }
-                catch { /* أُوقف */ }
+                catch { /* stopped */ }
             });
         }
 
@@ -64,18 +64,18 @@ public class ConnectProxyServerBlockedAddressTests
         using var victim = new Victim();
         var resolver = new StubResolver().Map("evil.test", resolvesTo);
         var mux = new FakeMux();
-        // سياسة العناوين الحقيقية: لا استثناء loopback هنا.
+        // The real address policy: no loopback exemption here.
         await using var proxy = Proxies.Start(mux, resolver, addressBlocker: Proxies.RealAddressPolicy);
         await using var client = await ProxyClient.ConnectAsync(proxy.Port);
 
-        // ‏evil.test ليس في القائمة ⇒ المسار المباشر، وهو المسار الذي نختبره.
+        // evil.test is not in the list => the direct path, which is the path under test.
         await client.SendAsync($"CONNECT evil.test:{victim.Port} HTTP/1.1\r\nHost: evil.test:{victim.Port}\r\n\r\n");
         var head = await client.ReadHeadAsync();
 
         Assert.Equal(403, head.Status);
-        Assert.Equal(1, resolver.Calls);                          // الرفض وقع بعد الحل لا قبله
-        Assert.Equal(0, victim.Accepted);                         // ولم يُفتح أي مقبس نحو الهدف
-        Assert.Empty(mux.Opens);                                  // ولم يُطلب من المضيف أن يفتحه نيابةً عنا
+        Assert.Equal(1, resolver.Calls);                          // the refusal happened after resolution, not before
+        Assert.Equal(0, victim.Accepted);                         // and no socket was opened towards the target
+        Assert.Empty(mux.Opens);                                  // and the host was not asked to open it on our behalf
         Assert.Equal(1, proxy.Counters.Rejected);
         Assert.Equal(0, proxy.Counters.DirectConnects);
         Assert.True(await client.ClosedWithoutDataAsync());
@@ -84,8 +84,8 @@ public class ConnectProxyServerBlockedAddressTests
     [Fact]
     public async Task Connect_AnyBlockedAddressInTheAnswerRejectsAll_EvenWhenAPublicOneIsAlsoThere()
     {
-        // DNS يعيد عنوانًا عامًا وآخر داخليًا: قاعدة العقد "أي عنوان محظور ⇒ ارفض" (القسم 6 الخطوة 6)
-        // تمنع Happy Eyeballs من اختيار الداخلي بعد الفحص.
+        // DNS returns one public address and one internal: the contract's rule "any blocked address => refuse" (section 6 step 6)
+        // stops Happy Eyeballs choosing the internal one after the check.
         using var victim = new Victim();
         var resolver = new StubResolver().Map("mixed.test", "93.184.216.34", "127.0.0.1");
         await using var proxy = Proxies.Start(new FakeMux(), resolver, addressBlocker: Proxies.RealAddressPolicy);
@@ -99,7 +99,7 @@ public class ConnectProxyServerBlockedAddressTests
     [Fact]
     public async Task Http_PlainRequestToABlockedName_Is403_WithNoConnection()
     {
-        // نفس القاعدة على مسار http:// المباشر لا على CONNECT وحده.
+        // The same rule on the direct http:// path, not on CONNECT alone.
         using var victim = new Victim();
         var resolver = new StubResolver().Map("evil.test", "127.0.0.1");
         await using var proxy = Proxies.Start(new FakeMux(), resolver, addressBlocker: Proxies.RealAddressPolicy);
@@ -121,7 +121,7 @@ public class ConnectProxyServerBlockedAddressTests
 
         await client.SendAsync($"CONNECT loop.test:{proxy.Port} HTTP/1.1\r\n\r\n");
         Assert.Equal(403, (await client.ReadHeadAsync()).Status);
-        Assert.Equal(1, proxy.Counters.Accepted); // اتصال واحد فقط: لم يتصل الـ Proxy بنفسه
+        Assert.Equal(1, proxy.Counters.Accepted); // one connection only: the proxy did not connect to itself
     }
 
     [Theory]
@@ -138,17 +138,17 @@ public class ConnectProxyServerBlockedAddressTests
 
         await client.SendAsync($"CONNECT {literal}:443 HTTP/1.1\r\n\r\n");
         Assert.Equal(403, (await client.ReadHeadAsync()).Status);
-        Assert.Equal(0, resolver.Calls); // العنوان الحرفي يسقط في الخطوة الأولى: لا DNS ولا مقبس
+        Assert.Equal(0, resolver.Calls); // an address literal falls at the first step: no DNS and no socket
     }
 
     [Fact]
     public async Task Connect_ToAPublicAddress_StillWorks_UnderTheRealPolicy()
     {
-        // إثبات أن التقوية لم تغلق المسار المباشر كله: عنوان عام يُوصل إليه كالمعتاد.
+        // Proving the hardening did not close the direct path entirely: a public address is reached as usual.
         using var origin = new LocalOrigin();
         var accept = origin.AcceptAsync();
         var resolver = new StubResolver().Map("public.test", "127.0.0.1");
-        // نُبقي السياسة الحقيقية عدا loopback لأنه لا سبيل لأصل عام حقيقي داخل الاختبار.
+        // We keep the real policy except for loopback, because there is no way to have a genuinely public origin inside the test.
         await using var proxy = Proxies.Start(new FakeMux(), resolver, addressBlocker: Proxies.BlockedExceptLoopback);
         await using var client = await ProxyClient.ConnectAsync(proxy.Port);
 

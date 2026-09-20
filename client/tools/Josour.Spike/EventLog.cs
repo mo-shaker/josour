@@ -3,11 +3,11 @@ using System.Text.Json;
 namespace Josour.Spike;
 
 /// <summary>
-/// سجل الأحداث المزدوج لأمر <c>session</c>: سطر JSON واحد لكل حدث على <b>stdout</b> (يقرأه سكربت QA أو يُحفظ كـ
-/// ‏JSONL)، وسطر بشري على <b>stderr</b> (يقرأه الإنسان الذي يشغّل الأداة). فصلهما يعني أن
-/// <c>… &gt; run.jsonl</c> يعطي ملفًا صالحًا للتحليل بينما تبقى المتابعة الحية على الشاشة.
+/// The dual event log for the <c>session</c> command: one JSON line per event on <b>stdout</b> (read by a QA script or kept as
+/// JSONL), and a human line on <b>stderr</b> (read by the person running the tool). Separating them means
+/// <c>… &gt; run.jsonl</c> gives a file fit for analysis while the live view stays on the screen.
 ///
-/// <para>شكل كل سطر: <c>{"ts","seq","role","event", …حقول الحدث}</c>. <c>ts</c> بـ ISO-8601 UTC و<c>seq</c> يبدأ من 1.</para>
+/// <para>Each line's shape: <c>{"ts","seq","role","event", …the event's fields}</c>. <c>ts</c> is ISO-8601 UTC and <c>seq</c> starts at 1.</para>
 /// </summary>
 public sealed class EventLog
 {
@@ -18,7 +18,7 @@ public sealed class EventLog
 
     public EventLog(string role) => _role = role;
 
-    /// <summary>هل تُطبع الأسطر البشرية على stderr؟ (<c>--quiet</c> يطفئها.)</summary>
+    /// <summary>Are the human lines printed on stderr? (<c>--quiet</c> turns them off.)</summary>
     public bool Human { get; init; } = true;
 
     public void Emit(string name, IReadOnlyDictionary<string, object?>? fields = null, string? human = null)
@@ -34,7 +34,7 @@ public sealed class EventLog
         {
             foreach (var (key, value) in fields)
             {
-                // حقول الحدث لا تدهس مفاتيح المظروف.
+                // An event's fields do not trample the envelope's keys.
                 record[key is "ts" or "seq" or "role" or "event" ? "_" + key : key] = value;
             }
         }
@@ -52,7 +52,7 @@ public sealed class EventLog
         }
     }
 
-    /// <summary>سطر بشري بلا حدث JSON (تعليمات وتحذيرات لا تخص مجرى البروتوكول).</summary>
+    /// <summary>A human line with no JSON event (instructions and warnings outside the protocol's stream).</summary>
     public void Note(string text)
     {
         if (!Human) return;

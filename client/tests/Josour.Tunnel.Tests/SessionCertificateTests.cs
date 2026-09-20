@@ -24,7 +24,7 @@ public class SessionCertificateTests
         Assert.Contains(SessionCertificate.ServerAuthOid, oids);
         Assert.Contains(SessionCertificate.ClientAuthOid, oids);
 
-        // الشهادات تقطع الثواني الجزئية
+        // Certificates truncate the fractional seconds
         Assert.InRange(cert.NotBefore, now.AddMinutes(-5).AddSeconds(-2), now.AddMinutes(-5).AddSeconds(1));
         Assert.InRange(cert.NotAfter, expiresAt.AddHours(1).AddSeconds(-2), expiresAt.AddHours(1).AddSeconds(1));
     }

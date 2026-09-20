@@ -7,11 +7,11 @@ using Josour.Tunnel.Transport;
 namespace Josour.Tunnel.Tests;
 
 /// <summary>
-/// جلسة كاملة فوق الـ Relay (ADR-0009): بلا مرشحين مباشرين إطلاقًا، فالمسار الوحيد الممكن هو الـ Relay.
+/// A complete session over the relay (ADR-0009): with no direct candidates at all, so the only possible path is the relay.
 ///
-/// <para>ما تثبته هذه الاختبارات تحديدًا هو النقطة التي كان الكود يتركها مفتوحة: على المسار المباشر «المستمع هو
-/// TLS Server»، وفوق الـ Relay لا مستمع أصلًا — الطرفان يتصلان خارجًا. لو بقيت القاعدة مشتقة من «من اتصل» لانتظر
-/// كلاهما مصافحة الآخر ولتعلّقت كل جلسة. القاعدة المعتمدة في docs/protocol.md القسم 3: المضيف Server دائمًا.</para>
+/// <para>What these tests prove specifically is the point the code used to leave open: on the direct path "the listener is the
+/// TLS server", and over the relay there is no listener at all — both sides connect outbound. Had the rule stayed derived from "who connected",
+/// both would have waited for the other's handshake and every session would have hung. The rule adopted in docs/protocol.md section 3: the host is always the server.</para>
 /// </summary>
 public class RelayTunnelTests
 {
@@ -34,8 +34,8 @@ public class RelayTunnelTests
         {
             BindAddress = IPAddress.Loopback,
             CandidateSource = () => new StaticCandidateSource(),
-            // اسم مضيف لا عنوان حرفي: هذا شكل RELAY_HOST الحقيقي، وتمرير "127.0.0.1" هنا هو ما أخفى
-            // عطلًا وصل إلى الإنتاج — النقل كان يرفض الاسم قبل أن يفتح مقبسًا.
+            // A hostname rather than an address literal: this is RELAY_HOST's real shape, and passing "127.0.0.1" here is what hid
+            // a defect that reached production — the transport was refusing the name before it opened a socket.
             Relay = new RelayEndpointInfo("localhost", relay.Port, token),
             HostEgress = role == TunnelRole.Host ? _ => new FakeEgress(log) : null,
             GuestProxy = role == TunnelRole.Guest ? _ => new FakeProxy(log) : null,
@@ -55,7 +55,7 @@ public class RelayTunnelTests
         var guestLocal = await guest.PrepareAsync(CancellationToken.None);
         var window = TimeSpan.FromSeconds(20);
 
-        // مصفوفة مرشحين فارغة للطرفين: لا مسار مباشر بأي حال، فما ينجح هو الـ Relay وحده.
+        // An empty candidate array for both sides: there is no direct path in any case, so what succeeds is the relay alone.
         var hostTask = host.ConnectAsync(new PeerEndpointInfo(guestLocal.CertFingerprintSha256Hex, Array.Empty<CandidateEndpoint>()), window, CancellationToken.None);
         var guestTask = guest.ConnectAsync(new PeerEndpointInfo(hostLocal.CertFingerprintSha256Hex, Array.Empty<CandidateEndpoint>()), window, CancellationToken.None);
         return new Pair(host, guest, await hostTask, await guestTask);
@@ -81,7 +81,7 @@ public class RelayTunnelTests
         await using var relay = new FakeRelay();
         await using var pair = await ConnectOverRelayAsync(relay);
 
-        // الـ Relay ينقل بايتات معتمة: TLS والمصادقة بين الجهازين كما في المباشر تمامًا.
+        // The relay carries opaque bytes: TLS and the authentication are between the two machines exactly as on the direct path.
         Assert.Contains(pair.HostResult.TlsVersion, new[] { "1.2", "1.3" });
         Assert.Equal(pair.HostResult.TlsVersion, pair.GuestResult.TlsVersion);
     }
@@ -105,7 +105,7 @@ public class RelayTunnelTests
         await using var relay = new FakeRelay();
         await using var pair = await ConnectOverRelayAsync(relay);
 
-        // التوكن بيان حامل حتى انتهاء صلاحيته، والتشخيص يُرفع إلى الخادم في session.connect_failed.
+        // The token is a bearer statement until it expires, and the diagnostics are reported to the server in session.connect_failed.
         foreach (var session in new[] { pair.Host, pair.Guest })
         {
             var rendered = string.Join("\n", session.Diagnostics.Select(kv => $"{kv.Key}={Describe(kv.Value)}"));
@@ -121,7 +121,7 @@ public class RelayTunnelTests
         await using var relay = new FakeRelay { ForcedStatus = RelayStatus.Unauthorized };
         await using var pair = await ConnectOverRelayAsync(relay);
 
-        // بلا مسار مباشر ومع رفض الـ Relay لا يبقى شيء؛ المهم أن ينتهي بنتيجة لا أن يعلّق حتى المهلة الخارجية.
+        // With no direct path and the relay refusing, nothing is left; what matters is that it ends with a result rather than hanging until the outer timeout.
         Assert.False(pair.HostResult.Connected);
         Assert.False(pair.GuestResult.Connected);
     }

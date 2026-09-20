@@ -11,10 +11,10 @@ using Josour.Infrastructure.Settings;
 namespace Josour.Spike;
 
 /// <summary>
-/// نفس الطبقة التي يبنيها تطبيق WPF عند الإقلاع، مركّبة بلا واجهة: إعدادات على القرص، مخزن أسرار، <see cref="ApiClient"/>
-/// مع <see cref="AuthenticatedHandler"/>، <see cref="AuthSession"/>، و<see cref="ControlChannel"/> حقيقي على WSS.
-/// لا شيء هنا خاص بالأداة عدا مكان الملفات: بجوار التنفيذي بدل <c>%LOCALAPPDATA%</c>، حتى تُشغَّل عدة هويات
-/// على الجهاز نفسه (<c>--state-dir</c>) ويُمسح كل شيء بحذف مجلد واحد (<c>--reset-device</c>).
+/// The same layer the WPF application builds at startup, assembled with no interface: settings on disk, a secret store, an <see cref="ApiClient"/>
+/// with an <see cref="AuthenticatedHandler"/>, an <see cref="AuthSession"/>, and a real <see cref="ControlChannel"/> over WSS.
+/// Nothing here is specific to the tool except where the files live: beside the executable instead of <c>%LOCALAPPDATA%</c>, so several identities can be run
+/// on the same machine (<c>--state-dir</c>) and everything is wiped by deleting one directory (<c>--reset-device</c>).
 /// </summary>
 public sealed class SessionStack : IAsyncDisposable
 {
@@ -49,8 +49,8 @@ public sealed class SessionStack : IAsyncDisposable
     public DeviceInfoProvider Device { get; }
 
     /// <summary>
-    /// يبني الطبقة ويثبّت عنوان الخادم في الإعدادات. <paramref name="resetDevice"/> يمسح هوية الجهاز والتوكنات
-    /// المخزّنة أولًا، فيسجّل الدخول التالي جهازًا جديدًا (يفيد حين يُلغى الجهاز على الخادم).
+    /// Builds the layer and pins the server's address in the settings. <paramref name="resetDevice"/> wipes the device identity and the stored
+    /// tokens first, so the next sign-in registers a new device (useful when the device has been revoked on the server).
     /// </summary>
     public static async Task<SessionStack> CreateAsync(string apiBaseUrl, string stateDirectory, bool resetDevice, ControlChannelOptions? channelOptions, CancellationToken ct)
     {
@@ -88,7 +88,7 @@ public sealed class SessionStack : IAsyncDisposable
         return new SessionStack(root, settings, secrets, http, api, auth, channel, device);
     }
 
-    /// <summary>القائمة من <c>GET /domains</c>. المدخلات غير الصالحة تُسقَط بدل أن تُسقط الجلسة كلها.</summary>
+    /// <summary>The list from <c>GET /domains</c>. Invalid entries are dropped rather than dropping the whole session.</summary>
     public async Task<(AllowlistMatcher Allowlist, int Version, int Skipped)> LoadAllowlistAsync(CancellationToken ct)
     {
         var result = await Api.GetDomainsAsync(null, ct).ConfigureAwait(false);
@@ -114,8 +114,8 @@ public sealed class SessionStack : IAsyncDisposable
 }
 
 /// <summary>
-/// ملتقط الإطارات الواردة: يبثها كأحداث ويسمح بانتظار إطار بعينه. القناة ترفع <c>MessageReceived</c> من حلقة
-/// توزيع واحدة بترتيب الوصول، فالانتظار هنا بلا تسابق ما دام المشترك قد سُجّل قبل إرسال الطلب.
+/// A catcher for the inbound frames: it broadcasts them as events and allows waiting for one particular frame. The channel raises <c>MessageReceived</c> from one
+/// dispatch loop in arrival order, so waiting here has no race as long as the subscriber was registered before the request was sent.
 /// </summary>
 public sealed class FrameWatcher : IDisposable
 {
@@ -131,7 +131,7 @@ public sealed class FrameWatcher : IDisposable
 
     public event Action<ControlMessage>? Frame;
 
-    /// <summary>ينتظر أول إطار يطابق <paramref name="match"/>. سجّل الانتظار قبل إرسال ما يستدعيه.</summary>
+    /// <summary>Waits for the first frame matching <paramref name="match"/>. Register the wait before sending what triggers it.</summary>
     public Task<ControlMessage> WaitAsync(Func<ControlMessage, bool> match)
     {
         var completion = new TaskCompletionSource<ControlMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -141,7 +141,7 @@ public sealed class FrameWatcher : IDisposable
 
     private void OnMessage(ControlMessage message)
     {
-        try { Frame?.Invoke(message); } catch { /* المستمع مسؤول عن أخطائه */ }
+        try { Frame?.Invoke(message); } catch { /* the listener is responsible for its own errors */ }
 
         List<TaskCompletionSource<ControlMessage>>? matched = null;
         lock (_gate)

@@ -29,13 +29,13 @@ public class StreamLimiterTests
         var limiter = new StreamLimiter(maxConcurrent: 10_000, maxOpensPerSecond: 50, nowTicks: () => now);
         for (var i = 0; i < 50; i++)
         {
-            Assert.NotNull(limiter.TryAcquire()); // فتح واحد كل ملّي ثانية: t0 .. t0+49
+            Assert.NotNull(limiter.TryAcquire()); // one open per millisecond: t0 .. t0+49
             now++;
         }
         now = 1_000_000 + 999;
         Assert.Null(limiter.TryAcquire());
         now = 1_000_000 + 1000;
-        Assert.NotNull(limiter.TryAcquire()); // أقدم فتح (t0) خرج من النافذة؛ الباقي 49 ما زالت داخلها
+        Assert.NotNull(limiter.TryAcquire()); // the oldest open (t0) left the window; the other 49 are still inside it
         Assert.Null(limiter.TryAcquire());
     }
 

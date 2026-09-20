@@ -499,9 +499,9 @@ public sealed class SessionCoordinatorTests
     [Fact]
     public async Task Expiry_TearsDownLocally_WithoutClaimingTheServersVerdict()
     {
-        // "expired" حكم من أحكام الخادم (ws-protocol القسم 9): مؤقته مشتق من expires_at نفسه.
-        // العميل يفكك فورًا حتى لا يمر بايت بعد انتهاء المدة، لكنه لا يرسل session.end
-        // لأن الخادم يرد عليها bad_request، ثم يصله session.terminate خلال فارق الساعتين.
+        // "expired" is one of the server's own judgements (ws-protocol section 9): its timer derives from the same expires_at.
+        // The client tears down at once so not a byte passes after the duration runs out, but it does not send session.end
+        // because the server answers it with bad_request, and then session.terminate arrives within the difference between the two clocks.
         await using var rig = await Rig.StartAsync();
         await rig.RunToActiveAsync(SessionInfo.GuestRole);
 
@@ -532,7 +532,7 @@ public sealed class SessionCoordinatorTests
     [Fact]
     public async Task SleepAndResume_EndsTheLiveSessionCleanly_AndTheChannelComesBack()
     {
-        // plan 8.5 (نوم الجهاز): the socket does not survive the sleep, so the server has already ended the session by
+        // plan 8.5 (the machine sleeping): the socket does not survive the sleep, so the server has already ended the session by
         // the time Windows says "resumed". The local side must tear down — browser closed, tunnel disposed — and the
         // channel must come back on its own, with the resume signal cutting short the wait.
         await using var rig = await Rig.StartAsync();
@@ -558,7 +558,7 @@ public sealed class SessionCoordinatorTests
     [Fact]
     public async Task TokenExpiryMidSession_TearsTheSessionDownCleanly_AndTheChannelComesBack()
     {
-        // plan 8.5 "انتهاء access token", on the WebSocket side: the server closes the live connection with 4401. The
+        // plan 8.5 "the access token expiring", on the WebSocket side: the server closes the live connection with 4401. The
         // channel refreshes once and reconnects, and because the socket was gone in between the server has already ended
         // the session (guest_disconnected) — so the local side must tear down cleanly rather than keep a dead tunnel.
         await using var rig = await Rig.StartAsync();
@@ -785,7 +785,7 @@ public sealed class SessionCoordinatorTests
         Assert.Single(rig.Api.DiagnosticsPosts);
     }
 
-    // ---------- the clock (plan 8.5: "الوقت") ----------
+    // ---------- the clock (plan 8.5: "Time") ----------
 
     [Theory]
     [InlineData(45)]   // this machine is 45 minutes behind the server
@@ -1026,7 +1026,7 @@ public sealed class SessionCoordinatorTests
         }
 
         /// <summary>Moves the hand-driven clock forward in steps until the awaited frame arrives.</summary>
-        /// <summary>يدفع الساعة حتى يتحقق شرط، لا حتى تصل رسالة: يلزم عندما يكون السلوك الصحيح ألا تُرسل رسالة.</summary>
+        /// <summary>It advances the clock until a condition holds, not until a message arrives: needed when the correct behaviour is that no message is sent.</summary>
         public async Task AdvanceUntilAsync(Func<bool> condition, TimeSpan step, int steps)
         {
             for (var i = 0; i < steps && !condition(); i++)

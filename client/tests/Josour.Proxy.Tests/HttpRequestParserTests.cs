@@ -165,7 +165,7 @@ public class HttpRequestParserTests
     [Fact]
     public void WindowsPidChecker_PortByteOrder()
     {
-        // 0x01BB = 443 بترتيب الشبكة في أدنى 16 بت: البايت الأدنى أولًا
+        // 0x01BB = 443 in network order in the lowest 16 bits: the low byte first
         Assert.Equal(443, TcpTableFormat.PortFromDword(0x0000BB01));
         Assert.Equal(1, TcpTableFormat.PortFromDword(0x00000100));
     }

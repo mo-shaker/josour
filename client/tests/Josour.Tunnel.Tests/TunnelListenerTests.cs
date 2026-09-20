@@ -67,13 +67,13 @@ public class TunnelListenerTests
                 }
                 catch (SocketException)
                 {
-                    // الإغلاق الفوري (Close(0) = RST) قد يسبق اكتمال connect على هذا النظام: رفض أيضًا.
+                    // An immediate close (Close(0) = RST) may precede the connect completing on this system: also a refusal.
                     resetOnConnect++;
                     client.Dispose();
                 }
             }
 
-            // InboundAttempts يزداد قبل قرار الرفض، فالانتظار عليه وحده يترك سباقًا مع Pending/RejectedOverCapacity.
+            // InboundAttempts increments before the refusal decision, so waiting on it alone leaves a race with Pending/RejectedOverCapacity.
             var deadline = DateTime.UtcNow.AddSeconds(5);
             while ((listener.InboundAttempts < 6 || listener.RejectedOverCapacity < 2) && DateTime.UtcNow < deadline) await Task.Delay(20);
 

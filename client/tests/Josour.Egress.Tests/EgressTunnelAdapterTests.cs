@@ -8,7 +8,7 @@ using Josour.Tunnel.Mux;
 namespace Josour.Egress.Tests;
 
 /// <summary>
-/// الجسر بين <see cref="TunnelSession"/> وسياسة الخروج: بناء السياسة من سياق الجلسة وربطها بـ acceptor الـ Mux.
+/// The bridge between <see cref="TunnelSession"/> and the egress policy: building the policy from the session's context and wiring it to the mux's acceptor.
 /// </summary>
 public class EgressTunnelAdapterTests
 {
@@ -70,14 +70,14 @@ public class EgressTunnelAdapterTests
         Assert.False(decision.IsOk);
         Assert.Equal(OpenFailReason.PortNotAllowed, decision.Reason);
         Assert.Empty(adapter.Domains);
-        Assert.Equal(0, resolver.Calls); // الرفض قبل DNS
+        Assert.Equal(0, resolver.Calls); // the refusal comes before DNS
     }
 
     [Fact]
     public async Task Create_BlocksTheHostsOwnAddresses_FromTheContext()
     {
         var acceptor = new FakeAcceptor();
-        var ours = IPAddress.Parse("93.184.216.34"); // عنوان عام لا تحظره النطاقات وحدها
+        var ours = IPAddress.Parse("93.184.216.34"); // a public address the ranges alone do not block
         var resolver = new StubResolver().Map("mirror.test", ours.ToString());
         await using var adapter = EgressTunnelAdapter.Create(Context(acceptor, new[] { "mirror.test" }, resolver, blockedLocals: new[] { ours }));
         adapter.Attach(acceptor);
@@ -102,7 +102,7 @@ public class EgressTunnelAdapterTests
         Assert.Equal(1, adapter.Handler.OpensFailed);
         Assert.Equal(0, adapter.Handler.OpensOk);
         await adapter.DisposeAsync();
-        await adapter.DisposeAsync(); // آمن مرتين
+        await adapter.DisposeAsync(); // safe twice
     }
 
     [Fact]
@@ -128,8 +128,8 @@ public class EgressTunnelAdapterTests
     }
 
     /// <summary>
-    /// حد الـ streams المتزامنة يأتي من شريحة النافذة التي اشتقتها الجلسة (docs/protocol.md القسم 5:
-    /// 256 عند 1 MiB، 128 عند 2 MiB، 64 عند 4 MiB) ولم يعد 256 مثبتًا. حد الـ 50 فتحة/ثانية لا يتغير.
+    /// The concurrent stream limit comes from the window band the session derived (docs/protocol.md section 5:
+    /// 256 at 1 MiB, 128 at 2 MiB, 64 at 4 MiB) and is no longer pinned at 256. The 50 opens/second limit does not change.
     /// </summary>
     [Theory]
     [InlineData(256)]
@@ -158,7 +158,7 @@ public class EgressTunnelAdapterTests
     }
 }
 
-/// <summary>acceptor وهمي: يحتفظ بالمعالج الذي يسجّله المحوّل ليستدعيه الاختبار مباشرة.</summary>
+/// <summary>A fake acceptor: it keeps the handler the adapter registers so the test can call it directly.</summary>
 internal sealed class FakeAcceptor : IMuxAcceptor
 {
     public Func<MuxOpenRequest, CancellationToken, Task<MuxOpenDecision>>? OpenRequested { get; set; }

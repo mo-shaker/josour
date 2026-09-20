@@ -68,7 +68,7 @@ internal sealed class StubResolver : IHostResolver
     }
 }
 
-/// <summary>مستمع TCP محلي يمثل موقعًا وجهة.</summary>
+/// <summary>A local TCP listener standing in for a destination site.</summary>
 internal sealed class LocalOrigin : IDisposable
 {
     private readonly TcpListener _listener;
@@ -95,7 +95,7 @@ internal sealed class LocalOrigin : IDisposable
     public void Dispose() => _listener.Stop();
 }
 
-/// <summary>أصل HTTP بدائي: يقبل اتصالًا واحدًا، يقرأ رأس الطلب، يرد بجسم ثابت ويغلق.</summary>
+/// <summary>A primitive HTTP origin: it accepts one connection, reads the request head, answers with a fixed body and closes.</summary>
 internal sealed class HttpOrigin : IDisposable
 {
     private readonly LocalOrigin _origin = new();
@@ -114,7 +114,7 @@ internal sealed class HttpOrigin : IDisposable
         await stream.WriteAsync(head);
         await stream.WriteAsync(payload);
         socket.Shutdown(SocketShutdown.Send);
-        // ننتظر إغلاق الطرف الآخر ثم نغلق
+        // We wait for the other side to close, then close
         var buffer = new byte[1024];
         try { while (await stream.ReadAsync(buffer) > 0) { } } catch { }
     });
@@ -124,7 +124,7 @@ internal sealed class HttpOrigin : IDisposable
 
 internal sealed record ResponseHead(int Status, Dictionary<string, string> Headers, byte[] Remainder);
 
-/// <summary>عميل خام على مقبس نحو الـ Proxy.</summary>
+/// <summary>A raw client on a socket towards the proxy.</summary>
 internal sealed class ProxyClient : IAsyncDisposable
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
@@ -194,7 +194,7 @@ internal sealed class ProxyClient : IAsyncDisposable
         return body;
     }
 
-    /// <summary>هل أُغلق الاتصال بلا أي بايت؟</summary>
+    /// <summary>Was the connection closed with no bytes at all?</summary>
     public async Task<bool> ClosedWithoutDataAsync()
     {
         var one = new byte[1];
@@ -203,7 +203,7 @@ internal sealed class ProxyClient : IAsyncDisposable
             var n = await Stream.ReadAsync(one).AsTask().WaitAsync(Timeout);
             return n == 0;
         }
-        // الإغلاق الفوري قد يصل FIN نظيفًا أو RST؛ كلاهما "أُغلق بلا بيانات" لغرض هذا الفحص.
+        // An immediate close may arrive as a clean FIN or as an RST; both are "closed with no data" for the purpose of this check.
         catch (IOException) { return true; }
         catch (SocketException) { return true; }
     }
@@ -229,7 +229,7 @@ internal sealed class ProxyClient : IAsyncDisposable
 
 internal static class TcpPair
 {
-    /// <summary>زوج مقبسين على loopback: SocketStream (كأنه stream النفق) والمقبس البعيد للاختبار.</summary>
+    /// <summary>A pair of sockets on loopback: a SocketStream (as if it were the tunnel's stream) and the far socket for the test.</summary>
     public static async Task<(SocketStream Near, Socket Far)> CreateAsync()
     {
         using var origin = new LocalOrigin();
@@ -242,7 +242,7 @@ internal static class TcpPair
 
 internal static class Proxies
 {
-    /// <summary>ينتظر شرطًا يتحقق من مهمة خلفية (الرفض والعدّ يحدثان بعد إغلاق المقبس).</summary>
+    /// <summary>Waits for a condition satisfied by a background task (the refusal and the counting happen after the socket is closed).</summary>
     public static async Task WaitForAsync(Func<bool> condition, int timeoutMs = 5000)
     {
         var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
@@ -252,13 +252,13 @@ internal static class Proxies
     public static readonly string[] DefaultEntries = { "allowed.example", "=exact.example", "portal.example:8443" };
 
     /// <summary>
-    /// حظر العناوين كما في الإنتاج عدا loopback: الأصول في هذه الاختبارات تسكن 127.0.0.1، والسياسة الحقيقية
-    /// (المفحوصة في <c>ConnectProxyServerBlockedAddressTests</c>) ترفضها. نظير <c>InProcessTunnelPair</c> على المضيف.
+    /// Blocking addresses as in production except loopback: the origins in these tests live on 127.0.0.1, and the real policy
+    /// (exercised in <c>ConnectProxyServerBlockedAddressTests</c>) refuses them. The counterpart of <c>InProcessTunnelPair</c> on the host.
     /// </summary>
     public static bool BlockedExceptLoopback(IPAddress address)
         => !IPAddress.IsLoopback(address) && IpRangePolicy.IsBlocked(address);
 
-    /// <summary>سياسة العناوين الإنتاجية بلا أي استثناء (اختبارات الحظر بعد الحل).</summary>
+    /// <summary>The production address policy with no exemption at all (the tests for blocking after resolution).</summary>
     public static readonly Func<IPAddress, bool> RealAddressPolicy = address => IpRangePolicy.IsBlocked(address);
 
     public static ConnectProxyServer Start(
@@ -283,7 +283,7 @@ internal static class Proxies
             OwnerPidChecker = checker ?? PermissiveOwnerPidChecker.Instance,
             RejectUnknownOwner = rejectUnknown,
             AddressBlocker = addressBlocker ?? BlockedExceptLoopback,
-            // الافتراضي: لا Proxy نظام. الاختبارات لا تعتمد على إعدادات جهاز المطوّر أو متغيرات بيئته.
+            // The default: no system proxy. The tests do not depend on the developer machine's settings or its environment variables.
             SystemProxy = systemProxy ?? NoSystemProxy.Instance,
             DirectConnectTimeout = TimeSpan.FromSeconds(3),
         });

@@ -46,7 +46,7 @@ public class TlsChannelTests
             TlsChannel.AuthenticateAsClientAsync(client, otherCert.FingerprintSha256, Timeout, CancellationToken.None));
 
         try { var r = await serverTask; await r.Stream.DisposeAsync(); }
-        catch (Exception) { /* الخادم يفشل أيضًا أو يكتشف الإغلاق؛ كلاهما مقبول */ }
+        catch (Exception) { /* the server fails too, or notices the close; both are acceptable */ }
     }
 
     [Fact]

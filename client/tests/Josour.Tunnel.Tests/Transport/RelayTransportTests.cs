@@ -6,7 +6,7 @@ using Josour.Tunnel.Transport;
 namespace Josour.Tunnel.Tests.Transport;
 
 /// <summary>
-/// جانب العميل من الـ Relay مقابل Relay وهمي داخل العملية: المقدمة، الرد، الاقتران، ومرور البايتات المعتمة.
+/// The relay's client side against a fake in-process relay: the preamble, the reply, the pairing, and the opaque bytes passing through.
 /// </summary>
 public class RelayTransportTests
 {
@@ -108,7 +108,7 @@ public class RelayTransportTests
         var second = Create(relay, sessionId, TunnelRole.Guest);
 
         var firstTask = first.ConnectAsync(relay.Endpoint, Timeout, CancellationToken.None);
-        // ننتظر وصول الأول فعلًا حتى لا يتبادل الاثنان الدورين تحت الحمل
+        // We wait for the first to actually arrive so the two do not swap roles under load
         var deadline = DateTime.UtcNow.AddSeconds(10);
         while (relay.Received.Count == 0 && DateTime.UtcNow < deadline) await Task.Delay(20);
         Assert.Single(relay.Received);
@@ -116,7 +116,7 @@ public class RelayTransportTests
         var error = await Assert.ThrowsAsync<RelayRejectedException>(
             () => second.ConnectAsync(relay.Endpoint, Timeout, CancellationToken.None));
         Assert.Equal(RelayStatus.Busy, error.Status);
-        Assert.False(firstTask.IsCompleted); // الأول ما زال ينتظر طرفًا مقابلًا
+        Assert.False(firstTask.IsCompleted); // the first is still waiting for a counterpart
     }
 
     [Fact]

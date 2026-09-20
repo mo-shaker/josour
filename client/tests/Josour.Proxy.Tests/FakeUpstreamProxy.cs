@@ -6,9 +6,9 @@ using Josour.Core.Net;
 namespace Josour.Proxy.Tests;
 
 /// <summary>
-/// (مشترك: مربوط أيضًا في <c>Josour.E2E.Tests</c>؛ سلوك واحد للطرفين.)
-/// Proxy أعلى محلي يمثل Proxy شبكة الشركة: يقبل <c>CONNECT host:port</c> فيوصل إلى الأصل الحقيقي،
-/// و<c>GET http://host/path</c> (absolute-URI) فيرد بنفسه. يستطيع أن يطلب مصادقة (407) مرة واحدة.
+/// (Shared: linked into <c>Josour.E2E.Tests</c> as well; one behaviour for both.)
+/// A local upstream proxy standing in for a company network's proxy: it accepts <c>CONNECT host:port</c> and connects to the real origin,
+/// and <c>GET http://host/path</c> (an absolute-URI) which it answers itself. It can demand authentication (407) once.
 /// </summary>
 internal sealed class FakeUpstreamProxy : IAsyncDisposable
 {
@@ -29,16 +29,16 @@ internal sealed class FakeUpstreamProxy : IAsyncDisposable
 
     public int Port { get; }
 
-    /// <summary>ترد 407 على كل طلب بلا <c>Proxy-Authorization</c>.</summary>
+    /// <summary>It answers 407 to every request with no <c>Proxy-Authorization</c>.</summary>
     public bool RequireAuthentication { get; set; }
 
-    /// <summary>ترد 502 على كل CONNECT (لاختبار الفشل الصادق).</summary>
+    /// <summary>It answers 502 to every CONNECT (to test the truthful failure).</summary>
     public bool RefuseConnect { get; set; }
 
-    /// <summary>جسم الرد على طلبات http العادية.</summary>
+    /// <summary>The reply body for ordinary http requests.</summary>
     public string HttpBody { get; set; } = "from upstream proxy";
 
-    /// <summary>ترسل هذه البايتات مع رأس رد CONNECT نفسه (اختبار البايتات التي تلي الرأس).</summary>
+    /// <summary>It sends these bytes with the CONNECT reply head itself (to test the bytes that follow the head).</summary>
     public byte[] ConnectRemainder { get; set; } = Array.Empty<byte>();
 
     public IReadOnlyList<string> RequestLines { get { lock (_gate) return _requestLines.ToArray(); } }
@@ -100,7 +100,7 @@ internal sealed class FakeUpstreamProxy : IAsyncDisposable
         }
         catch (Exception)
         {
-            // اتصال واحد فشل
+            // One connection failed
         }
     }
 
@@ -137,7 +137,7 @@ internal sealed class FakeUpstreamProxy : IAsyncDisposable
                 await to.FlushAsync(_cts.Token);
             }
         }
-        catch (Exception) { /* أُغلق */ }
+        catch (Exception) { /* closed */ }
     }
 
     private Task WriteAsync(Stream stream, string text) => stream.WriteAsync(Encoding.ASCII.GetBytes(text), _cts.Token).AsTask();
@@ -146,7 +146,7 @@ internal sealed class FakeUpstreamProxy : IAsyncDisposable
     {
         _cts.Cancel();
         _listener.Stop();
-        try { await _loop; } catch { /* تجاهل */ }
+        try { await _loop; } catch { /* ignore */ }
         _cts.Dispose();
     }
 }

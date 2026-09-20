@@ -7,8 +7,8 @@ using Xunit.Abstractions;
 namespace Josour.Tunnel.Tests.Fuzz;
 
 /// <summary>
-/// ‏fuzz على محلل مقدمة الـ Relay (<see cref="RelayProtocol"/>). المقدمة هي أول ما يقرأه أي طرف من طرف آخر لم
-/// يُصادَق بعد، فهي — مع <c>AUTH1</c> — الحد الذي يصله مدخل معادٍ قبل أي تحقق.
+/// Fuzzing the relay's preamble parser (<see cref="RelayProtocol"/>). The preamble is the first thing either side reads from a peer that has not
+/// been authenticated yet, so it is — with <c>AUTH1</c> — the boundary a hostile input reaches before any verification.
 /// </summary>
 public class RelayProtocolFuzzTests
 {
@@ -19,9 +19,9 @@ public class RelayProtocolFuzzTests
 
     private static byte[] Valid(string token = "signed-token") => RelayProtocol.BuildPreamble(Guid.NewGuid(), TunnelRole.Host, token);
 
-    // ---------- التحليل في الذاكرة ----------
+    // ---------- Parsing in memory ----------
 
-    /// <summary>بايتات عشوائية: لا يرمي أبدًا، وما يقبله يحترم كل قيد في العقد.</summary>
+    /// <summary>Random bytes: it never throws, and what it accepts respects every constraint in the contract.</summary>
     [Fact]
     public void TryParsePreamble_NeverThrows_AndKeepsItsContract()
     {
@@ -30,9 +30,9 @@ public class RelayProtocolFuzzTests
         for (var i = 0; i < cases; i++)
         {
             var rng = FuzzSeed.For("relay-random", i);
-            // بايتات عشوائية خالصة لا تعبر فحص السحر أبدًا، فثلثا الحالات تُبنى بمقدمة صحيحة البنية: هكذا يصل
-            // الـ fuzz فعلًا إلى فحص الدور وطول التوكن وفك ترميز UTF-8 لا إلى أول سطر وحده. والثلث الأخير يحمل
-            // توكنًا ASCII صالحًا ليثبت أن مسار القبول قابل للوصول أصلًا (وإلا كان «صفر مقبول» بلا معنى).
+            // Purely random bytes never pass the magic check, so two thirds of the cases are built with a structurally valid preamble: that is how
+            // the fuzz actually reaches the role check, the token length and the UTF-8 decoding rather than the first line alone. And the last third carries
+            // a valid ASCII token to prove the acceptance path is reachable at all (otherwise "zero accepted" would mean nothing).
             var bytes = Mutate.Random(rng, rng.Next(0, 1200));
             if (i % 3 != 0 && bytes.Length > RelayProtocol.FixedPreambleLength)
             {
@@ -65,7 +65,7 @@ public class RelayProtocolFuzzTests
         Assert.True(accepted > 0, "no generated preamble was ever accepted; the fuzz never reaches the accepting path");
     }
 
-    /// <summary>قطع عند كل طول ممكن: كل ما دون المقدمة الكاملة يُرفض، والكامل يُقبل.</summary>
+    /// <summary>Truncation at every possible length: anything short of the full preamble is refused, and the full one is accepted.</summary>
     [Fact]
     public void TruncationAtEveryLength_IsRejected_ExceptTheCompletePreamble()
     {
@@ -75,7 +75,7 @@ public class RelayProtocolFuzzTests
         Assert.True(RelayProtocol.TryParsePreamble(valid, out _, out _));
     }
 
-    /// <summary>قلب بت واحد في كل موضع من المقدمة: لا يرمي، وما يُقبل يبقى داخل العقد.</summary>
+    /// <summary>Flipping one bit at every position of the preamble: it does not throw, and what is accepted stays within the contract.</summary>
     [Fact]
     public void EverySingleBitFlip_IsHandled()
     {
@@ -96,16 +96,16 @@ public class RelayProtocolFuzzTests
     }
 
     /// <summary>
-    /// توكن ببايتات ليست UTF-8 صالحة. <b>عيب أُصلح في الأسبوع 6:</b> فك الترميز كان بـ
-    /// <c>Encoding.UTF8</c> الافتراضي الذي <i>يستبدل</i> البايت الفاسد بـ U+FFFD ولا يرمي، فكان فرع
-    /// «token is not valid UTF-8» ميتًا وكان المحلل يسلّم إلى ما بعده توكنًا أُعيدت كتابته لا التوكن الذي وصل.
+    /// A token with bytes that are not valid UTF-8. <b>A defect fixed in week 6:</b> the decoding used the default
+    /// <c>Encoding.UTF8</c>, which <i>replaces</i> the corrupt byte with U+FFFD and never throws, so the
+    /// "token is not valid UTF-8" branch was dead and the parser handed on a rewritten token rather than the token that arrived.
     /// </summary>
     [Theory]
     [InlineData(new byte[] { 0xFF, 0xFE })]
-    [InlineData(new byte[] { 0xC3, 0x28 })]          // بداية متعددة البايتات ثم متابعة غير صالحة
-    [InlineData(new byte[] { 0xED, 0xA0, 0x80 })]    // نصف زوج بديل مرمَّز (surrogate) — ممنوع في UTF-8
-    [InlineData(new byte[] { 0x80 })]                // بايت متابعة بلا بداية
-    [InlineData(new byte[] { 0xE2, 0x82 })]          // ثلاثي مقطوع
+    [InlineData(new byte[] { 0xC3, 0x28 })]          // a multi-byte lead followed by an invalid continuation
+    [InlineData(new byte[] { 0xED, 0xA0, 0x80 })]    // an encoded surrogate half — forbidden in UTF-8
+    [InlineData(new byte[] { 0x80 })]                // a continuation byte with no lead
+    [InlineData(new byte[] { 0xE2, 0x82 })]          // a truncated three-byte sequence
     public void TokenWithInvalidUtf8_IsRejected_NotSilentlyRewritten(byte[] tokenBytes)
     {
         var preamble = BuildRaw(Guid.NewGuid(), RelayProtocol.HostRole, tokenBytes);
@@ -117,7 +117,7 @@ public class RelayProtocolFuzzTests
         Assert.Equal("token is not valid UTF-8", error);
     }
 
-    /// <summary>طول توكن معلن أكبر مما وصل: رفض، لا انتظار ولا قراءة خارج المخزن.</summary>
+    /// <summary>A declared token length larger than what arrived: a refusal, with no waiting and no reading outside the buffer.</summary>
     [Fact]
     public void DeclaredTokenLengthBeyondTheBuffer_IsRejected()
     {
@@ -144,9 +144,9 @@ public class RelayProtocolFuzzTests
         Assert.Equal("token is too long", bigError);
     }
 
-    // ---------- القراءة من stream ----------
+    // ---------- Reading from a stream ----------
 
-    /// <summary>القارئ على مدخل معادٍ: لا يعلّق، ولا يرمي إلا الأنواع المتوقَّعة، ولا يخصّص أكثر من سقف التوكن.</summary>
+    /// <summary>The reader against a hostile input: it does not hang, throws nothing but the expected types, and allocates no more than the token's cap.</summary>
     [Fact]
     public async Task ReadPreambleAsync_OnAdversarialInput_NeverHangs_NorThrowsAnUnexpectedType()
     {
@@ -170,7 +170,7 @@ public class RelayProtocolFuzzTests
                 Assert.True(e is RelayProtocolException or TimeoutException or OperationCanceledException,
                     $"case {i} ({bytes.Length} bytes) threw {e.GetType().FullName}: {e.Message}");
             }
-            Assert.Empty(stream.Written); // القارئ لا يرد بشيء: الرد قرار الـ Relay بعد التحقق لا قرار المحلل
+            Assert.Empty(stream.Written); // the reader answers nothing: the reply is the relay's decision after verification, not the parser's
         }
 
         var after = GC.GetTotalMemory(forceFullCollection: true);
@@ -178,7 +178,7 @@ public class RelayProtocolFuzzTests
         Assert.True(after - before < 16L * 1024 * 1024, $"reading adversarial preambles grew the heap by {(after - before) / 1024} KiB");
     }
 
-    /// <summary>طول توكن معلن 1024 مع إغلاق مبكر: خطأ صريح لا انتظار، والمخصَّص محكوم بالسقف لا بالادّعاء.</summary>
+    /// <summary>A declared token length of 1024 with an early close: an explicit error rather than a wait, and what is allocated is governed by the cap rather than by the claim.</summary>
     [Fact]
     public async Task ReadPreambleAsync_WithADeclaredTokenThatNeverArrives_FailsFast()
     {
@@ -191,7 +191,7 @@ public class RelayProtocolFuzzTests
         Assert.Contains("relay token", error.Message, StringComparison.Ordinal);
     }
 
-    /// <summary>توكن غير صالح UTF-8 عبر القارئ أيضًا: نفس الحكم، بخطأ بروتوكول صريح.</summary>
+    /// <summary>A token that is not valid UTF-8 through the reader too: the same verdict, with an explicit protocol error.</summary>
     [Fact]
     public async Task ReadPreambleAsync_RejectsInvalidUtf8Token()
     {
@@ -201,7 +201,7 @@ public class RelayProtocolFuzzTests
         Assert.Equal("token is not valid UTF-8", error.Message);
     }
 
-    /// <summary>المقدمة موزّعة على كتابات ببايت واحد: تُجمَّع كاملة (القارئ لا يفترض حدود الرسائل).</summary>
+    /// <summary>The preamble spread over single-byte writes: it is assembled in full (the reader does not assume message boundaries).</summary>
     [Fact]
     public async Task ReadPreambleAsync_ReassemblesByteAtATimeDelivery()
     {
@@ -216,9 +216,9 @@ public class RelayProtocolFuzzTests
         Assert.Equal("t", preamble.Token);
     }
 
-    // ---------- الرد ----------
+    // ---------- The reply ----------
 
-    /// <summary>‏fuzz على بايتَي الرد: الإصدار الخاطئ خطأ بروتوكول، وكل حالة ليست <c>paired</c> رفض عند النقل.</summary>
+    /// <summary>Fuzzing the reply's two bytes: a wrong version is a protocol error, and every status that is not <c>paired</c> is a refusal at the transport.</summary>
     [Fact]
     public async Task ReplyFuzz_CoversEveryVersionAndStatusByte()
     {
@@ -237,7 +237,7 @@ public class RelayProtocolFuzzTests
 
                 var result = await RelayProtocol.ReadReplyAsync(stream, Timeout, CancellationToken.None);
                 Assert.Equal((RelayStatus)status, result);
-                // ‏RelayTransport يقبل paired وحدها؛ أي بايت آخر — معروفًا كان أو لا — رفض.
+                // RelayTransport accepts paired alone; any other byte — known or not — is a refusal.
                 if (result != RelayStatus.Paired) rejected++;
             }
         }
@@ -245,7 +245,7 @@ public class RelayProtocolFuzzTests
         Assert.True(rejected > 0);
     }
 
-    /// <summary>رد مقطوع (بايت واحد ثم إغلاق): خطأ صريح لا انتظار بلا نهاية.</summary>
+    /// <summary>A truncated reply (one byte then a close): an explicit error rather than an endless wait.</summary>
     [Fact]
     public async Task TruncatedReply_FailsFast()
     {
@@ -253,9 +253,9 @@ public class RelayProtocolFuzzTests
         await Assert.ThrowsAsync<RelayProtocolException>(() => RelayProtocol.ReadReplyAsync(stream, Timeout, CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10)));
     }
 
-    // ---------- أدوات ----------
+    // ---------- Helpers ----------
 
-    /// <summary>يبني مقدمة ببايتات توكن خام (قد لا تكون UTF-8 صالحة)، وهو ما لا يسمح به <c>BuildPreamble</c>.</summary>
+    /// <summary>It builds a preamble with raw token bytes (which may not be valid UTF-8), which <c>BuildPreamble</c> does not permit.</summary>
     private static byte[] BuildRaw(Guid sessionId, byte role, byte[] tokenBytes)
     {
         var buffer = new byte[RelayProtocol.FixedPreambleLength + tokenBytes.Length];
@@ -268,7 +268,7 @@ public class RelayProtocolFuzzTests
         return buffer;
     }
 
-    /// <summary>‏stream يسلّم بايتًا واحدًا في كل قراءة: أسوأ تجزئة ممكنة.</summary>
+    /// <summary>A stream that hands over one byte per read: the worst possible fragmentation.</summary>
     private sealed class OneByteAtATimeStream : Stream
     {
         private readonly byte[] _source;

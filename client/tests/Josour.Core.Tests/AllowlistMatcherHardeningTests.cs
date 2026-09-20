@@ -4,37 +4,37 @@ using Josour.Core.Allowlist;
 namespace Josour.Core.Tests;
 
 /// <summary>
-/// تقوية مطابق القائمة (الأسبوع 4). المطابق هو البوابة الوحيدة بين "اسم أرسله الضيف" و"اتصال يخرج من شبكة المضيف"،
-/// فخطأ هنا ليس خطأ سلوك بل ثغرة. ما تثبته هذه الاختبارات:
+/// Hardening the list matcher (week 4). The matcher is the only gate between "a name the guest sent" and "a connection leaving the host's network",
+/// so a mistake here is not a behaviour bug but a hole. What these tests prove:
 ///
 /// <list type="number">
-///   <item><b>لا يرمي إلا <see cref="ArgumentException"/>/<see cref="FormatException"/>:</b> أي مدخل، مهما كان،
-///     ينتهي إلى رفض معلن لا إلى استثناء يخترق المستهلك (EgressPolicy وProxyRouter يمسكان ArgumentException فقط).</item>
-///   <item><b>يفشل مغلقًا:</b> ما لا يُطبَّع لا يُسمح به. لا يوجد مدخل يجعل <c>IsAllowed</c> تعيد true لاسم
-///     ليس التسمية نفسها أو نطاقًا فرعيًا حقيقيًا منها.</item>
-///   <item><b>المتشابهات لا تطابق:</b> Punycode يفصل الحروف السيريلية والإغريقية عن اللاتينية، فلا يمر
-///     <c>раypal.example</c> على مدخل <c>paypal.example</c>.</item>
+///   <item><b>It throws nothing but <see cref="ArgumentException"/>/<see cref="FormatException"/>:</b> any input, whatever it is,
+///     ends in a declared refusal rather than an exception that escapes the consumer (EgressPolicy and ProxyRouter catch ArgumentException only).</item>
+///   <item><b>It fails closed:</b> what does not normalise is not allowed. There is no input that makes <c>IsAllowed</c> return true for a name
+///     that is neither the label itself nor a genuine subdomain of it.</item>
+///   <item><b>Lookalikes do not match:</b> Punycode separates the Cyrillic and Greek letters from the Latin ones, so
+///     <c>раypal.example</c> does not get past an entry of <c>paypal.example</c>.</item>
 /// </list>
 /// </summary>
 public class AllowlistMatcherHardeningTests
 {
     private static readonly int[] DefaultPorts = { 80, 443 };
 
-    // ---------- 1. أسماء لا تُطبَّع: رفض معلن ----------
+    // ---------- 1. Names that do not normalise: a declared refusal ----------
 
     [Theory]
-    // تسميات فارغة
+    // Empty labels
     [InlineData("a..b")]
     [InlineData(".example.com")]
     [InlineData("..")]
     [InlineData(".")]
-    // شرطة في طرف التسمية (غير صالحة في DNS؛ متصفحات ترفضها كذلك)
+    // A hyphen at a label's edge (invalid in DNS; browsers refuse it too)
     [InlineData("-lead.example")]
     [InlineData("trail-.example")]
     [InlineData("a.-b.example")]
     [InlineData("a.b-.example")]
     [InlineData("-")]
-    // محارف لا تجوز في اسم DNS، وكلها يمررها IdnMapping بلا STD3
+    // Characters not permitted in a DNS name, all of which IdnMapping passes through without STD3
     [InlineData("exa mple.com")]
     [InlineData("example.com:443")]
     [InlineData("example.com/path")]
@@ -46,7 +46,7 @@ public class AllowlistMatcherHardeningTests
     [InlineData("[example.com]")]
     [InlineData("exa|mple.com")]
     [InlineData("ex$ample.com")]
-    // فارغ
+    // Empty
     [InlineData("")]
     [InlineData("   ")]
     public void UnrepresentableHosts_AreRejected_WithArgumentException(string host)
@@ -61,7 +61,7 @@ public class AllowlistMatcherHardeningTests
         Assert.Equal(label + ".example", AllowlistMatcher.NormalizeHost(label + ".example"));
         Assert.Throws<ArgumentException>(() => AllowlistMatcher.NormalizeHost(new string('a', AllowlistMatcher.MaxLabelLength + 1) + ".example"));
 
-        // 4 × 63 + 3 نقاط = 255 > 253
+        // 4 x 63 + 3 dots = 255 > 253
         var tooLong = string.Join('.', Enumerable.Repeat(label, 4));
         Assert.True(tooLong.Length > AllowlistMatcher.MaxHostLength);
         Assert.Throws<ArgumentException>(() => AllowlistMatcher.NormalizeHost(tooLong));
@@ -70,7 +70,7 @@ public class AllowlistMatcherHardeningTests
     [Fact]
     public void PunycodeThatDecodesToSomethingInvalid_IsRejected()
     {
-        // xn-- مع حمولة غير صالحة: GetAscii يفك ويعيد الترميز ويشكو.
+        // xn-- with an invalid payload: GetAscii decodes, re-encodes and complains.
         Assert.Throws<ArgumentException>(() => AllowlistMatcher.NormalizeHost("xn--a-ecp.ru​"));
         Assert.Throws<ArgumentException>(() => AllowlistMatcher.NormalizeHost("xn--é.example"));
     }
@@ -100,7 +100,7 @@ public class AllowlistMatcherHardeningTests
                 Assert.Fail($"unexpected {e.GetType().Name} for {Escape(input)}: {e.Message}");
             }
 
-            // نجح التطبيع: فالناتج LDH صغير الحروف ومستقر عند إعادة التطبيع.
+            // Normalisation succeeded: so the result is lowercase LDH and stable under re-normalisation.
             AssertIsNormalized(normalized!, input);
             Assert.Equal(normalized, AllowlistMatcher.NormalizeHost(normalized!));
         }
@@ -135,7 +135,7 @@ public class AllowlistMatcherHardeningTests
                 Assert.NotNull(entry);
                 AssertIsNormalized(entry!.Host, raw);
                 Assert.True(entry.Port is null or (>= 1 and <= 65535));
-                // ما قُبل كمدخل يجب أن يمر أيضًا عبر Parse بلا استثناء.
+                // What was accepted as an entry must also get through Parse with no exception.
                 Assert.Single(AllowlistMatcher.Parse(1, new[] { raw }).Entries);
             }
             else
@@ -147,20 +147,20 @@ public class AllowlistMatcherHardeningTests
         }
     }
 
-    // ---------- 2. المتشابهات ----------
+    // ---------- 2. Lookalikes ----------
 
     [Theory]
-    // 'а' سيريلية في paypal، 'ο' إغريقية في google، 'е' سيريلية في secure
+    // A Cyrillic 'а' in paypal, a Greek 'ο' in google, a Cyrillic 'е' in secure
     [InlineData("раypal.example")]
     [InlineData("gοogle.example")]
     [InlineData("sеcure.example")]
-    // نفس الحيلة داخل نطاق فرعي
+    // The same trick inside a subdomain
     [InlineData("login.раypal.example")]
     public void Confusables_DoNotMatchTheLatinEntry(string lookalike)
     {
         var matcher = AllowlistMatcher.Parse(1, new[] { "paypal.example", "google.example", "secure.example" });
         var normalized = AllowlistMatcher.NormalizeHost(lookalike);
-        // الحرف غير اللاتيني يصير تسمية Punycode مختلفة تمامًا، فلا لاحقة ولا تطابق.
+        // The non-Latin letter becomes an entirely different Punycode label, so there is no suffix and no match.
         Assert.Contains(normalized.Split('.'), label => label.StartsWith("xn--", StringComparison.Ordinal));
         Assert.False(matcher.IsAllowed(normalized, 443, DefaultPorts), normalized);
     }
@@ -168,28 +168,28 @@ public class AllowlistMatcherHardeningTests
     [Fact]
     public void Confusables_MatchOnlyTheirOwnPunycodeEntry()
     {
-        // المدخل المكتوب بالحروف السيريلية نفسها يطابق — وهذا هو السلوك الصحيح: المطابقة على Punycode لا على الشكل.
+        // An entry written in those same Cyrillic letters does match — and that is the right behaviour: the matching is on Punycode, not on appearance.
         var matcher = AllowlistMatcher.Parse(1, new[] { "раypal.example" });
         Assert.True(matcher.IsAllowed(AllowlistMatcher.NormalizeHost("раypal.example"), 443, DefaultPorts));
         Assert.False(matcher.IsAllowed("paypal.example", 443, DefaultPorts));
     }
 
-    // ---------- 3. التطبيع: ما يتساوى وما لا يتساوى ----------
+    // ---------- 3. Normalisation: what is equal and what is not ----------
 
     [Theory]
-    // النقطة الأخيرة (جذر DNS) لا تغيّر الاسم
+    // The trailing dot (the DNS root) does not change the name
     [InlineData("example.com.", "example.com")]
     [InlineData("example.com...", "example.com")]
     [InlineData("EXAMPLE.COM.", "example.com")]
-    // فواصل IDN البديلة تُطبَّع إلى '.' — سلوك IDNA الصحيح، مثبَّت هنا حتى لا يتغير بصمت
+    // The alternative IDN separators normalise to '.' — correct IDNA behaviour, pinned here so it does not change silently
     [InlineData("example。com", "example.com")]
     [InlineData("example．com", "example.com")]
     [InlineData("example｡com", "example.com")]
     [InlineData("example.com。", "example.com")]
-    // كبير/صغير وPunycode المكتوب مسبقًا
+    // Upper/lower case and pre-written Punycode
     [InlineData("XN--BCHER-KVA.DE", "xn--bcher-kva.de")]
     [InlineData("Bücher.DE", "xn--bcher-kva.de")]
-    // شرطة سفلية مسموحة (أسماء DKIM/SRV الحقيقية)
+    // An underscore is allowed (real DKIM/SRV names)
     [InlineData("_dmarc.example.com", "_dmarc.example.com")]
     public void Normalization_IsCanonical(string input, string expected)
     {
@@ -199,7 +199,7 @@ public class AllowlistMatcherHardeningTests
     [Fact]
     public void IdnSeparators_MakeTheSubdomainMatchTheSameEntry()
     {
-        // ‏"shop。example.com" هو "shop.example.com" في DNS، فيجب أن يطابق مدخل example.com — ولا يجوز أن يطابق =exact.
+        // "shop。example.com" is "shop.example.com" in DNS, so it must match an example.com entry — and must not match =exact.
         var matcher = AllowlistMatcher.Parse(1, new[] { "example.com" });
         Assert.True(matcher.IsAllowed(AllowlistMatcher.NormalizeHost("shop。example.com"), 443, DefaultPorts));
 
@@ -207,7 +207,7 @@ public class AllowlistMatcherHardeningTests
         Assert.False(exact.IsAllowed(AllowlistMatcher.NormalizeHost("shop。example.com"), 443, DefaultPorts));
     }
 
-    // ---------- 4. حدود المطابقة على التسميات ----------
+    // ---------- 4. The matching's label boundaries ----------
 
     [Theory]
     [InlineData("example.com", "example.com", true)]
@@ -218,10 +218,10 @@ public class AllowlistMatcherHardeningTests
     [InlineData("example.com", "example.com.evil.example", false)]
     [InlineData("example.com", "aexample.com", false)]
     [InlineData("example.com", "_example.com", false)]
-    // التسمية الأخيرة وحدها لا تكفي
+    // The last label alone is not enough
     [InlineData("com", "example.com", true)]
     [InlineData("example.com", "com", false)]
-    // نقطة في أول الاسم المطابَق ليست حدودًا صالحة (الاسم غير مطبَّع أصلًا)
+    // A dot at the start of the matched name is not a valid boundary (the name is not normalised to begin with)
     [InlineData("example.com", ".example.com", false)]
     public void SuffixMatching_RespectsLabelBoundaries(string entry, string host, bool expected)
     {
@@ -232,7 +232,7 @@ public class AllowlistMatcherHardeningTests
     [Fact]
     public void Property_AllowedImpliesRealLabelSuffix()
     {
-        // الخاصية: لكل اسم يقبله المطابق، يوجد مدخل هو الاسم نفسه أو لاحقة له على حدّ تسمية.
+        // The property: for every name the matcher accepts, there is an entry that is the name itself or a suffix of it on a label boundary.
         var entries = new[] { "example.com", "=exact.example", "portal.example:8443", "co.uk" };
         var matcher = AllowlistMatcher.Parse(1, entries);
         var random = new Random(3);

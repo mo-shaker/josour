@@ -15,12 +15,12 @@ using Josour.Tunnel.Transport;
 namespace Josour.E2E.Tests;
 
 /// <summary>
-/// جلستا <see cref="TunnelSession"/> حقيقيتان (مضيف + ضيف) على loopback داخل العملية، بكل الطبقات:
-/// SymmetricConnector فوق TLS → NerdbankMux → EgressPolicy/OpenHandler على المضيف → ConnectProxyServer على الضيف.
-/// لا ربط يدوي هنا: كل ما يفعله الاختبار هو ما سيفعله التطبيق في الأسبوع 4 (Prepare، تبادل النهايات، Connect).
+/// Two real <see cref="TunnelSession"/>s (a host + a guest) on loopback inside the process, with all the layers:
+/// SymmetricConnector over TLS -> NerdbankMux -> EgressPolicy/OpenHandler on the host -> ConnectProxyServer on the guest.
+/// No manual wiring here: everything the test does is what the application will do in week 4 (Prepare, exchange the endpoints, Connect).
 ///
-/// المضيف هو من يتصل على مستوى TCP (الضيف بلا مرشحين للطرف الآخر) ليملك الاختبار مقبس النقل ويستطيع قتله.
-/// المحلل يربط site.test/direct.test بـ 127.0.0.1، وفحص الحظر يُستبدل للسماح بـ loopback في هذا الاختبار فقط.
+/// The host is the one that connects at the TCP level (the guest has no candidates for the other side) so the test owns the transport socket and can kill it.
+/// The resolver maps site.test/direct.test to 127.0.0.1, and the blocked check is replaced to permit loopback in this test only.
 /// </summary>
 internal sealed class InProcessTunnelPair : IAsyncDisposable
 {
@@ -48,16 +48,16 @@ internal sealed class InProcessTunnelPair : IAsyncDisposable
     public int ProxyPort => Guest.Proxy!.Port;
     public int OriginPort => Origin.Port;
 
-    /// <param name="hostAllowlistOverride">قائمة أحدث على المضيف (نافذة تباين الإصدار، ADR-0004). null = القائمة نفسها.</param>
-    /// <param name="extraEntries">مدخلات تُضاف إلى قائمتَي الطرفين (اختبارات توجّه اسمًا إضافيًا عبر النفق).</param>
+    /// <param name="hostAllowlistOverride">A newer list on the host (the version-divergence window, ADR-0004). null = the same list.</param>
+    /// <param name="extraEntries">Entries added to both sides' lists (tests that route an extra name through the tunnel).</param>
     /// <param name="hostAddressBlocker">
-    /// فحص الحظر على المضيف. null = السياسة الحقيقية عدا loopback (لأن الأصل داخل العملية يسكن 127.0.0.1).
-    /// اختبارات الوصول الذاتي تمرر <c>IpRangePolicy.IsBlocked</c> نفسها لتثبت أن loopback يُرفض فعلًا.
+    /// The blocked check on the host. null = the real policy except loopback (because the origin inside the process lives on 127.0.0.1).
+    /// The self-access tests pass <c>IpRangePolicy.IsBlocked</c> itself to prove loopback really is refused.
     /// </param>
-    /// <param name="guestAddressBlocker">مثله على المسار المباشر للضيف.</param>
-    /// <param name="extraHostNames">أسماء إضافية في محللَي الطرفين: الاسم ← العناوين.</param>
+    /// <param name="guestAddressBlocker">The same, on the guest's direct path.</param>
+    /// <param name="extraHostNames">Extra names in both resolvers: the name -> the addresses.</param>
     /// <param name="guestSystemProxy">
-    /// Proxy النظام على مسار الضيف المباشر (الخطة 8.5). null = لا Proxy: الاختبار لا يتأثر بإعدادات جهاز المطوّر.
+    /// The system proxy on the guest's direct path (plan 8.5). null = no proxy: the test is not affected by the developer machine's settings.
     /// </param>
     public static async Task<InProcessTunnelPair> CreateAsync(
         IEnumerable<string>? hostAllowlistOverride = null,
@@ -92,7 +92,7 @@ internal sealed class InProcessTunnelPair : IAsyncDisposable
                 guestResolver.Map(name, addresses);
             }
 
-            // الافتراضي: loopback مسموح (الأصل داخل العملية)، وبقية IpRangePolicy كما هي.
+            // The default: loopback is permitted (the origin is inside the process), and the rest of IpRangePolicy stays as it is.
             static bool ExceptLoopback(IPAddress a) => !IPAddress.IsLoopback(a) && IpRangePolicy.IsBlocked(a);
             var blocker = hostAddressBlocker ?? ExceptLoopback;
             var guestBlocker = guestAddressBlocker ?? ExceptLoopback;
@@ -102,8 +102,8 @@ internal sealed class InProcessTunnelPair : IAsyncDisposable
                 new TunnelSessionOptions
                 {
                     Allowlist = hostAllowlist,
-                    // حيوية قصيرة للاختبارات: المسار الأساسي لكشف الموت هو EOF، وهذه شبكة أمان
-                    // تجعل الكشف حتميًا داخل مهلة الاختبار بدل الاعتماد على 60 ثانية الافتراضية.
+                    // A short liveness for the tests: the main death-detection path is EOF, and this is a safety net
+                    // that makes the detection deterministic within the test's timeout rather than relying on the default 60 seconds.
                     Mux = TestMux,
                     Resolver = hostResolver,
                     Transport = hostTransport,
@@ -129,7 +129,7 @@ internal sealed class InProcessTunnelPair : IAsyncDisposable
                     CandidateSource = () => new LoopbackCandidateSource(),
                     GuestProxy = context =>
                     {
-                        // بلا Proxy نظام افتراضيًا: الاختبار داخل العملية لا يتأثر بإعدادات جهاز المطوّر.
+                        // No system proxy by default: the in-process test is not affected by the developer machine's settings.
                         var adapter = (ProxyTunnelAdapter)ProxyTunnelAdapter.Create(context, null, null, guestBlocker, guestSystemProxy ?? NoSystemProxy.Instance);
                         proxyServer = adapter.Server;
                         return adapter;
@@ -181,7 +181,7 @@ internal sealed class InProcessTunnelPair : IAsyncDisposable
     }
 }
 
-/// <summary>مرشح loopback واحد بلا شبكة ولا UPnP.</summary>
+/// <summary>A single loopback candidate with no network and no UPnP.</summary>
 internal sealed class LoopbackCandidateSource : ICandidateSource
 {
     public bool HasMapping => false;
@@ -196,7 +196,7 @@ internal sealed class LoopbackCandidateSource : ICandidateSource
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 
-/// <summary>نقل مباشر يحتفظ بالمقابس ليستطيع الاختبار قتل النقل تحت TLS (نفق ميت بلا GOAWAY).</summary>
+/// <summary>A direct transport that keeps the sockets so the test can kill the transport under TLS (a dead tunnel with no GOAWAY).</summary>
 internal sealed class RecordingTransport : ITunnelTransport
 {
     private readonly ITunnelTransport _inner = new DirectTransport();
@@ -218,7 +218,7 @@ internal sealed class RecordingTransport : ITunnelTransport
         lock (_gate) streams = _streams.ToArray();
         foreach (var stream in streams)
         {
-            try { stream.Dispose(); } catch { /* مقتول أصلًا */ }
+            try { stream.Dispose(); } catch { /* already killed */ }
         }
     }
 }
@@ -236,7 +236,7 @@ internal static class E2EWait
         return condition();
     }
 
-    /// <summary>هل المنفذ يرفض الاتصال الآن؟</summary>
+    /// <summary>Is the port refusing connections now?</summary>
     public static async Task<bool> PortRefusesAsync(int port)
     {
         using var client = new TcpClient();

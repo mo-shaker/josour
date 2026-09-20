@@ -13,32 +13,32 @@ using Josour.Tunnel;
 
 namespace Josour.Spike;
 
-/// <summary>كيف انتهت الجلسة. يترجمها <see cref="SessionCommand.ExitFor"/> إلى رمز خروج.</summary>
+/// <summary>How the session ended. <see cref="SessionCommand.ExitFor"/> translates it into an exit code.</summary>
 public enum SessionOutcomeKind
 {
-    /// <summary>لم يُصادَق أي اتصال خلال المهلة (أو رُفض التجهيز). أُرسل <c>session.connect_failed</c>.</summary>
+    /// <summary>No connection authenticated within the timeout (or the preparation was refused). <c>session.connect_failed</c> was sent.</summary>
     ConnectFailed,
 
-    /// <summary>النفق مات من تلقائه بعد أن عمل (انقطاع، أو موت عملية الطرف الآخر، أو انتهاء مهلة PONG).</summary>
+    /// <summary>The tunnel died of its own accord after having worked (a drop, or the other side's process dying, or the PONG timeout).</summary>
     TunnelDied,
 
-    /// <summary>الخادم أنهى الجلسة (<c>session.terminate</c>): انتهاء المدة، أو إنهاء الطرف الآخر، أو إنهاء المسؤول.</summary>
+    /// <summary>The server ended the session (<c>session.terminate</c>): the duration running out, the other side ending it, or an administrator ending it.</summary>
     Terminated,
 
-    /// <summary>بلغ <c>expires_at</c> محليًا قبل وصول <c>session.terminate</c>.</summary>
+    /// <summary><c>expires_at</c> was reached locally before <c>session.terminate</c> arrived.</summary>
     Expired,
 
-    /// <summary>إنهاء محلي مقصود (Ctrl+C، أو المستخدم ضغط «إنهاء»). أُرسل <c>session.end</c>.</summary>
+    /// <summary>A deliberate local end (Ctrl+C, or the user pressing "end"). <c>session.end</c> was sent.</summary>
     LocalEnd,
 
-    /// <summary>قناة التحكم سقطت أثناء الجلسة؛ الخادم ينهيها بـ <c>*_disconnected</c> ولا قيمة لنفق بلا تحكم.</summary>
+    /// <summary>The control channel fell during the session; the server ends it with <c>*_disconnected</c>, and a tunnel with no control is worthless.</summary>
     ChannelLost,
 
-    /// <summary>الخادم أرسل ما يخالف العقد، أو انتهت الجلسة بسبب محلي آخر (مثل <c>browser_not_proxied</c>).</summary>
+    /// <summary>The server sent something that breaches the contract, or the session ended for another local reason (such as <c>browser_not_proxied</c>).</summary>
     ProtocolError,
 }
 
-/// <summary>حصيلة الجلسة كاملة كما تظهر في <c>tool.exit</c>.</summary>
+/// <summary>The session's complete outcome as it appears in <c>tool.exit</c>.</summary>
 public sealed record SessionOutcome(
     SessionOutcomeKind Kind,
     TunnelEndReason EndReason,
@@ -47,14 +47,14 @@ public sealed record SessionOutcome(
     string? Detail);
 
 /// <summary>
-/// كل ما تحتاجه الأداة حول <see cref="SessionCoordinator"/>: المنسّق نفسه يملك دورة الجلسة كاملة بعد
-/// <c>session.created</c> (نفس الشيفرة التي يقودها تطبيق WPF)، وهذا الصنف يوفّر له ما يخص الأداة وحدها —
-/// مصنع النفق بلا واجهة، وتغليف القناة والنفق والمتصفح بحيث يخرج كل حدث سطر JSON واحد كما في
-/// <c>docs/spike-runbook.md</c>، وحصيلة واحدة تُترجَم إلى رمز الخروج.
+/// Everything the tool needs around <see cref="SessionCoordinator"/>: the coordinator itself owns the whole session cycle after
+/// <c>session.created</c> (the same code the WPF application drives), and this class provides what belongs to the tool alone —
+/// a headless tunnel factory, and wrapping the channel, the tunnel and the browser so every event comes out as one JSON line as in
+/// <c>docs/spike-runbook.md</c>, and one outcome that translates into the exit code.
 ///
 /// <para>
-/// لا منطق جلسة هنا: لا ترتيب تنظيف، ولا قرار سبب إنهاء يُرسل إلى الخادم، ولا مؤقتات. إن احتيج شيء من ذلك
-/// فمكانه <see cref="SessionCoordinator"/> لا هنا.
+/// No session logic here: no cleanup order, no decision about the end reason sent to the server, and no timers. If any of that is needed,
+/// its place is <see cref="SessionCoordinator"/> rather than here.
 /// </para>
 /// </summary>
 internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
@@ -88,20 +88,20 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
     }
 
     /// <summary>
-    /// متصفح العمل الذي يُسلَّم للمنسّق: الحقيقي مع <c>--browser</c>، وإلا <see cref="NoWorkBrowser"/> الذي يجعل
-    /// المنسّق يتخطى التشغيل وانتظار صفحة الفحص بدل أن ينهي الجلسة بـ <c>browser_not_proxied</c> بلا متصفح أصلًا.
+    /// The work browser handed to the coordinator: the real one with <c>--browser</c>, otherwise <see cref="NoWorkBrowser"/>, which makes
+    /// the coordinator skip launching and waiting for the check page instead of ending the session with <c>browser_not_proxied</c> when there is no browser at all.
     /// </summary>
     public IWorkBrowser Browser => _browser ?? (IWorkBrowser)NoWorkBrowser.Instance;
 
-    /// <summary>الدور، يُعرف من <c>session.created</c> عبر المنسّق (أو من المعاملات قبل ذلك).</summary>
+    /// <summary>The role, learned from <c>session.created</c> through the coordinator (or from the arguments before that).</summary>
     public TunnelRole Role { get; set; } = TunnelRole.Guest;
 
-    /// <summary>تنتهي عندما يبلغ المنسّق <see cref="SessionPhase.Ended"/> (أي بعد اكتمال ترتيب التنظيف).</summary>
+    /// <summary>Completes when the coordinator reaches <see cref="SessionPhase.Ended"/> (that is, after the cleanup order finishes).</summary>
     public Task Ended => _ended.Task;
 
-    // ---------- التوصيل ----------
+    // ---------- The wiring ----------
 
-    /// <summary>يغلّف قناة التحكم ليصدر <c>frame.out</c> لكل إطار يرسله المنسّق (إطارات الأداة نفسها ليست منه).</summary>
+    /// <summary>Wraps the control channel so it emits <c>frame.out</c> for every frame the coordinator sends (the tool's own frames are not from it).</summary>
     public IControlChannel Wrap(IControlChannel channel) => new EventControlChannel(channel, OnFrameSent, OnFrameFailed);
 
     public void Attach(SessionCoordinator coordinator)
@@ -116,13 +116,13 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
         };
     }
 
-    /// <summary>إطار وارد يخص مجرى الجلسة: نفس الأحداث التي كان يصدرها سائق الجلسة القديم فوق <c>frame.in</c>.</summary>
+    /// <summary>An inbound frame belonging to the session's stream: the same events the old session driver emitted over <c>frame.in</c>.</summary>
     public void OnFrameReceived(ControlMessage message)
     {
         switch (message)
         {
             case SessionCreatedMessage m:
-                // من هنا يتولى المنسّق: هذا الحدث يسبق أول خطوة له لأن هذا المشترك يسبقه على القناة.
+                // From here the coordinator takes over: this event precedes its first step because this subscriber precedes it on the channel.
                 _log.Emit("session.created", EventLog.Fields(
                     ("session_id", m.SessionId), ("peer_display_name", m.Peer.UserDisplayName), ("peer_device_name", m.Peer.DeviceName),
                     ("peer_public_ip", m.PeerPublicIp), ("same_public_ip", m.SamePublicIp),
@@ -141,14 +141,14 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
         }
     }
 
-    /// <summary>سقوط قناة التحكم أثناء الجلسة: الخادم ينهيها بـ <c>*_disconnected</c> ولا قيمة لنفق بلا تحكم.</summary>
+    /// <summary>The control channel falling during the session: the server ends it with <c>*_disconnected</c>, and a tunnel with no control is worthless.</summary>
     public void OnChannelState(ControlChannelState state)
     {
         if (state == ControlChannelState.Connected || _coordinator?.HasLiveSession != true) return;
         SetEnding(SessionOutcomeKind.ChannelLost, SessionEndReasonNames.LocalDisconnect(Role), state.ToString());
     }
 
-    /// <summary>‏Ctrl+C: إنهاء محلي مقصود بترتيب التنظيف الكامل، لا قتل للعملية.</summary>
+    /// <summary>Ctrl+C: a deliberate local end with the full cleanup order, not killing the process.</summary>
     public Task RequestEndAsync()
     {
         SetEnding(SessionOutcomeKind.LocalEnd, SessionEndReasonNames.LocalEnd(Role), "local");
@@ -156,13 +156,13 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
     }
 
     /// <summary>
-    /// محاولات الوصول غير المصرَّح بها على مستمع النفق، بالمفاتيح المحجوزة في <c>docs/api.md</c>
-    /// (‏<c>POST /api/v1/diagnostics</c>): <c>listener_unauthenticated</c> و<c>listener_port</c>
-    /// و<c>unauthenticated_peers</c> (≤ 10 عناوين)، وتُنقل كما هي من <c>ITunnelSession.Diagnostics</c> بلا تعديل
-    /// ولا إعادة تسمية. <c>null</c> إن لم يُنشأ نفق أصلًا (فلا مستمع ولا شيء يُبلَّغ عنه).
+    /// The unauthorised access attempts on the tunnel's listener, under the keys reserved in <c>docs/api.md</c>
+    /// (<c>POST /api/v1/diagnostics</c>): <c>listener_unauthenticated</c>, <c>listener_port</c>
+    /// and <c>unauthenticated_peers</c> (≤ 10 addresses), carried over from <c>ITunnelSession.Diagnostics</c> unchanged
+    /// and unrenamed. <c>null</c> if no tunnel was created at all (so there is no listener and nothing to report).
     ///
-    /// <para>تُرفع حتى حين يكون العدّاد صفرًا: الخادم لا يكتب صف <c>security_events</c> إلا على قيمة موجبة، لكن
-    /// الجلسات الخالية من المحاولات هي مقام النسبة — وبلا مقام لا يعني «عشر محاولات» شيئًا.</para>
+    /// <para>It is reported even when the counter is zero: the server writes a <c>security_events</c> row only for a positive value, but
+    /// the sessions with no attempts are the rate's denominator — and with no denominator "ten attempts" means nothing.</para>
     /// </summary>
     public (Guid SessionId, Dictionary<string, object?> Data)? ListenerDiagnostics()
     {
@@ -179,7 +179,7 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
         return (tunnel.SessionId, data);
     }
 
-    /// <summary>الحصيلة النهائية بعد <see cref="Ended"/>.</summary>
+    /// <summary>The final outcome after <see cref="Ended"/>.</summary>
     public SessionOutcome Outcome()
     {
         var ending = Volatile.Read(ref _ending) ?? new Ending(SessionOutcomeKind.ProtocolError, TunnelEndReason.ProtocolError, "the session ended without a reason");
@@ -192,13 +192,13 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
             ending.Detail);
     }
 
-    // ---------- مصنع النفق ----------
+    // ---------- The tunnel factory ----------
 
     /// <summary>
-    /// نفس تركيب <c>Josour.App.Services.TunnelSessionFactory</c> (<see cref="EgressTunnelAdapter.Create"/> على
-    /// المضيف و<see cref="ProxyTunnelAdapter.Create"/> على الضيف وخطاف إغلاق المتصفح)، مع ما تزيده الأداة وحدها:
-    /// <c>--listen-port</c> و<c>--no-upnp</c>، وفحص PID المالك حين يوجد متصفح حقيقي. بلا متصفح يُمرَّر null إلى
-    /// الـ Proxy: لا عملية متصفح تملك الاتصالات المحلية، والفحص كان سيرفض طلب <c>--curl-test</c> نفسه.
+    /// The same composition as <c>Josour.App.Services.TunnelSessionFactory</c> (<see cref="EgressTunnelAdapter.Create"/> on
+    /// the host, <see cref="ProxyTunnelAdapter.Create"/> on the guest, and the browser-close hook), plus what the tool alone adds:
+    /// <c>--listen-port</c> and <c>--no-upnp</c>, and the owning-PID check when there is a real browser. With no browser, null is passed to
+    /// the proxy: no browser process owns the local connections, and the check would have refused the <c>--curl-test</c> request itself.
     /// </summary>
     public ITunnelSession Create(TunnelSessionRequest request)
     {
@@ -206,7 +206,7 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
         Role = request.Material.Role;
         IBrowserSession? proxyBrowser = request.Browser is NoWorkBrowser ? null : request.Browser;
 
-        // خطوة التنظيف 2: خطاف المنسّق نفسه، مع سطر بشري يوضّح ما يجري حين يوجد متصفح فعلًا.
+        // Cleanup step 2: the coordinator's own hook, with a human line explaining what is happening when there really is a browser.
         Func<CancellationToken, Task> closeBrowser = request.CloseBrowserAsync;
         if (proxyBrowser is not null)
         {
@@ -237,11 +237,11 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
     private static IOwnerPidChecker OwnerChecker()
         => OperatingSystem.IsWindows() ? WindowsOwnerPidChecker.Instance : PermissiveOwnerPidChecker.Instance;
 
-    // ---------- ما بعد الاتصال على جانب الضيف ----------
+    // ---------- After connecting, on the guest's side ----------
 
     /// <summary>
-    /// الإثبات المباشر بلا متصفح: يُنفَّذ مرة واحدة بعد نجاح الاتصال على الضيف. أخطاؤه تُسجَّل ولا تُنهي الجلسة.
-    /// (تشغيل متصفح العمل ليس هنا: المنسّق يشغّله عند <c>session.active</c> كما يفعل التطبيق.)
+    /// The direct proof with no browser: run once after the connection succeeds on the guest. Its errors are recorded and do not end the session.
+    /// (Launching the work browser is not here: the coordinator launches it at <c>session.active</c>, as the application does.)
     /// </summary>
     private async Task AfterConnectedAsync(GuestProxyInfo proxy, CancellationToken ct)
     {
@@ -255,8 +255,8 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
     }
 
     /// <summary>
-    /// طلب HTTP GET عبر الـ Proxy المحلي نفسه. موقع يعكس عنوان الطالب (مثل <c>https://api.ipify.org</c>) يجعل الجسم
-    /// نفسه هو الدليل على أن الخروج تم من عنوان المضيف.
+    /// An HTTP GET request through the local proxy itself. A site that echoes the requester's address (such as <c>https://api.ipify.org</c>) makes the body
+    /// itself the proof that the egress happened from the host's address.
     /// </summary>
     private async Task CurlThroughProxyAsync(int proxyPort, string url, CancellationToken ct)
     {
@@ -287,7 +287,7 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
         }
     }
 
-    // ---------- الأحداث ----------
+    // ---------- The events ----------
 
     private void OnPhase(SessionPhase phase)
     {
@@ -342,7 +342,7 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
     private void OnFrameFailed(ControlMessage message, Exception error)
         => _log.Emit("frame.out_failed", EventLog.Fields(("type", message.Type), ("error", $"{error.GetType().Name}: {error.Message}")));
 
-    /// <summary>تشخيص الاتصال كما كان: محتوى <c>connect</c> مسطّحًا، مع <c>reason</c> و<c>role</c>.</summary>
+    /// <summary>The connection's diagnostics as they were: the contents of <c>connect</c> flattened, with <c>reason</c> and <c>role</c>.</summary>
     private Dictionary<string, object?> ConnectFailedFields(SessionConnectFailedMessage message)
     {
         var fields = new Dictionary<string, object?>(StringComparer.Ordinal);
@@ -356,7 +356,7 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
         return fields;
     }
 
-    /// <summary>أول شرط نهاية هو الحقيقي؛ اللاحق يُهمَل (كما كان في السائق القديم).</summary>
+    /// <summary>The first ending condition is the real one; a later one is ignored (as it was in the old driver).</summary>
     private void SetEnding(SessionOutcomeKind kind, TunnelEndReason reason, string? detail)
     {
         lock (_gate)
@@ -365,7 +365,7 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
         }
     }
 
-    /// <summary>لا مصدر صريح (انتهاء مدة، <c>browser_not_proxied</c>، خطأ بروتوكول): نقرأ حكم المنسّق نفسه.</summary>
+    /// <summary>No explicit source (the duration running out, <c>browser_not_proxied</c>, a protocol error): we read the coordinator's own verdict.</summary>
     private Ending Fallback()
     {
         var wire = _coordinator?.LastEndReason;
@@ -394,11 +394,11 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
 
     private sealed record Ending(SessionOutcomeKind Kind, TunnelEndReason Reason, string? Detail);
 
-    // ---------- التغليف ----------
+    // ---------- The wrapping ----------
 
     /// <summary>
-    /// قناة التحكم كما يراها المنسّق: كل شيء يمر كما هو، وكل إطار صادر يصير <c>frame.out</c>. لا تملك القناة
-    /// الداخلية ولا تغلقها (‏<see cref="SessionStack"/> يملكها).
+    /// The control channel as the coordinator sees it: everything passes through as it is, and every outbound frame becomes a <c>frame.out</c>. It does not own the inner
+    /// channel and does not close it (<see cref="SessionStack"/> owns it).
     /// </summary>
     private sealed class EventControlChannel : IControlChannel
     {
@@ -475,8 +475,8 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
     }
 
     /// <summary>
-    /// النفق كما يراه المنسّق: كل شيء يمر إلى <see cref="TunnelSession"/> الحقيقي، وكل خطوة تصير حدثًا في مجرى JSON.
-    /// وهذا أيضًا مكان ما بعد الاتصال على الضيف (منفذ الـ Proxy و<c>--curl-test</c>)، تمامًا حيث كان سابقًا.
+    /// The tunnel as the coordinator sees it: everything passes through to the real <see cref="TunnelSession"/>, and every step becomes an event in the JSON stream.
+    /// And this is also where the guest's after-connect work lives (the proxy's port and <c>--curl-test</c>), exactly where it was before.
     /// </summary>
     private sealed class EventTunnelSession : ITunnelSession
     {
@@ -546,8 +546,8 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
                 return result; // the coordinator answers with session.connect_failed, which raises tunnel.connect_failed
             }
 
-            // النافذة مشتقة من connect_ms (docs/protocol.md القسم 5): تُطبع في التشغيل الميداني لأن الشريحة
-            // تفسّر سقف التنزيل الواحد وحد الـ streams المتزامنة في نفس التشغيل.
+            // The window is derived from connect_ms (docs/protocol.md section 5): it is printed in a field run because the band
+            // explains the single-download ceiling and the concurrent stream limit in that same run.
             _driver._log.Emit("tunnel.connected", EventLog.Fields(
                 ("winner_type", result.WinnerType is null ? null : CandidateTypeNames.ToWire(result.WinnerType.Value)),
                 ("connect_ms", result.ConnectMs), ("tls_version", result.TlsVersion),
@@ -605,7 +605,7 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
         }
     }
 
-    /// <summary>متصفح العمل الحقيقي للأداة: نوع واحد (‏<c>--browser</c>) وملف تعريف واحد (‏<c>--profile</c>).</summary>
+    /// <summary>The tool's real work browser: one kind (<c>--browser</c>) and one profile (<c>--profile</c>).</summary>
     private sealed class SpikeBrowserProvider : IWorkBrowserProvider
     {
         private readonly BrowserKind _kind;
@@ -625,7 +625,7 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
         public IBrowserSession Create(BrowserKind kind) => new EventBrowserSession(new BrowserLauncher(), kind, _log);
     }
 
-    /// <summary>‏<see cref="BrowserLauncher"/> يصدر حدث <c>browser.launch</c> بنتيجة كل تشغيل.</summary>
+    /// <summary><see cref="BrowserLauncher"/> emits a <c>browser.launch</c> event with every launch's result.</summary>
     private sealed class EventBrowserSession : IBrowserSession
     {
         private readonly BrowserLauncher _inner;

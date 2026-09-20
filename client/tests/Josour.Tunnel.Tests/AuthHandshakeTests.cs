@@ -43,7 +43,7 @@ public class AuthHandshakeTests
         await Assert.ThrowsAsync<AuthFailedException>(() => hostTask);
         await StreamAssert.NothingReadableAsync(a, TimeSpan.FromMilliseconds(200));
 
-        // المستدعي يغلق الاتصال؛ Guest يرى الإغلاق قبل AUTH2
+        // The caller closes the connection; the guest sees the close before AUTH2
         await b.DisposeAsync();
         await Assert.ThrowsAsync<AuthFailedException>(() => guestTask);
     }
@@ -126,7 +126,7 @@ public class AuthHandshakeTests
     [Fact]
     public async Task WireFormat_MatchesProtocolSection4()
     {
-        // يتحقق من الصيغة بحساب مستقل: 81 بايت، version=1، session_id big-endian (RFC 4122)، mac = HMAC-SHA256 على label||sid||random||fp.
+        // It verifies the format with an independent computation: 81 bytes, version=1, a big-endian session_id (RFC 4122), mac = HMAC-SHA256 over label||sid||random||fp.
         var secret = TestMaterial.NewSecret();
         var id = Guid.NewGuid();
         var guest = TestMaterial.Create(TunnelRole.Guest, id, secret);
@@ -138,10 +138,10 @@ public class AuthHandshakeTests
 
         var auth1 = new byte[81];
         await b.ReadExactlyAsync(auth1);
-        await StreamAssert.NothingReadableAsync(b, TimeSpan.FromMilliseconds(100)); // لا بايت زائد
+        await StreamAssert.NothingReadableAsync(b, TimeSpan.FromMilliseconds(100)); // not one extra byte
 
         Assert.Equal(1, auth1[0]);
-        var expectedSessionId = Convert.FromHexString(id.ToString("N")); // الصيغة النصية للـ GUID هي big-endian
+        var expectedSessionId = Convert.FromHexString(id.ToString("N")); // the GUID's textual form is big-endian
         Assert.Equal(expectedSessionId, auth1[1..17]);
         var clientRandom = auth1[17..49];
         var mac1 = auth1[49..81];

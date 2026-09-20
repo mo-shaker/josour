@@ -4,7 +4,7 @@ using System.Net.Http.Json;
 
 namespace Josour.Spike;
 
-/// <summary>POST /api/v1/diagnostics {session_id, role, data} (أفضل جهد؛ النقطة يضيفها المسار A في الأسبوع 2). لا يرمي أبدًا.</summary>
+/// <summary>POST /api/v1/diagnostics {session_id, role, data} (best effort; track A adds the endpoint in week 2). It never throws.</summary>
 public static class DiagnosticsPoster
 {
     public static async Task<bool> PostAsync(string apiBase, string token, Guid sessionId, string role, object data, CancellationToken ct)

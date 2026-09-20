@@ -7,8 +7,8 @@ using Xunit.Abstractions;
 namespace Josour.Tunnel.Tests.Fuzz;
 
 /// <summary>
-/// ‏stream يقرأ من مخزن جاهز ويحتفظ بكل ما يُكتب إليه: يجعل جانب المضيف من المصافحة قابلًا للقياس آلاف المرات
-/// بلا مقابس، ويجعل «كم بايتًا كتب المضيف؟» سؤالًا يُجاب بدقة. نفاد المخزن = EOF (إغلاق الطرف الآخر).
+/// A stream that reads from a prepared buffer and keeps everything written to it: it makes the host's side of the handshake measurable thousands of times
+/// with no sockets, and makes "how many bytes did the host write?" a question answered exactly. The buffer running out = EOF (the other side closing).
 /// </summary>
 internal sealed class ReplayStream : Stream
 {
@@ -18,7 +18,7 @@ internal sealed class ReplayStream : Stream
 
     public ReplayStream(byte[] source) => _source = source;
 
-    /// <summary>ما كتبه الطرف المُختبَر. يجب أن يكون فارغًا في كل حالة فشل مصادقة.</summary>
+    /// <summary>What the side under test wrote. It must be empty in every authentication failure.</summary>
     public byte[] Written => _written.ToArray();
 
     public override bool CanRead => true;
@@ -66,9 +66,9 @@ internal sealed class ReplayStream : Stream
 }
 
 /// <summary>
-/// ‏fuzz على <c>AUTH1</c>/<c>AUTH2</c> (<c>docs/protocol.md</c> القسم 4). القاعدة الحاكمة في العقد:
-/// <b>«الفشل: إغلاق الاتصال بلا رد»</b> و«المضيف لا يكتب أي بايت قبل التحقق». الاختبار هنا يقيسها حرفيًا:
-/// عدد البايتات التي كتبها المضيف بعد كل مدخل معادٍ يجب أن يكون صفرًا.
+/// Fuzzing <c>AUTH1</c>/<c>AUTH2</c> (<c>docs/protocol.md</c> section 4). The governing rule in the contract:
+/// <b>"Failure: the connection is closed with no reply"</b> and "the host writes no byte before verifying". The test here measures it literally:
+/// the number of bytes the host wrote after every hostile input must be zero.
 /// </summary>
 public class AuthHandshakeFuzzTests
 {
@@ -90,7 +90,7 @@ public class AuthHandshakeFuzzTests
         return (material, fingerprint);
     }
 
-    /// <summary>‏AUTH1 صحيح تمامًا: مرجع المقارنة، ويثبت أن أداة البناء في الاختبار تطابق العقد.</summary>
+    /// <summary>A perfectly valid AUTH1: the reference for comparison, and proof that the test's builder matches the contract.</summary>
     private static byte[] ValidAuth1(SessionMaterial material, byte[] fingerprint, byte[]? clientRandom = null)
     {
         var sessionId = AuthHandshake.SessionIdBytes(material.SessionId);
@@ -124,7 +124,7 @@ public class AuthHandshakeFuzzTests
         }
     }
 
-    // ---------- المرجع ----------
+    // ---------- The reference ----------
 
     [Fact]
     public async Task ValidAuth1_IsAccepted_AndAnsweredWithExactly32Bytes()
@@ -135,9 +135,9 @@ public class AuthHandshakeFuzzTests
         Assert.Equal(AuthHandshake.Auth2Length, written.Length);
     }
 
-    // ---------- قطع ----------
+    // ---------- Truncation ----------
 
-    /// <summary>‏0..80 بايت ثم إغلاق: المضيف يفشل بلا رد مهما كان الطول.</summary>
+    /// <summary>0..80 bytes then a close: the host fails with no reply, whatever the length.</summary>
     [Fact]
     public async Task TruncatedAuth1_AtEveryLength_IsRejectedSilently()
     {
@@ -152,7 +152,7 @@ public class AuthHandshakeFuzzTests
         }
     }
 
-    /// <summary>‏81 بايتًا صحيحة متبوعة بحشو: ما بعد الرسالة لا يُقرأ ولا يغيّر الحكم (لا تهريب حمولة).</summary>
+    /// <summary>81 valid bytes followed by padding: what comes after the message is not read and does not change the verdict (no payload smuggling).</summary>
     [Theory]
     [InlineData(1)]
     [InlineData(1024)]
@@ -171,7 +171,7 @@ public class AuthHandshakeFuzzTests
         Assert.Equal(AuthHandshake.Auth2Length, written.Length);
     }
 
-    /// <summary>‏AUTH1 مضخّم بلا مقدمة صحيحة: يُرفض بلا رد ولا تخصيص يتبع الطول المعلن (لا طول معلن أصلًا).</summary>
+    /// <summary>An inflated AUTH1 with no valid preamble: refused with no reply and with no allocation following a declared length (there is no declared length at all).</summary>
     [Fact]
     public async Task OversizedGarbage_IsRejectedSilently()
     {
@@ -187,11 +187,11 @@ public class AuthHandshakeFuzzTests
         Assert.True(after - before < 16L * 1024 * 1024, $"a 4 MiB garbage AUTH1 grew the heap by {(after - before) / 1024} KiB");
     }
 
-    // ---------- قلب البتات ----------
+    // ---------- Bit flips ----------
 
     /// <summary>
-    /// قلب بت واحد في كل موضع من الـ 81 بايتًا: كل واحدة ترفَض بلا رد. هذا يغطي كل حقول الرسالة معًا
-    /// (الإصدار، معرّف الجلسة، العشوائي، الـ MAC) بلا استثناء.
+    /// Flipping one bit at every position of the 81 bytes: each one is refused with no reply. This covers every field of the message together
+    /// (the version, the session id, the random, the MAC) with no exception.
     /// </summary>
     [Fact]
     public async Task EverySingleBitFlip_IsRejectedSilently()
@@ -216,7 +216,7 @@ public class AuthHandshakeFuzzTests
         Assert.Equal(AuthHandshake.Auth1Length * 8, checkedBits);
     }
 
-    /// <summary>بايتات عشوائية بأطوال عشوائية: لا نوع استثناء خارج المتوقَّع، ولا بايت واحد يُكتب.</summary>
+    /// <summary>Random bytes at random lengths: no exception type outside the expected ones, and not one byte written.</summary>
     [Fact]
     public async Task RandomInput_NeverProducesAReply_NorAnUnexpectedExceptionType()
     {
@@ -234,7 +234,7 @@ public class AuthHandshakeFuzzTests
         _output.WriteLine($"{cases} random AUTH1 inputs: all rejected, none produced a byte on the wire");
     }
 
-    /// <summary>سر خاطئ وبصمة خاطئة ومعرّف جلسة خاطئ، كلٌّ على حدة: العقد يعطي النتيجة نفسها لكلٍّ منها.</summary>
+    /// <summary>A wrong secret, a wrong fingerprint and a wrong session id, each on its own: the contract gives the same result for each.</summary>
     [Fact]
     public async Task WrongSecret_WrongSessionId_AndWrongFingerprint_AllFailIdentically()
     {
@@ -250,19 +250,19 @@ public class AuthHandshakeFuzzTests
         {
             var (error, written) = await HostAsync(bytes, material, fingerprint);
             Assert.IsType<AuthFailedException>(error);
-            Assert.Equal("AUTH1 verification failed", error!.Message);   // رسالة واحدة: لا تفصح أي حقل فشل
+            Assert.Equal("AUTH1 verification failed", error!.Message);   // one message: it does not reveal which field failed
             Assert.Empty(written);
             _output.WriteLine($"{label}: AuthFailedException, 0 bytes written");
         }
     }
 
-    // ---------- إعادة الإرسال ----------
+    // ---------- Replay ----------
 
     /// <summary>
-    /// ‏<b>خاصية موثَّقة لا عيبًا:</b> ‏AUTH1 صحيحة تُقبل مرة أخرى إن أُعيد إرسالها بحرفيتها. لا nonce للخادم في
-    /// العقد (القسم 4)، فالحماية طبقتان: الرسالة لا تُرى أصلًا لأنها داخل TLS مثبَّت على بصمة المضيف، والمضيف
-    /// لا يرسل AUTH2 إلا لأول اتصال يجتاز AUTH1 ويغلق ما عداه (<c>SymmetricConnector.TryClaim</c>).
-    /// الاختبار يثبّت الخاصية حتى لا تتغير بصمت، وحتى يُتخذ قرار صريح إن أُريد تغييرها.
+    /// <b>A documented property rather than a defect:</b> a valid AUTH1 is accepted again if it is replayed literally. There is no server nonce in
+    /// the contract (section 4), so the protection is two layers: the message is not seen at all because it is inside TLS pinned to the host's fingerprint, and the host
+    /// sends AUTH2 only to the first connection that passes AUTH1 and closes the rest (<c>SymmetricConnector.TryClaim</c>).
+    /// The test pins the property so it does not change silently, and so an explicit decision is taken if changing it is wanted.
     /// </summary>
     [Fact]
     public async Task ReplayedAuth1_IsAcceptedByTheHandshakeItself_ByDesign()
@@ -275,24 +275,24 @@ public class AuthHandshakeFuzzTests
 
         Assert.Null(first.Error);
         Assert.Null(replay.Error);
-        Assert.Equal(first.Written, replay.Written); // نفس AUTH2 بالضبط: الرد دالة في المدخل وحده
+        Assert.Equal(first.Written, replay.Written); // exactly the same AUTH2: the reply is a function of the input alone
         _output.WriteLine("AUTH1 replay is accepted by the handshake; TLS pinning and the host's single-claim rule are what bound it");
     }
 
-    // ---------- التوقيت ----------
+    // ---------- Timing ----------
 
     /// <summary>
-    /// <b>ما يُقاس ولماذا هكذا:</b> ما يراه المهاجم فعلًا هو الزمن من إرسال AUTH1 إلى إغلاق المقبس، فالقياس هنا
-    /// من طرف إلى طرف على مسار الفشل كاملًا (بما فيه رمي الاستثناء) لا على المقارنة وحدها. تُقاس ثلاث مجموعات
-    /// متداخلة:
+    /// <b>What is measured and why this way:</b> what an attacker actually sees is the time from sending AUTH1 to the socket closing, so the measurement here is
+    /// end to end over the whole failure path (throwing the exception included) rather than over the comparison alone. Three interleaved groups
+    /// are measured:
     /// <list type="bullet">
-    ///   <item><b>سر خاطئ</b> و<b>معرّف جلسة خاطئ</b>: كلاهما يجب أن يمر بالمسار نفسه — المقارنة على الحقلين معًا
-    ///     بـ <c>&amp;</c> لا <c>&amp;&amp;</c>، والـ MAC يُحسب دائمًا.</item>
-    ///   <item><b>إصدار خاطئ</b>: عودة مبكرة <i>مقصودة ومعلنة</i> في العقد، وتعمل هنا شاهدًا موجبًا يقيس ما يستطيع
-    ///     هذا المقياس رؤيته أصلًا.</item>
+    ///   <item><b>A wrong secret</b> and <b>a wrong session id</b>: both must take the same path — the comparison covers both fields together
+    ///     with <c>&amp;</c> rather than <c>&amp;&amp;</c>, and the MAC is always computed.</item>
+    ///   <item><b>A wrong version</b>: an early return that is <i>deliberate and declared</i> in the contract, and it serves here as a positive control measuring what
+    ///     this probe can see at all.</item>
     /// </list>
-    /// الحكم نسبي إلى الضجيج لا إلى رقم مطلق: يُقارَن الفرق بين المجموعتين بتشتّت المجموعة الواحدة مع نفسها
-    /// (نصفان متناوبان). لو عاد أحد المسارين مبكرًا لظهر فرق أكبر من ضجيجه هو.
+    /// The verdict is relative to the noise rather than to an absolute number: the difference between the two groups is compared with one group's spread against itself
+    /// (two alternating halves). Had either path returned early, a difference larger than its own noise would have appeared.
     /// </summary>
     [Fact]
     public async Task WrongSecretAndWrongSessionId_AreNotDistinguishableByTiming()
@@ -313,7 +313,7 @@ public class AuthHandshakeFuzzTests
             await HostAsync(wrongVersion, material, fingerprint);
         }
 
-        // نصفان لكل مجموعة بالتناوب: الفرق بين نصفَي المجموعة الواحدة هو أرضية الضجيج بعينها.
+        // Two halves per group, alternating: the difference between one group's two halves is the noise floor itself.
         var secretA = new List<double>(samples / 2);
         var secretB = new List<double>(samples / 2);
         var session = new List<double>(samples);
@@ -329,9 +329,9 @@ public class AuthHandshakeFuzzTests
         var mSecretB = Median(secretB);
         var mSession = Median(session);
         var mVersion = Median(version);
-        var noise = Math.Abs(mSecretA - mSecretB);                       // نفس المدخل مرتين: ضجيج خالص
-        var signal = Math.Abs((mSecretA + mSecretB) / 2 - mSession);     // مدخلان يفترض أنهما على المسار نفسه
-        var control = Math.Abs((mSecretA + mSecretB) / 2 - mVersion);    // عودة مبكرة معلومة
+        var noise = Math.Abs(mSecretA - mSecretB);                       // the same input twice: pure noise
+        var signal = Math.Abs((mSecretA + mSecretB) / 2 - mSession);     // two inputs that should be on the same path
+        var control = Math.Abs((mSecretA + mSecretB) / 2 - mVersion);    // a known early return
 
         _output.WriteLine(
             $"median end-to-end failure time: wrong secret {mSecretA * 1000:F2}/{mSecretB * 1000:F2} µs, " +
@@ -359,8 +359,8 @@ public class AuthHandshakeFuzzTests
     }
 
     /// <summary>
-    /// الأنواع المسموح بها عند الفشل. أي نوع آخر (‏<c>IndexOutOfRange</c>، <c>NullReference</c>، …) يعني أن مدخلًا
-    /// معاديًا وصل إلى مسار لم يُصمَّم له.
+    /// The exception types permitted on failure. Any other type (<c>IndexOutOfRange</c>, <c>NullReference</c>, …) means a hostile
+    /// input reached a path that was not designed for it.
     /// </summary>
     private static void AssertExpectedAuthFailure(Exception error, string what)
         => Assert.True(error is AuthFailedException or TimeoutException or OperationCanceledException,

@@ -7,9 +7,9 @@ using Xunit.Abstractions;
 namespace Josour.Tunnel.Tests.Soak;
 
 /// <summary>
-/// تحمّل <b>دورة حياة الجلسة</b> لا حركة المرور: إنشاء وتخلص متكرران لما تملكه الجلسة من موارد النظام —
-/// شهادة الجلسة (وحاوية مفتاحها على Windows)، مقبس المستمع، مصدر المرشحين — لأن هذه لا تظهر في نفق واحد
-/// طويل العمر مهما طال. عيب هنا يعني جهازًا يستنزف واصفات ملفات أو حاويات مفاتيح على مدى يوم عمل كامل.
+/// A soak of <b>the session's lifecycle</b> rather than of traffic: repeated creation and disposal of the system resources the session owns —
+/// the session certificate (and its key container on Windows), the listener's socket, the candidate source — because these do not show up in one long-lived
+/// tunnel however long it lives. A defect here means a machine that exhausts file descriptors or key containers over a full working day.
 /// </summary>
 [Trait("Category", "Benchmark")]
 public class SessionLifecycleSoakTests
@@ -20,8 +20,8 @@ public class SessionLifecycleSoakTests
     public SessionLifecycleSoakTests(ITestOutputHelper output) => _output = output;
 
     /// <summary>
-    /// دورة كاملة: <c>PrepareAsync</c> (شهادة + مستمع + مرشحون) ثم <c>EndAsync</c> بترتيب التنظيف كاملًا.
-    /// المدة الافتراضية أقصر من تحمّل النفق لأن الدورة هنا سريعة جدًا والقياس على العدد لا على الزمن.
+    /// A complete cycle: <c>PrepareAsync</c> (a certificate + a listener + candidates) then <c>EndAsync</c> with the full cleanup order.
+    /// The default duration is shorter than the tunnel soak's because the cycle here is very fast and the measurement is on the count rather than on the time.
     /// </summary>
     [Fact]
     public async Task RepeatedPrepareAndEnd_DoesNotLeakHandlesOrCertificates()
@@ -34,7 +34,7 @@ public class SessionLifecycleSoakTests
         var nextSample = options.SampleInterval;
         long cycles = 0;
 
-        // إحماء: أول دورات تدفع تحميل التجميعات وتخصيصات لمرة واحدة، فلا تُحسب في خط الأساس.
+        // A warm-up: the first cycles pay for assembly loading and one-off allocations, so they are not counted in the baseline.
         for (var i = 0; i < 20; i++) await OneCycleAsync();
 
         while (clock.Elapsed < options.Duration)
@@ -83,9 +83,9 @@ public class SessionLifecycleSoakTests
     }
 
     /// <summary>
-    /// الشهادة وحدها بأعداد كبيرة: على Windows كل إنشاء يستورد PFX بـ <c>UserKeySet</c> فتُنشأ حاوية مفتاح
-    /// يجب أن يحذفها <c>Dispose</c>. هذا الاختبار هو ما سيكشف بقاءها هناك؛ على macOS يقيس واصفات الملفات
-    /// والذاكرة فقط (انظر «ما يبقى غير مثبت» في <c>docs/soak-and-fuzz-week6.md</c>).
+    /// The certificate alone at large counts: on Windows every creation imports a PFX with <c>UserKeySet</c>, so a key container is created
+    /// that <c>Dispose</c> must delete. This test is what will expose it surviving there; on macOS it measures file descriptors
+    /// and memory only (see "what remains unproven" in <c>docs/soak-and-fuzz-week6.md</c>).
     /// </summary>
     [Fact]
     public void RepeatedCertificateCreateAndDispose_DoesNotLeak()

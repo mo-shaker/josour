@@ -398,7 +398,7 @@ public sealed class ControlChannelTests
     [Fact]
     public async Task Close4401_MidSession_RefreshesTheTokenOnceAndComesBackConnected()
     {
-        // plan 8.5 "انتهاء access token": the token expires while the channel is up, so the server closes with 4401 on a
+        // plan 8.5 "the access token expiring": the token expires while the channel is up, so the server closes with 4401 on a
         // live connection rather than during the first handshake. One refresh, one reconnect, and the new token on the wire.
         await using var h = await Harness.StartAsync();
         var attempt = 0;

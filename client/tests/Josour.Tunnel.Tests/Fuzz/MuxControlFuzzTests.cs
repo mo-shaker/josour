@@ -6,9 +6,9 @@ using Xunit.Abstractions;
 namespace Josour.Tunnel.Tests.Fuzz;
 
 /// <summary>
-/// ‏fuzz على <b>ما نملكه داخل إطارات Nerdbank</b>: قناة التحكم المزروعة (PING/PONG/GOAWAY بتسعة بايتات)،
-/// وبروتوكول بايت الحالة عند الفتح، واسم القناة <c>host:port</c>. الطرف المعادي هنا
-/// <see cref="RawMuxPeer"/>: يتكلم بروتوكول Nerdbank 3 بصحة تامة ويكذب فوقه.
+/// Fuzzing <b>what we own inside Nerdbank's frames</b>: the seeded control channel (PING/PONG/GOAWAY in nine bytes),
+/// the status-byte protocol at open time, and the channel name <c>host:port</c>. The hostile peer here is
+/// <see cref="RawMuxPeer"/>: it speaks Nerdbank protocol 3 perfectly and lies on top of it.
 /// </summary>
 public class MuxControlFuzzTests
 {
@@ -22,16 +22,16 @@ public class MuxControlFuzzTests
 
     public MuxControlFuzzTests(ITestOutputHelper output) => _output = output;
 
-    // ---------- أنواع إطارات غير معروفة ----------
+    // ---------- Unknown frame types ----------
 
     /// <summary>
-    /// نوع إطار خارج {1,2,3}: العقد يقول <c>GOAWAY(protocol_error)</c> ثم إغلاق. والأهم أن الإغلاق يظهر
-    /// <b>عطلًا</b>: الإغلاق النظيف لا يرفع <c>Died</c> في <c>TunnelSession</c>، فكان الطرف المعادي ينهي الجلسة
-    /// بلا سبب ويبلَّغ الخادم بإنهاء عادي.
+    /// A frame type outside {1,2,3}: the contract says <c>GOAWAY(protocol_error)</c> then a close. And more importantly, the close must surface
+    /// as <b>a fault</b>: a clean close does not raise <c>Died</c> in <c>TunnelSession</c>, so a hostile peer used to end the session
+    /// with no reason and the server was told of an ordinary end.
     /// </summary>
     /// <remarks>
-    /// الحالات متوازية لا متعاقبة: كل واحدة تدفع نصف ثانية من تصريف GOAWAY (سلوك صحيح — ننتظر وصول الإطار قبل
-    /// إسقاط النقل)، والتعاقب يجعل سبع حالات ثلاث ثوانٍ ونصفًا في المجموعة الافتراضية بلا مقابل.
+    /// The cases run in parallel rather than in sequence: each one pays half a second of GOAWAY draining (correct behaviour — we wait for the frame to arrive before
+    /// dropping the transport), and running them in sequence makes seven cases three and a half seconds in the default suite for nothing.
     /// </remarks>
     [Fact]
     public async Task UnknownControlFrameType_SendsGoAwayProtocolError_AndFaultsCompletion()
@@ -51,7 +51,7 @@ public class MuxControlFuzzTests
         }));
     }
 
-    /// <summary>سبب GOAWAY خارج العقد (1..3): يُعامل خطأ بروتوكول لا إغلاقًا نظيفًا بسبب مجهول.</summary>
+    /// <summary>A GOAWAY reason outside the contract (1..3): treated as a protocol error rather than a clean close with an unknown reason.</summary>
     [Fact]
     public async Task GoAwayWithUnknownReason_IsAProtocolError()
     {
@@ -70,7 +70,7 @@ public class MuxControlFuzzTests
         }));
     }
 
-    /// <summary>‏<c>GOAWAY(protocol_error)</c> من الطرف الآخر: نهاية غير طبيعية يجب أن يعرفها التطبيق.</summary>
+    /// <summary><c>GOAWAY(protocol_error)</c> from the other side: an abnormal end the application must know about.</summary>
     [Fact]
     public async Task PeerGoAwayProtocolError_FaultsCompletion()
     {
@@ -85,7 +85,7 @@ public class MuxControlFuzzTests
         Assert.Equal(GoAwayReason.ProtocolError, peer.Victim.RemoteGoAway);
     }
 
-    /// <summary>‏<c>GOAWAY(session_end)</c> و<c>(expired)</c> يبقيان إغلاقًا نظيفًا: نهاية مقصودة لا موت.</summary>
+    /// <summary><c>GOAWAY(session_end)</c> and <c>(expired)</c> stay a clean close: a deliberate end, not a death.</summary>
     [Theory]
     [InlineData(GoAwayReason.SessionEnd)]
     [InlineData(GoAwayReason.Expired)]
@@ -102,9 +102,9 @@ public class MuxControlFuzzTests
         Assert.Equal(reason, peer.Victim.RemoteGoAway);
     }
 
-    // ---------- إطارات ناقصة ومقسومة ----------
+    // ---------- Truncated and split frames ----------
 
-    /// <summary>‏1..8 بايت ثم صمت: لا تعليق، ولا استهلاك خاطئ، والإطار الذي يكتمل بعدها يُعالَج صحيحًا.</summary>
+    /// <summary>1..8 bytes then silence: no hang, no mis-consumption, and the frame that completes after them is handled correctly.</summary>
     [Fact]
     public async Task PartialControlFrame_IsHeldUntilItCompletes()
     {
@@ -126,7 +126,7 @@ public class MuxControlFuzzTests
         }));
     }
 
-    /// <summary>إطارات مقسومة على كتابات ببايت واحد: لا فرق في النتيجة، وهذا ما يفعله السلك الحقيقي تحت الازدحام.</summary>
+    /// <summary>Frames split across single-byte writes: no difference in the result, and this is what the real wire does under congestion.</summary>
     [Fact]
     public async Task ControlFrames_SplitAcrossSingleByteWrites_AreStillParsed()
     {
@@ -144,9 +144,9 @@ public class MuxControlFuzzTests
         Assert.False(peer.Victim.IsClosed);
     }
 
-    // ---------- حمولات معادية على قناة سليمة ----------
+    // ---------- Hostile payloads on a sound channel ----------
 
-    /// <summary>‏PONG بنونس لم نطلبه: يُهمل، ولا يضيف شيئًا إلى الخريطة، ولا يقتل النفق.</summary>
+    /// <summary>A PONG with a nonce we did not request: it is dropped, adds nothing to the map, and does not kill the tunnel.</summary>
     [Fact]
     public async Task UnsolicitedPongs_AreIgnored_AndDoNotGrowThePendingMap()
     {
@@ -162,14 +162,14 @@ public class MuxControlFuzzTests
 
         Assert.False(peer.Victim.IsClosed, "unsolicited PONGs must not close the tunnel");
         Assert.Equal(0, peer.Victim.PendingPings);
-        // النفق ما زال صالحًا: PING منا يعود بـ PONG.
+        // The tunnel is still usable: a PING from us comes back with a PONG.
         var rtt = await peer.Victim.PingAsync(CancellationToken.None).WaitAsync(Short);
         Assert.InRange(rtt.TotalMilliseconds, 0, 10_000);
     }
 
     /// <summary>
-    /// طوفان PING: يجب أن يُجاب كله بلا نموّ ذاكرة بلا حد. الضغط العكسي هنا حقيقي (نافذة قناة التحكم 4 MiB)،
-    /// فالغرض إثبات أن الرد محكوم بالنافذة لا أن الطابور يكبر في ذاكرتنا.
+    /// A PING flood: it must all be answered with no unbounded memory growth. The backpressure here is real (the control channel's window is 4 MiB),
+    /// so the purpose is to prove the answering is governed by the window rather than a queue growing in our memory.
     /// </summary>
     [Fact]
     public async Task PingFlood_IsAnswered_WithoutUnboundedMemory()
@@ -195,7 +195,7 @@ public class MuxControlFuzzTests
         Assert.True(after - before < 64L * 1024 * 1024, $"the ping flood grew the heap by {(after - before) / 1024 / 1024} MiB");
     }
 
-    /// <summary>بايتات عشوائية على قناة التحكم: دائمًا حالة نهائية معرَّفة، وبلا استثناء من نوع آخر.</summary>
+    /// <summary>Random bytes on the control channel: always a defined final state, and never an exception of another type.</summary>
     [Fact]
     public Task RandomControlBytes_AlwaysEndInADefinedState() => RandomControlBytesAsync(FuzzSeed.Cases(32));
 
@@ -204,8 +204,8 @@ public class MuxControlFuzzTests
     public Task Deep_RandomControlBytes() => RandomControlBytesAsync(FuzzSeed.Cases(600));
 
     /// <summary>
-    /// الحالات مستقلة تمامًا فتُشغَّل على دفعات متوازية: كل حالة تدفع نصف ثانية من تصريف GOAWAY (السلوك الصحيح:
-    /// ننتظر أن يصل الإطار قبل إسقاط النقل)، والتسلسل يجعلها دقائق بلا فائدة.
+    /// The cases are entirely independent so they run in parallel batches: each one pays half a second of GOAWAY draining (the correct behaviour:
+    /// we wait for the frame to arrive before dropping the transport), and running them in sequence makes it minutes for nothing.
     /// </summary>
     private async Task RandomControlBytesAsync(int cases)
     {
@@ -222,13 +222,13 @@ public class MuxControlFuzzTests
                 await using var peer = await RawMuxPeer.CreateAsync();
                 await peer.WriteControlAsync(Mutate.Random(rng, rng.Next(1, 512)));
 
-                // ثلاث ثوانٍ لا عشر: المسار المنتهي يستقر خلال نصف ثانية (تصريف GOAWAY)، أما الحمولة التي تبقي
-                // النفق حيًّا (أقل من تسعة بايتات، أو إطارات PING/PONG صالحة بالصدفة) فتنتظر المهلة كاملة —
-                // وبعشر ثوانٍ كانت حالة واحدة من كل ستين تضيف عشر ثوانٍ إلى المجموعة الافتراضية.
+                // Three seconds rather than ten: the terminating path settles within half a second (the GOAWAY drain), while a payload that keeps
+                // the tunnel alive (under nine bytes, or PING/PONG frames valid by chance) waits out the whole timeout —
+                // and at ten seconds one case in sixty would have added ten seconds to the default suite.
                 var verdict = await peer.SettleAsync(TimeSpan.FromSeconds(3));
                 if (!verdict.Completed)
                 {
-                    // أقل من تسعة بايتات، أو بايتات كلها PING/PONG صالحة: النفق حيّ وهذا مقبول.
+                    // Under nine bytes, or bytes that are all valid PING/PONG: the tunnel is alive and that is acceptable.
                     Assert.False(peer.Victim.IsClosed, $"case {i}: mux is closed but Completion never settled");
                     Interlocked.Increment(ref alive);
                     return;
@@ -243,15 +243,15 @@ public class MuxControlFuzzTests
         var unobserved = watch.Drain();
         var ours = unobserved.Where(UnobservedExceptionWatch.IsOurs).ToList();
         _output.WriteLine($"random control bytes: {cases} cases, {faulted} faulted, {alive} still alive; unobserved: {ours.Count} ours, {unobserved.Count - ours.Count} from Nerdbank.Streams");
-        // ما نصنعه نحن يجب أن يكون صفرًا؛ ضجيج مهام Nerdbank الداخلية موثَّق ولا نملك إصلاحه.
+        // What we make must be zero; the noise from Nerdbank's internal tasks is documented and we cannot fix it.
         Assert.True(ours.Count == 0, UnobservedExceptionWatch.Describe(ours));
     }
 
-    // ---------- بروتوكول الفتح: الاسم وبايت الحالة ----------
+    // ---------- The open protocol: the name and the status byte ----------
 
     /// <summary>
-    /// أسماء قنوات معادية: العقد يقول <c>host:port</c> بلا IPv6 حرفي. كل ما لا يطابق يجب أن يعود
-    /// <c>OPEN_FAIL(not_allowed)</c>، لا أن يصل إلى سياسة الخروج ولا أن يعلّق العارض.
+    /// Hostile channel names: the contract says <c>host:port</c> with no IPv6 literal. Everything that does not match must come back as
+    /// <c>OPEN_FAIL(not_allowed)</c>, rather than reaching the egress policy or hanging the offerer.
     /// </summary>
     [Theory]
     [InlineData("")]
@@ -287,9 +287,9 @@ public class MuxControlFuzzTests
     }
 
     /// <summary>
-    /// أسماء قنوات ضخمة: الحد 300 محرف في <c>TryParseName</c> يمنع تمرير اسم بلا سقف إلى سياسة الخروج أو إلى
-    /// مجموعة النطاقات. الأسماء الأكبر من إطار Nerdbank لا تخرج من الطرف المعادي أصلًا (‏<c>null</c> هنا)،
-    /// وهو حد إضافي مجاني لكنه ليس حدَّنا: المطلوب ألا يصل شيء من هذا إلى ما بعد المحلل.
+    /// Huge channel names: the 300-character limit in <c>TryParseName</c> stops an unbounded name being passed to the egress policy or to
+    /// the domain set. Names larger than a Nerdbank frame never leave the hostile peer at all (<c>null</c> here),
+    /// which is a free extra bound but not our bound: what is required is that none of this reaches past the parser.
     /// </summary>
     [Theory]
     [InlineData(301)]
@@ -309,8 +309,8 @@ public class MuxControlFuzzTests
     }
 
     /// <summary>
-    /// طوفان عروض فوق حد الشريحة: الرفض <c>OPEN_FAIL(limit)</c>، والعدّاد يعود إلى الصفر، والذاكرة محكومة.
-    /// بلا حد على مسار <b>القبول</b> يستطيع الطرف الآخر وحده أن يقرر كم قناة نُنشئ.
+    /// A flood of offers past the band's limit: the refusal is <c>OPEN_FAIL(limit)</c>, the counter returns to zero, and memory stays bounded.
+    /// With no limit on the <b>acceptance</b> path, the other side alone can decide how many channels we create.
     /// </summary>
     [Fact]
     public async Task OfferFloodBeyondTheStreamLimit_IsRejectedAsLimit()
@@ -324,7 +324,7 @@ public class MuxControlFuzzTests
 
         var before = GC.GetTotalMemory(forceFullCollection: true);
         var offers = Enumerable.Range(0, 64).Select(i => peer.OfferAndReadStatusAsync($"h{i}.test:443", TimeSpan.FromSeconds(20))).ToArray();
-        // البوابة تُفتح والطوفان ما زال جاريًا: المقبولون محتجزون حتى يتجاوز العرض الحد، ثم يُطلَقون.
+        // The gate opens while the flood is still running: the accepted ones are held until the offers exceed the limit, and then they are released.
         var release = Task.Run(async () => { await Task.Delay(1500); hold.TrySetResult(); });
         var statuses = await Task.WhenAll(offers);
         await release;
@@ -340,7 +340,7 @@ public class MuxControlFuzzTests
         Assert.Equal(0, peer.Victim.Stats.OpenStreams);
     }
 
-    /// <summary>بايت حالة خارج 0..7 من مضيف معادٍ: يُطبَّع إلى سبب من العقد، ولا يظهر stream مفتوح.</summary>
+    /// <summary>A status byte outside 0..7 from a hostile host: it is normalised to a reason from the contract, and no open stream appears.</summary>
     [Theory]
     [InlineData((byte)8)]
     [InlineData((byte)9)]
@@ -359,7 +359,7 @@ public class MuxControlFuzzTests
         Assert.Equal(0, peer.Victim.Stats.OpenStreams);
     }
 
-    /// <summary>مضيف معادٍ يقبل القناة ثم يغلقها بلا بايت حالة: فشل معرَّف لا تعليق ولا تسريب حجز.</summary>
+    /// <summary>A hostile host that accepts the channel and then closes it with no status byte: a defined failure, with no hang and no leaked reservation.</summary>
     [Fact]
     public async Task ChannelClosedBeforeTheStatusByte_FailsCleanly()
     {
@@ -375,7 +375,7 @@ public class MuxControlFuzzTests
         Assert.Equal(0, peer.Victim.Stats.OpenStreams);
     }
 
-    /// <summary>‏fuzz على بايت الحالة: أي قيمة من 0 إلى 255 تنتهي إما بـ stream مفتوح وإما بسبب من العقد.</summary>
+    /// <summary>Fuzzing the status byte: any value from 0 to 255 ends either as an open stream or as a reason from the contract.</summary>
     [Fact]
     public async Task StatusByteFuzz_CoversTheWholeByteRange()
     {
@@ -388,7 +388,7 @@ public class MuxControlFuzzTests
             var open = await peer.Victim.OpenStreamAsync("example.com", 443, CancellationToken.None).WaitAsync(Short);
             if (open.IsOpen)
             {
-                Assert.Equal(0, value); // 0 = OPEN_OK وحده
+                Assert.Equal(0, value); // 0 = OPEN_OK, alone
                 opened++;
                 await open.Stream!.DisposeAsync();
             }
@@ -403,9 +403,9 @@ public class MuxControlFuzzTests
         Assert.Equal(255, failed);
     }
 
-    // ---------- GOAWAY في منتصف حركة ----------
+    // ---------- A GOAWAY mid-traffic ----------
 
-    /// <summary>‏GOAWAY يصل بينما البيانات تتحرك على stream: إغلاق معرَّف، والـ stream يعطي خطأ IO لا نوعًا مفاجئًا.</summary>
+    /// <summary>A GOAWAY arriving while data is moving on a stream: a defined close, and the stream gives an IO error rather than a surprising type.</summary>
     [Fact]
     public async Task GoAwayMidStream_ClosesEverythingWithAKnownExceptionType()
     {
@@ -437,7 +437,7 @@ public class MuxControlFuzzTests
         Assert.Equal(GoAwayReason.SessionEnd, peer.Victim.RemoteGoAway);
 
         var error = await writer.WaitAsync(Settle);
-        // الكاتب إما أنهى ما عليه قبل الإغلاق وإما رأى IOException/ObjectDisposedException؛ لا نوع خارج هذين.
+        // The writer either finished what it had before the close or saw an IOException/ObjectDisposedException; no type outside those two.
         Assert.True(error is null or IOException or ObjectDisposedException or OperationCanceledException,
             $"writing during GOAWAY threw {error?.GetType().FullName}: {error?.Message}");
         await stream.DisposeAsync();

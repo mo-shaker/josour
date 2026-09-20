@@ -7,7 +7,7 @@ public sealed class UsageException : Exception
     public UsageException(string message) : base(message) { }
 }
 
-/// <summary>تحليل يدوي بسيط: --name value أو --flag.</summary>
+/// <summary>A simple hand-written parser: --name value or --flag.</summary>
 public sealed class Args
 {
     private readonly Dictionary<string, string?> _values = new(StringComparer.OrdinalIgnoreCase);
@@ -58,7 +58,7 @@ public static class Json
     public static readonly System.Text.Json.JsonSerializerOptions Compact = new() { WriteIndented = false };
 }
 
-/// <summary>زوج NetworkStream على loopback للاختبارات الذاتية.</summary>
+/// <summary>A NetworkStream pair on loopback for the self-tests.</summary>
 public static class Loopback
 {
     public static async Task<(Stream Server, Stream Client)> CreatePairAsync(CancellationToken ct)

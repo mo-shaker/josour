@@ -8,14 +8,14 @@ using Josour.Tunnel.Transport;
 namespace Josour.Tunnel.Tests;
 
 /// <summary>
-/// عدّ محاولات الوصول غير المصرَّح بها على مستمع النفق ورفعها (‏<c>docs/protocol.md</c> القسم 2 مع
-/// <c>docs/api.md</c>: <c>POST /diagnostics</c> والمفاتيح المحجوزة). المستمع مفتوح بين <c>session.created</c>
-/// و<c>session.connected</c> فقط، وهو الموضع الوحيد الذي يرى فيه النظام اتصالًا لا يجتاز <c>AUTH1</c>؛
-/// الخادم لا يمر به شيء منه فلا يستطيع رصده.
+/// Counting the unauthorised access attempts on the tunnel's listener and reporting them (<c>docs/protocol.md</c> section 2 with
+/// <c>docs/api.md</c>: <c>POST /diagnostics</c> and the reserved keys). The listener is open between <c>session.created</c>
+/// and <c>session.connected</c> only, and it is the one place where the system sees a connection that does not pass <c>AUTH1</c>;
+/// none of it passes through the server, so the server cannot observe it.
 /// </summary>
 public class UnauthenticatedProbeTests
 {
-    // ---------- السجل نفسه ----------
+    // ---------- The log itself ----------
 
     [Fact]
     public void Log_CountsEveryAttempt_AndDeduplicatesAddresses()
@@ -29,7 +29,7 @@ public class UnauthenticatedProbeTests
         Assert.Equal(new[] { "198.51.100.7", "198.51.100.8" }, log.Peers);
     }
 
-    /// <summary>الحد عشرة عناوين (‏<c>docs/api.md</c>)، لكن العدّ الكلي وعدد المميزة يبقيان صحيحين فوقه.</summary>
+    /// <summary>The cap is ten addresses (<c>docs/api.md</c>), but the total count and the distinct count stay correct above it.</summary>
     [Fact]
     public void Log_CapsTheAddressListAtTen_ButKeepsCounting()
     {
@@ -39,11 +39,11 @@ public class UnauthenticatedProbeTests
         Assert.Equal(40, log.Count);
         Assert.Equal(40, log.DistinctPeers);
         Assert.Equal(UnauthenticatedProbeLog.MaxPeers, log.Peers.Count);
-        Assert.Equal("203.0.113.1", log.Peers[0]);   // بترتيب الظهور، لا عشوائيًا
+        Assert.Equal("203.0.113.1", log.Peers[0]);   // in order of appearance, not at random
         Assert.Equal("203.0.113.10", log.Peers[9]);
     }
 
-    /// <summary>العنوان المخطَّط <c>::ffff:a.b.c.d</c> هو نفسه <c>a.b.c.d</c>: مستمع DualMode يراه بالشكلين.</summary>
+    /// <summary>The mapped address <c>::ffff:a.b.c.d</c> is the same as <c>a.b.c.d</c>: a DualMode listener sees it in both forms.</summary>
     [Fact]
     public void Log_NormalisesIpv4MappedAddresses()
     {
@@ -65,7 +65,7 @@ public class UnauthenticatedProbeTests
         Assert.Empty(log.Peers);
     }
 
-    /// <summary>شكل <c>data</c> بالمفاتيح المحجوزة حرفيًا، و<c>null</c> حين لا شيء يُبلَّغ عنه.</summary>
+    /// <summary>The shape of <c>data</c> with the reserved keys literally, and <c>null</c> when there is nothing to report.</summary>
     [Fact]
     public void Log_ProducesTheReservedApiKeys()
     {
@@ -81,9 +81,9 @@ public class UnauthenticatedProbeTests
         Assert.Equal(new[] { "198.51.100.1", "198.51.100.2" }, Assert.IsType<List<string>>(data["unauthenticated_peers"]));
     }
 
-    // ---------- المستمع ----------
+    // ---------- The listener ----------
 
-    /// <summary>ما يرفضه المستمع بنفسه (فوق أربعة اتصالات معلّقة) أُغلق بلا قراءة بايت: غير مصادَق بالتعريف.</summary>
+    /// <summary>What the listener refuses itself (beyond four pending connections) was closed with not a byte read: unauthenticated by definition.</summary>
     [Fact]
     public async Task Listener_RecordsConnectionsItRejectsOverCapacity()
     {
@@ -122,7 +122,7 @@ public class UnauthenticatedProbeTests
         }
     }
 
-    /// <summary>السجل يبقى مقروءًا بعد إغلاق المستمع: التنظيف (القسم 7) يسبق رفع التقرير.</summary>
+    /// <summary>The log stays readable after the listener is closed: the cleanup (section 7) precedes reporting.</summary>
     [Fact]
     public async Task Listener_ProbesSurviveDisposal()
     {
@@ -134,7 +134,7 @@ public class UnauthenticatedProbeTests
         Assert.Equal(new[] { "198.51.100.5" }, listener.Probes.Peers);
     }
 
-    // ---------- الموصّل المتماثل ----------
+    // ---------- The symmetric connector ----------
 
     private sealed class HostSide : IAsyncDisposable
     {
@@ -161,8 +161,8 @@ public class UnauthenticatedProbeTests
     }
 
     /// <summary>
-    /// فاحص منافذ يفتح TCP ويكتب هراءً (لا TLS ولا AUTH1) أثناء نافذة الاتصال: يُعدّ محاولة غير مصرَّح بها،
-    /// ويظهر في تشخيص الاتصال تحت <c>inbound_unauthenticated</c>.
+    /// A port scanner that opens TCP and writes nonsense (no TLS and no AUTH1) during the connect window: it is counted as an unauthorised attempt,
+    /// and it appears in the connection's diagnostics under <c>inbound_unauthenticated</c>.
     /// </summary>
     [Fact]
     public async Task Connector_RecordsAPortScannerThatNeverPassesAuth1()
@@ -171,11 +171,11 @@ public class UnauthenticatedProbeTests
         using var peerCert = SessionCertificate.Create(DateTimeOffset.UtcNow.AddMinutes(30));
         var unreachablePeer = new PeerEndpointInfo(peerCert.FingerprintHex, new[] { new CandidateEndpoint(CandidateType.Lan, "127.0.0.1", Loopback.ClosedPort()) });
 
-        // نافذة اتصال طويلة يقطعها الاختبار بمجرد تسجيل المحاولات، بدل انتظار المهلة كاملة بلا فائدة.
+        // A long connect window the test cuts short as soon as the attempts are recorded, rather than waiting out the whole timeout for nothing.
         using var window = new CancellationTokenSource();
         var connect = host.Connector.ConnectAsync(unreachablePeer, TimeSpan.FromSeconds(30), window.Token);
 
-        // ثلاثة "فاحصين": يفتحون المقبس، يكتبون بايتات ليست ClientHello، ثم يغلقون.
+        // Three "scanners": they open the socket, write bytes that are not a ClientHello, then close.
         for (var i = 0; i < 3; i++)
         {
             using var scanner = new TcpClient();
@@ -194,10 +194,10 @@ public class UnauthenticatedProbeTests
     }
 
     /// <summary>
-    /// الاتصال الشرعي لا يُعدّ محاولة. هذا الاختبار كان متقطعًا وكشف عيبًا حقيقيًا لا هشاشة اختبار: الاتصال
-    /// المتماثل يفتح <b>اتصالين</b> بين الجهازين، وأحدهما خاسر في كل جلسة ناجحة، والقسم 2 الخطوة 5 يوجب إغلاقه
-    /// <b>بلا رد</b> — فكان الطرف الخاسر يسجّله محاولة غير مصرَّح بها، أي إشارة أمنية كاذبة في كل جلسة سليمة.
-    /// يُكرَّر السباق عدة مرات لأن ترتيب الفائز غير حتمي.
+    /// A legitimate connection is not counted as an attempt. This test was flaky and exposed a real defect rather than a fragile test: the symmetric
+    /// connection opens <b>two connections</b> between the two machines, one of which loses in every successful session, and section 2 step 5 requires closing it
+    /// <b>with no reply</b> — so the losing side recorded it as an unauthorised attempt, that is, a false security signal in every healthy session.
+    /// The race is repeated several times because the winner's order is not deterministic.
     /// </summary>
     [Fact]
     public async Task Connector_DoesNotRecordTheLegitimatePeer()
@@ -239,8 +239,8 @@ public class UnauthenticatedProbeTests
     }
 
     /// <summary>
-    /// صفوف الاتصالات الواردة في التشخيص محدودة بسقف. بلا سقف تنمو القائمة بعدد ما يفتحه أي طرف على الشبكة،
-    /// فتكبر الذاكرة ويتجاوز <c>session.connect_failed</c> حد الـ 64 KB في <c>docs/api.md</c> فيُرفض التشخيص كله.
+    /// The inbound-connection rows in the diagnostics are bounded by a ceiling. With no ceiling the list grows with whatever any party on the network opens,
+    /// so memory grows and <c>session.connect_failed</c> exceeds the 64 KB limit in <c>docs/api.md</c>, so the whole diagnostic is refused.
     /// </summary>
     [Fact]
     public async Task Connector_CapsTheRecordedInboundRows_ButKeepsCounting()
@@ -260,8 +260,8 @@ public class UnauthenticatedProbeTests
                 await scanner.ConnectAsync(IPAddress.Loopback, host.Listener.Port);
                 await scanner.GetStream().WriteAsync(new byte[] { 0x00 });
             }
-            catch (SocketException) { /* رفض فوق السعة */ }
-            catch (IOException) { /* أُغلق */ }
+            catch (SocketException) { /* refused over capacity */ }
+            catch (IOException) { /* closed */ }
         }
 
         Assert.True(await Wait.UntilAsync(
@@ -278,18 +278,18 @@ public class UnauthenticatedProbeTests
         Assert.True(inboundRows <= SymmetricConnector.MaxRecordedInboundAttempts,
             $"{inboundRows} inbound rows were kept, above the {SymmetricConnector.MaxRecordedInboundAttempts} cap");
         Assert.True(dropped > 0, "the cap never engaged");
-        // ثابت دقيق: كل اتصال وارد وصل إلى المعالج يُحسب مرة واحدة — إما صفًا محفوظًا وإما صفًا مُسقطًا.
+        // An exact invariant: every inbound connection that reached the handler is counted once — either as a stored row or as a dropped one.
         Assert.Equal(handled, inboundRows + dropped);
-        // العدّاد والعناوين يبقيان محدودين مهما بلغ العدد.
+        // The counter and the addresses stay bounded however large the number grows.
         Assert.True(host.Listener.Probes.Count > 0);
         Assert.True(host.Listener.Probes.Peers.Count <= UnauthenticatedProbeLog.MaxPeers);
     }
 
-    // ---------- ما يقرؤه المسار C ----------
+    // ---------- What track C reads ----------
 
     /// <summary>
-    /// المفاتيح الثلاثة على <c>ITunnelSession.Diagnostics</c> بأسمائها في <c>docs/api.md</c> حرفيًا. هذا هو العقد
-    /// مع المسار C: يقرؤها كما هي ويضعها في <c>data</c> بلا إعادة تسمية ولا حساب.
+    /// The three keys on <c>ITunnelSession.Diagnostics</c> under their names in <c>docs/api.md</c>, literally. This is the contract
+    /// with track C: it reads them as they are and puts them in <c>data</c> with no renaming and no arithmetic.
     /// </summary>
     [Fact]
     public async Task Session_PublishesTheReservedDiagnosticsKeys()
@@ -324,7 +324,7 @@ public class UnauthenticatedProbeTests
         Assert.True(peers.Count <= UnauthenticatedProbeLog.MaxPeers);
     }
 
-    /// <summary>جلسة بلا محاولات تنشر المفاتيح بصفر: الصفر هو مقام النسبة عند الخادم، لا غياب المفتاح.</summary>
+    /// <summary>A session with no attempts publishes the keys with a zero: the zero is the rate's denominator at the server, not the key's absence.</summary>
     [Fact]
     public async Task Session_PublishesZero_WhenNothingProbedTheListener()
     {

@@ -5,8 +5,8 @@ using Josour.Tunnel.Diagnostics;
 namespace Josour.Tunnel.Tests;
 
 /// <summary>
-/// عقد <c>hello.diagnostics</c> (docs/ws-protocol.md): ستة مفاتيح بالضبط، ولا رمي مهما فشلت المنصة.
-/// وقواعد كشف الـ VPN نفسها مختبَرة في <c>Josour.Core.Tests.VpnDetectorTests</c>.
+/// The <c>hello.diagnostics</c> contract (docs/ws-protocol.md): exactly six keys, and no throwing however the platform fails.
+/// The VPN detection's own rules are exercised in <c>Josour.Core.Tests.VpnDetectorTests</c>.
 /// </summary>
 public class HostDiagnosticsTests
 {
@@ -23,7 +23,7 @@ public class HostDiagnosticsTests
         Assert.IsType<bool>(diagnostics["vpn_adapter"]);
         Assert.IsType<bool>(diagnostics["ipv6_global"]);
         Assert.False(string.IsNullOrWhiteSpace(diagnostics["os_build"] as string));
-        // القيم غير القابلة للتحديد على هذه المنصة تكون null، لا استثناءً.
+        // Values that cannot be determined on this platform are null rather than an exception.
         Assert.True(diagnostics["system_proxy_present"] is null or bool);
         Assert.True(diagnostics["firewall_rule_present"] is null or bool);
     }

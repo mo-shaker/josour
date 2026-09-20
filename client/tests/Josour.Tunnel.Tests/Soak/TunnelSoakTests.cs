@@ -8,17 +8,17 @@ using Xunit.Abstractions;
 namespace Josour.Tunnel.Tests.Soak;
 
 /// <summary>
-/// اختبارات التحمّل: ما لا يكشفه إلا الوقت. تُشغَّل بلا مراقبة وتخرج بنتائج آلية:
+/// The soak tests: what only time reveals. They run unattended and produce machine-readable results:
 /// <code>
 ///   export DOTNET_ROOT="$HOME/.dotnet"; export PATH="$HOME/.dotnet:$PATH"
 ///   ROUTEBRIDGE_SOAK_MINUTES=30 ROUTEBRIDGE_SOAK_OUT=/tmp/soak \
 ///     dotnet test tests/Josour.Tunnel.Tests --filter 'FullyQualifiedName~TunnelSoakTests'
 /// </code>
-/// كل تشغيل يكتب <c>&lt;الاسم&gt;.jsonl</c> (عيّنة في كل سطر أثناء التشغيل) و<c>&lt;الاسم&gt;.summary.json</c>
-/// (جدول الاتجاهات) في <c>ROUTEBRIDGE_SOAK_OUT</c>، ويطبع الجدول نفسه في مخرجات الاختبار.
+/// Every run writes <c>&lt;name&gt;.jsonl</c> (one sample per line during the run) and <c>&lt;name&gt;.summary.json</c>
+/// (the trend table) in <c>ROUTEBRIDGE_SOAK_OUT</c>, and prints the same table in the test output.
 ///
-/// <para>الحكم على التسريب اتجاهي لا لحظي: يُقارَن وسيط النصف الثاني بوسيط النصف الأول، ويُحسب الميل بالساعة.
-/// الحدود سخية عمدًا (لا نقيس الضجيج) لكن أي نمو رتيب حقيقي يتجاوزها في تشغيل نصف ساعة.</para>
+/// <para>The leak verdict is a trend rather than an instant: the second half's median is compared with the first half's, and the slope per hour is computed.
+/// The thresholds are deliberately generous (we do not measure noise), but any real monotonic growth exceeds them in a half-hour run.</para>
 /// </summary>
 [Trait("Category", "Benchmark")]
 public class TunnelSoakTests
@@ -28,11 +28,11 @@ public class TunnelSoakTests
 
     public TunnelSoakTests(ITestOutputHelper output) => _output = output;
 
-    // ---------- 1. نفق تحت حمل واقعي ----------
+    // ---------- 1. A tunnel under realistic load ----------
 
     /// <summary>
-    /// نفق واحد فوق وصلة بـ RTT دولي، بحمل واقعي متصل: streams تُفتح وتُغلق بمعدل ثابت، وتنزيل واحد طويل العمر،
-    /// وفجوات خمول دورية، وإنهاءات مفاجئة (RST) على واحد من كل عشرة. الحيوية مفعّلة (PING/PONG كما في العقد).
+    /// One tunnel over a link with an international RTT, under continuous realistic load: streams opened and closed at a steady rate, one long-lived download,
+    /// periodic idle gaps, and abrupt terminations (RST) on one in ten. Liveness is enabled (PING/PONG as in the contract).
     /// </summary>
     [Fact]
     public async Task WorkingTunnel_DoesNotGrowOverTime()
@@ -43,7 +43,7 @@ public class TunnelSoakTests
             (recorder.JsonlPath is null ? " (no ROUTEBRIDGE_SOAK_OUT: results in this log only)" : $" → {recorder.JsonlPath}"));
 
         var link = new SimulatedLink(LinkProfile.FromRtt(options.RttMs));
-        // الحيوية مفعّلة عمدًا: خريطة الـ PING المعلّقة وتسجيلات الإلغاء عليها هي أول ما يُتَّهم بالتسريب.
+        // Liveness is deliberately enabled: the outstanding PING map and the cancellation registrations on it are the first suspects for a leak.
         var muxOptions = new MuxOptions { EnableLiveness = true, ReceiveWindow = MuxWindow.RegionalWindow, OpenTimeout = TimeSpan.FromSeconds(60) };
         await using var pair = await MuxPair.CreateAsync(
             guestOptions: muxOptions, hostOptions: muxOptions,
@@ -77,18 +77,18 @@ public class TunnelSoakTests
         AssertNoLeak(recorder, heapGrowthMiB: 24, handleGrowth: 48, threadGrowth: 24);
         AssertLatencyStable(recorder, factor: 3.0);
 
-        // بعد كل هذا: العدّادات تعود إلى الصفر والنفق ما زال يعمل.
+        // After all of that: the counters return to zero and the tunnel still works.
         await Wait.UntilAsync(() => pair.Guest.Stats.OpenStreams == 0 && pair.Host.Stats.OpenStreams == 0, TimeSpan.FromSeconds(30));
         Assert.Equal(0, pair.Guest.Stats.OpenStreams);
         Assert.Equal(0, pair.Host.Stats.OpenStreams);
         await AssertStillUsableAsync(pair);
     }
 
-    // ---------- 2. نفق خامل ----------
+    // ---------- 2. An idle tunnel ----------
 
     /// <summary>
-    /// نفق متصل بلا حركة: لا يجري فيه إلا PING/PONG كل عشرين ثانية. المطلوب إثبات أن حلقة الحيوية لا تراكم شيئًا
-    /// (خريطة الـ PING، تسجيلات الإلغاء على <c>_cts</c>، المؤقتات، الخيوط) وأن النفق يبقى صالحًا بعدها.
+    /// A connected tunnel with no traffic: nothing runs on it but PING/PONG every twenty seconds. What is required is proof that the liveness loop accumulates nothing
+    /// (the PING map, the cancellation registrations on <c>_cts</c>, the timers, the threads) and that the tunnel stays usable afterwards.
     /// </summary>
     [Fact]
     public async Task IdleTunnel_AccumulatesNothing_AndStaysUsable()
@@ -111,7 +111,7 @@ public class TunnelSoakTests
         Report(recorder, "no traffic; PING/PONG only");
         recorder.WriteSummary(new Dictionary<string, object?> { ["workload"] = "idle" });
 
-        // الخمول أضيق: لا شيء يجري، فأي نمو تسريب لا ضجيج تخصيص.
+        // Idle is tighter: nothing is running, so any growth is a leak rather than allocation noise.
         AssertNoLeak(recorder, heapGrowthMiB: 4, handleGrowth: 8, threadGrowth: 8);
         var pings = recorder.Samples.Max(s => Math.Max(s.GuestPendingPings, s.HostPendingPings));
         Assert.True(pings <= 2, $"pending PING map peaked at {pings}; the liveness loop is accumulating entries");
@@ -121,12 +121,12 @@ public class TunnelSoakTests
         await AssertStillUsableAsync(pair);
     }
 
-    // ---------- الحمل ----------
+    // ---------- The load ----------
 
     /// <summary>
-    /// دورة الـ streams: فتح، طلب مورد بحجم واقعي، قراءة، إغلاق. واحد من كل عشرة يُنهى فجأة في منتصف النقل
-    /// (نظير <c>RST</c>): هذا هو المسار الذي تبقى فيه حالة لكل stream إن كان هناك ما يبقى.
-    /// وفجوة خمول عشرين ثانية كل دقيقتين: النفق يمر بفترات صمت حقيقية في الاستعمال الفعلي.
+    /// The streams' cycle: open, request a realistically sized resource, read, close. One in ten is terminated abruptly mid-transfer
+    /// (the equivalent of <c>RST</c>): that is the path where per-stream state would remain if any remained.
+    /// And an idle gap of twenty seconds every two minutes: the tunnel goes through real periods of silence in actual use.
     /// </summary>
     private static async Task ChurnAsync(NerdbankMux guest, LatencyWindow latency, Action onOpen, Action onReset, Action<long> onBytes, CancellationToken ct)
     {
@@ -154,16 +154,16 @@ public class TunnelSoakTests
 
                 onOpen();
                 var stream = open.Stream!;
-                var size = 32 * 1024 + n % 8 * 32 * 1024;   // 32 KiB إلى 256 KiB
+                var size = 32 * 1024 + n % 8 * 32 * 1024;   // 32 KiB to 256 KiB
                 await ResourceProtocol.RequestAsync(stream, size, ct);
 
                 var head = new byte[1];
-                await stream.ReadExactlyAsync(head, ct);     // أول بايت: هذا ما يقيسه زمن الاستجابة
+                await stream.ReadExactlyAsync(head, ct);     // the first byte: this is what the latency measures
                 latency.Add(clock.Elapsed.TotalMilliseconds);
 
                 if (n % 10 == 9)
                 {
-                    // إنهاء مفاجئ في منتصف النقل: لا إغلاق نصفي ولا استنزاف.
+                    // An abrupt termination mid-transfer: no half-close and no draining.
                     onReset();
                     await stream.DisposeAsync();
                 }
@@ -171,7 +171,7 @@ public class TunnelSoakTests
                 {
                     await ResourceProtocol.ReadExactAsync(stream, size - 1, ct);
                     onBytes(size);
-                    await ResourceProtocol.RequestAsync(stream, 0, ct);   // طلب بطول صفر = إغلاق مهذب
+                    await ResourceProtocol.RequestAsync(stream, 0, ct);   // a request of length zero = a polite close
                     await ((IHalfClosable)stream).CompleteWritingAsync(ct);
                     await stream.DisposeAsync();
                 }
@@ -179,11 +179,11 @@ public class TunnelSoakTests
             catch (OperationCanceledException) { return; }
             catch (Exception) { await Delay(TimeSpan.FromMilliseconds(500), ct); }
 
-            await Delay(TimeSpan.FromMilliseconds(250), ct);   // نحو أربعة streams في الثانية
+            await Delay(TimeSpan.FromMilliseconds(250), ct);   // about four streams a second
         }
     }
 
-    /// <summary>تنزيل واحد طويل العمر يعيد الطلب على الـ stream نفسه: أطول ما يعيش في الجلسة.</summary>
+    /// <summary>One long-lived download that requests again on the same stream: the longest-lived thing in the session.</summary>
     private static async Task LongDownloadAsync(NerdbankMux guest, Action<long> onBytes, CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
@@ -206,7 +206,7 @@ public class TunnelSoakTests
         }
     }
 
-    // ---------- أخذ العيّنات والحكم ----------
+    // ---------- Sampling and the verdict ----------
 
     private static async Task SampleUntilAsync(
         SoakRecorder recorder, SoakOptions options, MuxPair pair, LatencyWindow latency,
@@ -218,13 +218,13 @@ public class TunnelSoakTests
             await Delay(options.SampleInterval, ct);
             var (p50, p95, max) = latency.DrainPercentiles();
             var (opened, reset, bytes) = counters();
-            // عدّادات الجمع تُقرأ قبل الجمع القسري ويُطرح منها ما أجراه المقياس نفسه، وإلا كان العمود قياسًا
-            // للمقياس لا لضغط التخصيص (على نفق خامل تكون عمليات المقياس هي كل ما يظهر فيه).
+            // The collection counters are read before the forced collection and what the probe itself performed is subtracted, otherwise the column would be a measurement
+            // of the probe rather than of allocation pressure (on an idle tunnel the probe's collections are all that appears in it).
             var forced = ProcessProbe.ForcedCollections;
             var (gen0, gen1, gen2) = (GC.CollectionCount(0) - forced.Gen0, GC.CollectionCount(1) - forced.Gen1, GC.CollectionCount(2) - forced.Gen2);
             recorder.Add(new SoakSample(
                 clock.Elapsed.TotalSeconds,
-                // ذاكرة مستقرة بعد جمع كامل: بلا هذا يكون الرسم قمامةً لم تُجمع بعد لا تسريبًا.
+                // Settled memory after a full collection: without this the graph would be uncollected garbage rather than a leak.
                 ProcessProbe.Settled(),
                 ProcessProbe.WorkingSet(),
                 gen0, gen1, gen2,
@@ -244,7 +244,7 @@ public class TunnelSoakTests
         if (recorder.SummaryPath is not null) _output.WriteLine($"    summary: {recorder.SummaryPath}");
     }
 
-    /// <summary>الحكم: نمو وسيط النصف الثاني عن الأول فوق الحد = تسريب. الحدود بالميغابايت والعدد المطلق.</summary>
+    /// <summary>The verdict: the second half's median growing over the first beyond the threshold = a leak. The thresholds are in megabytes and absolute counts.</summary>
     private static void AssertNoLeak(SoakRecorder recorder, double heapGrowthMiB, int handleGrowth, int threadGrowth)
     {
         Assert.True(recorder.Samples.Count >= 4, $"only {recorder.Samples.Count} samples; a trend needs at least four (raise ROUTEBRIDGE_SOAK_MINUTES)");
@@ -263,7 +263,7 @@ public class TunnelSoakTests
         var threads = Trend.Of(recorder.Samples, s => s.ThreadCount);
         Assert.True(threads.Growth < threadGrowth, $"thread count grew by {threads.Growth:F0} between halves ({threads.Describe("threads")})");
 
-        // خريطة الـ PING المعلّقة: العقد يسمح بواحد معلّق لكل طرف في كل لحظة، فثلاثة سقف سخي.
+        // The outstanding PING map: the contract permits one outstanding per side at any moment, so three is a generous ceiling.
         var pending = recorder.Samples.Max(s => Math.Max(s.GuestPendingPings, s.HostPendingPings));
         Assert.True(pending <= 3, $"pending PING map peaked at {pending}; entries are outliving their round trip");
     }
@@ -276,7 +276,7 @@ public class TunnelSoakTests
             $"per-stream latency drifted: {latency.Describe("ms")}");
     }
 
-    /// <summary>بعد التحمّل: النفق يفتح stream ويعيد البايتات كما في أول ثانية.</summary>
+    /// <summary>After the soak: the tunnel opens a stream and returns the bytes as it did in the first second.</summary>
     private static async Task AssertStillUsableAsync(MuxPair pair)
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
@@ -297,6 +297,6 @@ public class TunnelSoakTests
 
     private static async Task SafeAsync(Task task)
     {
-        try { await task; } catch (Exception) { /* الحمل ينتهي بالإلغاء */ }
+        try { await task; } catch (Exception) { /* the load ends on cancellation */ }
     }
 }
