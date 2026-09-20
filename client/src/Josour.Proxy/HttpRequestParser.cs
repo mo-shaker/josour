@@ -8,7 +8,7 @@ public sealed class HttpParseException : Exception
     public HttpParseException(string message) : base(message) { }
 }
 
-/// <summary>رأس طلب HTTP كما وصل من المتصفح، مع أي بايتات تلته في نفس القراءة (بداية الجسم أو TLS بعد CONNECT).</summary>
+/// <summary>An HTTP request head as it arrived from the browser, with any bytes that followed it in the same read (the start of the body, or TLS after CONNECT).</summary>
 public sealed class ProxyRequest
 {
     public ProxyRequest(string method, string target, string version, IReadOnlyList<KeyValuePair<string, string>> headers, byte[] remainder)
@@ -32,33 +32,33 @@ public sealed class ProxyRequest
 }
 
 /// <summary>
-/// محلل رأس HTTP/1.x بلا تخصيص زائد: يقرأ حتى CRLFCRLF (حد 16 KiB)، يفصل سطر الطلب والرؤوس، ويحلل الصيغ التي يرسلها
-/// المتصفح إلى Proxy: `CONNECT host:port` (بما فيه `[IPv6]:port`) و`GET http://host/path` (absolute-URI) و origin-form مع Host.
+/// An HTTP/1.x head parser with no excess allocation: it reads up to CRLFCRLF (a 16 KiB limit), splits the request line from the headers, and parses the forms the
+/// browser sends to a proxy: `CONNECT host:port` (including `[IPv6]:port`), `GET http://host/path` (an absolute-URI) and origin-form with a Host.
 ///
 /// <para>
-/// تشدّد الأسبوع 4 (منع تهريب الطلبات وحقن الرؤوس): كل ما يخرج من هنا يُعاد كتابته حرفيًا نحو الأصل في
-/// <c>ConnectProxyServer.BuildOriginFormHead</c>، فأي CR أو LF أو NUL داخل الهدف أو الإصدار أو قيمة رأس يعني سطرًا
-/// إضافيًا في طلب الأصل. لذلك يُرفض هنا (400) بدل تمريره:
+/// Week four's hardening (against request smuggling and header injection): everything that comes out of here is rewritten literally towards the origin in
+/// <c>ConnectProxyServer.BuildOriginFormHead</c>, so any CR or LF or NUL inside the target, the version or a header value means an extra line
+/// in the origin's request. So it is refused here (400) rather than passed on:
 /// </para>
 /// <list type="bullet">
-///   <item>سطر الطلب: الهدف والإصدار مرئيان ASCII فقط (0x21..0x7E).</item>
-///   <item>اسم الرأس: token بلا مسافة قبل ':' (المسافة قبل النقطتين ناقل تهريب معروف).</item>
-///   <item>قيمة الرأس: بلا محارف تحكم (يُسمح HTAB و obs-text ≥ 0x80 كما في RFC 7230).</item>
-///   <item>لا obs-fold (سطر يبدأ بمسافة أو HTAB) — RFC 7230 يوصي برفضه في الوسطاء.</item>
-///   <item>Host واحد على الأكثر، ولا <c>Content-Length</c> مع <c>Transfer-Encoding</c> معًا (RFC 7230 §3.3.3).</item>
-///   <item>عدد الرؤوس ≤ <see cref="MaxHeaders"/>.</item>
+///   <item>The request line: the target and the version are visible ASCII only (0x21..0x7E).</item>
+///   <item>The header name: a token with no space before ':' (a space before the colon is a known smuggling vector).</item>
+///   <item>The header value: no control characters (HTAB and obs-text >= 0x80 are permitted, as in RFC 7230).</item>
+///   <item>No obs-fold (a line starting with a space or HTAB) — RFC 7230 recommends intermediaries refuse it.</item>
+///   <item>At most one Host, and never <c>Content-Length</c> together with <c>Transfer-Encoding</c> (RFC 7230 §3.3.3).</item>
+///   <item>The number of headers <= <see cref="MaxHeaders"/>.</item>
 /// </list>
 /// </summary>
 public static class HttpRequestParser
 {
     public const int MaxHeadBytes = 16 * 1024;
 
-    /// <summary>أقصى عدد رؤوس في الطلب الواحد؛ المتصفحات لا تقترب منه والحد يمنع رؤوسًا بالآلاف داخل 16 KiB.</summary>
+    /// <summary>The largest number of headers in one request; browsers come nowhere near it, and the limit stops thousands of headers inside 16 KiB.</summary>
     public const int MaxHeaders = 200;
 
     private static ReadOnlySpan<byte> HeadEnd => "\r\n\r\n"u8;
 
-    /// <summary>null عند إغلاق الاتصال قبل أي بايت؛ HttpParseException عند رأس تالف أو أكبر من الحد.</summary>
+    /// <summary>null when the connection closes before any byte; HttpParseException on a malformed head or one larger than the limit.</summary>
     public static async Task<ProxyRequest?> ReadAsync(Stream stream, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(stream);
@@ -90,7 +90,7 @@ public static class HttpRequestParser
     {
         var text = Encoding.Latin1.GetString(head);
         var lines = text.Split("\r\n");
-        // السطر الأول: METHOD SP target SP HTTP/x.y (نتسامح مع مسافات متعددة)
+        // The first line: METHOD SP target SP HTTP/x.y (we tolerate repeated spaces)
         var requestLine = lines[0].Trim();
         var parts = requestLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length != 3) throw new HttpParseException("malformed request line");
@@ -99,7 +99,7 @@ public static class HttpRequestParser
         var version = parts[2];
         if (!version.StartsWith("HTTP/1.", StringComparison.Ordinal)) throw new HttpParseException("unsupported HTTP version");
         if (method.Length == 0 || !IsVisibleAscii(method)) throw new HttpParseException("malformed method");
-        // الهدف والإصدار يُعاد بناؤهما نحو الأصل: أي CR/LF/NUL/بايت غير مرئي هنا = سطر إضافي في طلب الأصل.
+        // The target and the version are rebuilt towards the origin: any CR/LF/NUL/non-printable byte here = an extra line in the origin's request.
         if (target.Length == 0 || !IsVisibleAscii(target)) throw new HttpParseException("malformed request target");
         if (!IsVisibleAscii(version)) throw new HttpParseException("malformed HTTP version");
 
@@ -116,7 +116,7 @@ public static class HttpRequestParser
             if (colon <= 0) throw new HttpParseException("malformed header line");
             var name = line[..colon];
             var value = line[(colon + 1)..].Trim();
-            // اسم بلا مسافة إطلاقًا: "Foo : bar" يُقرأ Foo عندنا وقد يُقرأ "Foo " عند الأصل — ناقل تهريب.
+            // A name with no space at all: "Foo : bar" reads as Foo here and may read as "Foo " at the origin — a smuggling vector.
             if (name.Length == 0 || !IsVisibleAscii(name)) throw new HttpParseException("malformed header name");
             if (!IsFieldValueSafe(value)) throw new HttpParseException("malformed header value");
             if (headers.Count == MaxHeaders) throw new HttpParseException($"more than {MaxHeaders} headers");
@@ -128,12 +128,12 @@ public static class HttpRequestParser
 
             headers.Add(new KeyValuePair<string, string>(name, value));
         }
-        // RFC 7230 §3.3.3 القاعدة 3: الرسالة التي تحمل الاثنين غامضة الطول؛ الوسيط يرفضها ولا يمررها.
+        // RFC 7230 §3.3.3 rule 3: a message carrying both has an ambiguous length; an intermediary refuses it rather than passing it on.
         if (hasContentLength && hasTransferEncoding) throw new HttpParseException("both Content-Length and Transfer-Encoding");
         return new ProxyRequest(method, target, version, headers, remainder);
     }
 
-    /// <summary>ASCII مرئي فقط (0x21..0x7E): بلا مسافات ولا محارف تحكم ولا بايتات ≥ 0x80.</summary>
+    /// <summary>Visible ASCII only (0x21..0x7E): no spaces, no control characters and no bytes >= 0x80.</summary>
     private static bool IsVisibleAscii(string text)
     {
         foreach (var c in text)
@@ -143,7 +143,7 @@ public static class HttpRequestParser
         return true;
     }
 
-    /// <summary>قيمة رأس آمنة للتمرير: بلا محارف تحكم (يُسمح HTAB) وبلا DEL؛ obs-text (≥ 0x80) مسموح.</summary>
+    /// <summary>A header value safe to pass through: no control characters (HTAB permitted) and no DEL; obs-text (>= 0x80) is allowed.</summary>
     private static bool IsFieldValueSafe(string value)
     {
         foreach (var c in value)
@@ -153,7 +153,7 @@ public static class HttpRequestParser
         return true;
     }
 
-    /// <summary>host[:port] أو [v6]:port أو [v6]. المضيف يعود بلا أقواس. port خارج 1..65535 = فشل.</summary>
+    /// <summary>host[:port] or [v6]:port or [v6]. The host comes back without brackets. A port outside 1..65535 = a failure.</summary>
     public static bool TryParseAuthority(string authority, int defaultPort, out string host, out int port)
     {
         host = string.Empty;
@@ -178,12 +178,12 @@ public static class HttpRequestParser
             host = a;
             return host.Length > 0 && !host.Contains('/');
         }
-        if (a.IndexOf(':', colon + 1) >= 0) return false; // IPv6 بلا أقواس أو صيغة تالفة
+        if (a.IndexOf(':', colon + 1) >= 0) return false; // IPv6 without brackets, or a malformed form
         host = a[..colon];
         return host.Length > 0 && !host.Contains('/') && TryParsePort(a[(colon + 1)..], out port);
     }
 
-    /// <summary>absolute-URI بمخطط http فقط. المضيف بلا أقواس؛ المسار يبدأ بـ '/'.</summary>
+    /// <summary>An absolute-URI with the http scheme only. The host without brackets; the path starts with '/'.</summary>
     public static bool TryParseHttpUri(string target, out string host, out int port, out string pathAndQuery)
     {
         host = string.Empty;

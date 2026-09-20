@@ -13,10 +13,10 @@ public sealed record GatherOptions(
     bool EnableUpnp = true);
 
 /// <summary>
-/// تشخيص الجمع. كان لبوابة قرار Relay (ADR-0003)؛ وبعد [ADR-0009] صار وظيفته تفسير فشل الاتصال بعد وقوعه.
+/// The gathering's diagnostics. It was for the relay decision gate (ADR-0003); after [ADR-0009] its job became explaining a connection failure after the fact.
 /// </summary>
 /// <param name="CgnatChecked">
-/// هل أمكن الحكم أصلًا. حين تكون <c>false</c> فإن <see cref="CgnatSuspected"/> تعني «لا نعرف» لا «لا يوجد».
+/// Whether a judgement was possible at all. When it is <c>false</c>, <see cref="CgnatSuspected"/> means "we do not know", not "not present".
 /// </param>
 public sealed record GatherDiagnostics(
     bool UpnpFound,
@@ -35,7 +35,7 @@ public sealed record GatherDiagnostics(
         ["mapping_ok"] = MappingOk,
         ["upnp_external_ip"] = UpnpExternalIp,
         ["cgnat_suspected"] = CgnatSuspected,
-        // بلا هذا المفتاح كانت cgnat_suspected=false تحمل معنيين لا يفترقان: «فُحص ولا يوجد» و«تعذّر الفحص».
+        // Without this key, cgnat_suspected=false carried two meanings that could not be told apart: "checked and not present" and "could not be checked".
         ["cgnat_checked"] = CgnatChecked,
         ["nat_reachability"] = Reachability.ToString().ToLowerInvariant(),
         ["nat_evidence"] = NatEvidence,
@@ -47,8 +47,8 @@ public sealed record GatherDiagnostics(
 public sealed record GatherResult(IReadOnlyList<CandidateEndpoint> Candidates, GatherDiagnostics Diagnostics);
 
 /// <summary>
-/// يجمع مرشحي docs/protocol.md القسم 2 الخطوة 2 لمنفذ استماع: lan (عند same_public_ip فقط)، v6 (عام غير مؤقت)،
-/// upnp (Mono.Nat)، public (IP الذي يراه الخادم + المنفذ). الترتيب lan, v6, upnp, public بلا تكرار. لا يرمي أبدًا.
+/// It gathers the candidates of docs/protocol.md section 2 step 2 for a listening port: lan (only when same_public_ip), v6 (public and non-temporary),
+/// upnp (Mono.Nat), public (the IP the server sees + the port). The order is lan, v6, upnp, public with no duplicates. It never throws.
 /// </summary>
 public sealed class CandidateGatherer : ICandidateSource
 {
@@ -56,7 +56,7 @@ public sealed class CandidateGatherer : ICandidateSource
     public static readonly TimeSpan DefaultDiscoveryTimeout = TimeSpan.FromSeconds(4);
     private static readonly TimeSpan DeviceCallTimeout = TimeSpan.FromSeconds(5);
 
-    // اكتشاف Mono.Nat عام على مستوى العملية (NatUtility ساكن)؛ نسلسل عمليات الجمع المتزامنة.
+    // Mono.Nat's discovery is global to the process (NatUtility is static); we serialise concurrent gatherings.
     private static readonly SemaphoreSlim NatGate = new(1, 1);
 
     private readonly TimeSpan _discoveryTimeout;
@@ -66,7 +66,7 @@ public sealed class CandidateGatherer : ICandidateSource
     public CandidateGatherer(TimeSpan? discoveryTimeout = null)
         => _discoveryTimeout = discoveryTimeout ?? DefaultDiscoveryTimeout;
 
-    /// <summary>هل يوجد تعيين UPnP نشط أنشأه هذا الكائن؟</summary>
+    /// <summary>Is there an active UPnP mapping this object created?</summary>
     public bool HasMapping => _mapping is not null;
 
     public async Task<GatherResult> GatherAsync(GatherOptions options, CancellationToken ct)
@@ -128,7 +128,7 @@ public sealed class CandidateGatherer : ICandidateSource
                     {
                         var lifetime = (int)Math.Clamp(options.MappingLifetime.TotalSeconds, 0, int.MaxValue);
                         var requested = new Mapping(Protocol.Tcp, options.ListenPort, options.ListenPort, lifetime, MappingDescription);
-                        // REAL-NETWORK: الراوتر قد يعيد منفذًا عامًا مختلفًا (NAT-PMP)؛ نستخدم ما أعاده.
+                        // REAL-NETWORK: the router may return a different external port (NAT-PMP); we use what it returned.
                         var created = await device.CreatePortMapAsync(requested).WaitAsync(DeviceCallTimeout, ct).ConfigureAwait(false);
                         _mapping = created ?? requested;
                         mappingOk = true;
@@ -163,8 +163,8 @@ public sealed class CandidateGatherer : ICandidateSource
             }
         }
 
-        // الحكم على الـ NAT يزن كل مصدر ينطق، لا الـ UPnP وحده: عناوين الجهاز نفسه، وما يراه الخادم،
-        // والبوابة إن ردّت. خلف نقطة اتصال الهاتف لا بوابة ترد — وهناك بالذات يعيش الـ CGNAT.
+        // Judging the NAT weighs every source that speaks, not UPnP alone: the machine's own addresses, what the server sees,
+        // and the gateway if it answers. Behind a phone hotspot no gateway answers — and that is precisely where CGNAT lives.
         IReadOnlyList<IPAddress> localAddresses;
         try
         {
@@ -189,7 +189,7 @@ public sealed class CandidateGatherer : ICandidateSource
         return new GatherResult(candidates, diagnostics);
     }
 
-    /// <summary>يزيل التعيين الذي أنشأه GatherAsync (إن وُجد). لا يرمي؛ يعيد false عند الفشل.</summary>
+    /// <summary>Removes the mapping GatherAsync created (if there is one). It does not throw; it returns false on failure.</summary>
     public async Task<bool> RemoveMappingAsync(CancellationToken ct)
     {
         var device = _device;
@@ -211,7 +211,7 @@ public sealed class CandidateGatherer : ICandidateSource
         await RemoveMappingAsync(CancellationToken.None).ConfigureAwait(false);
     }
 
-    // REAL-NETWORK: لم يُختبر إلا على هذا الجهاز (بلا بوابة UPnP)؛ يحتاج راوترين أو ثلاثة فعليين (الخطة 12.3 الأسبوع 1).
+    // REAL-NETWORK: only exercised on this machine (with no UPnP gateway); it needs two or three actual routers (plan 12.3, week 1).
     private async Task<INatDevice?> DiscoverAsync(CancellationToken ct)
     {
         await NatGate.WaitAsync(ct).ConfigureAwait(false);
@@ -235,7 +235,7 @@ public sealed class CandidateGatherer : ICandidateSource
             finally
             {
                 NatUtility.DeviceFound -= handler;
-                try { NatUtility.StopDiscovery(); } catch { /* تجاهل */ }
+                try { NatUtility.StopDiscovery(); } catch { /* ignore */ }
             }
         }
         finally

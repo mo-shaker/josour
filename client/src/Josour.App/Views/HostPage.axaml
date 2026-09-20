@@ -26,7 +26,7 @@
                 <!--
                     No OnContent/OffContent: Avalonia's ToggleSwitch writes "On"/"Off" beside itself by default,
                     in English, which is both untranslated and a second answer to a question StatusText already
-                    answers directly underneath the label ("متاح" / "غير متاح").
+                    answers directly underneath the label (the Arabic "available" / "unavailable").
                 -->
                 <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0"
                                  OnContent="" OffContent=""

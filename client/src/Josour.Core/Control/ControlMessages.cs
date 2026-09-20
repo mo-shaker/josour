@@ -2,10 +2,10 @@ using System.Text.Json.Serialization;
 
 namespace Josour.Core.Control;
 
-/// <summary>رسائل docs/ws-protocol.md. الحقول بأسماء JSON كما في العقد حرفيًا.</summary>
+/// <summary>The messages of docs/ws-protocol.md. The fields carry the JSON names from the contract, literally.</summary>
 public abstract record ControlMessage([property: JsonPropertyName("type")] string Type);
 
-// ---------- عميل ← خادم ----------
+// ---------- client -> server ----------
 public sealed record HelloMessage(
     [property: JsonPropertyName("token")] string Token,
     [property: JsonPropertyName("device_id")] Guid DeviceId,
@@ -69,7 +69,7 @@ public sealed record SessionEndMessage(
 public sealed record PingMessage() : ControlMessage("ping");
 public sealed record PongMessage() : ControlMessage("pong");
 
-// ---------- خادم ← عميل ----------
+// ---------- server -> client ----------
 public sealed record ServerSettings(
     [property: JsonPropertyName("max_session_minutes")] int MaxSessionMinutes,
     [property: JsonPropertyName("request_timeout_seconds")] int RequestTimeoutSeconds,
@@ -146,8 +146,8 @@ public sealed record SessionCreatedMessage(
     [property: JsonPropertyName("relay")] RelayDto? Relay = null) : ControlMessage("session.created");
 
 /// <summary>
-/// عنوان الـ Relay وتوكن هذا الطرف (ADR-0009). null في نشر بلا Relay، وهو مدعوم: المباشر وحده.
-/// <see cref="Token"/> بيان حامل: لا يُسجَّل ولا يوضع في تشخيص.
+/// The relay's address and this side's token (ADR-0009). null in a deployment with no relay, which is supported: direct only.
+/// <see cref="Token"/> is a bearer statement: it is not logged and not put into any diagnostics.
 /// </summary>
 public sealed record RelayDto(
     [property: JsonPropertyName("address")] string Address,

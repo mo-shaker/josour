@@ -1,6 +1,6 @@
 namespace Josour.Core.Tunnel;
 
-/// <summary>أسماء أنواع المرشحين على السلك كما في docs/ws-protocol.md (session.endpoint / session.peer_endpoint).</summary>
+/// <summary>The candidate types' names on the wire as in docs/ws-protocol.md (session.endpoint / session.peer_endpoint).</summary>
 public static class CandidateTypeNames
 {
     public static string ToWire(CandidateType type) => type switch

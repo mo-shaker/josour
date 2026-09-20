@@ -71,11 +71,12 @@ def test_ensure_utc() -> None:
     assert ensure_utc(naive) == datetime(2026, 9, 3, 12, 0, 0, tzinfo=UTC)
 
 
-# --- ADR-0007: معاملات argon2id (معتمد 2026-09-05) ---
+# --- ADR-0007: the argon2id parameters (adopted 2026-09-05) ---
 
 
 def test_argon2_uses_the_owasp_recommended_parameters() -> None:
-    """المعاملات جزء من الموقف الأمني: تغييرها يجب أن يكون قرارًا لا انزلاقًا."""
+    """The parameters are part of the security posture: changing them must be a decision,
+    not a drift."""
     from app.core.security import (
         ARGON2_MEMORY_COST_KIB,
         ARGON2_PARALLELISM,
@@ -87,12 +88,13 @@ def test_argon2_uses_the_owasp_recommended_parameters() -> None:
     assert _hasher.memory_cost == ARGON2_MEMORY_COST_KIB
     assert _hasher.time_cost == ARGON2_TIME_COST
     assert _hasher.parallelism == ARGON2_PARALLELISM
-    # والمعاملات مكتوبة داخل التجزئة، وهو ما يجعل الترقية التدريجية ممكنة أصلًا
+    # and the parameters are written inside the hash, which is what makes the gradual upgrade
+    # possible at all
     assert "m=19456,t=2,p=1" in hash_password("Whatever-pass-1")
 
 
 def test_passwords_hashed_with_the_previous_parameters_still_verify_and_are_upgraded() -> None:
-    """لا يجوز أن يكسر تغيير المعاملات حساب مستخدم قائم."""
+    """Changing the parameters may not break an existing user's account."""
     from argon2 import PasswordHasher
 
     legacy = PasswordHasher(memory_cost=65536, time_cost=3, parallelism=4).hash("Existing-pass-1")

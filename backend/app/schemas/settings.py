@@ -1,4 +1,4 @@
-"""Operator settings (docs/api.md "القيم الافتراضية للإعدادات")."""
+"""Operator settings (docs/api.md "The settings' default values")."""
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 

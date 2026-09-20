@@ -28,7 +28,7 @@ public sealed record StaleWorkBrowserCleanup(bool MarkerFound, bool ProcessFound
 }
 
 /// <summary>
-/// Start-up guard for the plan's "انهيار التطبيق" case (8.5): a work browser left over from a previous run is closed
+/// Start-up guard for the plan's "the application crashing" case (8.5): a work browser left over from a previous run is closed
 /// BEFORE this run starts, so no browser window keeps pointing at a local proxy that died with the process — from the
 /// user's side it still looks like a working session, while nothing is filtered or tunnelled any more.
 /// <para>

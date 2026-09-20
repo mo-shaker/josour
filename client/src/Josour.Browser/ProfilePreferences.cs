@@ -3,12 +3,12 @@ using System.Text.Json.Nodes;
 
 namespace Josour.Browser;
 
-/// <summary>ضبط exit_type=Normal وexited_cleanly=true في Default\Preferences حتى لا يظهر «لم يُغلق Chrome بشكل صحيح» عند التشغيل التالي.</summary>
+/// <summary>Setting exit_type=Normal and exited_cleanly=true in Default\Preferences so "Chrome did not shut down correctly" does not appear on the next launch.</summary>
 public static class ProfilePreferences
 {
     public static string PreferencesPath(string profileDirectory) => Path.Combine(profileDirectory, "Default", "Preferences");
 
-    /// <summary>يعيد true إن كان الملف موجودًا وعُدّل. لا يرمي؛ الملف التالف أو غير الموجود = false.</summary>
+    /// <summary>Returns true if the file existed and was modified. It does not throw; a corrupt or missing file = false.</summary>
     public static bool SetExitTypeNormal(string profileDirectory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileDirectory);

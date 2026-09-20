@@ -7,7 +7,7 @@ namespace Josour.Infrastructure.Session;
 
 /// <summary>
 /// The note the app leaves on disk while a work browser is running, so the NEXT start can tell that the last one did not
-/// end cleanly (plan 8.5: انهيار التطبيق) and close a browser that is still pointing at a proxy which no longer exists.
+/// end cleanly (plan 8.5: the application crashing) and close a browser that is still pointing at a proxy which no longer exists.
 /// <para>
 /// A crash normally takes the browser with it — the launcher's Job Object is <c>KILL_ON_JOB_CLOSE</c> — but that is a
 /// fail-safe of the same process. It does not cover a Job that was broken by a policy, a process killed with the Job

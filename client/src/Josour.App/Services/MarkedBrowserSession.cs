@@ -9,7 +9,7 @@ namespace Josour.App.Services;
 /// A work-browser session that leaves a marker on disk while its browser is running, and removes it when the browser is
 /// gone. That marker is what <see cref="StaleWorkBrowserGuard"/> reads at the next start-up: if the app died without
 /// closing the browser, the next run finds it and closes it before starting a session of its own
-/// (plan 8.5: انهيار التطبيق).
+/// (plan 8.5: the application crashing).
 /// <para>
 /// It wraps <see cref="BrowserLauncher"/> rather than living inside it because the launcher belongs to Track B and the
 /// process identity (id, name, start time) is all this needs from it — <see cref="BrowserLauncher.ProcessId"/> plus one

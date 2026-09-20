@@ -1,6 +1,6 @@
 namespace Josour.Core.Security;
 
-/// <summary>تخزين أسرار الجهاز (refresh token، device secret) محميًا بـ DPAPI على Windows. المسار C يوفر التنفيذ.</summary>
+/// <summary>Storing the device's secrets (the refresh token, the device secret) protected by DPAPI on Windows. Track C provides the implementation.</summary>
 public interface ISecretStore
 {
     Task<string?> GetAsync(string key, CancellationToken ct);

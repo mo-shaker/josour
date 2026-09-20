@@ -14,41 +14,41 @@ public sealed class ConnectProxyOptions
 {
     public required IAllowlist Allowlist { get; init; }
     public IReadOnlyList<int> AllowedPorts { get; init; } = new[] { 80, 443 };
-    /// <summary>IP المضيف العام كما يراه الخادم؛ يظهر في صفحة الفحص.</summary>
+    /// <summary>The host's public IP as the server sees it; it appears on the check page.</summary>
     public string PeerPublicIp { get; init; } = string.Empty;
-    /// <summary>null = لا نفق (كل شيء مباشر؛ وضع self-hosted في أداة Spike).</summary>
+    /// <summary>null = no tunnel (everything direct; the self-hosted mode in the Spike tool).</summary>
     public IMuxConnection? Mux { get; init; }
     public IHostResolver Resolver { get; init; } = DnsHostResolver.Instance;
     public IOwnerPidChecker OwnerPidChecker { get; init; } = PermissiveOwnerPidChecker.Instance;
-    /// <summary>null = لا فحص مالك (كل اتصال محلي مقبول).</summary>
+    /// <summary>null = no owner check (every local connection is accepted).</summary>
     public IBrowserSession? Browser { get; init; }
     /// <summary>
-    /// فحص الحظر لعنوان واحد على المسار المباشر بعد حل الاسم. الافتراضي <see cref="IpRangePolicy.IsBlocked(IPAddress, IEnumerable{IPAddress}?)"/>:
-    /// اسم يحل إلى loopback أو عنوان خاص لا يُوصَل إليه، فلا يصير الـ Proxy المحلي جسرًا نحو ما يسمعه هذا الجهاز
-    /// (مستمع النفق نفسه، منفذ الـ Relay، خدمات 127.0.0.1). يُستبدل في الاختبارات داخل العملية فقط للسماح بـ loopback.
+    /// The blocked check for one address on the direct path after the name is resolved. The default is <see cref="IpRangePolicy.IsBlocked(IPAddress, IEnumerable{IPAddress}?)"/>:
+    /// a name that resolves to loopback or a private address is not connected to, so the local proxy does not become a bridge towards whatever this machine is listening on
+    /// (the tunnel's own listener, the relay's port, services on 127.0.0.1). Replaced in in-process tests only, to permit loopback.
     /// </summary>
     public Func<IPAddress, bool>? AddressBlocker { get; init; }
     /// <summary>
-    /// عند وجود Browser: هل يُرفض اتصال لا يمكن تحديد مالكه؟ **الافتراضي `true` على كل نظام** (fail-closed).
+    /// When a Browser is present: is a connection whose owner cannot be determined refused? **The default is `true` on every system** (fail-closed).
     /// <para>
-    /// كان الافتراض `OperatingSystem.IsWindows()`، أي «ارفض على Windows واقبل على غيره». ومع
-    /// <see cref="PermissiveOwnerPidChecker"/> — وهي كل ما يوجد خارج Windows — كان معنى ذلك أن الـ Proxy المحلي
-    /// **يقبل كل عملية على الجهاز**، لا متصفح العمل وحده. لم يكن ذلك قرارًا اتُّخذ، بل أثرًا جانبيًا لافتراض،
-    /// وكان يُسقط معيار القبول رقم 10 بصمت على أي نظام غير Windows.
+    /// The default used to be `OperatingSystem.IsWindows()`, that is, "refuse on Windows and accept everywhere else". And with
+    /// <see cref="PermissiveOwnerPidChecker"/> — which is all that exists off Windows — that meant the local proxy
+    /// **accepted every process on the machine**, not the work browser alone. That was not a decision taken but the side effect of a default,
+    /// and it silently dropped acceptance criterion 10 on any system that is not Windows.
     /// </para>
     /// <para>
-    /// من أراد «اقبل كل شيء» فليقل ذلك صراحةً بـ `false` — كما تفعل الاختبارات داخل العملية وأداة Spike. الفرق
-    /// بين اختيارٍ مُعلَن وافتراضٍ صامت هو كل الفرق هنا.
+    /// Whoever wants "accept everything" must say so explicitly with `false` — as the in-process tests and the Spike tool do. The difference
+    /// between a declared choice and a silent default is the whole difference here.
     /// </para>
     /// </summary>
     public bool? RejectUnknownOwner { get; init; }
     public TimeSpan DirectConnectTimeout { get; init; } = TimeSpan.FromSeconds(5);
     public TimeSpan RequestHeadTimeout { get; init; } = TimeSpan.FromSeconds(30);
     /// <summary>
-    /// Proxy النظام للمسار **المباشر** فقط (الخطة 8.5). الافتراضي إعدادات الجهاز:
-    /// WinHTTP/WinINET على Windows ومتغيرات البيئة على غيرها، بقائمة تجاوزها.
-    /// المسار المسموح به لا يمر من هنا أبدًا — يذهب عبر الـ mux إلى المضيف.
-    /// تُحقن <see cref="NoSystemProxy.Instance"/> في الاختبارات كي لا تعتمد على إعدادات الجهاز.
+    /// The system proxy for the **direct** path only (plan 8.5). The default is the machine's settings:
+    /// WinHTTP/WinINET on Windows and the environment variables elsewhere, with their bypass list.
+    /// The allowed path never goes through here — it goes over the mux to the host.
+    /// <see cref="NoSystemProxy.Instance"/> is injected in the tests so they do not depend on the machine's settings.
     /// </summary>
     public ISystemProxyResolver SystemProxy { get; init; } = SystemProxyResolver.Default;
 }
@@ -64,7 +64,7 @@ public sealed class ProxyCounters
     public long Rejected => Volatile.Read(ref _rejected);
     public long ProbeHits => Volatile.Read(ref _probeHits);
     public long Errors => Volatile.Read(ref _errors);
-    /// <summary>كم طلبًا مباشرًا مرّ عبر Proxy النظام بدل مقبس خام (تشخيص شبكات الشركات).</summary>
+    /// <summary>How many direct requests went through the system proxy rather than a raw socket (diagnostics for corporate networks).</summary>
     public long ViaSystemProxy => Volatile.Read(ref _viaSystemProxy);
     internal void SystemProxyUsed() => Interlocked.Increment(ref _viaSystemProxy);
     internal void Accept() => Interlocked.Increment(ref _accepted);
@@ -78,17 +78,17 @@ public sealed class ProxyCounters
 }
 
 /// <summary>
-/// Proxy محلي على 127.0.0.1:0 لمتصفح العمل (docs/protocol.md وخطة 7.5):
-/// - فحص المالك لكل اتصال (PID ضمن Job Object المتصفح).
-/// - CONNECT host:port (ws/wss كذلك، و[IPv6]:port): IP حرفي/محلي → 403؛ مسموح → OPEN عبر النفق و200 بعد OPEN_OK فقط
-///   (OPEN_FAIL → 403/502/503 صادقة، وnot_allowed أثناء تباين إصدار القائمة → سقوط إلى المباشر)؛ غير مسموح → TCP مباشر (5 ث).
-/// - http:// absolute-URI: check.josour → صفحة الفحص؛ مسموح → 307 إلى https://؛ غيره → طلب واحد لكل اتصال بصيغة origin-form
-///   مع Connection: close وضخ حتى يغلق الأصل.
-/// اتصال واحد = طلب واحد دائمًا؛ الردود المحلية تحمل Connection: close.
+/// A local proxy on 127.0.0.1:0 for the work browser (docs/protocol.md and plan 7.5):
+/// - An owner check for every connection (the PID inside the browser's Job Object).
+/// - CONNECT host:port (ws/wss too, and [IPv6]:port): an address literal/local -> 403; allowed -> OPEN through the tunnel, and 200 only after OPEN_OK
+///   (OPEN_FAIL -> a truthful 403/502/503, and not_allowed during a list-version divergence -> falling back to direct); not allowed -> direct TCP (5 s).
+/// - An http:// absolute-URI: check.josour -> the check page; allowed -> a 307 to https://; otherwise -> one request per connection in origin-form
+///   with Connection: close, pumped until the origin closes.
+/// One connection = one request, always; the local replies carry Connection: close.
 /// </summary>
 public sealed class ConnectProxyServer : IAsyncDisposable
 {
-    /// <summary>لماذا فشل الاتصال المباشر: سياسة العناوين (403) أم تعذّر الوصول (502).</summary>
+    /// <summary>Why the direct connection failed: the address policy (403) or being unreachable (502).</summary>
     private enum DirectFailure { None, Blocked, Unreachable }
 
     private readonly ConnectProxyOptions _options;
@@ -133,7 +133,7 @@ public sealed class ConnectProxyServer : IAsyncDisposable
     public bool IsAccepting => Volatile.Read(ref _accepting) == 1;
     public int ActiveConnections => _connections.Count;
 
-    /// <summary>يُرفع عند كل وصول لصفحة الفحص بوقت الوصول؛ FirstProbeHitAt يحفظ الأول.</summary>
+    /// <summary>Raised on every arrival of the check page with its arrival time; FirstProbeHitAt keeps the first.</summary>
     public event Action<DateTimeOffset>? ProbeHit;
     public DateTimeOffset? FirstProbeHitAt
     {
@@ -150,11 +150,11 @@ public sealed class ConnectProxyServer : IAsyncDisposable
         _acceptLoop = Task.Run(() => AcceptLoopAsync(_cts.Token));
     }
 
-    /// <summary>خطوة التنظيف 1 (docs/protocol.md القسم 7): لا اتصالات جديدة؛ الجارية تستمر حتى StopAsync.</summary>
+    /// <summary>Cleanup step 1 (docs/protocol.md section 7): no new connections; the ones under way continue until StopAsync.</summary>
     public void StopAccepting()
     {
         if (Interlocked.Exchange(ref _accepting, 0) == 0 && _acceptLoop is null) return;
-        try { _listener.Close(); } catch { /* تجاهل */ }
+        try { _listener.Close(); } catch { /* ignore */ }
     }
 
     public async Task StopAsync()
@@ -162,8 +162,8 @@ public sealed class ConnectProxyServer : IAsyncDisposable
         if (Interlocked.Exchange(ref _stopped, 1) != 0) return;
         StopAccepting();
         _cts.Cancel();
-        if (_acceptLoop is not null) { try { await _acceptLoop.ConfigureAwait(false); } catch { /* تجاهل */ } }
-        try { await Task.WhenAll(_connections.Keys).ConfigureAwait(false); } catch { /* المعالجات تبتلع أخطاءها */ }
+        if (_acceptLoop is not null) { try { await _acceptLoop.ConfigureAwait(false); } catch { /* ignore */ } }
+        try { await Task.WhenAll(_connections.Keys).ConfigureAwait(false); } catch { /* the handlers swallow their own errors */ }
     }
 
     public async ValueTask DisposeAsync()
@@ -210,7 +210,7 @@ public sealed class ConnectProxyServer : IAsyncDisposable
         if (!Admit(remote))
         {
             Counters.RejectOwner();
-            try { socket.Close(0); } catch { /* تجاهل */ }
+            try { socket.Close(0); } catch { /* ignore */ }
             return;
         }
 
@@ -290,10 +290,10 @@ public sealed class ConnectProxyServer : IAsyncDisposable
                 await TryRespondAsync(client, status, ct).ConfigureAwait(false);
                 return;
             }
-            // not_allowed أثناء نافذة تباين إصدار القائمة: المضيف يعرف الأحدث؛ نسقط إلى المباشر (ADR-0004).
+            // not_allowed during the list-version divergence window: the host knows the newer one; we fall back to direct (ADR-0004).
         }
 
-        // شبكة شركة بـ Proxy إجباري: المسار المباشر يمرر CONNECT إلى Proxy النظام (الخطة 8.5).
+        // A corporate network with a mandatory proxy: the direct path passes CONNECT to the system proxy (plan 8.5).
         if (ResolveSystemProxy(route.Host, route.Port, secure: true) is { } upstreamProxy)
         {
             await ConnectViaSystemProxyAsync(client, request, upstreamProxy, route.Host, route.Port, ct).ConfigureAwait(false);
@@ -316,8 +316,8 @@ public sealed class ConnectProxyServer : IAsyncDisposable
     }
 
     /// <summary>
-    /// CONNECT عبر Proxy النظام. 2xx → 200 للمتصفح وضخ؛ 407 → يُنقل للمتصفح مع <c>Proxy-Authenticate</c>
-    /// ليعيد المحاولة بـ <c>Proxy-Authorization</c> (Basic/Digest بجولة واحدة)؛ غير ذلك → 502 صادق.
+    /// CONNECT through the system proxy. 2xx -> 200 to the browser and pumping; 407 -> relayed to the browser with <c>Proxy-Authenticate</c>
+    /// so it retries with <c>Proxy-Authorization</c> (Basic/Digest in one round trip); anything else -> a truthful 502.
     /// </summary>
     private async Task ConnectViaSystemProxyAsync(SocketStream client, ProxyRequest request, SystemProxyEndpoint proxy, string host, int port, CancellationToken ct)
     {
@@ -347,7 +347,7 @@ public sealed class ConnectProxyServer : IAsyncDisposable
         Counters.Direct();
         Counters.SystemProxyUsed();
         await WriteConnectEstablishedAsync(client, ct).ConfigureAwait(false);
-        // بايتات وصلت بعد رأس رد الـ Proxy تخص النفق نفسه ويجب أن تصل المتصفح.
+        // Bytes that arrived after the proxy's reply head belong to the tunnel itself and must reach the browser.
         if (result.Remainder.Length > 0)
         {
             await client.WriteAsync(result.Remainder, ct).ConfigureAwait(false);
@@ -356,7 +356,7 @@ public sealed class ConnectProxyServer : IAsyncDisposable
         await PumpAsync(client, tunnel, request.Remainder, ct).ConfigureAwait(false);
     }
 
-    /// <summary>Proxy النظام لهذه الوجهة، أو null إن لم يُضبط أو كانت ضمن قائمة التجاوز. لا يرمي.</summary>
+    /// <summary>The system proxy for this destination, or null if none is configured or it is in the bypass list. It does not throw.</summary>
     private SystemProxyEndpoint? ResolveSystemProxy(string host, int port, bool secure)
     {
         var resolver = _options.SystemProxy;
@@ -368,7 +368,7 @@ public sealed class ConnectProxyServer : IAsyncDisposable
         }
         catch (Exception)
         {
-            return null; // اسم لا يصلح لبناء Uri: نكمل مباشرةً
+            return null; // a name that cannot build a Uri: we carry on directly
         }
     }
 
@@ -381,12 +381,12 @@ public sealed class ConnectProxyServer : IAsyncDisposable
         string path;
         if (HttpRequestParser.TryParseHttpUri(request.Target, out host, out port, out path))
         {
-            // absolute-URI كما يرسله المتصفح إلى Proxy
+            // An absolute-URI as the browser sends it to a proxy
         }
         else if (request.Target.StartsWith('/') && request.Header("Host") is { Length: > 0 } hostHeader
                  && HttpRequestParser.TryParseAuthority(hostHeader, 80, out host, out port))
         {
-            path = request.Target; // origin-form (curl مباشرة على المنفذ، أو صفحة الفحص بترويسة Host)
+            path = request.Target; // origin-form (curl straight at the port, or the check page with a Host header)
         }
         else
         {
@@ -410,13 +410,13 @@ public sealed class ConnectProxyServer : IAsyncDisposable
 
         if (ProxyRouter.HostIsAllowlisted(route.Host, _options.Allowlist))
         {
-            // لا بايتات نصية عبر النفق: تحويل محلي إلى https
+            // No plaintext bytes through the tunnel: a local redirect to https
             var location = port == 80 ? $"https://{route.Host}{path}" : $"https://{route.Host}:{port}{path}";
             await TryRespondAsync(client, 307, ct, ("Location", location)).ConfigureAwait(false);
             return;
         }
 
-        // شبكة شركة بـ Proxy إجباري: الطلب يذهب إلى Proxy النظام بصيغة absolute-URI (الخطة 8.5).
+        // A corporate network with a mandatory proxy: the request goes to the system proxy in absolute-URI form (plan 8.5).
         if (ResolveSystemProxy(route.Host, port, secure: false) is { } upstreamProxy)
         {
             var upstream = await UpstreamProxyClient.DialAsync(upstreamProxy, _options.Resolver, _options.DirectConnectTimeout, ct).ConfigureAwait(false);
@@ -431,7 +431,7 @@ public sealed class ConnectProxyServer : IAsyncDisposable
                 Counters.SystemProxyUsed();
                 var proxyHead = BuildProxyFormHead(request, route.Host, port, path);
                 await upstream.WriteAsync(proxyHead, ct).ConfigureAwait(false);
-                // رد الـ Proxy يُنقل كما هو (بما فيه 407): المتصفح هو من يملك بيانات الاعتماد.
+                // The proxy's reply is relayed as it is (407 included): the browser is what holds the credentials.
                 await PumpUntilOriginClosesAsync(client, upstream, request.Remainder, ct).ConfigureAwait(false);
             }
             return;
@@ -449,15 +449,15 @@ public sealed class ConnectProxyServer : IAsyncDisposable
             Counters.DirectHttp();
             var head = BuildOriginFormHead(request, path);
             await origin.WriteAsync(head, ct).ConfigureAwait(false);
-            // طلب واحد لكل اتصال: نضخ الجسم إن وُجد ونعيد الرد حتى يغلق الأصل، ثم نغلق نحو المتصفح.
+            // One request per connection: we pump the body if there is one and relay the reply until the origin closes, then close towards the browser.
             await PumpUntilOriginClosesAsync(client, origin, request.Remainder, ct).ConfigureAwait(false);
         }
     }
 
     /// <summary>
-    /// رأس موجَّه إلى Proxy أعلى: هدف absolute-URI مبني من الاسم المطبَّع (لا من نص الطلب كما وصل)،
-    /// وحذف Proxy-Connection/Keep-Alive/Connection، مع **الإبقاء على Proxy-Authorization** لأنها موجهة
-    /// إلى الـ Proxy الأعلى نفسه (على المسار المباشر بلا Proxy تُحذف؛ هناك لا مُخاطَب لها).
+    /// A head aimed at an upstream proxy: an absolute-URI target built from the normalised name (not from the request's text as it arrived),
+    /// with Proxy-Connection/Keep-Alive/Connection removed, and **Proxy-Authorization kept**, because it is addressed
+    /// to that upstream proxy itself (on the direct path with no proxy it is removed; there is nobody there for it to address).
     /// </summary>
     public static byte[] BuildProxyFormHead(ProxyRequest request, string host, int port, string path)
     {
@@ -477,7 +477,7 @@ public sealed class ConnectProxyServer : IAsyncDisposable
         return Encoding.Latin1.GetBytes(sb.ToString());
     }
 
-    /// <summary>absolute-URI → origin-form؛ حذف Proxy-Connection/Proxy-Authorization/Keep-Alive؛ Connection: close.</summary>
+    /// <summary>An absolute-URI -> origin-form; Proxy-Connection/Proxy-Authorization/Keep-Alive removed; Connection: close.</summary>
     public static byte[] BuildOriginFormHead(ProxyRequest request, string path)
     {
         var sb = new StringBuilder();
@@ -499,7 +499,7 @@ public sealed class ConnectProxyServer : IAsyncDisposable
         var now = DateTimeOffset.UtcNow;
         Interlocked.CompareExchange(ref _firstProbeHitTicks, now.UtcTicks, 0);
         Counters.Probe();
-        try { ProbeHit?.Invoke(now); } catch { /* المستمع مسؤول عن أخطائه */ }
+        try { ProbeHit?.Invoke(now); } catch { /* the listener is responsible for its own errors */ }
         var body = ProbePage.HtmlBytes(_options.PeerPublicIp);
         await TryRespondAsync(client, 200, ct, body, "text/html; charset=utf-8", ("Cache-Control", "no-store")).ConfigureAwait(false);
     }
@@ -507,11 +507,11 @@ public sealed class ConnectProxyServer : IAsyncDisposable
     // ---------- direct ----------
 
     /// <summary>
-    /// حل الاسم، رفض النتيجة إن كان **أي** عنوان منها محظورًا (نفس قاعدة docs/protocol.md القسم 6 الخطوة 6 على المضيف)،
-    /// ثم Socket.ConnectAsync(IPAddress[], port) بالقائمة المفحوصة فقط وبمهلة 5 ثوانٍ للعملية كلها.
+    /// Resolving the name, refusing the result if **any** of its addresses is blocked (the same rule as docs/protocol.md section 6 step 6 on the host),
+    /// then Socket.ConnectAsync(IPAddress[], port) using the checked list only, with a 5-second timeout for the whole operation.
     /// <para>
-    /// الرفض يقع **بعد** الحل و**قبل** أي اتصال: اسم يحل إلى loopback أو عنوان خاص لا يُفتح إليه مقبس أصلًا.
-    /// الاتصال بالقائمة لا بالاسم يغلق DNS rebinding بين الفحص والاتصال.
+    /// The refusal happens **after** the resolution and **before** any connection: a name that resolves to loopback or a private address has no socket opened to it at all.
+    /// Connecting to the list rather than to the name closes DNS rebinding between the check and the connection.
     /// </para>
     /// </summary>
     private async Task<(SocketStream? Stream, DirectFailure Failure)> DirectConnectAsync(string host, int port, CancellationToken ct)
@@ -565,7 +565,7 @@ public sealed class ConnectProxyServer : IAsyncDisposable
         await StreamPump.RunAsync(client, far, ct).ConfigureAwait(false);
     }
 
-    /// <summary>الرد يُنسخ حتى يغلق الأصل؛ عندها ينتهي الطلب ولا ننتظر المتصفح (يُغلق نحوه بعد العودة).</summary>
+    /// <summary>The reply is copied until the origin closes; the request then ends and we do not wait on the browser (it is closed towards after returning).</summary>
     private static async Task PumpUntilOriginClosesAsync(Stream client, Stream origin, byte[] remainder, CancellationToken ct)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -581,10 +581,10 @@ public sealed class ConnectProxyServer : IAsyncDisposable
                 await StreamPump.CopyAsync(client, origin, cts.Token).ConfigureAwait(false);
                 if (origin is IHalfClosable h) await h.CompleteWritingAsync(cts.Token).ConfigureAwait(false);
             }
-            catch { /* المتصفح أغلق أو أُلغي */ }
+            catch { /* the browser closed, or it was cancelled */ }
         }, CancellationToken.None);
         try { await StreamPump.CopyAsync(origin, client, cts.Token).ConfigureAwait(false); }
-        catch { /* الأصل قطع الاتصال أو المتصفح أغلق */ }
+        catch { /* the origin dropped the connection, or the browser closed */ }
         cts.Cancel();
         await upload.ConfigureAwait(false);
         if (client is IHalfClosable half) await half.CompleteWritingAsync(CancellationToken.None).ConfigureAwait(false);
@@ -616,7 +616,7 @@ public sealed class ConnectProxyServer : IAsyncDisposable
         }
         catch (Exception) when (!ct.IsCancellationRequested)
         {
-            // المتصفح أغلق؛ لا شيء يُفعل
+            // The browser closed; there is nothing to do
         }
     }
 }

@@ -28,7 +28,7 @@ _SEND_ERRORS = (WebSocketDisconnect, RuntimeError, OSError)
 
 FRAME_BUDGET = 100
 FRAME_BUDGET_SECONDS = 10.0
-"""Per-connection frame allowance (product document section 14, "تحديد معدل الطلبات").
+"""Per-connection frame allowance (product document section 14, "Rate limiting").
 
 Authentication is not a licence to spin the single worker's event loop: every frame after
 ``hello`` costs a parse and usually a database round trip, so an authenticated device could

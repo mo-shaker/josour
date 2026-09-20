@@ -1,6 +1,6 @@
 namespace Josour.Egress;
 
-/// <summary>عدّاد البايتات في الاتجاهين على المضيف: Up = من Guest إلى الموقع، Down = من الموقع إلى Guest. آمن للخيوط.</summary>
+/// <summary>The byte counter in both directions on the host: Up = from the guest to the site, Down = from the site to the guest. Thread-safe.</summary>
 public sealed class ByteCounter
 {
     private long _up;

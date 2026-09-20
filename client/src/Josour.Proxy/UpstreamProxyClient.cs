@@ -7,7 +7,7 @@ using Josour.Tunnel.Mux;
 
 namespace Josour.Proxy;
 
-/// <summary>رد الـ Proxy الأعلى على CONNECT: الحالة، ترويسات المصادقة إن طُلبت، وأي بايتات تلت الرأس.</summary>
+/// <summary>The upstream proxy's reply to CONNECT: the status, the authentication headers if they were requested, and any bytes that followed the head.</summary>
 public sealed record UpstreamConnectResult(
     SocketStream? Stream,
     int Status,
@@ -18,20 +18,20 @@ public sealed record UpstreamConnectResult(
 }
 
 /// <summary>
-/// التخاطب مع Proxy النظام على المسار المباشر (الخطة 8.5: «المستخدم على شبكة شركة بـ Proxy إجباري …
-/// المسار المباشر يمرر CONNECT إلى Proxy النظام»).
+/// Talking to the system proxy on the direct path (plan 8.5: "a user on a corporate network with a mandatory proxy …
+/// the direct path passes CONNECT to the system proxy").
 ///
-/// <para>لا يمس مسار القائمة المسموحة إطلاقًا: ذاك يمر عبر الـ mux إلى المضيف، ولا علاقة لـ Proxy جهاز
-/// المستخدم به.</para>
+/// <para>It does not touch the allowed-list path at all: that goes through the mux to the host, and the user's machine's proxy
+/// has nothing to do with it.</para>
 /// </summary>
 public static class UpstreamProxyClient
 {
-    /// <summary>أقصى رأس رد نقبله من الـ Proxy الأعلى.</summary>
+    /// <summary>The largest reply head we accept from the upstream proxy.</summary>
     public const int MaxHeadBytes = 16 * 1024;
 
     /// <summary>
-    /// يفتح مقبسًا إلى الـ Proxy الأعلى. عنوان الـ Proxy من إعداد الجهاز لا من الطلب، لذلك <b>لا</b> يخضع
-    /// لفحص العناوين الخاصة: Proxy الشركات يسكن عادةً 10.x أو 127.0.0.1 وهذا هو الوضع الطبيعي.
+    /// Opens a socket to the upstream proxy. The proxy's address comes from the machine's configuration rather than from the request, so it is <b>not</b> subject
+    /// to the private-address check: a corporate proxy usually lives on 10.x or 127.0.0.1, and that is the normal state.
     /// </summary>
     public static async Task<SocketStream?> DialAsync(SystemProxyEndpoint proxy, IHostResolver resolver, TimeSpan timeout, CancellationToken ct)
     {
@@ -68,9 +68,9 @@ public static class UpstreamProxyClient
     }
 
     /// <summary>
-    /// CONNECT إلى الـ Proxy الأعلى لوجهة <paramref name="host"/>:<paramref name="port"/>.
-    /// <paramref name="proxyAuthorization"/> يُمرَّر كما أرسله المتصفح (يمكّن Basic/Digest عبر جولة 407 واحدة).
-    /// عند غير 2xx يُغلق المقبس ويعاد الحالة مع ترويسات <c>Proxy-Authenticate</c> لتُنقل إلى المتصفح.
+    /// CONNECT to the upstream proxy for the destination <paramref name="host"/>:<paramref name="port"/>.
+    /// <paramref name="proxyAuthorization"/> is passed through as the browser sent it (which enables Basic/Digest over one 407 round trip).
+    /// On anything but 2xx the socket is closed and the status is returned with the <c>Proxy-Authenticate</c> headers to be relayed to the browser.
     /// </summary>
     public static async Task<UpstreamConnectResult> ConnectAsync(
         SocketStream upstream,
@@ -112,7 +112,7 @@ public static class UpstreamProxyClient
         }
     }
 
-    /// <summary>يقرأ رأس رد HTTP حتى CRLFCRLF ويعيد (الحالة، Proxy-Authenticate، ما تلا الرأس).</summary>
+    /// <summary>Reads an HTTP reply head up to CRLFCRLF and returns (the status, Proxy-Authenticate, what followed the head).</summary>
     private static async Task<(int Status, IReadOnlyList<string> Authenticate, byte[] Remainder)> ReadHeadAsync(Stream stream, CancellationToken ct)
     {
         var buffer = new byte[MaxHeadBytes];
@@ -148,7 +148,7 @@ public static class UpstreamProxyClient
             if (colon <= 0) continue;
             if (!line.AsSpan(0, colon).Trim().Equals("Proxy-Authenticate", StringComparison.OrdinalIgnoreCase)) continue;
             var value = line[(colon + 1)..].Trim();
-            // ترويسة تُعاد كتابتها نحو المتصفح: لا محارف تحكم.
+            // A header rewritten towards the browser: no control characters.
             if (value.Length > 0 && !value.Any(char.IsControl)) authenticate.Add(value);
         }
         return (status, authenticate, remainder);

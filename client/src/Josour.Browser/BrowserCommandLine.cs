@@ -3,7 +3,7 @@ using Josour.Core.Browser;
 
 namespace Josour.Browser;
 
-/// <summary>سطر أوامر متصفح العمل حرفيًا كما في الخطة 8.2 (Chrome وEdge سواء). بلا --proxy-bypass-list عمدًا.</summary>
+/// <summary>The work browser's command line, literally as in plan 8.2 (Chrome and Edge alike). Deliberately without --proxy-bypass-list.</summary>
 public static class BrowserCommandLine
 {
     public static IReadOnlyList<string> Arguments(BrowserLaunchOptions options)
@@ -29,7 +29,7 @@ public static class BrowserCommandLine
         };
     }
 
-    /// <summary>الصيغة النصية للتقارير (اقتباس الوسائط التي تحوي مسافات).</summary>
+    /// <summary>The textual form for reports (quoting arguments that contain spaces).</summary>
     public static string Render(string exePath, IEnumerable<string> arguments)
         => string.Join(" ", new[] { Quote(exePath) }.Concat(arguments.Select(Quote)));
 
@@ -37,7 +37,7 @@ public static class BrowserCommandLine
     {
         if (arg.Length > 0 && arg.IndexOfAny(new[] { ' ', '\t', '"' }) < 0) return arg;
         var eq = arg.IndexOf('=');
-        // --name="value with spaces" كما تُكتب في الوثائق
+        // --name="value with spaces", as it is written in the documentation
         if (arg.StartsWith("--", StringComparison.Ordinal) && eq > 0)
             return arg[..(eq + 1)] + "\"" + arg[(eq + 1)..].Replace("\"", "\\\"") + "\"";
         return "\"" + arg.Replace("\"", "\\\"") + "\"";

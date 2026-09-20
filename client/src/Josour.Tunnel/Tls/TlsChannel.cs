@@ -5,7 +5,7 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace Josour.Tunnel.Tls;
 
-/// <summary>الإصدار المتفاوَض عليه أدنى من TLS 1.2 (ADR-0002). الاتصال أُغلق قبل الرمي.</summary>
+/// <summary>The negotiated version is below TLS 1.2 (ADR-0002). The connection was closed before throwing.</summary>
 public sealed class TlsTooOldException : AuthenticationException
 {
     public TlsTooOldException(SslProtocols negotiated)
@@ -14,13 +14,13 @@ public sealed class TlsTooOldException : AuthenticationException
     public SslProtocols Negotiated { get; }
 }
 
-/// <summary>نتيجة المصافحة: الـ SslStream (يملك الـ Stream الداخلي) والإصدار بصيغة السلك ("1.2"/"1.3").</summary>
+/// <summary>The handshake's result: the SslStream (which owns the inner Stream) and the version in wire form ("1.2"/"1.3").</summary>
 public sealed record TlsHandshakeResult(SslStream Stream, string TlsVersion, SslProtocols Protocol);
 
 /// <summary>
-/// مصافحة TLS حسب docs/protocol.md القسم 3: SslProtocols.None، TargetHost ثابت، تثبيت بصمة SHA-256 للشهادة،
-/// تجاهل أخطاء السلسلة والاسم، بلا فحص إبطال، بلا شهادة عميل، ورفض أي إصدار أدنى من TLS 1.2 بعد المصافحة.
-/// عند أي فشل يُغلق الـ SslStream (ومعه الـ Stream الداخلي) ثم يُرمى الاستثناء.
+/// The TLS handshake per docs/protocol.md section 3: SslProtocols.None, a fixed TargetHost, pinning the certificate's SHA-256 fingerprint,
+/// ignoring chain and name errors, with no revocation check, no client certificate, and refusing any version below TLS 1.2 after the handshake.
+/// On any failure the SslStream (and with it the inner Stream) is closed and then the exception is thrown.
 /// </summary>
 public static class TlsChannel
 {
@@ -81,7 +81,7 @@ public static class TlsChannel
                 EncryptionPolicy = EncryptionPolicy.RequireEncryption,
                 AllowRenegotiation = false,
                 ClientCertificates = null,
-                // أخطاء السلسلة والاسم تُتجاهل عمدًا: القبول يعتمد على البصمة المثبّتة فقط.
+                // Chain and name errors are deliberately ignored: acceptance rests on the pinned fingerprint alone.
                 RemoteCertificateValidationCallback = (_, certificate, _, _) =>
                     certificate is not null && CryptographicOperations.FixedTimeEquals(ComputeFingerprint(certificate), pinned),
             };
@@ -104,7 +104,7 @@ public static class TlsChannel
         }
     }
 
-    /// <summary>SHA-256 على الشهادة بصيغة DER (RawData).</summary>
+    /// <summary>SHA-256 over the certificate in DER form (RawData).</summary>
     public static byte[] ComputeFingerprint(X509Certificate certificate)
     {
         ArgumentNullException.ThrowIfNull(certificate);
@@ -114,7 +114,7 @@ public static class TlsChannel
     public static bool IsAtLeastTls12(SslProtocols protocol)
         => protocol == SslProtocols.Tls12 || protocol == SslProtocols.Tls13 || (int)protocol > (int)SslProtocols.Tls13;
 
-    /// <summary>صيغة السلك للإصدار كما في session.connected.tls_version.</summary>
+    /// <summary>The version's wire form as in session.connected.tls_version.</summary>
     public static string ToWireVersion(SslProtocols protocol) => protocol switch
     {
         SslProtocols.Tls12 => "1.2",

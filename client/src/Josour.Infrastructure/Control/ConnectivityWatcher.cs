@@ -26,7 +26,7 @@ public interface IConnectivitySignals
 
 /// <summary>
 /// Turns "the machine woke up" and "the network changed" into an immediate re-evaluation of the control channel
-/// (plan 8.5: نوم الجهاز / تغيير الشبكة).
+/// (plan 8.5: the machine sleeping / the network changing).
 /// <para>
 /// Two things happen on a signal. A channel that is reconnecting is told to stop waiting out its backoff
 /// (<see cref="IReconnectNow"/>), because the 30 s it still owes were budgeted for a server that is down, not for a

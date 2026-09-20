@@ -1,5 +1,5 @@
 #!/bin/sh
-# نسخة احتياطية يومية مضغوطة مع حذف ما يتجاوز مدة الاحتفاظ.
+# A daily compressed backup, deleting anything past the retention period.
 set -eu
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 OUT="/backups/josour-${STAMP}.sql.gz"

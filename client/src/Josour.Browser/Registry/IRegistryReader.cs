@@ -4,16 +4,16 @@ namespace Josour.Browser.Registry;
 
 public enum RegistryRoot { LocalMachine, CurrentUser }
 
-/// <summary>قراءة السجل قابلة للحقن (اختبار محدد المتصفح وكاشف السياسات على أي نظام).</summary>
+/// <summary>Reading the registry, injectable (so the browser locator and the policy detector can be tested on any system).</summary>
 public interface IRegistryReader
 {
-    /// <summary>قيمة نصية (REG_SZ/REG_EXPAND_SZ). valueName فارغ = القيمة الافتراضية. null إن لم توجد.</summary>
+    /// <summary>A string value (REG_SZ/REG_EXPAND_SZ). An empty valueName = the default value. null if it does not exist.</summary>
     string? GetString(RegistryRoot root, string subKey, string? valueName);
     int? GetInt(RegistryRoot root, string subKey, string valueName);
     bool KeyExists(RegistryRoot root, string subKey);
 }
 
-/// <summary>لا سجل (غير Windows).</summary>
+/// <summary>No registry (off Windows).</summary>
 public sealed class NullRegistryReader : IRegistryReader
 {
     public static readonly NullRegistryReader Instance = new();
@@ -22,7 +22,7 @@ public sealed class NullRegistryReader : IRegistryReader
     public bool KeyExists(RegistryRoot root, string subKey) => false;
 }
 
-/// <summary>WINDOWS-ONLY: Microsoft.Win32.Registry. على غير Windows يعيد null دائمًا.</summary>
+/// <summary>WINDOWS-ONLY: Microsoft.Win32.Registry. Off Windows it always returns null.</summary>
 public sealed class WindowsRegistryReader : IRegistryReader
 {
     public static readonly WindowsRegistryReader Instance = new();

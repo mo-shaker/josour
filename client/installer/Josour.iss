@@ -45,12 +45,12 @@ Name: "autostart"; Description: "Start Josour when I sign in to Windows"; GroupD
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Josour"; ValueData: """{app}\Josour.exe"" --minimized"; Flags: uninsdeletevalue; Tasks: autostart
 
 [Run]
-; قاعدة جدار ناري واردة للتنفيذي (المستمع المؤقت للنفق). تُحذف عند الإزالة.
+; An inbound firewall rule for the executable (the tunnel's temporary listener). It is removed on uninstall.
 Filename: "netsh"; Parameters: "advfirewall firewall delete rule name=""Josour Tunnel"""; Flags: runhidden; StatusMsg: "Configuring Windows Firewall..."
 Filename: "netsh"; Parameters: "advfirewall firewall add rule name=""Josour Tunnel"" dir=in action=allow program=""{app}\Josour.exe"" enable=yes profile=domain,private,public protocol=TCP"; Flags: runhidden
 Filename: "{app}\Josour.exe"; Description: "Launch Josour"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-; إزالة تسجيل إشعارات Toast (CLSID تحت HKCU\Software\Classes) قبل حذف الملفات
+; Unregistering the toast notifications (the CLSID under HKCU\Software\Classes) before deleting the files
 Filename: "{app}\Josour.exe"; Parameters: "--uninstall-notifications"; Flags: runhidden waituntilterminated; RunOnceId: "UninstallNotifications"
 Filename: "netsh"; Parameters: "advfirewall firewall delete rule name=""Josour Tunnel"""; Flags: runhidden; RunOnceId: "RemoveFirewallRule"

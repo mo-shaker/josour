@@ -3,12 +3,12 @@ using System.Text;
 
 namespace Josour.Proxy;
 
-/// <summary>صفحة الفحص التي يُفتح عليها المتصفح (http://check.josour/). وصولها يثبت أن المتصفح يستخدم الـ Proxy.</summary>
+/// <summary>The check page the browser is opened on (http://check.josour/). Its arrival proves the browser is using the proxy.</summary>
 public static class ProbePage
 {
     public const string Host = "check.josour";
 
-    /// <summary>الرابط الذي يُفتح عليه المتصفح (BrowserLaunchOptions.ProbeUrl) ويُكشف في GuestProxyInfo.ProbeUrl.</summary>
+    /// <summary>The URL the browser is opened on (BrowserLaunchOptions.ProbeUrl), exposed in GuestProxyInfo.ProbeUrl.</summary>
     public const string Url = "http://check.josour/";
 
     public const string TitleEnglish = "Tunnel active. Sites will see: ";

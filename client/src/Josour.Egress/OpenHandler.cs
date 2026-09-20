@@ -3,8 +3,8 @@ using Josour.Tunnel.Mux;
 namespace Josour.Egress;
 
 /// <summary>
-/// يربط IMuxAcceptor بـ EgressPolicy على المضيف (docs/protocol.md القسم 6 الخطوة 8): الحدود ← السياسة ← OPEN_OK ثم ضخ ثنائي
-/// الاتجاه (ينفذه الـ Mux) مع عدّ البايتات وجمع النطاقات المميزة. المعالج لا يرمي أبدًا.
+/// It wires an IMuxAcceptor to the EgressPolicy on the host (docs/protocol.md section 6 step 8): the limits -> the policy -> OPEN_OK, then bidirectional
+/// pumping (carried out by the mux) with the bytes counted and the distinct domains collected. The handler never throws.
 /// </summary>
 public sealed class OpenHandler
 {
@@ -27,7 +27,7 @@ public sealed class OpenHandler
     public int OpensOk => Volatile.Read(ref _opensOk);
     public int OpensFailed => Volatile.Read(ref _opensFailed);
 
-    /// <summary>يسجل هذا المعالج على الـ acceptor.</summary>
+    /// <summary>Registers this handler on the acceptor.</summary>
     public void Attach(IMuxAcceptor acceptor)
     {
         ArgumentNullException.ThrowIfNull(acceptor);
@@ -67,7 +67,7 @@ public sealed class OpenHandler
 
             Domains.Add(result.NormalizedHost!);
             Interlocked.Increment(ref _opensOk);
-            // الكتابة إلى الموقع = Up، القراءة منه = Down. الحجز يُحرَّر عندما يتخلص الـ Mux من الـ stream بعد انتهاء الضخ.
+            // Writing to the site = Up, reading from it = Down. The reservation is released when the mux disposes of the stream once the pumping ends.
             var counted = new EgressCountingStream(result.Stream!, Counter, lease);
             return MuxOpenDecision.Ok(counted);
         }
@@ -79,7 +79,7 @@ public sealed class OpenHandler
         }
     }
 
-    /// <summary>CountingStream يغذي ByteCounter المشترك ويحرر حجز الحد عند التخلص.</summary>
+    /// <summary>A CountingStream that feeds the shared ByteCounter and releases the limit's reservation on dispose.</summary>
     private sealed class EgressCountingStream : Stream, IHalfClosable
     {
         private readonly Stream _inner;

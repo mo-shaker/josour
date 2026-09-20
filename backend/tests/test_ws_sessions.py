@@ -824,9 +824,11 @@ async def test_a_completed_session_shows_up_in_the_diagnostics_summary(
     }
 
 
-# --- تصحيح تكامل: العميل هو المصدر الوحيد لخبر موت النفق ---
-# إن مات النفق بينما تبقى قناتا التحكم حيتين، لا يستطيع الخادم ملاحظة ذلك بنفسه،
-# فيقبل تقرير الطرف عن اختفاء نظيره. ويظل يرفض ادعاءه اختفاء نفسه وادعاء أحكام الخادم.
+# --- An integration correction: the client is the only source of news that the tunnel died ---
+# If the tunnel dies while both control channels stay alive, the server cannot observe it itself,
+# so it accepts one side's report that its peer vanished. It still refuses a side claiming it
+# vanished itself, and refuses any client claiming the server's own judgements.
+# itself, and refuses any client claiming the server's own judgements.
 
 
 async def test_host_reports_a_dead_tunnel_as_guest_disconnected(
@@ -869,7 +871,8 @@ async def test_a_party_may_not_claim_its_own_disconnect(
 async def test_server_verdicts_are_refused_from_clients(
     ws_connect: WsFactory, make_actor: ActorFactory, reason: str
 ) -> None:
-    """المدة والفشل والإنهاء المركزي يرصدها الخادم بنفسه؛ ادعاؤها من عميل مرفوض."""
+    """The duration, the failure and central termination are the server's own
+    observations; a client claiming them is refused."""
     live = await _connecting(ws_connect, make_actor)
     await live.guest_ws.send(_end(live.session_id, reason))
     error = await live.guest_ws.expect("error")

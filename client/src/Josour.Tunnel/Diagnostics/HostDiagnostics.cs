@@ -6,13 +6,13 @@ using Josour.Tunnel.Candidates;
 namespace Josour.Tunnel.Diagnostics;
 
 /// <summary>
-/// تشخيص «عند تفعيل متاح» بمفاتيح docs/ws-protocol.md hello.diagnostics حرفيًا:
+/// The "when available is enabled" diagnostics, under the docs/ws-protocol.md hello.diagnostics keys literally:
 /// firewall_rule_present, firewall_profile, vpn_adapter, system_proxy_present, os_build, ipv6_global.
-/// القيم غير القابلة للتحديد على هذه المنصة تكون null. لا يرمي أبدًا.
+/// Values that cannot be determined on this platform are null. It never throws.
 /// </summary>
 public static class HostDiagnostics
 {
-    /// <summary>اسم قاعدة الجدار الناري التي يضيفها المثبّت. المصدر الوحيد في <see cref="FirewallDiagnostics"/>.</summary>
+    /// <summary>The name of the firewall rule the installer adds. The single source is <see cref="FirewallDiagnostics"/>.</summary>
     public const string FirewallRuleName = FirewallDiagnostics.RuleName;
 
     public static async Task<Dictionary<string, object?>> CollectAsync(CancellationToken ct)
@@ -23,8 +23,8 @@ public static class HostDiagnostics
 
         if (OperatingSystem.IsWindows())
         {
-            // فحص الجدار الناري صار في Josour.Core.Diagnostics ليكون له مالك واحد:
-            // كان هنا وفي Josour.Infrastructure نسختان من استدعاء netsh وتفسير نصه.
+            // The firewall check moved into Josour.Core.Diagnostics so it has one owner:
+            // there used to be two copies here and in Josour.Infrastructure of the netsh invocation and of reading its text.
             var firewall = await FirewallDiagnostics.InspectSystemAsync(ct).ConfigureAwait(false);
             firewallRule = firewall.RulePresent;
             firewallProfile = firewall.Profile;
@@ -32,8 +32,8 @@ public static class HostDiagnostics
         }
         else
         {
-            // خارج Windows: متغيرات البيئة (http_proxy وأخواتها) عبر نفس المُحلّل الذي يستعمله المسار المباشر.
-            // لا يُستعمل على Windows لأن WinHTTP قد يجلب ملف PAC عبر الشبكة، والتشخيص لا يحتمل انتظارًا.
+            // Off Windows: the environment variables (http_proxy and its siblings) through the same resolver the direct path uses.
+            // Not used on Windows because WinHTTP may fetch a PAC file over the network, and the diagnostics cannot bear a wait.
             systemProxy = EnvironmentProxyPresent();
         }
 
@@ -41,7 +41,7 @@ public static class HostDiagnostics
         {
             ["firewall_rule_present"] = firewallRule,
             ["firewall_profile"] = firewallProfile,
-            // مفاتيح hello.diagnostics مجمَّدة في docs/ws-protocol.md، فتبقى bool؛ التصنيف الكامل عبر DetectVpn().
+            // The hello.diagnostics keys are frozen in docs/ws-protocol.md, so this stays a bool; the full classification is through DetectVpn().
             ["vpn_adapter"] = DetectVpn().IsVpn,
             ["system_proxy_present"] = systemProxy,
             ["os_build"] = OsBuild(),
@@ -56,9 +56,9 @@ public static class HostDiagnostics
     }
 
     /// <summary>
-    /// الكشف المصنَّف عن الـ VPN (الخطة 8.5): أي واجهة، وبأي ثقة، وهل تحمل مسار الخروج.
-    /// هذا ما يستهلكه المسار C للتحذير: <c>ShouldWarn</c> صحيح للثقة العالية وحدها.
-    /// القواعد والاستثناءات في <see cref="VpnDetector"/>. لا يرمي أبدًا.
+    /// The classified VPN detection (plan 8.5): which interface, at what confidence, and whether it holds the egress route.
+    /// This is what track C consumes for the warning: <c>ShouldWarn</c> is true for high confidence alone.
+    /// The rules and the exclusions are in <see cref="VpnDetector"/>. It never throws.
     /// </summary>
     public static VpnDetectionResult DetectVpn() => DetectVpn(SystemNetworkAdapterSource.Instance);
 
@@ -69,7 +69,7 @@ public static class HostDiagnostics
         catch { return VpnDetectionResult.NotDetected; }
     }
 
-    /// <summary>مفتاح <c>vpn_adapter</c> في hello.diagnostics: هل هناك واجهة VPN عاملة (بأي ثقة).</summary>
+    /// <summary>The <c>vpn_adapter</c> key in hello.diagnostics: is there a VPN interface that is up (at any confidence).</summary>
     public static bool VpnAdapterPresent() => DetectVpn().IsVpn;
 
 
@@ -91,7 +91,7 @@ public static class HostDiagnostics
         }
     }
 
-    /// <summary>خارج Windows: متغيرات البيئة فقط (بلا شبكة). null إن تعذّر القرار.</summary>
+    /// <summary>Off Windows: the environment variables only (with no network). null if the decision cannot be made.</summary>
     private static bool? EnvironmentProxyPresent()
     {
         try { return SystemProxyResolver.Default.IsConfigured; }

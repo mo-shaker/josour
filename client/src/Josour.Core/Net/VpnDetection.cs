@@ -4,26 +4,26 @@ using System.Net.Sockets;
 
 namespace Josour.Core.Net;
 
-/// <summary>ثقة كشف الـ VPN. انظر <see cref="VpnDetector"/> للقواعد.</summary>
+/// <summary>The confidence of the VPN detection. See <see cref="VpnDetector"/> for the rules.</summary>
 public enum VpnConfidence
 {
-    /// <summary>لا واجهة VPN عاملة.</summary>
+    /// <summary>No VPN interface is up.</summary>
     None = 0,
 
-    /// <summary>واجهة VPN موجودة وعاملة لكنها لا تحمل مسار الخروج: الحركة على الأرجح لا تمر بها.</summary>
+    /// <summary>A VPN interface exists and is up but does not hold the egress route: the traffic most likely does not pass through it.</summary>
     Low = 1,
 
-    /// <summary>واجهة VPN تحمل مسار الخروج الافتراضي: الحركة الخارجة تمر بها فعلًا.</summary>
+    /// <summary>A VPN interface holds the default egress route: outbound traffic really does pass through it.</summary>
     High = 2,
 }
 
-/// <summary>وصف واجهة شبكة كما تراه أداة الكشف. قابل للتلفيق في الاختبارات.</summary>
-/// <param name="Name">اسم الواجهة (utun3، wg0، Ethernet 2).</param>
-/// <param name="Description">وصف المنتج (WireGuard Tunnel، TAP-Windows Adapter V9).</param>
-/// <param name="IsUp">هل الواجهة عاملة.</param>
-/// <param name="IsTunnelType">هل نوعها Tunnel/Ppp حسب النظام.</param>
-/// <param name="UnicastAddresses">عناوين الواجهة.</param>
-/// <param name="GatewayAddresses">بوابات الواجهة (وجودها شرط ضروري لحمل مسار افتراضي، وليس كافيًا).</param>
+/// <summary>A network interface as the detector sees it. Fakeable in the tests.</summary>
+/// <param name="Name">The interface's name (utun3, wg0, Ethernet 2).</param>
+/// <param name="Description">The product description (WireGuard Tunnel, TAP-Windows Adapter V9).</param>
+/// <param name="IsUp">Whether the interface is up.</param>
+/// <param name="IsTunnelType">Whether its type is Tunnel/Ppp per the system.</param>
+/// <param name="UnicastAddresses">The interface's addresses.</param>
+/// <param name="GatewayAddresses">The interface's gateways (having one is necessary for holding a default route, not sufficient).</param>
 public sealed record NetworkAdapterInfo(
     string Name,
     string Description,
@@ -32,19 +32,19 @@ public sealed record NetworkAdapterInfo(
     IReadOnlyList<IPAddress> UnicastAddresses,
     IReadOnlyList<IPAddress> GatewayAddresses);
 
-/// <summary>مصدر الواجهات ومسار الخروج. يُحقن في الاختبارات.</summary>
+/// <summary>The source of the interfaces and the egress route. Injected in the tests.</summary>
 public interface INetworkAdapterSource
 {
     IReadOnlyList<NetworkAdapterInfo> GetAdapters();
 
     /// <summary>
-    /// عنوان المصدر الذي يختاره النظام للخروج إلى الإنترنت، أو null إن تعذّر تحديده.
-    /// المطابقة معه هي كيف نعرف أي واجهة تحمل المسار الافتراضي بلا قراءة جدول التوجيه.
+    /// The source address the system chooses for going out to the internet, or null if it cannot be determined.
+    /// Matching against it is how we learn which interface holds the default route without reading the routing table.
     /// </summary>
     IPAddress? GetOutboundSourceAddress();
 }
 
-/// <summary>نتيجة الكشف: هل هناك VPN، وأي واجهة، وبأي ثقة، ولماذا.</summary>
+/// <summary>The detection's result: whether there is a VPN, which interface, at what confidence, and why.</summary>
 public sealed record VpnDetectionResult(
     VpnConfidence Confidence,
     string? AdapterName,
@@ -56,32 +56,32 @@ public sealed record VpnDetectionResult(
 
     public bool IsVpn => Confidence != VpnConfidence.None;
 
-    /// <summary>هل يجب تحذير المستخدم بأن عنوان الخروج سيكون عنوان الـ VPN؟ (الثقة العالية فقط.)</summary>
+    /// <summary>Should the user be warned that the egress address will be the VPN's? (High confidence only.)</summary>
     public bool ShouldWarn => Confidence == VpnConfidence.High;
 
-    /// <summary>سطر تشخيصي قصير للسجل ولـ <c>hello.diagnostics</c>.</summary>
+    /// <summary>A short diagnostic line for the log and for <c>hello.diagnostics</c>.</summary>
     public string Describe() => Confidence == VpnConfidence.None
         ? "none"
         : $"{Confidence.ToString().ToLowerInvariant()}:{AdapterName}" + (Marker is null ? string.Empty : $" ({Marker})");
 }
 
 /// <summary>
-/// كشف واجهات الـ VPN على المضيف (الخطة 8.5 وجدول المخاطر: «المضيف على VPN: IP الخروج هو IP الـ VPN»).
+/// Detecting VPN interfaces on the host (plan 8.5 and the risk table: "the host on a VPN: the exit IP is the VPN's IP").
 ///
-/// <para><b>القواعد:</b> الواجهة مرشّحة إن كانت <b>عاملة</b> و(نوعها Tunnel/Ppp أو طابق اسمها/وصفها أحد
-/// <see cref="Markers"/>) ولم تطابق أحد <see cref="Exclusions"/>. المرشّحة التي تملك <b>عنوان المصدر الخارج</b>
-/// (أي التي يخرج منها فعلًا) ثقتها <see cref="VpnConfidence.High"/>؛ ومجرد وجودها ثقته <see cref="VpnConfidence.Low"/>.</para>
+/// <para><b>The rules:</b> an interface is a candidate if it is <b>up</b> and (its type is Tunnel/Ppp or its name/description matched one of
+/// <see cref="Markers"/>) and it matched none of <see cref="Exclusions"/>. A candidate that holds <b>the outbound source address</b>
+/// (that is, the one traffic actually leaves by) has <see cref="VpnConfidence.High"/>; merely existing is <see cref="VpnConfidence.Low"/>.</para>
 ///
-/// <para><b>لماذا الاستثناءات:</b> Windows يصنّف Teredo وISATAP و6to4 على أنها <c>NetworkInterfaceType.Tunnel</c>
-/// وهي ليست VPN؛ وmacOS يفتح واجهات <c>utun</c> لـ Handoff وiCloud Private Relay بلا أي VPN. بدون هذه
-/// الاستثناءات يصير الكشف تحذيرًا كاذبًا دائمًا على أجهزة عادية.</para>
+/// <para><b>Why the exclusions:</b> Windows classifies Teredo, ISATAP and 6to4 as <c>NetworkInterfaceType.Tunnel</c>
+/// and they are not VPNs; and macOS opens <c>utun</c> interfaces for Handoff and iCloud Private Relay with no VPN at all. Without these
+/// exclusions the detection becomes a permanent false warning on ordinary machines.</para>
 ///
-/// <para><b>لماذا الرموز القصيرة تُطابَق ككلمات:</b> «tun» و«tap» و«wg» مقاطع شائعة داخل كلمات أخرى
-/// (Fortune، Adaptap)، فتُطابَق على حدود الكلمات فقط؛ والرموز الطويلة تُطابَق كسلسلة فرعية.</para>
+/// <para><b>Why the short markers are matched as words:</b> "tun", "tap" and "wg" are common fragments inside other words
+/// (Fortune, Adaptap), so they are matched on word boundaries only; the long markers are matched as substrings.</para>
 /// </summary>
 public static class VpnDetector
 {
-    /// <summary>رموز تُطابَق كسلسلة فرعية (طويلة بما يكفي ألا تصطدم بكلمات أخرى).</summary>
+    /// <summary>Markers matched as a substring (long enough not to collide with other words).</summary>
     private static readonly string[] SubstringMarkers =
     {
         "vpn", "wireguard", "tailscale", "openvpn", "zerotier", "anyconnect", "globalprotect",
@@ -90,19 +90,19 @@ public static class VpnDetector
         "wintun", "tunnelbear", "hamachi", "ipsec", "l2tp", "pptp", "sstp", "cloudflare warp",
     };
 
-    /// <summary>رموز تُطابَق ككلمة كاملة أو ببادئة رقمية (utun3، wg0، tun0، tap-windows).</summary>
+    /// <summary>Markers matched as a whole word or with a numeric suffix (utun3, wg0, tun0, tap-windows).</summary>
     private static readonly string[] TokenMarkers = { "tun", "utun", "tap", "wg", "ppp", "gpd", "nordvpn" };
 
-    /// <summary>واجهات نفقية ليست VPN.</summary>
+    /// <summary>Tunnel interfaces that are not VPNs.</summary>
     private static readonly string[] Exclusions =
     {
         "teredo", "isatap", "6to4", "loopback", "pseudo-interface", "bluetooth", "ipv6 helper",
     };
 
-    /// <summary>الرموز المعروضة في التوثيق والاختبارات.</summary>
+    /// <summary>The markers shown in the documentation and the tests.</summary>
     public static IReadOnlyList<string> Markers { get; } = SubstringMarkers.Concat(TokenMarkers).ToArray();
 
-    /// <summary>كشف باستخدام واجهات النظام الحقيقية.</summary>
+    /// <summary>Detection using the system's real interfaces.</summary>
     public static VpnDetectionResult Detect() => Detect(SystemNetworkAdapterSource.Instance);
 
     public static VpnDetectionResult Detect(INetworkAdapterSource source)
@@ -136,7 +136,7 @@ public static class VpnDetector
         return best ?? VpnDetectionResult.NotDetected;
     }
 
-    /// <summary>الرمز الذي جعل الواجهة مرشّحة، أو null إن لم تكن.</summary>
+    /// <summary>The marker that made the interface a candidate, or null if it is not one.</summary>
     public static string? MarkerFor(NetworkAdapterInfo adapter)
     {
         ArgumentNullException.ThrowIfNull(adapter);
@@ -152,7 +152,7 @@ public static class VpnDetector
         {
             if (HasToken(name, marker) || HasToken(description, marker)) return marker;
         }
-        // النوع وحده يكفي بعد استبعاد الأنفاق غير الـ VPN.
+        // The type alone is enough once the non-VPN tunnels are excluded.
         return adapter.IsTunnelType ? "tunnel-type" : null;
     }
 
@@ -161,7 +161,7 @@ public static class VpnDetector
     private static bool Contains(string text, string needle)
         => text.Contains(needle, StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>كلمة كاملة، أو كلمة متبوعة برقم (utun3، wg0، tun1).</summary>
+    /// <summary>A whole word, or a word followed by a number (utun3, wg0, tun1).</summary>
     private static bool HasToken(string text, string token)
     {
         if (string.IsNullOrEmpty(text)) return false;
@@ -184,12 +184,12 @@ public static class VpnDetector
 }
 
 /// <summary>
-/// المصدر الحقيقي: <see cref="NetworkInterface"/> لعناوين الواجهات، ومقبس UDP «متصل» بعنوان عام
-/// لمعرفة عنوان المصدر الخارج. المقبس <b>لا يرسل أي بايت</b>؛ الاتصال على UDP اختيارُ مسارٍ محلي فقط.
+/// The real source: <see cref="NetworkInterface"/> for the interfaces' addresses, and a UDP socket "connected" to a public address
+/// to learn the outbound source address. The socket <b>sends no byte</b>; connecting on UDP is a local route choice only.
 /// </summary>
 public sealed class SystemNetworkAdapterSource : INetworkAdapterSource
 {
-    /// <summary>عناوين لا يُرسل إليها شيء؛ تُستعمل لسؤال النظام عن مسار الخروج فقط.</summary>
+    /// <summary>Addresses nothing is sent to; they are used only to ask the system about the egress route.</summary>
     private static readonly IPEndPoint ProbeV4 = new(IPAddress.Parse("192.0.2.1"), 53);        // TEST-NET-1 (RFC 5737)
     private static readonly IPEndPoint ProbeV6 = new(IPAddress.Parse("2001:db8::1"), 53);      // Documentation (RFC 3849)
 
@@ -217,7 +217,7 @@ public sealed class SystemNetworkAdapterSource : INetworkAdapterSource
             }
             catch
             {
-                // واجهة واحدة معطوبة لا تمنع الباقي
+                // One broken interface does not stop the rest
             }
         }
         return result;

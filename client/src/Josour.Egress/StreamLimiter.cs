@@ -1,17 +1,17 @@
 namespace Josour.Egress;
 
 /// <summary>
-/// حدود المضيف (docs/protocol.md القسم 5): streams متزامنة بحسب شريحة النافذة و50 OPEN في الثانية (نافذة منزلقة).
-/// التجاوز = OPEN_FAIL(limit).
+/// The host's limits (docs/protocol.md section 5): concurrent streams per the window's band, and 50 OPENs a second (a sliding window).
+/// Exceeding them = OPEN_FAIL(limit).
 ///
-/// <b>الحد المتزامن يتبع النافذة</b> بعد تعديل الأسبوع 5: 256 عند 1 MiB، 128 عند 2 MiB، 64 عند 4 MiB — أي
-/// النافذة × الحد = 256 MiB في كل شريحة. من يمرره هو <c>EgressTunnelAdapter.Create</c> من
-/// <c>TunnelEgressContext.MaxConcurrentStreams</c> الذي تشتقه <c>TunnelSession</c> من الـ RTT.
-/// حد الفتحات في الثانية لا علاقة له بالنافذة فلم يتغير.
+/// <b>The concurrency limit follows the window</b> after the week-5 amendment: 256 at 1 MiB, 128 at 2 MiB, 64 at 4 MiB — that is,
+/// the window x the limit = 256 MiB in every band. What passes it is <c>EgressTunnelAdapter.Create</c> from
+/// <c>TunnelEgressContext.MaxConcurrentStreams</c>, which <c>TunnelSession</c> derives from the RTT.
+/// The opens-per-second limit has nothing to do with the window, so it did not change.
 /// </summary>
 public sealed class StreamLimiter
 {
-    /// <summary>الحد عند النافذة الدنيا (1 MiB)؛ قيمة العقد قبل التعديل وسقفه بعده.</summary>
+    /// <summary>The limit at the lowest window (1 MiB); the contract's value before the amendment and its cap after it.</summary>
     public const int DefaultMaxConcurrent = 256;
     public const int DefaultMaxOpensPerSecond = 50;
 
@@ -35,7 +35,7 @@ public sealed class StreamLimiter
     public int MaxConcurrent => _maxConcurrent;
     public int MaxOpensPerSecond => _maxOpensPerSecond;
 
-    /// <summary>يحجز مكانًا لـ stream جديد؛ null عند تجاوز أي من الحدين. التخلص من الحجز يحرر المكان.</summary>
+    /// <summary>Reserves a slot for a new stream; null when either limit is exceeded. Disposing the reservation frees the slot.</summary>
     public Lease? TryAcquire()
     {
         lock (_gate)

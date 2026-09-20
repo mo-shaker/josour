@@ -13,7 +13,7 @@
     -Server
   }
 
-  # WebSocket و REST معًا؛ Caddy يمرر Upgrade تلقائيًا
+  # WebSocket and REST together; Caddy passes the Upgrade through automatically
   reverse_proxy api:8000 {
     header_up X-Forwarded-For {remote_host}
     transport http {

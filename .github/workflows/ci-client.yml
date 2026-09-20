@@ -58,7 +58,7 @@ jobs:
           done
 
   build-linux:
-    # يثبت أن المكتبات تُبنى وتُختبر خارج Windows وmacOS أيضًا
+    # Proves the libraries build and test off Windows and macOS too
     runs-on: ubuntu-latest
     defaults:
       run:

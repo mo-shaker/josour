@@ -3,12 +3,12 @@ using System.Globalization;
 
 namespace Josour.Core.Allowlist;
 
-/// <summary>نتيجة تقييم القائمة؛ تُربط بأسباب OPEN_FAIL في docs/protocol.md القسم 6.</summary>
+/// <summary>The outcome of evaluating the list; it maps to the OPEN_FAIL reasons in docs/protocol.md section 6.</summary>
 public enum AllowlistDecision { Allowed, HostNotAllowed, PortNotAllowed }
 
 /// <summary>
-/// مطابق قائمة المواقع (دالة نقية مشتركة بين الطرفين) حسب docs/protocol.md القسم 6 القاعدة 3.
-/// الصيغ: example.com (لاحقة على حدود التسميات) | =exact.com (تامة فقط) | host:port | =host:port.
+/// The site-list matcher (a pure function shared by both sides) per docs/protocol.md section 6 rule 3.
+/// The forms: example.com (a suffix on label boundaries) | =exact.com (exact only) | host:port | =host:port.
 /// </summary>
 public sealed class AllowlistMatcher : IAllowlist
 {
@@ -24,7 +24,7 @@ public sealed class AllowlistMatcher : IAllowlist
         Entries = entries;
     }
 
-    /// <summary>يحلل المدخلات الخام. يرمي FormatException عند أول مدخل غير صالح (الرفض عند التحميل).</summary>
+    /// <summary>Parses the raw entries. It throws FormatException on the first invalid entry (refusal at load time).</summary>
     public static AllowlistMatcher Parse(int version, IEnumerable<string> rawEntries)
     {
         ArgumentNullException.ThrowIfNull(rawEntries);
@@ -37,7 +37,7 @@ public sealed class AllowlistMatcher : IAllowlist
         => TryParseEntry(raw, out var entry, out var error) ? entry : throw new FormatException(error);
 
     /// <summary>
-    /// مرفوض: فارغ، يحتوي مسافات أو '*' أو '/'، منفذ خارج 1..65535، أكثر من ':' واحدة، مضيف فارغ، أو IDN غير صالح.
+    /// Refused: empty, containing spaces or '*' or '/', a port outside 1..65535, more than one ':', an empty host, or invalid IDN.
     /// </summary>
     public static bool TryParseEntry(string? raw, [NotNullWhen(true)] out AllowlistEntry? entry, [NotNullWhen(false)] out string? error)
     {
@@ -78,20 +78,21 @@ public sealed class AllowlistMatcher : IAllowlist
         return true;
     }
 
-    /// <summary>أقصى طول اسم بعد Punycode (RFC 1035).</summary>
+    /// <summary>The maximum name length after Punycode (RFC 1035).</summary>
     public const int MaxHostLength = 253;
 
-    /// <summary>أقصى طول تسمية واحدة بعد Punycode.</summary>
+    /// <summary>The maximum length of one label after Punycode.</summary>
     public const int MaxLabelLength = 63;
 
     /// <summary>
-    /// تطبيع الاسم: أحرف صغيرة، حذف النقطة الأخيرة، IDN إلى Punycode، ثم فحص LDH صارم على الناتج.
-    /// يرمي ArgumentException للاسم غير الصالح، وكل المستهلكين (EgressPolicy وProxyRouter) يترجمون ذلك إلى رفض.
+    /// Normalising the name: lowercase, strip the trailing dot, IDN to Punycode, then a strict LDH check on the result.
+    /// It throws ArgumentException for an invalid name, and every consumer (EgressPolicy and ProxyRouter) turns that into a refusal.
     ///
     /// <para>
-    /// لماذا الفحص الصارم بعد Punycode: <see cref="IdnMapping"/> عندنا بلا STD3، فيمرر محارف لا تجوز في اسم DNS
-    /// (NUL، ':' ، '/'، مسافات، شرطة في أول التسمية). اسم كهذا لا يطابق أي مدخل فيبدو آمنًا، لكنه يصل إلى
-    /// <c>Dns.GetHostAddressesAsync</c> وإلى ترويسة Host، حيث تختلف قراءته بين طبقة وأخرى. الفشل المغلق أرخص.
+    /// Why the strict check after Punycode: our <see cref="IdnMapping"/> has no STD3, so it passes through characters that
+    /// are not permitted in a DNS name (NUL, ':', '/', spaces, a leading hyphen in a label). Such a name matches no entry
+    /// so it looks safe, but it reaches <c>Dns.GetHostAddressesAsync</c> and the Host header, where one layer reads it
+    /// differently from another. Failing closed is cheaper.
     /// </para>
     /// </summary>
     public static string NormalizeHost(string host)
@@ -116,13 +117,13 @@ public sealed class AllowlistMatcher : IAllowlist
             throw new ArgumentException("host is not a valid IDN/DNS name", nameof(host), e);
         }
 
-        // GetAscii يحوّل فواصل IDN (U+3002 وأخواتها) إلى '.'، فقد تظهر نقطة أخيرة لم تكن في الأصل.
+        // GetAscii converts the IDN separators (U+3002 and its siblings) into '.', so a trailing dot may appear that was not in the original.
         while (ascii.EndsWith('.')) ascii = ascii[..^1];
         ValidateAsciiHost(ascii);
         return ascii;
     }
 
-    /// <summary>الاسم بعد Punycode: طول كلي ≤ 253، كل تسمية 1..63 من [a-z0-9-_] بلا شرطة في طرفيها.</summary>
+    /// <summary>The name after Punycode: a total length of ≤ 253, and every label 1..63 of [a-z0-9-_] with no hyphen at either end.</summary>
     private static void ValidateAsciiHost(string ascii)
     {
         if (ascii.Length == 0) throw new ArgumentException("host is empty", nameof(ascii));
@@ -156,8 +157,8 @@ public sealed class AllowlistMatcher : IAllowlist
         => Evaluate(normalizedHost, port, allowedPorts) == AllowlistDecision.Allowed;
 
     /// <summary>
-    /// يميّز بين عدم مطابقة الاسم (not_allowed) وعدم السماح بالمنفذ (port_not_allowed).
-    /// المدخل الذي يحمل منفذًا يطابق ذلك المنفذ فقط؛ بدونه يُسمح بمنافذ allowedPorts.
+    /// It distinguishes the name not matching (not_allowed) from the port not being permitted (port_not_allowed).
+    /// An entry carrying a port matches that port only; without one, the allowedPorts are permitted.
     /// </summary>
     public AllowlistDecision Evaluate(string normalizedHost, int port, IReadOnlyList<int> allowedPorts)
     {
@@ -181,8 +182,8 @@ public sealed class AllowlistMatcher : IAllowlist
     }
 
     /// <summary>
-    /// مطابقة تامة، أو لاحقة على حدود التسميات (a.example.com يطابق example.com؛ notexample.com لا يطابق).
-    /// النطاق الفرعي يجب أن يحمل تسمية واحدة على الأقل، فلا يطابق ".example.com" (اسم غير مطبَّع) مدخل "example.com".
+    /// An exact match, or a suffix on label boundaries (a.example.com matches example.com; notexample.com does not).
+    /// A subdomain must carry at least one label, so ".example.com" (an unnormalised name) does not match the entry "example.com".
     /// </summary>
     public static bool HostMatches(string normalizedHost, AllowlistEntry entry)
     {

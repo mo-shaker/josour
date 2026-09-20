@@ -6,7 +6,7 @@ using Josour.Tunnel.Mux;
 
 namespace Josour.Egress;
 
-/// <summary>نتيجة سياسة الخروج: stream إلى الموقع (يملك المقبس، يدعم الإغلاق النصفي) أو سبب OPEN_FAIL.</summary>
+/// <summary>The egress policy's result: a stream to the site (owning the socket, supporting the half-close) or an OPEN_FAIL reason.</summary>
 public sealed class EgressResult
 {
     private EgressResult(Stream? stream, OpenFailReason? reason, string? normalizedHost, IPAddress? connectedTo)
@@ -19,7 +19,7 @@ public sealed class EgressResult
 
     public Stream? Stream { get; }
     public OpenFailReason? Reason { get; }
-    /// <summary>الاسم بعد التطبيع (متاح من الخطوة 2 فصاعدًا حتى عند الرفض).</summary>
+    /// <summary>The name after normalisation (available from step 2 onwards, even on a refusal).</summary>
     public string? NormalizedHost { get; }
     public IPAddress? ConnectedTo { get; }
     public bool IsOk => Stream is not null;
@@ -37,20 +37,20 @@ public sealed class EgressPolicyOptions
     public TimeSpan ConnectTimeout { get; init; } = TimeSpan.FromSeconds(10);
     public IHostResolver Resolver { get; init; } = DnsHostResolver.Instance;
 
-    /// <summary>عناوين المضيف نفسه (واجهاته وبواباته) وعنوانه العام كما يراه الخادم؛ كلها محظورة.</summary>
+    /// <summary>The host's own addresses (its interfaces and gateways) and its public address as the server sees it; all of them blocked.</summary>
     public IReadOnlyList<IPAddress> LocalAddresses { get; init; } = Array.Empty<IPAddress>();
 
     /// <summary>
-    /// فحص الحظر لعنوان واحد. الافتراضي IpRangePolicy.IsBlocked(address, LocalAddresses).
-    /// يُستبدل في اختبارات E2E فقط (للسماح بـ 127.0.0.1 داخل العملية).
+    /// The blocked check for one address. The default is IpRangePolicy.IsBlocked(address, LocalAddresses).
+    /// Replaced in the E2E tests only (to permit 127.0.0.1 inside the process).
     /// </summary>
     public Func<IPAddress, bool>? AddressBlocker { get; init; }
 }
 
 /// <summary>
-/// سياسة الخروج على المضيف حسب docs/protocol.md القسم 6 بالترتيب: (1) IP حرفي → ip_literal، (2) تطبيع، (3) القائمة → not_allowed،
-/// (4) المنفذ → port_not_allowed، (5) DNS مرة واحدة بمهلة 5 ث → dns_failed، (6) أي عنوان محظور → private_ip،
-/// (7) Socket.ConnectAsync(IPAddress[], port) بالقائمة المفحوصة فقط بمهلة 10 ث → connect_failed.
+/// The egress policy on the host per docs/protocol.md section 6, in order: (1) an address literal -> ip_literal, (2) normalisation, (3) the list -> not_allowed,
+/// (4) the port -> port_not_allowed, (5) DNS once with a 5 s timeout -> dns_failed, (6) any blocked address -> private_ip,
+/// (7) Socket.ConnectAsync(IPAddress[], port) using the checked list only, with a 10 s timeout -> connect_failed.
 /// </summary>
 public sealed class EgressPolicy
 {
@@ -68,7 +68,7 @@ public sealed class EgressPolicy
 
     public IAllowlist Allowlist => _allowlist;
 
-    /// <summary>الخطوات 1-4 فقط (بلا I/O). يعيد null عند القبول مع الاسم المطبَّع.</summary>
+    /// <summary>Steps 1-4 only (with no I/O). It returns null on acceptance, with the normalised name.</summary>
     public OpenFailReason? Evaluate(string host, int port, out string? normalizedHost)
     {
         normalizedHost = null;
@@ -82,12 +82,12 @@ public sealed class EgressPolicy
         if (port is < 1 or > 65535) return OpenFailReason.PortNotAllowed;
 
         if (_allowlist.IsAllowed(normalized, port, _options.AllowedPorts)) return null;
-        // الاسم مطابق لكن المنفذ ليس ضمن allowed_ports ولا قيد المدخل → port_not_allowed؛ وإلا not_allowed.
+        // The name matched but the port is neither within allowed_ports nor the entry's restriction -> port_not_allowed; otherwise not_allowed.
         var hostMatched = _allowlist.HostMatches(normalized);
         return hostMatched ? OpenFailReason.PortNotAllowed : OpenFailReason.NotAllowed;
     }
 
-    /// <summary>الخطوات 1-7 كاملة. لا يرمي إلا عند الإلغاء الخارجي.</summary>
+    /// <summary>All of steps 1-7. It throws only on an external cancellation.</summary>
     public async Task<EgressResult> OpenAsync(string host, int port, CancellationToken ct)
     {
         var early = Evaluate(host, port, out var normalized);
@@ -119,7 +119,7 @@ public sealed class EgressPolicy
         {
             using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             connectCts.CancelAfter(_options.ConnectTimeout);
-            // بالقائمة المفحوصة فقط، لا بالاسم (يغلق DNS rebinding وHappy Eyeballs على أسماء غير مفحوصة).
+            // Using the checked list only, not the name (which closes DNS rebinding and Happy Eyeballs on unchecked names).
             await socket.ConnectAsync(addresses, port, connectCts.Token).ConfigureAwait(false);
             var remote = socket.RemoteEndPoint as IPEndPoint;
             var connectedTo = remote?.Address ?? addresses[0];
@@ -150,7 +150,7 @@ public sealed class EgressPolicy
             }
             catch (SocketException) when (needV4)
             {
-                // لا IPv6 على الجهاز؛ نسقط إلى v4
+                // No IPv6 on the machine; we fall back to v4
             }
         }
         return new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);

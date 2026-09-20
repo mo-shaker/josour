@@ -312,7 +312,7 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
                 if (_serverClockOffset.Duration() > _options.ClockSkewWarning)
                 {
                     // The countdown is immune to this (it is anchored on server time and then counted monotonically —
-                    // plan 8.5 "الوقت"), but a clock this far out breaks TLS validity windows and makes every log line
+                    // plan 8.5 "Time"), but a clock this far out breaks TLS validity windows and makes every log line
                     // on this machine hard to line up with the server's, so it is worth saying out loud once per connect.
                     _logger.LogWarning(
                         "This machine's clock is {OffsetSeconds:0.#} s away from the server's ({ServerTime:O}); the session countdown follows the server, but check the system clock",
@@ -819,9 +819,9 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
 
             if (remaining <= TimeSpan.Zero)
             {
-                // ننهي محليًا فورًا (لا نمرر بايتًا بعد انتهاء المدة) بلا session.end:
-                // "expired" حكم من أحكام الخادم، ومؤقته مشتق من expires_at نفسه فيصدر session.terminate
-                // خلال فارق الساعتين. إرساله من العميل يُرد bad_request (ws-protocol القسم 9).
+                // We tear down locally at once (not a byte passes after the duration runs out) with no session.end:
+                // "expired" is one of the server's own judgements, and its timer derives from the same expires_at, so it issues session.terminate
+                // within the difference between the two clocks. Sending it from the client is answered with bad_request (ws-protocol section 9).
                 _logger.LogInformation("Session {SessionId} reached expires_at: tearing down locally, awaiting the server's session.terminate", run.SessionId);
                 _ = EndCoreAsync(TunnelEndReason.Expired, notifyServer: false);
                 return;

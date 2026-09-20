@@ -1,4 +1,4 @@
-"""Admin REST API under ``/api/v1/admin`` (docs/api.md "الإدارة"); every route requires
+"""Admin REST API under ``/api/v1/admin`` (docs/api.md "Administration"); every route requires
 ``role = admin`` via ``require_admin``."""
 
 from fastapi import APIRouter, Depends

@@ -6,12 +6,12 @@ namespace Josour.Proxy;
 
 public enum RouteKind { Reject, Tunnel, Direct }
 
-/// <summary>Host مطبَّع عند Tunnel/Direct؛ Reason وصفي عند Reject.</summary>
+/// <summary>Host is normalised for Tunnel/Direct; Reason is descriptive for Reject.</summary>
 public sealed record RouteDecision(RouteKind Kind, string Host, int Port, string? Reason);
 
 /// <summary>
-/// قرار التوجيه على جانب المستخدم (docs/protocol.md وخطة 7.5): IP حرفي (أي عنوان) أو اسم محلي → رفض محلي 403 (دفاع في العمق؛
-/// لا يمكن إدراج IP في القائمة أصلًا)؛ مسموح → عبر النفق؛ غيره → اتصال مباشر من جهاز المستخدم (ADR-0004).
+/// The routing decision on the user's side (docs/protocol.md and plan 7.5): an address literal (any address) or a local name -> a local 403 refusal (defence in depth;
+/// an IP cannot be listed to begin with); allowed -> through the tunnel; otherwise -> a direct connection from the user's machine (ADR-0004).
 /// </summary>
 public static class ProxyRouter
 {
@@ -35,15 +35,15 @@ public static class ProxyRouter
             : new RouteDecision(RouteKind.Direct, normalized, port, null);
     }
 
-    /// <summary>localhost و*.localhost تُرفض محليًا (المتصفح لا يمررها للـ Proxy عادةً، لكن الدفاع في العمق مطلوب).</summary>
+    /// <summary>localhost and *.localhost are refused locally (the browser does not usually pass them to the proxy, but defence in depth is required).</summary>
     public static bool IsLocalName(string normalizedHost)
         => normalizedHost == "localhost" || normalizedHost.EndsWith(".localhost", StringComparison.Ordinal);
 
-    /// <summary>هل الاسم مطابق لأي مدخل في القائمة بغض النظر عن المنفذ (لرد 307 على http://).</summary>
+    /// <summary>Does the name match any entry in the list regardless of the port (for the 307 answer to http://)?</summary>
     public static bool HostIsAllowlisted(string normalizedHost, IAllowlist allowlist)
         => allowlist.HostMatches(normalizedHost);
 
-    /// <summary>OPEN_FAIL → رمز HTTP صادق للمتصفح: 403 سياسة، 502 فشل وصول، 503 حدود.</summary>
+    /// <summary>OPEN_FAIL -> a truthful HTTP code for the browser: 403 policy, 502 unreachable, 503 limits.</summary>
     public static int StatusForOpenFail(OpenFailReason reason) => reason switch
     {
         OpenFailReason.NotAllowed or OpenFailReason.PrivateIp or OpenFailReason.PortNotAllowed or OpenFailReason.IpLiteral => 403,

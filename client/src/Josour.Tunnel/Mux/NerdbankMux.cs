@@ -11,26 +11,26 @@ namespace Josour.Tunnel.Mux;
 public sealed class MuxOptions
 {
     /// <summary>
-    /// تجاوز صريح لنافذة الاستقبال لكل stream بالبايت. <c>null</c> (الافتراضي) = تُشتق من الـ RTT المقيس عند
-    /// الاتصال (<see cref="MuxWindow.ForRoundTrip"/>) — يفعل ذلك <c>TunnelSession</c> لأنه وحده يعرف
-    /// <c>connect_ms</c> — وتصير <see cref="MuxWindow.Default"/> (1 MiB) عند إنشاء Mux مباشرةً بلا اشتقاق.
+    /// An explicit override of the per-stream receiving window in bytes. <c>null</c> (the default) = it is derived from the RTT
+    /// measured at connect time (<see cref="MuxWindow.ForRoundTrip"/>) — which <c>TunnelSession</c> does, because it alone knows
+    /// <c>connect_ms</c> — and it becomes <see cref="MuxWindow.Default"/> (1 MiB) when a mux is created directly with no derivation.
     /// </summary>
     public int? ReceiveWindow { get; init; }
 
-    /// <summary>تجاوز صريح لحد الـ streams المتزامنة. <c>null</c> = يتبع النافذة (ميزانية 256 MiB).</summary>
+    /// <summary>An explicit override of the concurrent stream limit. <c>null</c> = it follows the window (a 256 MiB budget).</summary>
     public int? MaxConcurrentStreams { get; init; }
 
     public TimeSpan PingInterval { get; init; } = TimeSpan.FromSeconds(20);
     public TimeSpan DeadAfter { get; init; } = TimeSpan.FromSeconds(60);
-    /// <summary>أقصى انتظار لـ OPEN_OK/OPEN_FAIL (المضيف: DNS 5 ث + اتصال 10 ث).</summary>
+    /// <summary>The longest wait for OPEN_OK/OPEN_FAIL (at the host: DNS 5 s + connect 10 s).</summary>
     public TimeSpan OpenTimeout { get; init; } = TimeSpan.FromSeconds(20);
     public bool EnableLiveness { get; init; } = true;
-    /// <summary>تتبع Nerdbank الداخلي (معايير ADR-0006: سهولة التتبع عند الأعطال).</summary>
+    /// <summary>Nerdbank's internal tracing (an ADR-0006 criterion: ease of tracing when things break).</summary>
     public TraceSource? Trace { get; init; }
 
     /// <summary>
-    /// النافذة الفعلية: التجاوز الصريح إن وُجد، وإلا <paramref name="derived"/> المشتقة من الـ RTT،
-    /// وإلا <see cref="MuxWindow.Default"/>. التجاوز يفوز دائمًا (الاختبارات وأداة Spike تعتمد عليه).
+    /// The window actually applied: the explicit override if there is one, otherwise the RTT-derived <paramref name="derived"/>,
+    /// otherwise <see cref="MuxWindow.Default"/>. The override always wins (the tests and the Spike tool rely on it).
     /// </summary>
     public MuxWindow Resolve(MuxWindow? derived = null)
     {
@@ -42,12 +42,12 @@ public sealed class MuxOptions
 }
 
 /// <summary>
-/// ADR-0006: Nerdbank.Streams.MultiplexingStream (بروتوكول 3، بلا مصافحة) خلف IMuxConnection/IMuxAcceptor.
-/// - OPEN: Guest يعرض قناة باسم "host:port". المضيف يقبلها دائمًا ثم يكتب بايت حالة واحدًا: 0 = OPEN_OK ويبدأ الضخ،
-///   وإلا رمز OPEN_FAIL (1..7) ثم يكمل الكتابة. الرفض داخل القناة نفسها يضمن الترتيب ولا يحتاج قناة تحكم لكل فتح.
-/// - PING/PONG/GOAWAY على قناة مزروعة (seeded, id 0) بإطارات 9 بايت: u8 type | 8 بايت حمولة.
-/// - نافذة الاستقبال لكل قناة تُشتق من الـ RTT (<see cref="MuxWindow"/>) وتُعلَن للطرف الآخر في إطار العرض/القبول
-///   (Backpressure من Nerdbank عبر System.IO.Pipelines).
+/// ADR-0006: Nerdbank.Streams.MultiplexingStream (protocol 3, with no handshake) behind IMuxConnection/IMuxAcceptor.
+/// - OPEN: the guest offers a channel named "host:port". The host always accepts it and then writes one status byte: 0 = OPEN_OK and pumping begins,
+///   otherwise the OPEN_FAIL code (1..7), and then it finishes writing. Refusing inside the channel itself guarantees ordering and needs no control channel per open.
+/// - PING/PONG/GOAWAY on a seeded channel (id 0) with 9-byte frames: u8 type | 8 payload bytes.
+/// - The per-channel receiving window is derived from the RTT (<see cref="MuxWindow"/>) and announced to the other side in the offer/accept frame
+///   (backpressure from Nerdbank through System.IO.Pipelines).
 /// </summary>
 public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
 {
@@ -58,15 +58,15 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
     private const int CtlFrameLength = 9;
 
     /// <summary>
-    /// القناة المزروعة لا تمر بعرض/قبول، فلا تُعلَن نافذتها على السلك: يفترض كل طرف أن نافذة الآخر تساوي نافذته.
-    /// لذلك تُثبَّت فوق أكبر شريحة ممكنة حتى تبقى القيمة نفسها عند الطرفين مهما اختلفت شريحتاهما
-    /// (Nerdbank يرفع أي <c>ChannelReceivingWindowSize</c> أصغر من الافتراضية إلى الافتراضية).
-    /// رصيد لا حجز: القناة لا تحمل إلا إطارات 9 بايت.
+    /// The seeded channel goes through no offer/accept, so its window is not announced on the wire: each side assumes the other's window equals its own.
+    /// So it is pinned above the largest possible band, to keep the value the same at both ends however their bands differ
+    /// (Nerdbank raises any <c>ChannelReceivingWindowSize</c> smaller than the default up to the default).
+    /// Credit, not a reservation: the channel carries nothing but 9-byte frames.
     /// </summary>
     private const int ControlChannelWindow = MuxWindow.DistantWindow;
 
     private static readonly TimeSpan GoAwayFlushTimeout = TimeSpan.FromSeconds(2);
-    /// <summary>بعد GOAWAY ننتظر إغلاق الطرف الآخر (أو هذه المهلة) قبل إسقاط النقل، حتى لا يضيع الإطار في المخازن.</summary>
+    /// <summary>After a GOAWAY we wait for the other side to close (or for this timeout) before dropping the transport, so the frame is not lost in the buffers.</summary>
     private static readonly TimeSpan GoAwayDrainTimeout = TimeSpan.FromMilliseconds(500);
 
     private readonly MultiplexingStream _mx;
@@ -98,7 +98,7 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
 
     public TunnelRole Role => _role;
 
-    /// <summary>النافذة المطبَّقة فعلًا وحد الـ streams المرافق لها (docs/protocol.md القسم 5).</summary>
+    /// <summary>The window actually applied and the stream limit that goes with it (docs/protocol.md section 5).</summary>
     public MuxWindow Window => _window;
     public Func<MuxOpenRequest, CancellationToken, Task<MuxOpenDecision>>? OpenRequested { get; set; }
     public MuxStats Stats => new(_transport.BytesWritten, _transport.BytesRead, Volatile.Read(ref _openStreams));
@@ -107,17 +107,17 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
     public bool IsClosed => Volatile.Read(ref _closed) != 0;
 
     /// <summary>
-    /// عدد الـ PING المعلّقة بلا PONG. تشخيص لا سلوك: اختبار التحمّل يراقبه لأن كل مُعلَّق يحمل
-    /// <c>TaskCompletionSource</c> وتسجيل إلغاء على <c>_cts</c>، فنموّه = تسريب.
+    /// The number of PINGs outstanding with no PONG. Diagnostics, not behaviour: the soak test watches it because every outstanding one holds
+    /// a <c>TaskCompletionSource</c> and a cancellation registration on <c>_cts</c>, so its growth = a leak.
     /// </summary>
     public int PendingPings => _pendingPings.Count;
 
     /// <summary>
-    /// ينشئ الـ Mux فوق الـ stream المصادَق (SslStream من SymmetricConnector) ويبدأ الاستماع فورًا. يملك الـ stream.
+    /// Creates the mux over the authenticated stream (the SslStream from SymmetricConnector) and starts listening at once. It owns the stream.
     /// </summary>
     /// <param name="window">
-    /// النافذة المشتقة من الـ RTT (<c>TunnelSession</c> يمررها بعد <c>SymmetricConnector</c>). null = ما تعطيه
-    /// <see cref="MuxOptions.Resolve"/> وحدها: التجاوز الصريح إن وُجد وإلا <see cref="MuxWindow.Default"/>.
+    /// The RTT-derived window (<c>TunnelSession</c> passes it after <c>SymmetricConnector</c>). null = whatever
+    /// <see cref="MuxOptions.Resolve"/> gives on its own: the explicit override if there is one, otherwise <see cref="MuxWindow.Default"/>.
     /// </param>
     public static NerdbankMux Create(Stream authenticatedStream, TunnelRole role, MuxOptions? options = null, MuxWindow? window = null)
     {
@@ -140,7 +140,7 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
             var mux = new NerdbankMux(mx, transport, role, options, effective);
             mx.ChannelOffered += mux.OnChannelOffered;
             mx.StartListening();
-            // القناة المزروعة (id 0) لا تُقبل إلا بعد بدء الاستماع.
+            // The seeded channel (id 0) is only accepted once listening has started.
             mux._control = mx.AcceptChannel(0);
             mux.Start();
             return mux;
@@ -154,10 +154,10 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
 
     private void Start()
     {
-        // ‏Completion قد لا يراقبه أحد: TunnelSession يعلّق WatchAsync لكن هناك مسارات تسبقه (فشل بناء الطرف
-        // الخاص بالدور فتخلص فوري) واستعمالات بلا TunnelSession أصلًا (أداة Spike، الاختبارات). بلا هذا المراقب
-        // الصامت يصير كل موت نفق استثناء مهمة غير مُلاحَظ يرفعه خيط الإنهاء — ضجيج اليوم، وانهيار عملية على أي
-        // مضيف يُشغّل ThrowUnobservedTaskExceptions. المراقبون الحقيقيون لا يتأثرون: كلهم يقرؤون المهمة نفسها.
+        // Completion may be watched by nobody: TunnelSession attaches WatchAsync but there are paths before it (the role-specific end
+        // failing to build, so an immediate dispose) and uses with no TunnelSession at all (the Spike tool, the tests). Without this silent
+        // observer every tunnel death becomes an unobserved task exception raised by the finaliser thread — noise today, and a process crash on any
+        // host that enables ThrowUnobservedTaskExceptions. The real observers are unaffected: they all read the same task.
         _ = _completion.Task.ContinueWith(static t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
         _controlLoop = Task.Run(ControlLoopAsync);
         if (_options.EnableLiveness) _livenessLoop = Task.Run(LivenessLoopAsync);
@@ -169,10 +169,10 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
                 return;
             }
 
-            // اكتمال بلا خطأ ليس دليل إغلاق نظيف. النظيف هو ما قررناه نحن (CloseAsync/Dispose)
-            // أو ما تلا GOAWAY من الطرف الآخر؛ وكلاهما يضبط _closed قبل الوصول إلى هنا.
-            // أما انتهاء النقل من تلقائه (انقطاع الشبكة أو موت عملية الطرف الآخر) فهو نفق ميت
-            // يجب أن يظهر عطلًا، وإلا بدا للتطبيق كإنهاء عادي وأبلغ الخادم بسبب خاطئ.
+            // Completing with no error is not proof of a clean close. A clean one is what we decided (CloseAsync/Dispose)
+            // or what followed a GOAWAY from the other side; both set _closed before reaching here.
+            // The transport ending of its own accord (a network drop or the other side's process dying) is a dead tunnel
+            // that must surface as a failure, otherwise it looks to the application like an ordinary end and the server is told a wrong reason.
             if (Volatile.Read(ref _closed) != 0 || RemoteGoAway is not null) Finish();
             else Fail(new MuxClosedException("transport closed without GOAWAY; tunnel is dead"));
         }, TaskScheduler.Default);
@@ -187,16 +187,16 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
         if (host.Contains(':')) throw new ArgumentException("host must not contain ':' (IPv6 literals are rejected by policy)", nameof(host));
         if (IsClosed) throw new MuxClosedException("mux is closed");
 
-        // ميزانية ذاكرة هذا الطرف: النافذة × الـ streams المتزامنة (docs/protocol.md القسم 5). المضيف يفرض حده
-        // على السلك في StreamLimiter، وهذا الحجز يحمي ذاكرة الضيف نفسه إن اختلفت شريحته عن شريحة المضيف
-        // (كل طرف يشتق نافذته من قياسه هو). الحجز قبل العرض لا بعده حتى لا تتجاوزه دفعة فتوحات متوازية.
+        // This side's memory budget: the window x the concurrent streams (docs/protocol.md section 5). The host enforces its limit
+        // on the wire in StreamLimiter, and this reservation protects the guest's own memory if its band differs from the host's
+        // (each side derives its window from its own measurement). The reservation comes before the offer, not after, so a burst of parallel opens cannot exceed it.
         if (Interlocked.Increment(ref _openStreams) > _window.MaxConcurrentStreams)
         {
             Interlocked.Decrement(ref _openStreams);
             return MuxOpenResult.Fail(OpenFailReason.Limit);
         }
 
-        var handedOff = false; // صار الـ stream ملك المتصل، وهو الذي يحرر المكان عند التخلص منه
+        var handedOff = false; // the stream became the caller's, and the caller is what frees the slot when disposing it
         try
         {
             return await OpenReservedAsync(host, port, () => handedOff = true, ct).ConfigureAwait(false);
@@ -223,12 +223,12 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
         catch (OperationCanceledException)
         {
             if (IsClosed) throw new MuxClosedException("mux closed while opening a stream");
-            return MuxOpenResult.Fail(OpenFailReason.ConnectFailed); // مهلة OPEN
+            return MuxOpenResult.Fail(OpenFailReason.ConnectFailed); // the OPEN timeout
         }
         catch (Exception e) when (e is not MuxClosedException)
         {
             if (IsClosed) throw new MuxClosedException("mux closed while opening a stream", e);
-            return MuxOpenResult.Fail(OpenFailReason.ConnectFailed); // رفض على مستوى Nerdbank (لا يحدث في بروتوكولنا)
+            return MuxOpenResult.Fail(OpenFailReason.ConnectFailed); // a rejection at the Nerdbank level (does not happen in our protocol)
         }
 
         try
@@ -292,16 +292,16 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
         }
         catch (Exception)
         {
-            return; // أُغلقت أو قُبلت في مكان آخر
+            return; // closed, or accepted somewhere else
         }
         _ = Task.Run(() => HandleOfferAsync(channel, e.Name));
     }
 
     private async Task HandleOfferAsync(MultiplexingStream.Channel channel, string name)
     {
-        // حد الشريحة على مسار القبول أيضًا، لا على مسار الفتح وحده: الطرف الآخر هو من يقرر عدد القنوات المعروضة،
-        // فبلا هذا الحد يستطيع طرف معادٍ إجبارنا على إنشاء قنوات (وأنابيبها) بلا سقف. المضيف يملك حدًّا أدق في
-        // Josour.Egress.StreamLimiter (يشمل 50 فتحًا/ثانية) ويقع قبله؛ وهذا يحمي الطرفين معًا، والضيف بلا حدّ آخر.
+        // The band's limit on the acceptance path too, not on the open path alone: the other side is what decides how many channels are offered,
+        // so without this limit a hostile peer could force us to create channels (and their pipes) with no ceiling. The host has a finer limit in
+        // Josour.Egress.StreamLimiter (which includes 50 opens/second) and it comes first; this protects both sides, and the guest has no other limit.
         if (Interlocked.Increment(ref _openStreams) > _window.MaxConcurrentStreams)
         {
             try
@@ -312,7 +312,7 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
             }
             catch (Exception)
             {
-                try { channel.Dispose(); } catch { /* تجاهل */ }
+                try { channel.Dispose(); } catch { /* ignore */ }
             }
             finally
             {
@@ -342,7 +342,7 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
         }
         catch (Exception)
         {
-            try { channel.Dispose(); } catch { /* تجاهل */ }
+            try { channel.Dispose(); } catch { /* ignore */ }
         }
         finally
         {
@@ -365,7 +365,7 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
         }
     }
 
-    /// <summary>"host:port" حيث host بلا ':' (لا IPv6 حرفي) والمنفذ 1..65535.</summary>
+    /// <summary>"host:port" where the host contains no ':' (no IPv6 literal) and the port is 1..65535.</summary>
     public static bool TryParseName(string name, out string host, out int port)
     {
         host = string.Empty;
@@ -433,7 +433,7 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
                     terminal = !await ProcessControlFrameAsync(frame).ConfigureAwait(false);
                 }
                 reader.AdvanceTo(buffer.Start, buffer.End);
-                // إطار منهٍ (GOAWAY أو خطأ بروتوكول): من عالجه ضبط الحالة النهائية، ولا معنى لقراءة ما بعده.
+                // A terminating frame (GOAWAY or a protocol error): whoever handled it set the final state, and there is no point reading past it.
                 if (terminal) return;
                 if (result.IsCompleted || result.IsCanceled) break;
             }
@@ -450,7 +450,7 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
         }
     }
 
-    /// <summary>يعالج إطار تحكم واحدًا. <c>false</c> = إطار منهٍ (GOAWAY أو خطأ بروتوكول) فتتوقف حلقة التحكم.</summary>
+    /// <summary>Handles one control frame. <c>false</c> = a terminating frame (GOAWAY or a protocol error), so the control loop stops.</summary>
     private async Task<bool> ProcessControlFrameAsync(byte[] frame)
     {
         switch (frame[0])
@@ -461,7 +461,7 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
 
             case CtlPong:
                 Volatile.Write(ref _lastPongMs, _clock.ElapsedMilliseconds);
-                // نونس مجهول (PONG مكرر أو مصطنع) يُهمل بلا أثر: لا شيء يُضاف إلى _pendingPings من السلك.
+                // An unknown nonce (a duplicated or forged PONG) is dropped with no effect: nothing is added to _pendingPings from the wire.
                 if (_pendingPings.TryRemove(BitConverter.ToUInt64(frame, 1), out var tcs)) tcs.TrySetResult(_clock.ElapsedMilliseconds);
                 return true;
 
@@ -471,7 +471,7 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
                 var reason = (GoAwayReason)raw;
                 if (!MuxWire.IsValid(reason))
                 {
-                    // سبب خارج العقد: يُعامل معاملة خطأ البروتوكول لا معاملة إغلاق نظيف.
+                    // A reason outside the contract: treated as a protocol error rather than as a clean close.
                     RemoteGoAway = GoAwayReason.ProtocolError;
                     _ = FailProtocolAsync($"GOAWAY carried an unknown reason {raw}", sendGoAway: true);
                     return false;
@@ -480,8 +480,8 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
                 RemoteGoAway = reason;
                 if (reason == GoAwayReason.ProtocolError)
                 {
-                    // الطرف الآخر يقول إن السلك انكسر: نهاية غير طبيعية يجب أن يبلّغ عنها التطبيق
-                    // (TunnelSession.SuggestDeathReason ⇒ TunnelEndReason.ProtocolError)، لا إغلاق نظيف صامت.
+                    // The other side says the wire broke: an abnormal end the application must report
+                    // (TunnelSession.SuggestDeathReason => TunnelEndReason.ProtocolError), not a silent clean close.
                     _ = FailProtocolAsync("peer sent GOAWAY(protocol_error)", sendGoAway: false);
                     return false;
                 }
@@ -498,9 +498,9 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
     }
 
     /// <summary>
-    /// خطأ بروتوكول على قناة التحكم: GOAWAY(protocol_error) إن كنا نحن من اكتشفه، ثم <b>عطل</b> صريح على
-    /// <see cref="Completion"/>. المهم أن الإخفاق يظهر عطلًا: الإغلاق النظيف لا يرفع <c>Died</c> في
-    /// <c>TunnelSession</c>، فكان طرف معادٍ يفسد قناة التحكم فتنتهي الجلسة بلا سبب ويبلَّغ الخادم بإنهاء عادي.
+    /// A protocol error on the control channel: GOAWAY(protocol_error) if we are the ones who found it, then an explicit <b>fault</b> on
+    /// <see cref="Completion"/>. What matters is that the failure surfaces as a failure: a clean close does not raise <c>Died</c> in
+    /// <c>TunnelSession</c>, so a hostile peer corrupting the control channel ended the session with no reason and the server was told of an ordinary end.
     /// </summary>
     private async Task FailProtocolAsync(string detail, bool sendGoAway)
     {
@@ -512,7 +512,7 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
                     .WaitAsync(GoAwayFlushTimeout).ConfigureAwait(false);
                 await Task.WhenAny(_control.Completion, _mx.Completion, Task.Delay(GoAwayDrainTimeout)).ConfigureAwait(false);
             }
-            catch { /* النفق ميت أصلًا */ }
+            catch { /* the tunnel is already dead */ }
         }
         Fail(new MuxClosedException($"control channel protocol error: {detail}"));
     }
@@ -557,17 +557,17 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
                     return;
                 }
                 _ = LivenessPingAsync();
-                if (lastPong == 0) Volatile.Write(ref _lastPongMs, _clock.ElapsedMilliseconds); // بداية العد من أول PING
+                if (lastPong == 0) Volatile.Write(ref _lastPongMs, _clock.ElapsedMilliseconds); // start counting from the first PING
             }
         }
         catch (OperationCanceledException) { }
     }
 
     /// <summary>
-    /// PING الحيوية: يتخلى عن الانتظار بعد <see cref="MuxOptions.DeadAfter"/> بدل أن يبقى معلّقًا حتى موت النفق.
-    /// بلا هذا الحد كان كل PING بلا PONG يترك مدخلًا في <c>_pendingPings</c> وتسجيلَ إلغاء على <c>_cts</c> يعيشان
-    /// ما عاش النفق، فينمو الاثنان بلا حد كلما تأخرت الـ PONG دون أن تنقطع. النتيجة هنا لا تُقرأ: الحكم بالموت
-    /// وظيفة الحلقة نفسها عبر <c>_lastPongMs</c>، وكل ما يهم أن يُحرَّر المُعلَّق.
+    /// The liveness PING: it gives up waiting after <see cref="MuxOptions.DeadAfter"/> instead of staying outstanding until the tunnel dies.
+    /// Without that bound, every PING with no PONG left an entry in <c>_pendingPings</c> and a cancellation registration on <c>_cts</c> that lived
+    /// as long as the tunnel, so both grew without bound whenever the PONG was late without the link dropping. The result here is not read: judging death
+    /// is the loop's own job through <c>_lastPongMs</c>, and all that matters is that the outstanding entry is released.
     /// </summary>
     private async Task LivenessPingAsync()
     {
@@ -579,7 +579,7 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
         }
         catch (Exception)
         {
-            // إلغاء، أو مهلة، أو نفق مغلق: كلها ملاحظة هنا حتى لا تصير استثناءً غير مراقَب.
+            // Cancellation, or a timeout, or a closed tunnel: all of them observed here so none becomes an unobserved exception.
         }
     }
 
@@ -602,14 +602,14 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
             try
             {
                 await SendControlAsync(CtlGoAway, new[] { (byte)reason }, CancellationToken.None).WaitAsync(GoAwayFlushTimeout).ConfigureAwait(false);
-                // FlushAsync يعني أن الإطار في أنبوب القناة لا على السلك؛ الطرف الآخر يغلق النقل عند استلام GOAWAY فننتظره (بحد أقصى).
+                // FlushAsync means the frame is in the channel's pipe rather than on the wire; the other side closes the transport on receiving a GOAWAY, so we wait for it (with a ceiling).
                 await Task.WhenAny(_control.Completion, _mx.Completion, Task.Delay(GoAwayDrainTimeout)).ConfigureAwait(false);
             }
-            catch { /* النفق ميت أصلًا */ }
+            catch { /* the tunnel is already dead */ }
         }
         _cts.Cancel();
-        try { await _mx.DisposeAsync().ConfigureAwait(false); } catch { /* تجاهل */ }
-        try { await _transport.DisposeAsync().ConfigureAwait(false); } catch { /* تجاهل */ }
+        try { await _mx.DisposeAsync().ConfigureAwait(false); } catch { /* ignore */ }
+        try { await _transport.DisposeAsync().ConfigureAwait(false); } catch { /* ignore */ }
         foreach (var pending in _pendingPings.Values) pending.TrySetCanceled();
         Finish();
     }
@@ -618,21 +618,21 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
     {
         if (Volatile.Read(ref _closed) != 0)
         {
-            // إغلاق مقصود جارٍ أو مكتمل (CloseAsync/GOAWAY): ما يظهر بعده من أخطاء قراءة ليس عطلًا.
+            // A deliberate close is under way or complete (CloseAsync/GOAWAY): read errors appearing after it are not a failure.
             _completion.TrySetResult();
             return;
         }
-        // السبب يُثبَّت على المهمة **قبل** إعلان الإغلاق، لسببين:
-        //  1) _cts.Cancel() يوقظ حلقة التحكم التي تنهي المهمة بنجاح.
-        //  2) موت النقل يوقظ مسارين معًا (نهاية Completion وحلقة التحكم): لو أعلن أحدهما الإغلاق أولًا
-        //     لرأى الآخر IsClosed=true فأنهى المهمة بـ Finish، وTrySetResult تسبق TrySetException،
-        //     فيظهر نفق ميت في صورة إغلاق نظيف (فلا حدث Died، ويُبلَّغ الخادم بسبب إنهاء خاطئ).
+        // The cause is set on the task **before** the close is announced, for two reasons:
+        //  1) _cts.Cancel() wakes the control loop, which completes the task successfully.
+        //  2) The transport dying wakes two paths at once (Completion ending and the control loop): if one announced the close first,
+        //     the other would see IsClosed=true and finish the task with Finish, and TrySetResult precedes TrySetException,
+        //     so a dead tunnel would appear as a clean close (no Died event, and the server told a wrong end reason).
         _completion.TrySetException(e);
-        // ومن يعلن الإغلاق فعلًا يتولى التنظيف مرة واحدة؛ إن سبقنا إغلاق مقصود فهو صاحبه.
+        // And whoever actually announces the close performs the cleanup once; if a deliberate close got there first, it owns it.
         if (Interlocked.Exchange(ref _closed, 1) != 0) return;
         _cts.Cancel();
         _ = _mx.DisposeAsync().AsTask().ContinueWith(_ => { }, TaskScheduler.Default);
-        try { _transport.Dispose(); } catch { /* تجاهل */ }
+        try { _transport.Dispose(); } catch { /* ignore */ }
         foreach (var pending in _pendingPings.Values) pending.TrySetCanceled();
     }
 

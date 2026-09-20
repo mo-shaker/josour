@@ -4,7 +4,7 @@ using Josour.Core.Tunnel;
 
 namespace Josour.Tunnel.Transport;
 
-/// <summary>النقل المباشر: اتصال TCP بمهلة (مقبس DualMode + NoDelay) يعيد NetworkStream يملك المقبس. RelayTransport يُضاف لاحقًا خلف الواجهة نفسها.</summary>
+/// <summary>The direct transport: a TCP connection with a timeout (a DualMode socket + NoDelay) returning a NetworkStream that owns the socket. RelayTransport is added later behind the same interface.</summary>
 public sealed class DirectTransport : ITunnelTransport
 {
     public string Name => "direct";
@@ -48,7 +48,7 @@ public sealed class DirectTransport : ITunnelTransport
             return new Socket(AddressFamily.InterNetworkV6, SocketType.Stream, ProtocolType.Tcp);
         }
 
-        // مقبس DualMode يتصل بعنوان v4 عبر صيغته المغلَّفة؛ إن لم يتوفر IPv6 على الجهاز نسقط إلى مقبس v4 عادي.
+        // A DualMode socket connects to a v4 address through its mapped form; if IPv6 is unavailable on the machine we fall back to an ordinary v4 socket.
         try
         {
             var dual = new Socket(AddressFamily.InterNetworkV6, SocketType.Stream, ProtocolType.Tcp) { DualMode = true };

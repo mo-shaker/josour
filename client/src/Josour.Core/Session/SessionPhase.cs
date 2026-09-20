@@ -1,13 +1,13 @@
 namespace Josour.Core.Session;
 
-/// <summary>حالة الجلسة من منظور العميل. الخادم مرجع الحالة؛ هذه انعكاسها المحلي في التطبيق.</summary>
+/// <summary>The session's state from the client's point of view. The server is the authority on state; this is its local reflection in the application.</summary>
 public enum SessionPhase
 {
     Idle,
-    RequestPending,     // أرسلنا request.create وننتظر request.result (Guest) / وصلنا request.incoming (Host)
-    Preparing,          // وصل session.created: توليد الشهادة وفتح المستمع وإرسال session.endpoint
-    Connecting,         // وصل session.peer_endpoint: الاتصال بالمرشحين
-    Active,             // وصل session.active
-    Ending,             // بدأ التنظيف
+    RequestPending,     // we sent request.create and are waiting for request.result (guest) / request.incoming arrived (host)
+    Preparing,          // session.created arrived: generating the certificate, opening the listener and sending session.endpoint
+    Connecting,         // session.peer_endpoint arrived: connecting to the candidates
+    Active,             // session.active arrived
+    Ending,             // the cleanup began
     Ended
 }

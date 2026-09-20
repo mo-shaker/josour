@@ -6,12 +6,12 @@ using Josour.Tunnel;
 namespace Josour.Proxy;
 
 /// <summary>
-/// جانب Guest من <see cref="TunnelSession"/>: يبني <see cref="ConnectProxyServer"/> فوق الـ Mux ويكشف منفذه ورابط صفحة
-/// الفحص وإشارة الوصول إليها. الجلسة تكشف هذه الثلاثة للتطبيق في <c>Proxy</c> و<c>ProbeSeen</c> ليشغّل المتصفح ويكشف
+/// The guest's side of <see cref="TunnelSession"/>: it builds a <see cref="ConnectProxyServer"/> over the mux and exposes its port, the check page's URL
+/// and the signal that it was reached. The session exposes those three to the application in <c>Proxy</c> and <c>ProbeSeen</c> so it can launch the browser and detect
 /// <c>browser_not_proxied</c>.
 ///
-/// لماذا مصنع: <c>Josour.Proxy</c> يعتمد على <c>Josour.Tunnel</c> (الـ Mux)، فلا يمكن للاتجاه أن ينعكس.
-/// المسار C يمرر <c>ProxyTunnelAdapter.Create</c>، أو <c>ctx =&gt; ProxyTunnelAdapter.Create(ctx, browser)</c> ليفعّل فحص PID المالك.
+/// Why a factory: <c>Josour.Proxy</c> depends on <c>Josour.Tunnel</c> (the mux), so the direction cannot be reversed.
+/// Track C passes <c>ProxyTunnelAdapter.Create</c>, or <c>ctx =&gt; ProxyTunnelAdapter.Create(ctx, browser)</c> to enable the owning-PID check.
 /// </summary>
 public sealed class ProxyTunnelAdapter : ITunnelProxy
 {
@@ -36,18 +36,18 @@ public sealed class ProxyTunnelAdapter : ITunnelProxy
         ["via_system_proxy"] = _server.Counters.ViaSystemProxy,
     };
 
-    /// <summary>الاستعمال الإنتاجي بلا فحص مالك: <c>GuestProxy = ProxyTunnelAdapter.Create</c>.</summary>
+    /// <summary>The production use with no owner check: <c>GuestProxy = ProxyTunnelAdapter.Create</c>.</summary>
     public static ITunnelProxy Create(TunnelProxyContext context) => Create(context, null);
 
-    /// <param name="browser">جلسة المتصفح لفحص PID المالك؛ null = كل اتصال محلي مقبول (اختبارات وأداة Spike).</param>
-    /// <param name="ownerPidChecker">فاحص PID مخصّص؛ null = الافتراضي.</param>
+    /// <param name="browser">The browser session for the owning-PID check; null = every local connection is accepted (the tests and the Spike tool).</param>
+    /// <param name="ownerPidChecker">A custom PID checker; null = the default.</param>
     /// <param name="addressBlocker">
-    /// استبدال فحص حظر العناوين على المسار المباشر؛ لاختبارات داخل العملية فقط (للسماح بـ 127.0.0.1).
-    /// null = سياسة <c>IpRangePolicy</c> (نظير <c>EgressTunnelAdapter.Create</c> على المضيف).
+    /// Replacing the address-blocking check on the direct path; for in-process tests only (to permit 127.0.0.1).
+    /// null = the <c>IpRangePolicy</c> policy (the counterpart of <c>EgressTunnelAdapter.Create</c> on the host).
     /// </param>
     /// <param name="systemProxy">
-    /// Proxy النظام للمسار المباشر (الخطة 8.5). null = إعدادات الجهاز الحقيقية.
-    /// الاختبارات داخل العملية تمرر <see cref="NoSystemProxy.Instance"/> كي لا تتأثر بإعدادات جهاز المطوّر.
+    /// The system proxy for the direct path (plan 8.5). null = the machine's real settings.
+    /// In-process tests pass <see cref="NoSystemProxy.Instance"/> so they are not affected by the developer machine's settings.
     /// </param>
     public static ITunnelProxy Create(
         TunnelProxyContext context,
@@ -84,7 +84,7 @@ public sealed class ProxyTunnelAdapter : ITunnelProxy
     /// </summary>
     private static IOwnerPidChecker DefaultOwnerPidChecker() => OwnerPidCheckers.ForCurrentPlatform();
 
-    /// <summary>الخادم الأصلي (العدّادات التفصيلية، وقت أول وصول لصفحة الفحص).</summary>
+    /// <summary>The underlying server (the detailed counters, and when the check page was first reached).</summary>
     public ConnectProxyServer Server => _server;
 
     public int Port => _server.Port;
@@ -104,6 +104,6 @@ public sealed class ProxyTunnelAdapter : ITunnelProxy
 
     private void OnProbeHit(DateTimeOffset _)
     {
-        try { ProbeSeen?.Invoke(); } catch { /* المستمع مسؤول عن أخطائه */ }
+        try { ProbeSeen?.Invoke(); } catch { /* the listener is responsible for its own errors */ }
     }
 }

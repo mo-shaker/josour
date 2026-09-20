@@ -5,7 +5,7 @@ namespace Josour.Infrastructure.Localization;
 /// <summary>The languages the interface ships in. Arabic is the product's language and the default.</summary>
 public enum UiLanguage
 {
-    /// <summary>العربية الفصحى المعاصرة، واتجاه القراءة من اليمين إلى اليسار.</summary>
+    /// <summary>Modern Standard Arabic, and a right-to-left reading direction.</summary>
     Arabic,
 
     /// <summary>English, left to right.</summary>

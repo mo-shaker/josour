@@ -7,9 +7,9 @@ using Josour.Core.Browser;
 namespace Josour.Browser;
 
 /// <summary>
-/// متصفح العمل (IBrowserSession): تحديد المسار والتحقق من الناشر ← كشف السياسات ← exit_type=Normal ← Job Object (KILL_ON_JOB_CLOSE)
-/// ← تشغيل بسطر أوامر الخطة 8.2 ← كشف تسليم النسخة (خروج خلال 3 ثوانٍ = InstanceHandoff). الإغلاق: WM_CLOSE لنوافذ الـ Job ثم
-/// انتظار مهذب ثم إغلاق مقبض الـ Job (قتل ما بقي). على غير Windows: LaunchAsync يعيد Failure=Other برسالة واضحة.
+/// The work browser (IBrowserSession): locating the path and verifying the publisher -> detecting policies -> exit_type=Normal -> a Job Object (KILL_ON_JOB_CLOSE)
+/// -> launching with plan 8.2's command line -> detecting a handoff (exiting within 3 seconds = InstanceHandoff). The close: WM_CLOSE to the job's windows, then
+/// a polite wait, then closing the job's handle (killing whatever is left). Off Windows: LaunchAsync returns Failure=Other with a clear message.
 /// </summary>
 public sealed class BrowserLauncher : IBrowserSession
 {
@@ -119,7 +119,7 @@ public sealed class BrowserLauncher : IBrowserSession
             return new BrowserLaunchResult(false, BrowserLaunchFailure.Other, $"launch failed: {e.GetType().Name}: {e.Message}");
         }
 
-        // تسليم النسخة: إن كانت نسخة أخرى تستخدم Profile نفسه، العملية الجديدة تسلّمها الرابط وتخرج خلال لحظات.
+        // A handoff: if another instance is using the same profile, the new process hands it the link and exits within moments.
         try
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -129,7 +129,7 @@ public sealed class BrowserLauncher : IBrowserSession
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            // ما زالت تعمل بعد نافذة التسليم: تشغيل ناجح
+            // Still running after the handoff window: a successful launch
         }
         if (InstanceHandoff && LivePids().Count == 0)
         {
@@ -161,7 +161,7 @@ public sealed class BrowserLauncher : IBrowserSession
         catch (OperationCanceledException) { }
         finally
         {
-            job?.Dispose(); // KILL_ON_JOB_CLOSE يقتل ما بقي
+            job?.Dispose(); // KILL_ON_JOB_CLOSE kills whatever is left
             try { if (!process.HasExited) process.Kill(true); } catch { }
             process.Dispose();
             lock (_gate)

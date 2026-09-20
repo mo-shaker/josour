@@ -257,7 +257,7 @@ async def test_revoking_a_device_drops_its_control_channel(
 async def test_a_flood_of_frames_is_rate_limited_without_dropping_the_connection(
     ws_connect: WsFactory, make_actor: ActorFactory
 ) -> None:
-    """Product document section 14 ("تحديد معدل الطلبات"): authentication is not a licence to
+    """Product document section 14 ("Rate limiting"): authentication is not a licence to
     spin the single worker's loop. The budget is per connection and answers ``rate_limited``
     (docs/ws-protocol.md section 2); it must never disconnect a client."""
     from app.ws.connection_manager import FRAME_BUDGET

@@ -11,19 +11,19 @@ using Josour.Tunnel.Transport;
 namespace Josour.Tunnel;
 
 /// <summary>
-/// تنفيذ <see cref="ITunnelSession"/> للدورين معًا: يجمع القطع الموجودة (الشهادة، المستمع، جامع المرشحين، الموصّل المتماثل،
-/// الـ Mux، سياسة الخروج على المضيف، الـ Proxy على Guest) في كائن واحد يملك دورة الحياة وترتيب التنظيف.
+/// The <see cref="ITunnelSession"/> implementation for both roles: it gathers the existing pieces (the certificate, the listener, the candidate gatherer,
+/// the symmetric connector, the mux, the egress policy on the host, the proxy on the guest) into one object that owns the lifecycle and the cleanup order.
 ///
-/// دورة الحياة (docs/protocol.md القسمان 2 و7):
-///   PrepareAsync → Listening (شهادة + مستمع + مرشحون؛ ما يُرسل في session.endpoint)
-///   ConnectAsync → Connecting → Authenticating → Connected (Mux + الطرف الخاص بالدور)
-///   موت النفق  → حدث Died بسبب مقترح (لا يُرفع أبدًا لإغلاق نظيف)
-///   EndAsync    → Ended (ترتيب التنظيف الست خطوات، آمن من أي حالة ومن التكرار)
+/// The lifecycle (docs/protocol.md sections 2 and 7):
+///   PrepareAsync -> Listening (a certificate + a listener + candidates; what is sent in session.endpoint)
+///   ConnectAsync -> Connecting -> Authenticating -> Connected (the mux + the role-specific end)
+///   the tunnel dying -> a Died event with a suggested reason (never raised for a clean close)
+///   EndAsync     -> Ended (the six-step cleanup order, safe from any state and safe to repeat)
 ///
-/// ما يبقى على التطبيق (المسار C): تشغيل المتصفح وإغلاقه (عبر <see cref="TunnelSessionOptions.CloseBrowserAsync"/>)،
-/// وكل رسائل الخادم (session.endpoint / connected / connect_failed / stats / end).
+/// What stays with the application (track C): launching and closing the browser (through <see cref="TunnelSessionOptions.CloseBrowserAsync"/>),
+/// and every server message (session.endpoint / connected / connect_failed / stats / end).
 ///
-/// ملكية الأسرار: الجلسة تملك <c>material.Secret</c> وتمسحه في الخطوة 5 من التنظيف.
+/// Ownership of the secrets: the session owns <c>material.Secret</c> and wipes it in step 5 of the cleanup.
 /// </summary>
 public sealed class TunnelSession : ITunnelSession
 {
@@ -74,22 +74,22 @@ public sealed class TunnelSession : ITunnelSession
 
     public IReadOnlyDictionary<string, long>? ProxyCounters => _proxy?.Counters;
 
-    /// <summary>وقت أول وصول لصفحة الفحص (للمشتركين المتأخرين على <see cref="ProbeSeen"/>).</summary>
+    /// <summary>When the check page first arrived (for late subscribers to <see cref="ProbeSeen"/>).</summary>
     public DateTimeOffset? ProbeSeenAt { get; private set; }
 
-    /// <summary>تشخيص جمع المرشحين لبوابة قرار Relay (ADR-0003). null قبل PrepareAsync.</summary>
+    /// <summary>The candidate-gathering diagnostics for the relay decision gate (ADR-0003). null before PrepareAsync.</summary>
     public GatherDiagnostics? GatherDiagnostics { get; private set; }
 
-    /// <summary>منفذ الاستماع الذي يُرسل في host.available.listen_port. صفر قبل PrepareAsync أو بعد التنظيف.</summary>
+    /// <summary>The listening port sent in host.available.listen_port. Zero before PrepareAsync or after the cleanup.</summary>
     public int ListenPort => _listener?.Port ?? 0;
 
-    /// <summary>بصمة شهادة هذه الجلسة (نفس ما في LocalEndpointInfo). null قبل PrepareAsync.</summary>
+    /// <summary>This session's certificate fingerprint (the same as in LocalEndpointInfo). null before PrepareAsync.</summary>
     public string? CertificateFingerprintHex => _local?.CertFingerprintSha256Hex;
 
-    /// <summary>هل حُذفت الشهادة (خطوة التنظيف 5)؟ true قبل الإنشاء أيضًا.</summary>
+    /// <summary>Has the certificate been deleted (cleanup step 5)? true before it is created, too.</summary>
     public bool CertificateDisposed => _certificate?.IsDisposed ?? true;
 
-    /// <summary>هل الـ Mux مغلق (خطوة التنظيف 3)؟ true قبل الاتصال أيضًا.</summary>
+    /// <summary>Is the mux closed (cleanup step 3)? true before connecting, too.</summary>
     public bool MuxClosed => _mux?.IsClosed ?? true;
 
     public TunnelStats Stats => State == TunnelState.Ended ? _finalStats : SnapshotStats();
@@ -105,8 +105,8 @@ public sealed class TunnelSession : ITunnelSession
     // ---------- 1. PrepareAsync ----------
 
     /// <summary>
-    /// docs/protocol.md القسم 2 الخطوة 1: شهادة الجلسة + مستمع TCP + تعيين UPnP + جمع المرشحين.
-    /// عديم الأثر عند التكرار (يعيد النتيجة نفسها). ينقل الحالة إلى Listening.
+    /// docs/protocol.md section 2 step 1: the session certificate + a TCP listener + the UPnP mapping + gathering the candidates.
+    /// Idempotent (it returns the same result). It moves the state to Listening.
     /// </summary>
     public async Task<LocalEndpointInfo> PrepareAsync(CancellationToken ct)
     {
@@ -156,9 +156,9 @@ public sealed class TunnelSession : ITunnelSession
     // ---------- 2. ConnectAsync ----------
 
     /// <summary>
-    /// docs/protocol.md القسم 2 الخطوات 3-6 عبر <see cref="SymmetricConnector"/>، ثم الـ Mux والطرف الخاص بالدور:
-    /// المضيف يربط سياسة الخروج بـ acceptor، وGuest يشغّل الـ Proxy المحلي ويكشف منفذه ورابط صفحة الفحص.
-    /// عند الفشل تبقى الحالة Connecting (المستمع أُغلق) ويعيد النتيجة بسبب الفشل مع تشخيص كل مرشح في <see cref="Diagnostics"/>.
+    /// docs/protocol.md section 2 steps 3-6 through <see cref="SymmetricConnector"/>, then the mux and the role-specific end:
+    /// the host wires the egress policy to an acceptor, and the guest starts the local proxy and exposes its port and the check page's URL.
+    /// On failure the state stays Connecting (the listener was closed) and it returns the result with the failure's reason, with each candidate's diagnostics in <see cref="Diagnostics"/>.
     /// </summary>
     public async Task<TunnelConnectResult> ConnectAsync(PeerEndpointInfo peer, TimeSpan timeout, CancellationToken ct)
     {
@@ -189,7 +189,7 @@ public sealed class TunnelSession : ITunnelSession
         }
 
         Note("connect", outcome.Diagnostics);
-        NoteUnauthenticatedProbes(); // المستمع أُغلق الآن، فالعدّ نهائي حتى لو فشل الاتصال
+        NoteUnauthenticatedProbes(); // the listener is closed now, so the count is final even if the connection failed
         if (!outcome.Result.Connected || outcome.Connection is null) return outcome.Result;
 
         await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
@@ -197,19 +197,19 @@ public sealed class TunnelSession : ITunnelSession
         {
             if (_endTask is not null)
             {
-                // انتهت الجلسة بينما كان الاتصال جاريًا: لا نبني نفقًا فوق ما سيُغلق فورًا.
+                // The session ended while the connection was under way: we do not build a tunnel over what will close at once.
                 await SafeDisposeAsync(outcome.Connection).ConfigureAwait(false);
                 return new TunnelConnectResult(false, null, outcome.Result.ConnectMs, outcome.Result.TlsVersion, "session_ended");
             }
 
-            // docs/protocol.md القسم 5: النافذة تُشتق من الـ RTT المقيس عند الاتصال، وهذا أول موضع يعرفه
-            // (SymmetricConnector عاد للتو). كل طرف يشتق من قياسه هو — نافذة الاستقبال خاصية المستقبل
-            // وتُعلَن لكل قناة في بروتوكول Nerdbank 3، فلا حاجة إلى اتفاق على السلك (انظر MuxWindow).
+            // docs/protocol.md section 5: the window is derived from the RTT measured at connect time, and this is the first place that knows it
+            // (SymmetricConnector has just returned). Each side derives from its own measurement — the receiving window is the receiver's property
+            // and is announced per channel in Nerdbank protocol 3, so no agreement on the wire is needed (see MuxWindow).
             var muxOptions = _options.Mux ?? new MuxOptions();
             var window = muxOptions.Resolve(MuxWindow.ForRoundTrip(TimeSpan.FromMilliseconds(outcome.Result.ConnectMs)));
             Note("mux_window", window.ReceiveWindow);
             Note("mux_max_streams", window.MaxConcurrentStreams);
-            Note("mux_window_reason", window.Reason); // لماذا هذه الشريحة، وسبب الملاذ عند قياس فاسد
+            Note("mux_window_reason", window.Reason); // why this band, and the fallback's reason when the measurement is corrupt
             var mux = NerdbankMux.Create(outcome.Connection.Stream, _material.Role, muxOptions, window);
             try
             {
@@ -253,11 +253,11 @@ public sealed class TunnelSession : ITunnelSession
     }
 
     /// <summary>
-    /// يبني مسار الـ Relay من <c>session.created.relay</c>، أو null إن لم يُضبط Relay في النشر.
+    /// Builds the relay path from <c>session.created.relay</c>, or null if no relay is configured in the deployment.
     /// <para>
-    /// مهلة المصافحة هنا هي نافذة الاتصال كاملة لا الخمس ثوانٍ الافتراضية: رد الـ Relay هو
-    /// <c>paired</c>، وهو لا يصل حتى يصل <b>النظير أيضًا</b> — وقد يتأخر بقدر النافذة. خمس ثوانٍ كانت
-    /// ستُسقط كل جلسة لا يبدأ طرفاها في اللحظة نفسها، وهو الحال الطبيعي لا الاستثناء.
+    /// The handshake timeout here is the whole connect window rather than the default five seconds: the relay's reply is
+    /// <c>paired</c>, and it does not arrive until <b>the peer arrives too</b> — which may be as late as the window allows. Five seconds would
+    /// have dropped every session whose two sides do not start in the same instant, which is the normal case rather than the exception.
     /// </para>
     /// </summary>
     private RelayLeg? BuildRelayLeg(TimeSpan connectWindow)
@@ -269,19 +269,19 @@ public sealed class TunnelSession : ITunnelSession
             Role = _material.Role,
             TokenProvider = _ => ValueTask.FromResult(relay.Token),
             HandshakeTimeout = connectWindow,
-            // RELAY_HOST هو اسم مضيف بحكم التصميم، وDirectTransport يرفض غير العناوين الحرفية عمدًا
-            // (المرشحون يأتون من النظير؛ هذا العنوان يأتي من خادمنا). انظر ResolvingTransport.
+            // RELAY_HOST is a hostname by design, and DirectTransport deliberately refuses anything but address literals
+            // (the candidates come from the peer; this address comes from our own server). See ResolvingTransport.
             Inner = new ResolvingTransport(),
         });
-        Note("relay_endpoint", $"{relay.Address}:{relay.Port}"); // التوكن لا يُسجَّل
+        Note("relay_endpoint", $"{relay.Address}:{relay.Port}"); // the token is not logged
         return new RelayLeg(transport, new CandidateEndpoint(CandidateType.Relay, relay.Address, relay.Port));
     }
 
-    // ---------- 3. الحيوية والموت ----------
+    // ---------- 3. Liveness and death ----------
 
     /// <summary>
-    /// <c>Completion</c> يفشل = نفق ميت (EOF بلا GOAWAY أو انتهاء مهلة PONG بعد إصلاحَي الأسبوع 2)؛ اكتماله بلا خطأ
-    /// إغلاق نظيف لا يُبلَّغ عنه. الحدث يُرفع مرة واحدة ولا يُرفع أثناء EndAsync.
+    /// <c>Completion</c> failing = a dead tunnel (EOF with no GOAWAY, or the PONG timeout, after week two's two fixes); it completing with no error
+    /// is a clean close that is not reported. The event is raised once, and is not raised during EndAsync.
     /// </summary>
     private async Task WatchAsync(NerdbankMux mux)
     {
@@ -302,7 +302,7 @@ public sealed class TunnelSession : ITunnelSession
     {
         GoAwayReason.Expired => TunnelEndReason.Expired,
         GoAwayReason.ProtocolError => TunnelEndReason.ProtocolError,
-        // لا GOAWAY: الطرف الآخر اختفى. الخادم يسمي ذلك بحسب من اختفى (docs/ws-protocol.md القسم 5).
+        // No GOAWAY: the other side vanished. The server names it after whoever vanished (docs/ws-protocol.md section 5).
         _ => _material.Role == TunnelRole.Host ? TunnelEndReason.GuestDisconnected : TunnelEndReason.HostDisconnected,
     };
 
@@ -311,7 +311,7 @@ public sealed class TunnelSession : ITunnelSession
         if (Volatile.Read(ref _ending) != 0) return;
         if (Interlocked.Exchange(ref _diedRaised, 1) != 0) return;
         Note("died_reason", reason.ToString());
-        try { Died?.Invoke(reason); } catch { /* المستمع مسؤول عن أخطائه */ }
+        try { Died?.Invoke(reason); } catch { /* the listener is responsible for its own errors */ }
     }
 
     private void OnProbeSeen()
@@ -319,14 +319,14 @@ public sealed class TunnelSession : ITunnelSession
         if (Interlocked.Exchange(ref _probeRaised, 1) != 0) return;
         ProbeSeenAt = DateTimeOffset.UtcNow;
         Note("probe_seen_at", ProbeSeenAt.Value.ToString("O"));
-        try { ProbeSeen?.Invoke(); } catch { /* المستمع مسؤول عن أخطائه */ }
+        try { ProbeSeen?.Invoke(); } catch { /* the listener is responsible for its own errors */ }
     }
 
     // ---------- 4. EndAsync ----------
 
     /// <summary>
-    /// ترتيب التنظيف في docs/protocol.md القسم 7 حرفيًا. آمن من أي حالة (حتى Idle) ومن التكرار: الاستدعاء الثاني
-    /// ينتظر الأول نفسه. لا يرمي أبدًا؛ أخطاء كل خطوة تُسجَّل في <see cref="Diagnostics"/> ولا توقف ما بعدها.
+    /// The cleanup order in docs/protocol.md section 7, literally. Safe from any state (even Idle) and safe to repeat: a second call
+    /// waits on the first one itself. It never throws; each step's errors are recorded in <see cref="Diagnostics"/> and do not stop what follows.
     /// </summary>
     public Task EndAsync(TunnelEndReason reason, CancellationToken ct)
     {
@@ -334,8 +334,8 @@ public sealed class TunnelSession : ITunnelSession
         {
             if (_endTask is null)
             {
-                Volatile.Write(ref _ending, 1); // فورًا: أي انقطاع من الآن متوقَّع ولا يُرفع كموت
-                // خارج القفل حتى لا ينفَّذ أي خطاف (المتصفح، StateChanged) وهو محتجَز.
+                Volatile.Write(ref _ending, 1); // at once: any drop from now on is expected and is not raised as a death
+                // Outside the lock, so no hook (the browser, StateChanged) runs while it is held.
                 _endTask = Task.Run(() => EndCoreAsync(reason, ct));
             }
             return _endTask;
@@ -344,9 +344,9 @@ public sealed class TunnelSession : ITunnelSession
 
     private async Task EndCoreAsync(TunnelEndReason reason, CancellationToken ct)
     {
-        Volatile.Write(ref _ending, 1); // من هنا فصاعدًا كل انقطاع متوقَّع: لا حدث Died
+        Volatile.Write(ref _ending, 1); // from here on every drop is expected: no Died event
         Note("end_reason", reason.ToString());
-        // ننتظر أي تجهيز أو ربط جارٍ حتى لا نهدم قطعة قيد الإنشاء (ConnectAsync يفحص _endTask تحت البوابة نفسها).
+        // We wait for any preparation or wiring under way so we do not tear down a piece still being built (ConnectAsync checks _endTask under the same gate).
         await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
         {
@@ -359,20 +359,20 @@ public sealed class TunnelSession : ITunnelSession
 
         if (_deathWatch is { } watch)
         {
-            try { await watch.ConfigureAwait(false); } catch { /* الحارس يبتلع أخطاءه */ }
+            try { await watch.ConfigureAwait(false); } catch { /* the watcher swallows its own errors */ }
         }
     }
 
     private async Task CleanupAsync(TunnelEndReason reason, CancellationToken ct)
     {
-        // 1) الـ Proxy يتوقف عن قبول اتصالات جديدة.
+        // 1) The proxy stops accepting new connections.
         Try("proxy_stop_accepting", () => _proxy?.StopAccepting());
 
-        // 2) إغلاق المتصفح: ملك التطبيق، ينفذه هنا عبر الخطاف ليبقى في موضعه من الترتيب.
+        // 2) Closing the browser: the application's own, carried out here through the hook so it stays in its place in the order.
         if (_options.CloseBrowserAsync is { } closeBrowser)
             await TryAsync("browser_close", () => closeBrowser(ct)).ConfigureAwait(false);
 
-        // 3) GOAWAY(session_end) وإغلاق النفق، ثم إيقاف الـ Proxy كاملًا (لا وجهة لاتصالاته بعد إغلاق النفق).
+        // 3) GOAWAY(session_end) and closing the tunnel, then stopping the proxy entirely (its connections have no destination once the tunnel is closed).
         if (_mux is { } mux)
         {
             await TryAsync("mux_goaway", () => mux.CloseAsync(GoAwayFor(reason))).ConfigureAwait(false);
@@ -385,13 +385,13 @@ public sealed class TunnelSession : ITunnelSession
             await TryAsync("proxy_dispose", () => proxy.DisposeAsync().AsTask()).ConfigureAwait(false);
         }
 
-        // الإحصاءات النهائية تُلتقط قبل التخلص من عدّادات الخروج.
+        // The final statistics are captured before the egress counters are disposed.
         _finalStats = SnapshotStats() with { OpenStreams = 0 };
         _finalDomains = _egress?.Domains ?? Array.Empty<string>();
         if (_egress is { } egress) await TryAsync("egress_dispose", () => egress.DisposeAsync().AsTask()).ConfigureAwait(false);
 
-        // 4) إغلاق المستمع وإزالة تعيين UPnP.
-        NoteUnauthenticatedProbes(); // آخر فرصة: جلسة انتهت قبل ConnectAsync لها مستمع عمل ورأى ما رآه
+        // 4) Closing the listener and removing the UPnP mapping.
+        NoteUnauthenticatedProbes(); // the last chance: a session that ended before ConnectAsync still had a listener that ran and saw what it saw
         if (_listener is { } listener) await TryAsync("listener_dispose", () => listener.DisposeAsync().AsTask()).ConfigureAwait(false);
         if (_candidateSource is { } source)
         {
@@ -404,11 +404,11 @@ public sealed class TunnelSession : ITunnelSession
             await TryAsync("candidate_source_dispose", () => source.DisposeAsync().AsTask()).ConfigureAwait(false);
         }
 
-        // 5) Dispose للشهادة ومسح السر.
+        // 5) Disposing the certificate and wiping the secret.
         Try("certificate_dispose", () => _certificate?.Dispose());
         CryptographicOperations.ZeroMemory(_material.Secret);
 
-        // 6) الإحصاءات والنطاقات جاهزة لـ session.end (يرسلها التطبيق).
+        // 6) The statistics and the domains are ready for session.end (the application sends it).
         Note("final_bytes_up", _finalStats.BytesUp);
         Note("final_bytes_down", _finalStats.BytesDown);
         Note("final_domains", _finalDomains.Count);
@@ -430,7 +430,7 @@ public sealed class TunnelSession : ITunnelSession
     private TunnelStats SnapshotStats()
     {
         var muxStats = _mux?.Stats ?? default;
-        // المضيف يبلّغ حمولة المواقع (ما يريده الخادم في session.stats)؛ Guest لا عدّاد له فيبلّغ بايتات النقل.
+        // The host reports the sites' payload (what the server wants in session.stats); the guest has no counter of its own, so it reports the transport's bytes.
         if (_material.Role == TunnelRole.Host && _egress is { } egress)
             return new TunnelStats(egress.BytesUp, egress.BytesDown, muxStats.OpenStreams);
         return new TunnelStats(muxStats.BytesUp, muxStats.BytesDown, muxStats.OpenStreams);
@@ -469,15 +469,15 @@ public sealed class TunnelSession : ITunnelSession
         var previous = (TunnelState)Interlocked.Exchange(ref _state, (int)next);
         if (previous == next) return;
         Note("state", next.ToString());
-        try { StateChanged?.Invoke(next); } catch { /* المستمع مسؤول عن أخطائه */ }
+        try { StateChanged?.Invoke(next); } catch { /* the listener is responsible for its own errors */ }
     }
 
     /// <summary>
-    /// محاولات الوصول غير المصرَّح بها على مستمع النفق، بالمفاتيح المحجوزة في <c>docs/api.md</c> (‏<c>POST /diagnostics</c>):
-    /// <c>listener_unauthenticated</c> (عدد) و<c>listener_port</c> (يُكتب في PrepareAsync) و<c>unauthenticated_peers</c>
-    /// (عناوين IP، بحد 10). يقرأها المسار C من <see cref="Diagnostics"/> كما هي ويضعها في <c>data</c> بلا تعديل.
-    /// المفتاح <c>unauthenticated_peers_distinct</c> إضافة اختيارية: كم عنوانًا مميزًا رُئي فعلًا قبل حد العشرة.
-    /// لا حمولات ولا منافذ مصدر ولا أوقات — عدّاد وعناوين فقط.
+    /// Unauthorised access attempts on the tunnel's listener, under the keys reserved in <c>docs/api.md</c> (<c>POST /diagnostics</c>):
+    /// <c>listener_unauthenticated</c> (a count), <c>listener_port</c> (written in PrepareAsync) and <c>unauthenticated_peers</c>
+    /// (IP addresses, capped at 10). Track C reads them from <see cref="Diagnostics"/> as they are and puts them in <c>data</c> unchanged.
+    /// The key <c>unauthenticated_peers_distinct</c> is an optional addition: how many distinct addresses were actually seen before the cap of ten.
+    /// No payloads, no source ports and no timestamps — a counter and addresses only.
     /// </summary>
     private void NoteUnauthenticatedProbes()
     {
@@ -507,7 +507,7 @@ public sealed class TunnelSession : ITunnelSession
 
     private static async ValueTask SafeDisposeAsync(IAsyncDisposable disposable)
     {
-        try { await disposable.DisposeAsync().ConfigureAwait(false); } catch { /* تجاهل أثناء التراجع */ }
+        try { await disposable.DisposeAsync().ConfigureAwait(false); } catch { /* ignore while unwinding */ }
     }
 
     private static List<Dictionary<string, object?>> DescribeCandidates(IReadOnlyList<CandidateEndpoint> candidates)
@@ -518,7 +518,7 @@ public sealed class TunnelSession : ITunnelSession
             ["port"] = c.Port,
         }).ToList();
 
-    // لا أسرار ولا حمولات في النصوص؛ الوصف نوع الخطأ ورسالته فقط.
+    // No secrets and no payloads in the text; the description is the exception's type and message only.
     private static string Describe(Exception e) => e switch
     {
         TimeoutException => "timeout",

@@ -4,8 +4,8 @@ using System.Net.Sockets;
 namespace Josour.Core.Net;
 
 /// <summary>
-/// العناوين المحظورة للخروج من المضيف (docs/protocol.md القسم 6 القاعدة 6). دالة نقية بلا I/O.
-/// عناوين IPv6 المغلِّفة لـ IPv4 (::ffff:0:0/96، 64:ff9b::/96، 2002::/16، 2001::/32 Teredo) تُفك ويُفحص العنوان المضمَّن.
+/// The addresses blocked for egress from the host (docs/protocol.md section 6 rule 6). A pure function with no I/O.
+/// IPv6 addresses that wrap IPv4 (::ffff:0:0/96, 64:ff9b::/96, 2002::/16, 2001::/32 Teredo) are unwrapped and the embedded address is checked.
 /// </summary>
 public static class IpRangePolicy
 {
@@ -26,7 +26,7 @@ public static class IpRangePolicy
 
     private static (byte[] Prefix, int Bits) P(string address, int bits) => (IPAddress.Parse(address).GetAddressBytes(), bits);
 
-    /// <summary>هل العنوان ضمن النطاقات المحظورة (بعد فك التغليف) أو يساوي أحد عناوين المضيف نفسه؟</summary>
+    /// <summary>Is the address inside the blocked ranges (after unwrapping), or equal to one of the host's own addresses?</summary>
     public static bool IsBlocked(IPAddress address, IEnumerable<IPAddress>? localAddresses = null)
     {
         ArgumentNullException.ThrowIfNull(address);
@@ -44,7 +44,7 @@ public static class IpRangePolicy
         return false;
     }
 
-    /// <summary>فحص النطاقات فقط (بلا عناوين المضيف).</summary>
+    /// <summary>The ranges only (without the host's own addresses).</summary>
     public static bool IsBlockedRange(IPAddress address)
     {
         ArgumentNullException.ThrowIfNull(address);
@@ -68,17 +68,17 @@ public static class IpRangePolicy
                 return embedded is not null && IsBlockedRange(embedded);
             }
             default:
-                return true; // عائلات أخرى لا تُطلب أبدًا
+                return true; // other families are never requested
         }
     }
 
     /// <summary>
-    /// يعيد IPv4 المضمَّن في عنوان IPv6 مغلِّف، أو null:
-    /// ::ffff:a.b.c.d (آخر 32 بت)، ::a.b.c.d المهجور (RFC 4291 §2.5.5.1، آخر 32 بت)، 64:ff9b::/96 (آخر 32 بت)،
-    /// 2002::/16 (البتات 16-47)، 2001::/32 Teredo (آخر 32 بت XOR 0xFFFFFFFF).
+    /// Returns the IPv4 embedded in a wrapping IPv6 address, or null:
+    /// ::ffff:a.b.c.d (the last 32 bits), the deprecated ::a.b.c.d (RFC 4291 §2.5.5.1, the last 32 bits), 64:ff9b::/96 (the last 32 bits),
+    /// 2002::/16 (bits 16-47), 2001::/32 Teredo (the last 32 bits XOR 0xFFFFFFFF).
     /// <para>
-    /// <c>::</c> و<c>::1</c> مستثنيان من فك <c>::/96</c> لأنهما محظوران أصلًا بقاعدتيهما الصريحتين، ولأن فكّهما
-    /// إلى <c>0.0.0.0</c> و<c>0.0.0.1</c> يجعلهما يطابقان عناوين محلية بلا معنى.
+    /// <c>::</c> and <c>::1</c> are excluded from the <c>::/96</c> unwrapping because they are already blocked by their own explicit
+    /// rules, and because unwrapping them to <c>0.0.0.0</c> and <c>0.0.0.1</c> would make them match local addresses meaninglessly.
     /// </para>
     /// </summary>
     public static IPAddress? ExtractEmbeddedIPv4(IPAddress address)
@@ -90,7 +90,7 @@ public static class IpRangePolicy
 
         if (address.IsIPv4MappedToIPv6) return new IPAddress(b[12..16]);
         if (Matches(b, Nat64Prefix, 96)) return new IPAddress(b[12..16]);
-        // ::a.b.c.d المهجور: مهجور لا يعني غير قابل للطلب — محلل DNS خبيث قد يعيده ليتجاوز فحص v4.
+        // The deprecated ::a.b.c.d: deprecated does not mean unrequestable — a malicious DNS resolver could return it to get past the v4 check.
         if (Matches(b, IPv4CompatiblePrefix, 96) && !(b[12] == 0 && b[13] == 0 && b[14] == 0 && b[15] <= 1))
             return new IPAddress(b[12..16]);
         if (b[0] == 0x20 && b[1] == 0x02) return new IPAddress(b[2..6]);
@@ -103,7 +103,7 @@ public static class IpRangePolicy
         return null;
     }
 
-    /// <summary>هل الاسم عنوان IP حرفي (v4 أو v6، ولو بين أقواس مربعة)؟</summary>
+    /// <summary>Is the name an IP address literal (v4 or v6, even in square brackets)?</summary>
     public static bool IsIpLiteral(string? host)
     {
         if (string.IsNullOrWhiteSpace(host)) return false;

@@ -3,7 +3,7 @@ using System.Runtime.Versioning;
 
 namespace Josour.Browser.Native;
 
-/// <summary>WINDOWS-ONLY: WM_CLOSE إلى كل نافذة علوية مرئية تملكها عمليات معيّنة (الإغلاق المهذب قبل قتل الـ Job).</summary>
+/// <summary>WINDOWS-ONLY: WM_CLOSE to every visible top-level window owned by the given processes (the polite close before killing the job).</summary>
 [SupportedOSPlatform("windows")]
 public static class WindowCloser
 {
@@ -11,7 +11,7 @@ public static class WindowCloser
 
     private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
-    /// <summary>يعيد عدد النوافذ التي أُرسل إليها WM_CLOSE.</summary>
+    /// <summary>Returns the number of windows WM_CLOSE was posted to.</summary>
     public static int PostCloseToWindowsOf(IReadOnlySet<int> pids)
     {
         ArgumentNullException.ThrowIfNull(pids);
@@ -22,12 +22,12 @@ public static class WindowCloser
             try
             {
                 if (!IsWindowVisible(hWnd)) return true;
-                if (GetWindow(hWnd, 4 /* GW_OWNER */) != IntPtr.Zero) return true; // نوافذ مملوكة (قوائم/أدوات) تُغلق مع مالكها
+                if (GetWindow(hWnd, 4 /* GW_OWNER */) != IntPtr.Zero) return true; // owned windows (menus/tools) close with their owner
                 var threadId = GetWindowThreadProcessId(hWnd, out var pid);
                 if (threadId == 0) return true;
                 if (pids.Contains(unchecked((int)pid)) && PostMessage(hWnd, WmClose, IntPtr.Zero, IntPtr.Zero)) posted++;
             }
-            catch { /* نافذة واحدة */ }
+            catch { /* one window */ }
             return true;
         };
         _ = EnumWindows(callback, IntPtr.Zero);

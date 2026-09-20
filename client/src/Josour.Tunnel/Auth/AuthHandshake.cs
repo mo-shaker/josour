@@ -3,21 +3,21 @@ using Josour.Core.Tunnel;
 
 namespace Josour.Tunnel.Auth;
 
-/// <summary>فشل AUTH1/AUTH2 (تحقق خاطئ، إصدار خاطئ، أو إغلاق الطرف الآخر قبل الرد). المستدعي يغلق الاتصال.</summary>
+/// <summary>AUTH1/AUTH2 failed (a wrong verification, a wrong version, or the other side closing before replying). The caller closes the connection.</summary>
 public sealed class AuthFailedException : Exception
 {
     public AuthFailedException(string message, Exception? inner = null, bool peerClosed = false) : base(message, inner)
         => PeerClosed = peerClosed;
 
     /// <summary>
-    /// الطرف الآخر أغلق أو انقطع قبل أن تكتمل الرسالة، لا أن رسالته فشلت في التحقق. الفرق ليس تجميليًا:
-    /// <b>الإغلاق بلا رد هو ما يفعله المضيف بالاتصال الخاسر</b> (docs/protocol.md القسم 2 الخطوة 5)، فلا يصح
-    /// عدّه محاولة وصول غير مصرَّح بها؛ أما فشل التحقق فهو أقوى دليل ممكن على العكس (طرف يعرف الشكل ولا يعرف السر).
+    /// The other side closed or dropped before the message completed, rather than its message failing verification. The difference is not cosmetic:
+    /// <b>closing with no reply is what the host does to the losing connection</b> (docs/protocol.md section 2 step 5), so it may not
+    /// be counted as an unauthorised access attempt; a verification failure, on the other hand, is the strongest evidence possible of the opposite (a party that knows the shape and not the secret).
     /// </summary>
     public bool PeerClosed { get; }
 }
 
-/// <summary>ما يحتاجه المضيف من AUTH1 لبناء AUTH2 (client_random).</summary>
+/// <summary>What the host needs from AUTH1 to build AUTH2 (client_random).</summary>
 public sealed class Auth1Result
 {
     internal Auth1Result(byte[] clientRandom) => ClientRandom = clientRandom;
@@ -25,11 +25,11 @@ public sealed class Auth1Result
 }
 
 /// <summary>
-/// المصادقة داخل TLS حسب docs/protocol.md القسم 4 بالضبط.
-/// AUTH1 (Guest → Host) 81 بايت: u8 version=1 | 16B session_id (big-endian RFC 4122) | 32B client_random | 32B mac1.
-/// AUTH2 (Host → Guest) 32 بايت: mac2.
-/// mac = HMAC-SHA256(secret, label || session_id || client_random || listener_cert_fp)، المقارنة ثابتة الزمن.
-/// المضيف لا يكتب أي بايت قبل التحقق من AUTH1. الفشل يرمي AuthFailedException بلا أي رد.
+/// Authentication inside TLS, exactly per docs/protocol.md section 4.
+/// AUTH1 (guest -> host), 81 bytes: u8 version=1 | 16B session_id (big-endian, RFC 4122) | 32B client_random | 32B mac1.
+/// AUTH2 (host -> guest), 32 bytes: mac2.
+/// mac = HMAC-SHA256(secret, label || session_id || client_random || listener_cert_fp), compared in constant time.
+/// The host writes no byte before verifying AUTH1. A failure throws AuthFailedException with no reply at all.
 /// </summary>
 public static class AuthHandshake
 {
@@ -45,12 +45,12 @@ public static class AuthHandshake
     private static ReadOnlySpan<byte> Label1 => "rb-auth1"u8;
     private static ReadOnlySpan<byte> Label2 => "rb-auth2"u8;
 
-    /// <summary>بايتات معرّف الجلسة بترتيب big-endian كما في RFC 4122 (لا ترتيب Guid.ToByteArray() الافتراضي).</summary>
+    /// <summary>The session id's bytes in big-endian order as in RFC 4122 (not Guid.ToByteArray()'s default order).</summary>
     public static byte[] SessionIdBytes(Guid sessionId) => sessionId.ToByteArray(bigEndian: true);
 
     // ---------- Guest ----------
 
-    /// <summary>جانب Guest: يرسل AUTH1 ثم ينتظر AUTH2 ويتحقق منه. listenerCertFp = بصمة شهادة من يعمل TLS Server في هذا الاتصال.</summary>
+    /// <summary>The guest's side: it sends AUTH1 then waits for AUTH2 and verifies it. listenerCertFp = the fingerprint of whoever is the TLS server in this connection.</summary>
     public static async Task SendAuth1AndVerifyAuth2Async(Stream stream, SessionMaterial material, byte[] listenerCertFp, TimeSpan timeout, CancellationToken ct)
     {
         Validate(stream, material, listenerCertFp);
@@ -85,7 +85,7 @@ public static class AuthHandshake
 
     // ---------- Host ----------
 
-    /// <summary>جانب Host: يقرأ AUTH1 ويتحقق منه دون كتابة أي بايت. يرمي AuthFailedException عند الفشل.</summary>
+    /// <summary>The host's side: it reads AUTH1 and verifies it without writing a byte. It throws AuthFailedException on failure.</summary>
     public static async Task<Auth1Result> VerifyAuth1Async(Stream stream, SessionMaterial material, byte[] listenerCertFp, TimeSpan timeout, CancellationToken ct)
     {
         Validate(stream, material, listenerCertFp);
@@ -104,7 +104,7 @@ public static class AuthHandshake
         return new Auth1Result(VerifyAuth1Bytes(auth1, material, listenerCertFp));
     }
 
-    /// <summary>التحقق المتزامن من AUTH1 (81 بايت). يعيد client_random عند النجاح.</summary>
+    /// <summary>The synchronous verification of AUTH1 (81 bytes). It returns client_random on success.</summary>
     private static byte[] VerifyAuth1Bytes(ReadOnlySpan<byte> auth1, SessionMaterial material, ReadOnlySpan<byte> listenerCertFp)
     {
         if (auth1[0] != Version) throw new AuthFailedException("AUTH1 has unsupported version");
@@ -114,7 +114,7 @@ public static class AuthHandshake
         var clientRandom = auth1.Slice(1 + SessionIdLength, RandomLength).ToArray();
         var receivedMac = auth1.Slice(1 + SessionIdLength + RandomLength, MacLength);
 
-        // المقارنة على المعرّف والـ MAC معًا ثابتة الزمن ولا تُفصح أيهما فشل.
+        // Comparing the id and the MAC together is constant time and does not reveal which one failed.
         var sessionOk = CryptographicOperations.FixedTimeEquals(sessionId, receivedSessionId);
         var expectedMac = ComputeMac(Label1, material.Secret, sessionId, clientRandom, listenerCertFp);
         var macOk = CryptographicOperations.FixedTimeEquals(expectedMac, receivedMac);
@@ -123,7 +123,7 @@ public static class AuthHandshake
         return clientRandom;
     }
 
-    /// <summary>جانب Host: يرسل AUTH2 بعد نجاح VerifyAuth1Async. يُستدعى فقط للاتصال الذي قرر المضيف إبقاءه.</summary>
+    /// <summary>The host's side: it sends AUTH2 after VerifyAuth1Async succeeds. It is called only for the connection the host decided to keep.</summary>
     public static async Task SendAuth2Async(Stream stream, SessionMaterial material, byte[] listenerCertFp, Auth1Result auth1, TimeSpan timeout, CancellationToken ct)
     {
         Validate(stream, material, listenerCertFp);
@@ -142,7 +142,7 @@ public static class AuthHandshake
         }
     }
 
-    /// <summary>جانب Host مركّبًا: تحقق من AUTH1 ثم أرسل AUTH2. المهلة تغطي الخطوتين معًا.</summary>
+    /// <summary>The host's side combined: verify AUTH1 then send AUTH2. The timeout covers both steps together.</summary>
     public static async Task VerifyAuth1AndSendAuth2Async(Stream stream, SessionMaterial material, byte[] listenerCertFp, TimeSpan timeout, CancellationToken ct)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);

@@ -1,8 +1,8 @@
 namespace Josour.Core.Tunnel;
 
 /// <summary>
-/// جلسة نفق واحدة بين الجهازين. المسار B يوفر التنفيذ في Josour.Tunnel؛ المسار C يستهلكها من التطبيق.
-/// دورة الحياة: PrepareAsync (مستمع + مرشحون) ← ConnectAsync (بعد وصول مرشحي الطرف الآخر) ← Connected ← EndAsync.
+/// One tunnel session between the two machines. Track B provides the implementation in Josour.Tunnel; track C consumes it from the application.
+/// The lifecycle: PrepareAsync (a listener + candidates) -> ConnectAsync (once the other side's candidates arrive) -> Connected -> EndAsync.
 /// </summary>
 public interface ITunnelSession : IAsyncDisposable
 {
@@ -11,49 +11,49 @@ public interface ITunnelSession : IAsyncDisposable
     TunnelState State { get; }
     event Action<TunnelState>? StateChanged;
 
-    /// <summary>يولّد الشهادة، يفتح المستمع، يطلب تعيين UPnP، ويعيد ما يُرسل في session.endpoint.</summary>
+    /// <summary>Generates the certificate, opens the listener, requests the UPnP mapping, and returns what is sent in session.endpoint.</summary>
     Task<LocalEndpointInfo> PrepareAsync(CancellationToken ct);
 
-    /// <summary>يتصل بمرشحي الطرف الآخر بالتوازي مع الاستمرار في قبول الاتصالات الواردة. ينتهي عند أول اتصال مصادَق أو انقضاء المهلة.</summary>
+    /// <summary>Connects to the other side's candidates in parallel while still accepting inbound connections. It ends at the first authenticated connection or at the timeout.</summary>
     Task<TunnelConnectResult> ConnectAsync(PeerEndpointInfo peer, TimeSpan timeout, CancellationToken ct);
 
     TunnelStats Stats { get; }
 
-    /// <summary>النطاقات المميزة التي فُتحت عبر النفق. تُملأ على المضيف فقط.</summary>
+    /// <summary>The distinct domains opened through the tunnel. Filled on the host only.</summary>
     IReadOnlyCollection<string> DomainsSeen { get; }
 
     /// <summary>
-    /// إضافة الأسبوع 3: منفذ الـ Proxy المحلي ورابط صفحة الفحص بعد ConnectAsync على جانب Guest (null على المضيف أو قبل الاتصال).
-    /// التطبيق يحتاجهما ليشغّل المتصفح؛ تشغيل المتصفح وإغلاقه يبقيان مسؤوليته لا مسؤولية النفق.
+    /// Added in week 3: the local proxy's port and the check page's URL after ConnectAsync on the guest side (null on the host or before connecting).
+    /// The application needs them to launch the browser; launching and closing the browser stay its responsibility, not the tunnel's.
     /// </summary>
     GuestProxyInfo? Proxy { get; }
 
     /// <summary>
-    /// ما عدّه الوكيل المحلي على جانب Guest، أو null على المضيف وقبل الاتصال. يُقرأ عند انتهاء مهلة صفحة
-    /// الفحص: بدونه يقول السجل «لم تصل الصفحة» ولا يميّز بين متصفح لم يتصل أصلًا واتصال رفضه الوكيل.
+    /// What the local proxy counted on the guest side, or null on the host and before connecting. It is read when the check page
+    /// times out: without it the log says "the page did not arrive" and cannot tell a browser that never connected from a connection the proxy refused.
     /// </summary>
     IReadOnlyDictionary<string, long>? ProxyCounters { get; }
 
     /// <summary>
-    /// إضافة الأسبوع 3: يُرفع عند أول وصول لصفحة الفحص عبر الـ Proxy (Guest فقط). غيابه بعد تشغيل المتصفح =
-    /// المتصفح لا يمر بالـ Proxy، وهو ما يبلّغ عنه التطبيق بـ browser_not_proxied (docs/ws-protocol.md القسم 5).
+    /// Added in week 3: raised at the check page's first arrival through the proxy (guest only). Its absence after the browser is launched =
+    /// the browser is not going through the proxy, which the application reports as browser_not_proxied (docs/ws-protocol.md section 5).
     /// </summary>
     event Action? ProbeSeen;
 
     /// <summary>
-    /// إضافة الأسبوع 3: النفق مات من تلقائه (انقطاع، أو موت عملية الطرف الآخر، أو انتهاء مهلة PONG) لا بإنهاء مقصود.
-    /// الحمولة سبب مقترح ليبلّغ به التطبيق الخادم. الإغلاق النظيف (EndAsync أو GOAWAY متبادل) لا يرفع هذا الحدث أبدًا.
+    /// Added in week 3: the tunnel died of its own accord (a drop, or the other side's process dying, or the PONG timeout) rather than by a deliberate end.
+    /// The payload is a suggested reason for the application to report to the server. A clean close (EndAsync or a mutual GOAWAY) never raises this event.
     /// </summary>
     event Action<TunnelEndReason>? Died;
 
-    /// <summary>بيانات التشخيص لبوابة قرار Relay (المرشحون المجرَّبون، زمن وخطأ كل واحد).</summary>
+    /// <summary>The diagnostic data for the relay decision gate (the candidates tried, and each one's timing and error).</summary>
     IReadOnlyDictionary<string, object?> Diagnostics { get; }
 
-    /// <summary>ينفذ ترتيب التنظيف في docs/protocol.md القسم 7 من الخطوة 3 فصاعدًا.</summary>
+    /// <summary>Carries out the cleanup order in docs/protocol.md section 7 from step 3 onwards.</summary>
     Task EndAsync(TunnelEndReason reason, CancellationToken ct);
 }
 
-/// <summary>طبقة النقل الخام. اليوم Direct (TCP)؛ لاحقًا Relay دون تغيير في المصادقة أو الـ Mux.</summary>
+/// <summary>The raw transport layer. Direct (TCP) today; the relay later, with no change to the authentication or the mux.</summary>
 public interface ITunnelTransport
 {
     string Name { get; }

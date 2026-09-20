@@ -4,8 +4,8 @@ using System.Net.Sockets;
 namespace Josour.Tunnel;
 
 /// <summary>
-/// مستمع TCP لنافذة الاتصال ([::]:port بوضع DualMode افتراضيًا). حد 4 اتصالات غير مصادقة معلّقة؛ أي اتصال زائد يُغلق فورًا
-/// (docs/protocol.md القسم 2). "معلّق" = المعالج لم يُكمل بعد؛ المعالج يملك المقبس ويغلقه، ومهلتا TLS والمصادقة مسؤولية المستدعي.
+/// The TCP listener for the connect window ([::]:port in DualMode by default). A limit of 4 pending unauthenticated connections; anything beyond that is closed at once
+/// (docs/protocol.md section 2). "Pending" = the handler has not finished; the handler owns the socket and closes it, and the TLS and authentication timeouts are the caller's responsibility.
 /// </summary>
 public sealed class TunnelListener : IAsyncDisposable
 {
@@ -21,8 +21,8 @@ public sealed class TunnelListener : IAsyncDisposable
     private readonly List<Task> _handlerTasks = new();
     private readonly object _gate = new();
 
-    /// <param name="port">0 = يعيّنه النظام.</param>
-    /// <param name="bindAddress">افتراضيًا IPv6Any بوضع DualMode (مع سقوط إلى IPv4Any إن لم يتوفر IPv6).</param>
+    /// <param name="port">0 = the system assigns it.</param>
+    /// <param name="bindAddress">IPv6Any in DualMode by default (falling back to IPv4Any if IPv6 is unavailable).</param>
     public TunnelListener(int port = 0, IPAddress? bindAddress = null, int backlog = 16)
     {
         _socket = Bind(bindAddress, port, backlog);
@@ -38,13 +38,13 @@ public sealed class TunnelListener : IAsyncDisposable
     public int RejectedOverCapacity => Volatile.Read(ref _rejectedOverCapacity);
 
     /// <summary>
-    /// الاتصالات التي أُغلقت قبل اجتياز AUTH1. المستمع يسجّل هنا ما يرفضه بنفسه (تجاوز الأربعة المعلّقة)؛ ونتيجة
-    /// المصادقة نفسها يسجّلها <see cref="SymmetricConnector"/> لأنه وحده يعرفها. يبقى صالحًا للقراءة بعد
-    /// <see cref="StopAsync"/> و<see cref="DisposeAsync"/> ليُرفع في <c>POST /api/v1/diagnostics</c>.
+    /// The connections closed before passing AUTH1. The listener records here what it refuses itself (exceeding the four pending); the authentication's
+    /// own result is recorded by <see cref="SymmetricConnector"/>, because it alone knows it. It stays readable after
+    /// <see cref="StopAsync"/> and <see cref="DisposeAsync"/> so it can be reported in <c>POST /api/v1/diagnostics</c>.
     /// </summary>
     public UnauthenticatedProbeLog Probes { get; } = new();
 
-    /// <summary>يبدأ حلقة القبول. المعالج يملك المقبس؛ عند اكتماله يُحرَّر مكان من الأربعة.</summary>
+    /// <summary>Starts the accept loop. The handler owns the socket; when it completes, one of the four slots is freed.</summary>
     public Task StartAsync(Func<Socket, CancellationToken, Task> handler, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(handler);
@@ -58,7 +58,7 @@ public sealed class TunnelListener : IAsyncDisposable
         return Task.CompletedTask;
     }
 
-    /// <summary>يوقف القبول ويغلق مقبس الاستماع وينتظر انتهاء المعالجات الجارية (التي تُلغى عبر الرمز).</summary>
+    /// <summary>Stops accepting, closes the listening socket, and waits for the handlers under way (which are cancelled through the token).</summary>
     public async Task StopAsync()
     {
         Task? loop;
@@ -69,12 +69,12 @@ public sealed class TunnelListener : IAsyncDisposable
             loop = _acceptLoop;
             handlers = _handlerTasks.ToArray();
         }
-        try { _socket.Close(); } catch { /* تجاهل */ }
+        try { _socket.Close(); } catch { /* ignore */ }
         if (loop is not null)
         {
-            try { await loop.ConfigureAwait(false); } catch { /* تجاهل */ }
+            try { await loop.ConfigureAwait(false); } catch { /* ignore */ }
         }
-        try { await Task.WhenAll(handlers).ConfigureAwait(false); } catch { /* المعالجات تبتلع أخطاءها */ }
+        try { await Task.WhenAll(handlers).ConfigureAwait(false); } catch { /* the handlers swallow their own errors */ }
     }
 
     public async ValueTask DisposeAsync()
@@ -103,7 +103,7 @@ public sealed class TunnelListener : IAsyncDisposable
             {
                 Interlocked.Decrement(ref _pending);
                 Interlocked.Increment(ref _rejectedOverCapacity);
-                // أُغلق بلا قراءة بايت واحد، فهو بالتعريف اتصال لم يجتز AUTH1.
+                // Closed with not one byte read, so it is by definition a connection that did not pass AUTH1.
                 Probes.Record(RemoteAddress(accepted));
                 SafeClose(accepted);
                 continue;
@@ -127,7 +127,7 @@ public sealed class TunnelListener : IAsyncDisposable
         }
         catch
         {
-            // المعالج مسؤول عن تسجيل أخطائه وإغلاق مقبسه.
+            // The handler is responsible for logging its errors and closing its socket.
         }
         finally
         {
@@ -137,10 +137,10 @@ public sealed class TunnelListener : IAsyncDisposable
 
     private static void SafeClose(Socket socket)
     {
-        try { socket.Close(0); } catch { /* تجاهل */ }
+        try { socket.Close(0); } catch { /* ignore */ }
     }
 
-    /// <summary>عنوان الطرف الآخر إن كان المقبس ما زال يعرفه (قد يكون أُغلق بيننا وبين القبول).</summary>
+    /// <summary>The other side's address if the socket still knows it (it may have closed between us and the accept).</summary>
     private static IPAddress? RemoteAddress(Socket socket)
     {
         try { return (socket.RemoteEndPoint as IPEndPoint)?.Address; }
@@ -162,7 +162,7 @@ public sealed class TunnelListener : IAsyncDisposable
             }
             catch (SocketException) when (bindAddress is null)
             {
-                address = IPAddress.Any; // لا IPv6 على هذا الجهاز
+                address = IPAddress.Any; // no IPv6 on this machine
             }
         }
 

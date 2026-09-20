@@ -6,8 +6,8 @@ using Josour.Infrastructure.Localization;
 namespace Josour.Infrastructure.Session;
 
 /// <summary>
-/// The allow-list as the host is shown it before accepting a request (product document section 15: "المواقع أو الفئات
-/// المسموح بها"). <see cref="Loaded"/> is the important part: a list that could not be fetched is NOT an empty list, and
+/// The allow-list as the host is shown it before accepting a request (product document section 15: "The allowed sites
+/// or categories"). <see cref="Loaded"/> is the important part: a list that could not be fetched is NOT an empty list, and
 /// the two must never look the same on screen — "nothing is allowed" would make an ordinary request look harmless.
 /// </summary>
 /// <param name="Version">The <c>allowlist_version</c> of the request this disclosure belongs to.</param>

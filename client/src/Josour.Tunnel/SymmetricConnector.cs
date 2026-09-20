@@ -10,7 +10,7 @@ using Josour.Tunnel.Tls;
 
 namespace Josour.Tunnel;
 
-/// <summary>اتصال مصادَق (TLS + AUTH1/AUTH2 مكتملان). الـ Stream هو SslStream يملك المقبس.</summary>
+/// <summary>An authenticated connection (TLS + AUTH1/AUTH2 complete). The Stream is an SslStream that owns the socket.</summary>
 public sealed record AuthenticatedConnection(Stream Stream, CandidateType WinnerType, string TlsVersion, bool Inbound, string RemoteDescription) : IAsyncDisposable
 {
     public ValueTask DisposeAsync() => Stream.DisposeAsync();
@@ -18,17 +18,17 @@ public sealed record AuthenticatedConnection(Stream Stream, CandidateType Winner
 
 public sealed record SymmetricConnectOutcome(TunnelConnectResult Result, AuthenticatedConnection? Connection, IReadOnlyDictionary<string, object?> Diagnostics);
 
-/// <summary>مسار الـ Relay: النقل الذي يتكلم بروتوكوله والعنوان الذي وصل في session.created.relay (ADR-0009).</summary>
+/// <summary>The relay path: the transport that speaks its protocol and the address that arrived in session.created.relay (ADR-0009).</summary>
 public sealed record RelayLeg(ITunnelTransport Transport, CandidateEndpoint Endpoint);
 
 /// <summary>
-/// تنسيق docs/protocol.md القسم 2 الخطوات 3-6 لكلا الدورين: قبول الاتصالات الواردة (TLS Server بشهادتنا) والاتصال بكل مرشحي
-/// الطرف الآخر بالتوازي (TLS Client مثبّت على بصمته)، ثم المصادقة حسب الدور المنطقي. أول اتصال يجتاز المصادقة يفوز؛
-/// الباقي يُغلق ويُوقَف المستمع.
+/// It coordinates docs/protocol.md section 2 steps 3-6 for both roles: accepting inbound connections (as the TLS server with our certificate) and connecting to all of
+/// the other side's candidates in parallel (as the TLS client pinned to its fingerprint), then authenticating per the logical role. The first connection that passes authentication wins;
+/// the rest are closed and the listener is stopped.
 ///
-/// من يقرر الفائز: المضيف هو المرجع (session.connected). لتفادي أن يحتفظ كل طرف باتصال مختلف، المضيف لا يرسل AUTH2 إلا على
-/// أول اتصال يجتاز AUTH1 ويغلق ما عداه بلا رد (وهو ما يسمح به القسم 4). وهكذا لا يرى Guest سوى AUTH2 واحدة، فاتصاله
-/// "الأول المصادَق" هو نفسه اتصال المضيف. الأسبوع 4 يضيف مصافحة تأكيد صريحة إن أظهرت التجارب الحقيقية حاجة إليها.
+/// Who decides the winner: the host is the authority (session.connected). To stop each side keeping a different connection, the host sends AUTH2 only on
+/// the first connection that passes AUTH1 and closes the rest with no reply (which section 4 permits). So the guest sees only one AUTH2, and its
+/// "first authenticated" connection is the host's connection itself. Week 4 adds an explicit confirmation handshake if real trials show it is needed.
 /// </summary>
 public sealed class SymmetricConnector
 {
@@ -37,10 +37,10 @@ public sealed class SymmetricConnector
     public static readonly TimeSpan AuthTimeout = TimeSpan.FromSeconds(5);
 
     /// <summary>
-    /// سقف صفوف الاتصالات الواردة في التشخيص. المشروع لا يتوقع أكثر من عدد مرشحي الطرف الآخر، لكن أي طرف على
-    /// الشبكة يستطيع فتح اتصالات على المنفذ خلال نافذة الاتصال. بلا سقف تنمو القائمة بلا حد (ذاكرة)، ويتضخم
-    /// <c>session.connect_failed</c> فوق حد 64 KB في <c>docs/api.md</c> فيُرفض التشخيص كله. الزائد يبقى معدودًا في
-    /// <c>inbound_attempts</c> و<c>inbound_unauthenticated</c> وفي <see cref="TunnelListener.Probes"/>.
+    /// The ceiling on inbound-connection rows in the diagnostics. The project expects no more than the number of the other side's candidates, but any party on
+    /// the network can open connections on the port during the connect window. With no ceiling the list grows without bound (memory), and
+    /// <c>session.connect_failed</c> swells past the 64 KB limit in <c>docs/api.md</c> so the whole diagnostic is refused. The excess stays counted in
+    /// <c>inbound_attempts</c> and <c>inbound_unauthenticated</c> and in <see cref="TunnelListener.Probes"/>.
     /// </summary>
     public const int MaxRecordedInboundAttempts = 16;
 
@@ -57,7 +57,7 @@ public sealed class SymmetricConnector
     private int _started;
     private int _inboundSeen;
     private int _inboundDropped;
-    /// <summary>رُفع مرة واحدة عند أول اتصال يجتاز المصادقة، ولا يعود. انظر <see cref="IsUnauthenticatedProbe"/>.</summary>
+    /// <summary>Raised once at the first connection that passes authentication, and never goes back. See <see cref="IsUnauthenticatedProbe"/>.</summary>
     private int _authenticatedAny;
 
     public SymmetricConnector(SessionMaterial material, SessionCertificate ourCertificate, TunnelListener listener, ITunnelTransport transport, IReadOnlyList<CandidateEndpoint>? ourCandidates = null, RelayLeg? relay = null)
@@ -71,12 +71,12 @@ public sealed class SymmetricConnector
     }
 
     /// <summary>
-    /// تقدّم أي محاولة إلى مرحلة جديدة ("tls" ثم "auth" ثم "ok"). يُرفع من خيوط متعددة وقد يتكرر؛
-    /// <see cref="TunnelSession"/> يستعمله ليعكس Connecting → Authenticating في StateChanged. أخطاء المستمع تُبتلع.
+    /// Any attempt advancing to a new stage ("tls", then "auth", then "ok"). It is raised from several threads and may repeat;
+    /// <see cref="TunnelSession"/> uses it to reflect Connecting -> Authenticating in StateChanged. The listener's errors are swallowed.
     /// </summary>
     public event Action<string>? StageReached;
 
-    /// <summary>يُستدعى مرة واحدة. عند الانتهاء يكون المستمع متوقفًا وكل المحاولات الأخرى مغلقة.</summary>
+    /// <summary>Called once. When it returns, the listener is stopped and every other attempt is closed.</summary>
     public async Task<SymmetricConnectOutcome> ConnectAsync(PeerEndpointInfo peer, TimeSpan timeout, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(peer);
@@ -94,8 +94,8 @@ public sealed class SymmetricConnector
         cts.CancelAfter(timeout);
 
         await _listener.StartAsync((socket, lct) => HandleInboundAsync(socket, peerFp, ourFp, winner, clock, lct), cts.Token).ConfigureAwait(false);
-        // ADR-0009: الـ Relay يُجرَّب بالتوازي مع المباشر لا بعده. المباشر أسرع حين ينجح، والـ Relay يعمل دائمًا،
-        // فالسباق يعطي الأفضل المتاح بلا انتظار فشل أحدهما.
+        // ADR-0009: the relay is attempted in parallel with direct rather than after it. Direct is faster when it succeeds, and the relay always works,
+        // so the race gives the best available without waiting for one of them to fail.
         var dials = peer.Candidates.Select(c => DialAsync(c, peerFp, ourFp, winner, clock, cts.Token))
             .Append(_relay is null ? Task.CompletedTask : DialRelayAsync(_relay, timeout, peerFp, ourFp, winner, clock, cts.Token))
             .ToArray();
@@ -106,12 +106,12 @@ public sealed class SymmetricConnector
         }
         catch (OperationCanceledException)
         {
-            // مهلة أو إلغاء خارجي
+            // A timeout or an external cancellation
         }
 
         cts.Cancel();
         await _listener.StopAsync().ConfigureAwait(false);
-        try { await Task.WhenAll(dials).ConfigureAwait(false); } catch { /* المحاولات تبتلع أخطاءها */ }
+        try { await Task.WhenAll(dials).ConfigureAwait(false); } catch { /* the attempts swallow their own errors */ }
 
         var elapsed = (int)Math.Min(clock.ElapsedMilliseconds, int.MaxValue);
         if (winner.Task.IsCompletedSuccessfully)
@@ -156,19 +156,19 @@ public sealed class SymmetricConnector
     }
 
     /// <summary>
-    /// هل هذا الاتصال الوارد محاولة وصول غير مصرَّح بها إلى منفذنا (‏<c>docs/api.md</c>: <c>listener_unauthenticated</c>)؟
+    /// Is this inbound connection an unauthorised attempt to reach our port (<c>docs/api.md</c>: <c>listener_unauthenticated</c>)?
     ///
-    /// <para>الإشارة لا تحتمل إيجابية كاذبة واحدة: إيجابية في كل جلسة ناجحة تُفقدها معناها تمامًا. لذلك تُستثنى
-    /// ثلاث حالات، كلٌّ منها تصف <b>الطرف الآخر الشرعي</b> لا مهاجمًا:</para>
+    /// <para>The signal cannot bear one false positive: one in every successful session robs it of its meaning entirely. So three cases
+    /// are excluded, each of them describing <b>the legitimate peer</b> rather than an attacker:</para>
     /// <list type="number">
-    ///   <item><b>ما ألغيناه نحن</b> (‏<c>cancelled</c>): فوز اتصال آخر أو انتهاء نافذة الاتصال.</item>
-    ///   <item><b>ما أغلقه الطرف الآخر بلا رد</b> (‏<see cref="AuthFailedException.PeerClosed"/>): هذا نصًّا ما
-    ///     يفعله المضيف بالاتصال الخاسر في القسم 2 الخطوة 5 — «يغلق أي اتصال آخر بلا رد». والاتصال المتماثل يفتح
-    ///     اتصالين بين الجهازين دائمًا، فأحدهما خاسر <b>في كل جلسة ناجحة</b>.</item>
-    ///   <item><b>ما أخفق بعد أن صادقنا أحدًا</b>: من تلك اللحظة كل إخفاق حطام سباق لا دليل.</item>
+    ///   <item><b>What we cancelled ourselves</b> (<c>cancelled</c>): another connection winning, or the connect window closing.</item>
+    ///   <item><b>What the other side closed with no reply</b> (<see cref="AuthFailedException.PeerClosed"/>): this is literally what
+    ///     the host does to the losing connection in section 2 step 5 — "closes any other connection with no reply". And the symmetric connection always opens
+    ///     two connections between the two machines, so one of them loses <b>in every successful session</b>.</item>
+    ///   <item><b>What failed after we had authenticated someone</b>: from that moment every failure is race debris rather than evidence.</item>
     /// </list>
-    /// <para>الثمن مقبول ومعلوم: فاحص منافذ يكمل مصافحة TLS ثم يغلق بلا كلام لا يُحتسب. أما ما يُحتسب فيشمل
-    /// كل فحص لا يكمل TLS (الأغلبية الساحقة)، وكل مهلة، و<b>كل فشل تحقق</b> — وهو أقوى دليل ممكن.</para>
+    /// <para>The price is accepted and known: a port scanner that completes the TLS handshake and then closes without speaking is not counted. What is counted includes
+    /// every scan that does not complete TLS (the overwhelming majority), every timeout, and <b>every verification failure</b> — the strongest evidence possible.</para>
     /// </summary>
     private bool IsUnauthenticatedProbe(Attempt attempt)
     {
@@ -199,7 +199,7 @@ public sealed class SymmetricConnector
         }
     }
 
-    /// <summary>محاولة الاتصال عبر الـ Relay: نقل واحد وعنوان واحد، بلا مرشحين ولا مستمع.</summary>
+    /// <summary>The connection attempt over the relay: one transport and one address, with no candidates and no listener.</summary>
     private async Task DialRelayAsync(RelayLeg relay, TimeSpan timeout, byte[] peerFp, byte[] ourFp, TaskCompletionSource<(AuthenticatedConnection, long)> winner, Stopwatch clock, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
@@ -207,10 +207,10 @@ public sealed class SymmetricConnector
         Record(attempt);
         try
         {
-            // المهلة الكاملة لا DialTimeout: رد الـ Relay لا يصل حتى يصل النظير أيضًا، وقد يتأخر بقدر نافذة
-            // الاتصال كلها. قصرها على خمس ثوانٍ كان سيُسقط كل جلسة لا يتزامن طرفاها.
+            // The full timeout rather than DialTimeout: the relay's reply does not arrive until the peer arrives too, and it may be as late as the whole
+            // connect window. Limiting it to five seconds would have dropped every session whose two sides do not start together.
             var raw = await relay.Transport.ConnectAsync(relay.Endpoint, timeout, ct).ConfigureAwait(false);
-            // docs/protocol.md القسم 3: لا مستمع هنا، فالمضيف هو TLS Server دائمًا على هذا المسار.
+            // docs/protocol.md section 3: there is no listener here, so the host is always the TLS server on this path.
             await AuthenticateAsync(raw, inbound: false, tlsServer: _material.Role == TunnelRole.Host, attempt, peerFp, ourFp, winner, clock, ct).ConfigureAwait(false);
         }
         catch (Exception e)
@@ -226,9 +226,9 @@ public sealed class SymmetricConnector
     // ---------- shared ----------
 
     /// <summary>
-    /// <paramref name="tlsServer"/> مفصول عن <paramref name="inbound"/> عمدًا. على المسار المباشر هما الشيء نفسه
-    /// (المستمع هو Server)، أما فوق الـ Relay فلا مستمع: الطرفان يتصلان خارجًا، فلو بقيت القاعدة مشتقة من
-    /// «من اتصل» لانتظر كلاهما مصافحة الآخر إلى الأبد. القاعدة هناك: المضيف Server دائمًا (docs/protocol.md القسم 3).
+    /// <paramref name="tlsServer"/> is deliberately separate from <paramref name="inbound"/>. On the direct path they are the same thing
+    /// (the listener is the server), but over the relay there is no listener: both sides connect outbound, so if the rule stayed derived from
+    /// "who connected" both would wait for the other's handshake forever. The rule there: the host is always the server (docs/protocol.md section 3).
     /// </summary>
     private async Task AuthenticateAsync(Stream raw, bool inbound, bool tlsServer, Attempt attempt, byte[] peerFp, byte[] ourFp, TaskCompletionSource<(AuthenticatedConnection, long)> winner, Stopwatch clock, CancellationToken ct)
     {
@@ -237,7 +237,7 @@ public sealed class SymmetricConnector
             ? await TlsChannel.AuthenticateAsServerAsync(raw, _certificate.Certificate, TlsTimeout, ct).ConfigureAwait(false)
             : await TlsChannel.AuthenticateAsClientAsync(raw, peerFp, TlsTimeout, ct).ConfigureAwait(false);
 
-        // listener_cert_fp = شهادة من يعمل TLS Server في هذا الاتصال، أيًا كان من فتح المقبس.
+        // listener_cert_fp = the certificate of whoever is the TLS server in this connection, whoever opened the socket.
         var listenerFp = tlsServer ? ourFp : peerFp;
         Stage(attempt, "auth");
         try
@@ -245,7 +245,7 @@ public sealed class SymmetricConnector
             if (_material.Role == TunnelRole.Host)
             {
                 var auth1 = await AuthHandshake.VerifyAuth1Async(tls.Stream, _material, listenerFp, AuthTimeout, ct).ConfigureAwait(false);
-                attempt.Authenticated = true; // اجتاز AUTH1: ليس محاولة غير مصرَّح بها حتى لو خسر السباق بعد ذلك
+                attempt.Authenticated = true; // it passed AUTH1: not an unauthorised attempt even if it loses the race afterwards
                 Volatile.Write(ref _authenticatedAny, 1);
                 if (!TryClaim()) throw new SupersededException();
                 try
@@ -283,12 +283,12 @@ public sealed class SymmetricConnector
     private void Stage(Attempt attempt, string stage)
     {
         attempt.Stage = stage;
-        try { StageReached?.Invoke(stage); } catch { /* المستمع مسؤول عن أخطائه */ }
+        try { StageReached?.Invoke(stage); } catch { /* the listener is responsible for its own errors */ }
     }
 
     /// <summary>
-    /// يضيف المحاولة إلى التشخيص. صفوف الاتصال (dial) تُسجَّل كلها لأن عددها = عدد مرشحي الطرف الآخر؛ أما الواردة
-    /// فيحدها <see cref="MaxRecordedInboundAttempts"/> لأن مصدرها الشبكة لا نحن (انظر تعليق الثابت).
+    /// Adds the attempt to the diagnostics. Every dial row is recorded because their number = the number of the other side's candidates; the inbound ones
+    /// are bounded by <see cref="MaxRecordedInboundAttempts"/> because their source is the network rather than us (see the constant's comment).
     /// </summary>
     private void Record(Attempt attempt)
     {
@@ -301,8 +301,8 @@ public sealed class SymmetricConnector
     }
 
     /// <summary>
-    /// تصنيف الاتصال الوارد حسب العنوان المحلي الذي وصل إليه: يطابق مرشحينا lan/v6؛ وإلا فالاتصال جاء عبر NAT
-    /// حيث لا يمكن التمييز بين upnp وpublic من جهة المستقبِل، فنفضّل upnp إن كان لدينا تعيين.
+    /// Classifying an inbound connection by the local address it arrived at: it matches our lan/v6 candidates; otherwise the connection came through NAT,
+    /// where upnp and public cannot be told apart from the receiver's side, so we prefer upnp if we have a mapping.
     /// </summary>
     private CandidateType? ClassifyInbound(IPEndPoint? local)
     {
@@ -340,7 +340,7 @@ public sealed class SymmetricConnector
             ["listener_port"] = _listener.Port,
             ["inbound_attempts"] = _listener.InboundAttempts,
             ["inbound_rejected"] = _listener.RejectedOverCapacity,
-            // اتصالات واردة لم تجتز AUTH1، وعدد الصفوف التي أُسقطت من القائمة بسبب السقف (كلاهما معدود لا مسجَّل).
+            // Inbound connections that did not pass AUTH1, and the number of rows dropped from the list because of the ceiling (both counted, not recorded).
             ["inbound_unauthenticated"] = _listener.Probes.Count,
             ["inbound_dropped"] = Volatile.Read(ref _inboundDropped),
             ["candidates"] = rows,
@@ -350,7 +350,7 @@ public sealed class SymmetricConnector
         };
     }
 
-    // لا أسرار ولا حمولات في النصوص؛ رسائل الاستثناءات هنا وصفية فقط.
+    // No secrets and no payloads in the text; the exception messages here are descriptive only.
     private static string Describe(Exception e) => e switch
     {
         SupersededException => "superseded",
@@ -387,10 +387,10 @@ public sealed class SymmetricConnector
         public string? Stage { get; set; }
         public string? Error { get; set; }
 
-        /// <summary>اجتاز AUTH1 (المضيف) أو تحقق من AUTH2 (Guest)، ولو خسر السباق بعدها.</summary>
+        /// <summary>It passed AUTH1 (the host) or verified AUTH2 (the guest), even if it lost the race afterwards.</summary>
         public bool Authenticated { get; set; }
 
-        /// <summary>أغلق الطرف الآخر أو انقطع قبل اكتمال رسالة المصادقة (لا فشل تحقق).</summary>
+        /// <summary>The other side closed, or the link dropped, before the authentication message completed (not a verification failure).</summary>
         public bool PeerClosed { get; set; }
     }
 }

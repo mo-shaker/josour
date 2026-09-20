@@ -5,8 +5,8 @@ using System.Runtime.Versioning;
 namespace Josour.Browser.Native;
 
 /// <summary>
-/// WINDOWS-ONLY: Job Object بـ JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE: إغلاق المقبض (أو انهيار تطبيقنا) يقتل المتصفح وكل عملياته الفرعية
-/// (Fail-closed، خطة 8.5). لم يُشغَّل على Windows بعد (مراجعة كود فقط).
+/// WINDOWS-ONLY: a Job Object with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE: closing the handle (or our application crashing) kills the browser and all its child processes
+/// (fail-closed, plan 8.5). It has not been run on Windows yet (a code review only).
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class JobObject : IDisposable
@@ -59,7 +59,7 @@ public sealed class JobObject : IDisposable
             throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), "AssignProcessToJobObject failed");
     }
 
-    /// <summary>معرّفات العمليات الحية داخل الـ Job (QueryInformationJobObject / JobObjectBasicProcessIdList).</summary>
+    /// <summary>The live process ids inside the job (QueryInformationJobObject / JobObjectBasicProcessIdList).</summary>
     public IReadOnlyList<int> ProcessIds()
     {
         if (_handle == IntPtr.Zero) return Array.Empty<int>();
@@ -95,7 +95,7 @@ public sealed class JobObject : IDisposable
         return Array.Empty<int>();
     }
 
-    /// <summary>إغلاق المقبض = قتل كل ما بقي في الـ Job.</summary>
+    /// <summary>Closing the handle = killing whatever is left in the job.</summary>
     public void Dispose()
     {
         var handle = Interlocked.Exchange(ref _handle, IntPtr.Zero);

@@ -1,6 +1,6 @@
 #!/bin/sh
-# استعادة نسخة: ./backup/restore.sh backups/josour-YYYYMMDDTHHMMSSZ.sql.gz
-# يوقف api، يعيد إنشاء القاعدة، يستورد، ثم يشغّل api.
+# Restore a backup: ./backup/restore.sh backups/josour-YYYYMMDDTHHMMSSZ.sql.gz
+# It stops api, recreates the database, imports, then starts api.
 set -eu
 FILE="${1:?usage: restore.sh <file.sql.gz>}"
 cd "$(dirname "$0")/.."

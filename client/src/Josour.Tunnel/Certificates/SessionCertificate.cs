@@ -4,9 +4,9 @@ using System.Security.Cryptography.X509Certificates;
 namespace Josour.Tunnel.Certificates;
 
 /// <summary>
-/// شهادة ذاتية مؤقتة لجلسة واحدة (docs/protocol.md القسم 2 الخطوة 1):
-/// ECDSA P-256، CN=josour، EKU serverAuth+clientAuth، الصلاحية من الآن − 5 دقائق إلى expires_at + ساعة.
-/// Dispose يحذف المفتاح الخاص (على Windows: حاوية المفتاح لأن الاستيراد بـ UserKeySet بلا PersistKeySet).
+/// A temporary self-signed certificate for one session (docs/protocol.md section 2 step 1):
+/// ECDSA P-256, CN=josour, EKU serverAuth+clientAuth, valid from now − 5 minutes to expires_at + an hour.
+/// Dispose deletes the private key (on Windows: the key container, because the import uses UserKeySet without PersistKeySet).
 /// </summary>
 public sealed class SessionCertificate : IDisposable
 {
@@ -28,10 +28,10 @@ public sealed class SessionCertificate : IDisposable
 
     public X509Certificate2 Certificate { get; }
 
-    /// <summary>SHA-256 على RawData (32 بايت). نسخة جديدة في كل استدعاء.</summary>
+    /// <summary>SHA-256 over RawData (32 bytes). A fresh copy on every call.</summary>
     public byte[] FingerprintSha256 => (byte[])_fingerprint.Clone();
 
-    /// <summary>البصمة hex بأحرف صغيرة (64 حرفًا) كما تُرسل في session.endpoint.</summary>
+    /// <summary>The fingerprint as lowercase hex (64 characters) as it is sent in session.endpoint.</summary>
     public string FingerprintHex { get; }
 
     public DateTimeOffset NotBefore { get; }
@@ -59,9 +59,9 @@ public sealed class SessionCertificate : IDisposable
         return new SessionCertificate(OperatingSystem.IsWindows() ? ReimportForSchannel(created) : created);
     }
 
-    // WINDOWS-ONLY: CreateSelfSigned يعطي مفتاح CNG مؤقتًا لا يستطيع Schannel استخدامه. نصدّر PFX ونعيد الاستيراد
-    // بـ UserKeySet (بلا PersistKeySet) فيُحفظ المفتاح في حاوية مستخدم تُحذف عند Dispose للشهادة.
-    // لم يُتحقق منه إلا بمراجعة الكود على هذا الجهاز (macOS)؛ يحتاج تشغيلًا فعليًا على Windows 10 و11.
+    // WINDOWS-ONLY: CreateSelfSigned gives an ephemeral CNG key that Schannel cannot use. We export a PFX and re-import it
+    // with UserKeySet (without PersistKeySet), so the key is stored in a user container that is deleted when the certificate is disposed.
+    // Only verified by reading the code on this machine (macOS); it needs an actual run on Windows 10 and 11.
     private static X509Certificate2 ReimportForSchannel(X509Certificate2 ephemeral)
     {
         var pfx = ephemeral.Export(X509ContentType.Pfx);

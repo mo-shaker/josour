@@ -1,4 +1,4 @@
-"""Request/response shapes of the admin API (docs/api.md "الإدارة")."""
+"""Request/response shapes of the admin API (docs/api.md "Administration")."""
 
 import uuid
 from typing import Any

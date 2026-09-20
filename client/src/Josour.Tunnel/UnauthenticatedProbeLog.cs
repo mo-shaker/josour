@@ -4,25 +4,25 @@ using System.Net.Sockets;
 namespace Josour.Tunnel;
 
 /// <summary>
-/// عدّاد الاتصالات الواردة التي لم تجتز <c>AUTH1</c> على مستمع النفق (docs/protocol.md القسم 2).
+/// The counter of inbound connections that did not pass <c>AUTH1</c> on the tunnel's listener (docs/protocol.md section 2).
 ///
-/// <para><b>لماذا يوجد:</b> مستمع النفق مفتوح بين <c>session.created</c> و<c>session.connected</c> فقط، وهو الموضع
-/// الوحيد الذي يرى فيه النظام محاولة وصول غير مصرَّح بها إلى منفذ الجهاز. الخادم لا يستطيع رصدها بنفسه (لا يمر بها
-/// شيء منه)، فيرفعها العميل في <c>POST /api/v1/diagnostics</c> بالمفاتيح المحجوزة في <c>docs/api.md</c>:
-/// <c>listener_unauthenticated</c> و<c>listener_port</c> و<c>unauthenticated_peers</c>.</para>
+/// <para><b>Why it exists:</b> the tunnel's listener is open between <c>session.created</c> and <c>session.connected</c> only, and it is the one place
+/// where the system sees an unauthorised attempt to reach the machine's port. The server cannot observe it itself (none of it passes
+/// through it), so the client reports it in <c>POST /api/v1/diagnostics</c> under the keys reserved in <c>docs/api.md</c>:
+/// <c>listener_unauthenticated</c>, <c>listener_port</c> and <c>unauthenticated_peers</c>.</para>
 ///
-/// <para><b>ما يُحفظ:</b> عدّاد وعناوين مصدر مميزة بحد <see cref="MaxPeers"/> فقط. لا حمولات ولا منافذ مصدر ولا أوقات
-/// (متطلب الخصوصية في القسم 15 من وثيقة المنتج، وشرط <c>docs/api.md</c> صراحةً). العناوين المخطَّطة
-/// <c>::ffff:a.b.c.d</c> تُطبَّع إلى IPv4 حتى لا يظهر العنوان الواحد مرتين.</para>
+/// <para><b>What is stored:</b> a counter and distinct source addresses capped at <see cref="MaxPeers"/>, and nothing else. No payloads, no source ports and no timestamps
+/// (the privacy requirement in section 15 of the product document, and an explicit condition of <c>docs/api.md</c>). Mapped
+/// <c>::ffff:a.b.c.d</c> addresses are normalised to IPv4 so the same address does not appear twice.</para>
 ///
-/// <para><b>ما لا يُحتسب:</b> اتصال اجتاز AUTH1 (ولو خسر السباق: <c>superseded</c>)، واتصال أُلغي بإلغائنا نحن عند
-/// فوز اتصال آخر أو انتهاء نافذة الاتصال. الغرض إشارة أمنية بلا إيجابيات كاذبة، فالشك يُحسب لصالح الصمت.</para>
+/// <para><b>What is not counted:</b> a connection that passed AUTH1 (even if it lost the race: <c>superseded</c>), and a connection we cancelled ourselves when
+/// another connection won or the connect window closed. The purpose is a security signal with no false positives, so doubt is resolved in favour of silence.</para>
 ///
-/// آمن للخيوط: حلقة القبول ومعالجات المصادقة تكتب فيه بالتوازي.
+/// Thread-safe: the accept loop and the authentication handlers write to it in parallel.
 /// </summary>
 public sealed class UnauthenticatedProbeLog
 {
-    /// <summary>سقف العناوين المميزة المحفوظة (نفس الحد في <c>docs/api.md</c>: <c>unauthenticated_peers</c> ≤ 10).</summary>
+    /// <summary>The cap on distinct addresses stored (the same limit as in <c>docs/api.md</c>: <c>unauthenticated_peers</c> ≤ 10).</summary>
     public const int MaxPeers = 10;
 
     private readonly object _gate = new();
@@ -31,19 +31,19 @@ public sealed class UnauthenticatedProbeLog
     private int _count;
     private int _distinctPeers;
 
-    /// <summary>عدد الاتصالات الواردة التي أُغلقت قبل اجتياز AUTH1.</summary>
+    /// <summary>The number of inbound connections closed before passing AUTH1.</summary>
     public int Count => Volatile.Read(ref _count);
 
-    /// <summary>عدد العناوين المميزة التي رُئيت فعلًا (قد يتجاوز <see cref="MaxPeers"/> بينما القائمة لا تتجاوزه).</summary>
+    /// <summary>The number of distinct addresses actually seen (it may exceed <see cref="MaxPeers"/> while the list does not).</summary>
     public int DistinctPeers => Volatile.Read(ref _distinctPeers);
 
-    /// <summary>أول <see cref="MaxPeers"/> عنوانًا مميزًا بترتيب الظهور.</summary>
+    /// <summary>The first <see cref="MaxPeers"/> distinct addresses in order of appearance.</summary>
     public IReadOnlyList<string> Peers
     {
         get { lock (_gate) return _peers.ToArray(); }
     }
 
-    /// <summary>يسجّل محاولة غير مصادَقة من <paramref name="remote"/> (null = عنوان غير معروف: يُعدّ ولا يُسجَّل).</summary>
+    /// <summary>Records an unauthenticated attempt from <paramref name="remote"/> (null = an unknown address: counted but not recorded).</summary>
     public void Record(IPAddress? remote)
     {
         Interlocked.Increment(ref _count);
@@ -57,7 +57,7 @@ public sealed class UnauthenticatedProbeLog
         }
     }
 
-    /// <summary>الشكل الذي يُرسل في <c>data</c> عند <c>POST /api/v1/diagnostics</c>، أو null إن لم تقع أي محاولة.</summary>
+    /// <summary>The shape sent in <c>data</c> at <c>POST /api/v1/diagnostics</c>, or null if no attempt occurred.</summary>
     public IReadOnlyDictionary<string, object?>? ToDiagnostics(int listenerPort)
     {
         var count = Count;
@@ -70,7 +70,7 @@ public sealed class UnauthenticatedProbeLog
         };
     }
 
-    /// <summary>‏<c>::ffff:a.b.c.d</c> ← <c>a.b.c.d</c>، ونطاق المدى (scope id) يُحذف من عناوين IPv6 المحلية.</summary>
+    /// <summary><c>::ffff:a.b.c.d</c> -> <c>a.b.c.d</c>, and the scope id is stripped from local IPv6 addresses.</summary>
     private static string Normalize(IPAddress address)
     {
         if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();

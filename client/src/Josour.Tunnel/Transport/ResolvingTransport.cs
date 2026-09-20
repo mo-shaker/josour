@@ -5,17 +5,17 @@ using Josour.Core.Tunnel;
 namespace Josour.Tunnel.Transport;
 
 /// <summary>
-/// نقل يقبل <b>اسم مضيف</b> في <see cref="CandidateEndpoint.Ip"/>، يحلّه ثم يفوّض الاتصال إلى نقل داخلي.
+/// A transport that accepts a <b>hostname</b> in <see cref="CandidateEndpoint.Ip"/>, resolves it, and then delegates the connection to an inner transport.
 ///
 /// <para>
-/// <see cref="DirectTransport"/> يرفض أي شيء غير عنوان IP حرفي، وهذا ليس تشددًا زائدًا بل ضابط أمني:
-/// المرشحون تصل من <c>session.peer_endpoint</c>، أي من الطرف الآخر عبر الخادم، والعقد يشترط أن تكون عناوين
-/// حرفية (<c>docs/ws-protocol.md</c> القسم 5). لو قَبِل أسماء لصار بإمكان النظير أن يجعلنا نحلّ ما يختاره.
+/// <see cref="DirectTransport"/> refuses anything but an IP address literal, and that is not excess strictness but a security control:
+/// the candidates arrive from <c>session.peer_endpoint</c>, that is, from the other side through the server, and the contract requires them to be
+/// literals (<c>docs/ws-protocol.md</c> section 5). Had it accepted names, the peer could make us resolve whatever it chose.
 /// </para>
 /// <para>
-/// عنوان الـ Relay حالة أخرى تمامًا: يأتي في <c>session.created.relay</c> من <b>خادمنا نحن</b>، وهو اسم بحكم
-/// التصميم (<c>RELAY_HOST</c> في ADR-0009). فالفرق بين المسارين فرق مصدر لا فرق تشدد، ولذلك حُلَّ بنقل ثانٍ
-/// بدل توسيع الأول.
+/// The relay's address is an entirely different case: it arrives in <c>session.created.relay</c> from <b>our own server</b>, and it is a name by
+/// design (<c>RELAY_HOST</c> in ADR-0009). So the difference between the two paths is a difference of source rather than of strictness, and that is why it was solved with a second transport
+/// rather than by widening the first.
 /// </para>
 /// </summary>
 public sealed class ResolvingTransport : ITunnelTransport
@@ -43,8 +43,8 @@ public sealed class ResolvingTransport : ITunnelTransport
         }
         if (addresses.Length == 0) throw new SocketException((int)SocketError.HostNotFound);
 
-        // اسم واحد قد يحل إلى IPv6 وIPv4 معًا، وقد لا يكون أولهما قابلًا للوصول من هذه الشبكة. نجرّبها
-        // بالترتيب داخل المهلة الكلية بدل أن نتوقف عند أول إخفاق.
+        // One name may resolve to both IPv6 and IPv4, and the first of them may not be reachable from this network. We try them
+        // in order within the overall timeout instead of stopping at the first failure.
         var deadline = DateTimeOffset.UtcNow + timeout;
         Exception? last = null;
         foreach (var address in addresses)

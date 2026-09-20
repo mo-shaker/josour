@@ -23,7 +23,7 @@
 
 
   <ItemGroup>
-    <!-- اختبارات تربط مقابس حقيقية وتعتمد مؤقتات: التوازي داخل التجميعة يجعلها متقطعة -->
+    <!-- Tests that bind real sockets and depend on timers: parallelism inside the assembly makes them flaky -->
     <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

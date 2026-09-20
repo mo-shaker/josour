@@ -3,9 +3,9 @@ using Josour.Core.Tunnel;
 namespace Josour.Core.Control;
 
 /// <summary>
-/// أسماء أسباب الإنهاء على السلك كما في docs/ws-protocol.md القسم 5 (<c>session.end.reason</c> و<c>session.terminate.reason</c>).
-/// الجدول في القسم 3 يذكر <c>guest_ended</c>/<c>host_ended</c> فقط لأنها الحالة المعتادة، بينما القسم 5 يعدّد بقية الأسباب
-/// (<c>expired</c>، <c>browser_not_proxied</c>، …) والعميل يحتاج أن يبلّغ بها حرفيًا. الاسم هنا هو صيغة القسم 5.
+/// The end reasons' names on the wire as in docs/ws-protocol.md section 5 (<c>session.end.reason</c> and <c>session.terminate.reason</c>).
+/// The table in section 3 mentions <c>guest_ended</c>/<c>host_ended</c> only because that is the usual case, while section 5 enumerates
+/// the rest (<c>expired</c>, <c>browser_not_proxied</c>, …) and the client needs to report them literally. The name here is section 5's spelling.
 /// </summary>
 public static class SessionEndReasonNames
 {
@@ -33,7 +33,7 @@ public static class SessionEndReasonNames
         _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, "unknown end reason"),
     };
 
-    /// <summary>يحوّل سبب <c>session.terminate</c> القادم من الخادم إلى <see cref="TunnelEndReason"/>؛ المجهول يصير <see cref="TunnelEndReason.ProtocolError"/>.</summary>
+    /// <summary>Turns a <c>session.terminate</c> reason from the server into a <see cref="TunnelEndReason"/>; an unknown one becomes <see cref="TunnelEndReason.ProtocolError"/>.</summary>
     public static bool TryParse(string? wire, out TunnelEndReason reason)
     {
         switch (wire?.Trim().ToLowerInvariant())
@@ -57,9 +57,9 @@ public static class SessionEndReasonNames
         return reason;
     }
 
-    /// <summary>سبب الإنهاء الذي يخص هذا الطرف عندما يوقف المستخدم الجلسة بنفسه.</summary>
+    /// <summary>The end reason belonging to this side when the user stops the session themselves.</summary>
     public static TunnelEndReason LocalEnd(TunnelRole role) => role == TunnelRole.Host ? TunnelEndReason.HostEnded : TunnelEndReason.GuestEnded;
 
-    /// <summary>سبب الإنهاء عندما يختفي هذا الطرف (انقطاع قناة التحكم): الخادم يسميه باسم من اختفى.</summary>
+    /// <summary>The end reason when this side vanishes (the control channel drops): the server names it after whoever vanished.</summary>
     public static TunnelEndReason LocalDisconnect(TunnelRole role) => role == TunnelRole.Host ? TunnelEndReason.HostDisconnected : TunnelEndReason.GuestDisconnected;
 }

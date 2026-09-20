@@ -4,8 +4,8 @@ using System.IO.Pipelines;
 namespace Josour.Tunnel.Mux;
 
 /// <summary>
-/// Stream فوق زوج PipeReader/PipeWriter (قناة Nerdbank). الكتابة تدفع فورًا (FlushAsync) فتخضع لضغط النافذة البعيدة.
-/// الإغلاق النصفي = Output.Complete. التخلص يكمل الاتجاهين وينتظر اكتمال القناة بمهلة قصيرة ثم يكسرها قسرًا.
+/// A Stream over a PipeReader/PipeWriter pair (a Nerdbank channel). Writing flushes at once (FlushAsync), so it is subject to the remote window's pressure.
+/// The half-close = Output.Complete. Disposing completes both directions and waits for the channel to complete with a short timeout, then breaks it forcibly.
 /// </summary>
 public sealed class PipeDuplexStream : Stream, IHalfClosable
 {
@@ -20,8 +20,8 @@ public sealed class PipeDuplexStream : Stream, IHalfClosable
     private int _readCompleted;
     private int _disposed;
 
-    /// <param name="completion">يكتمل عندما تُغلق القناة من الطرفين (اختياري).</param>
-    /// <param name="breakGlass">إنهاء قسري للقناة إن لم تكتمل خلال المهلة (اختياري).</param>
+    /// <param name="completion">Completes when the channel is closed from both ends (optional).</param>
+    /// <param name="breakGlass">A forced termination of the channel if it does not complete within the timeout (optional).</param>
     public PipeDuplexStream(PipeReader reader, PipeWriter writer, Task? completion = null, Action? breakGlass = null, Action? onDispose = null)
     {
         _reader = reader ?? throw new ArgumentNullException(nameof(reader));
@@ -50,7 +50,7 @@ public sealed class PipeDuplexStream : Stream, IHalfClosable
             }
             catch (InvalidOperationException e)
             {
-                // القارئ اكتمل أثناء القراءة (Dispose متزامن)
+                // The reader completed while reading (a concurrent Dispose)
                 if (Volatile.Read(ref _readCompleted) != 0) return 0;
                 throw new IOException("mux stream read failed", e);
             }
@@ -118,7 +118,7 @@ public sealed class PipeDuplexStream : Stream, IHalfClosable
     {
         if (Interlocked.Exchange(ref _writeCompleted, 1) == 0)
         {
-            try { _writer.Complete(); } catch (InvalidOperationException) { /* مكتمل أصلًا */ }
+            try { _writer.Complete(); } catch (InvalidOperationException) { /* already complete */ }
         }
     }
 
@@ -126,7 +126,7 @@ public sealed class PipeDuplexStream : Stream, IHalfClosable
     {
         if (Interlocked.Exchange(ref _readCompleted, 1) == 0)
         {
-            try { _reader.Complete(); } catch (InvalidOperationException) { /* مكتمل أصلًا */ }
+            try { _reader.Complete(); } catch (InvalidOperationException) { /* already complete */ }
         }
     }
 
@@ -141,12 +141,12 @@ public sealed class PipeDuplexStream : Stream, IHalfClosable
                 var breakGlass = _breakGlass;
                 _ = _completion.WaitAsync(GracefulCompletion).ContinueWith(t =>
                 {
-                    if (!t.IsCompletedSuccessfully) { try { breakGlass(); } catch { /* تجاهل */ } }
+                    if (!t.IsCompletedSuccessfully) { try { breakGlass(); } catch { /* ignore */ } }
                 }, TaskScheduler.Default);
             }
             else
             {
-                try { _breakGlass?.Invoke(); } catch { /* تجاهل */ }
+                try { _breakGlass?.Invoke(); } catch { /* ignore */ }
             }
             _onDispose?.Invoke();
         }
@@ -162,11 +162,11 @@ public sealed class PipeDuplexStream : Stream, IHalfClosable
             if (_completion is not null)
             {
                 try { await _completion.WaitAsync(GracefulCompletion).ConfigureAwait(false); }
-                catch { try { _breakGlass?.Invoke(); } catch { /* تجاهل */ } }
+                catch { try { _breakGlass?.Invoke(); } catch { /* ignore */ } }
             }
             else
             {
-                try { _breakGlass?.Invoke(); } catch { /* تجاهل */ }
+                try { _breakGlass?.Invoke(); } catch { /* ignore */ }
             }
             _onDispose?.Invoke();
         }

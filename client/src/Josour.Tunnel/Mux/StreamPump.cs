@@ -5,8 +5,8 @@ namespace Josour.Tunnel.Mux;
 public sealed record PumpResult(long BytesAToB, long BytesBToA, Exception? Error);
 
 /// <summary>
-/// ضخ ثنائي الاتجاه بين stream-ين مع نشر الإغلاق النصفي: نهاية القراءة من A → CompleteWriting على B (وبالعكس).
-/// ينتهي عندما ينتهي الاتجاهان، أو فورًا عند خطأ في أحدهما (فيُلغى الآخر). لا يتخلص من الـ streams؛ المستدعي يملكها.
+/// Bidirectional pumping between two streams, propagating the half-close: the end of reading from A -> CompleteWriting on B (and the reverse).
+/// It ends when both directions end, or at once on an error in either (which cancels the other). It does not dispose of the streams; the caller owns them.
 /// </summary>
 public static class StreamPump
 {
@@ -40,7 +40,7 @@ public static class StreamPump
         }
     }
 
-    /// <summary>ينسخ حتى نهاية المصدر ويعيد عدد البايتات. الكتابة تُدفع (Flush) بعد كل قطعة.</summary>
+    /// <summary>Copies to the end of the source and returns the byte count. The write is flushed after every chunk.</summary>
     public static async Task<long> CopyAsync(Stream source, Stream destination, CancellationToken ct)
     {
         var buffer = ArrayPool<byte>.Shared.Rent(BufferSize);

@@ -1,12 +1,12 @@
 name: deploy-staging
 
-# نشر آلي إلى خادم الاختبار عند نجاح CI على main، أو يدويًا.
-# الأسرار المطلوبة في المستودع:
-#   STAGING_HOST      عنوان الخادم أو اسمه
-#   STAGING_USER      مستخدم SSH
-#   STAGING_SSH_KEY   مفتاح خاص (ed25519) بلا عبارة مرور
-#   STAGING_PATH      مسار المستودع على الخادم، مثل /opt/routebridge
-# الخادم يجب أن يكون مجهّزًا مسبقًا وفق docs/runbook.md وفيه deploy/.env جاهز.
+# Automatic deployment to the staging server when CI succeeds on main, or by hand.
+# The secrets required in the repository:
+#   STAGING_HOST      the server's address or name
+#   STAGING_USER      the SSH user
+#   STAGING_SSH_KEY   a private key (ed25519) with no passphrase
+#   STAGING_PATH      the repository's path on the server, e.g. /opt/routebridge
+# The server must already be prepared per docs/runbook.md with deploy/.env in place.
 
 on:
   workflow_run:
@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   deploy:
-    # لا تنشر إلا إذا نجح CI فعلًا
+    # Do not deploy unless CI actually succeeded
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     environment: staging

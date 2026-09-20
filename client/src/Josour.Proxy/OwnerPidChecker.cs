@@ -5,11 +5,11 @@ using System.Runtime.Versioning;
 
 namespace Josour.Proxy;
 
-/// <summary>يعيد PID العملية المالكة لطرف الاتصال الوارد (المنفذ المحلي للعميل = المنفذ البعيد الذي نراه). null = غير معروف.</summary>
+/// <summary>Returns the PID of the process that owns the inbound connection's end (the client's local port = the remote port we see). null = unknown.</summary>
 public interface IOwnerPidChecker
 {
-    /// <param name="remoteEndPoint">طرف العميل كما نراه (منفذه المحلي).</param>
-    /// <param name="localEndPoint">طرف الـ Proxy (منفذ الاستماع).</param>
+    /// <param name="remoteEndPoint">The client's end as we see it (its local port).</param>
+    /// <param name="localEndPoint">The proxy's end (the listening port).</param>
     int? GetOwnerPid(IPEndPoint remoteEndPoint, IPEndPoint localEndPoint);
 }
 
@@ -44,7 +44,7 @@ public static class OwnerPidCheckers
     };
 }
 
-/// <summary>لا يعرف شيئًا (غير Windows والاختبارات). قبول الاتصال يعتمد حينها على RejectUnknownOwner.</summary>
+/// <summary>It knows nothing (off Windows, and the tests). Accepting the connection then rests on RejectUnknownOwner.</summary>
 public sealed class PermissiveOwnerPidChecker : IOwnerPidChecker
 {
     public static readonly PermissiveOwnerPidChecker Instance = new();
@@ -52,8 +52,8 @@ public sealed class PermissiveOwnerPidChecker : IOwnerPidChecker
 }
 
 /// <summary>
-/// WINDOWS-ONLY: iphlpapi!GetExtendedTcpTable(TCP_TABLE_OWNER_PID_ALL) لجدولي IPv4 وIPv6؛ يبحث عن الصف الذي منفذه المحلي =
-/// المنفذ البعيد للاتصال الوارد ومنفذه البعيد = منفذ الـ Proxy. لم يُشغَّل على Windows بعد (مراجعة كود فقط).
+/// WINDOWS-ONLY: iphlpapi!GetExtendedTcpTable(TCP_TABLE_OWNER_PID_ALL) for both the IPv4 and IPv6 tables; it looks for the row whose local port =
+/// the inbound connection's remote port and whose remote port = the proxy's port. It has not been run on Windows yet (a code review only).
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class WindowsOwnerPidChecker : IOwnerPidChecker
@@ -155,7 +155,7 @@ public sealed class WindowsOwnerPidChecker : IOwnerPidChecker
         }
     }
 
-    /// <summary>الجدول يُحجز بـ AllocHGlobal؛ المستدعي يحرره. IntPtr.Zero عند الفشل.</summary>
+    /// <summary>The table is allocated with AllocHGlobal; the caller frees it. IntPtr.Zero on failure.</summary>
     private static IntPtr ReadTable(int family)
     {
         var size = 0;
@@ -175,11 +175,11 @@ public sealed class WindowsOwnerPidChecker : IOwnerPidChecker
 }
 
 /// <summary>
-/// تحويلات بايتات جداول TCP. منطق خالص بلا استدعاء نظام، فهو خارج الصنف الخاص بـ Windows
-/// ليبقى قابلًا للاختبار على أي منصة.
+/// Byte conversions for the TCP tables. Pure logic with no system call, so it lives outside the Windows-specific class
+/// to stay testable on any platform.
 /// </summary>
 public static class TcpTableFormat
 {
-    /// <summary>المنفذ في الـ DWORD بترتيب الشبكة في أدنى 16 بت.</summary>
+    /// <summary>The port sits in the DWORD in network order in the lowest 16 bits.</summary>
     public static int PortFromDword(uint dword) => (int)(((dword & 0xFF) << 8) | ((dword >> 8) & 0xFF));
 }

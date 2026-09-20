@@ -2,41 +2,41 @@ using Josour.Core.Tunnel;
 
 namespace Josour.Tunnel.Transport;
 
-/// <summary>إعداد <see cref="RelayTransport"/>. التوكن يأتي من الخادم الخلفي ويُطلب عند كل اتصال ليمكن تجديده.</summary>
+/// <summary><see cref="RelayTransport"/>'s configuration. The token comes from the backend server and is requested on every connection so it can be refreshed.</summary>
 public sealed record RelayTransportOptions
 {
-    /// <summary>معرّف الجلسة نفسه الذي في session.created (يزاوج به الـ Relay الطرفين).</summary>
+    /// <summary>The same session id as in session.created (the relay pairs the two sides by it).</summary>
     public required Guid SessionId { get; init; }
 
     public required TunnelRole Role { get; init; }
 
-    /// <summary>توكن جلسة موقَّع من الخادم الخلفي. لا يُسجَّل ولا يظهر في التشخيص.</summary>
+    /// <summary>A session token signed by the backend server. It is not logged and does not appear in the diagnostics.</summary>
     public required Func<CancellationToken, ValueTask<string>> TokenProvider { get; init; }
 
-    /// <summary>عنوان الـ Relay من الإعداد. null = يُستعمل المرشح الممرَّر إلى ConnectAsync كما هو.</summary>
+    /// <summary>The relay's address from the configuration. null = the candidate passed to ConnectAsync is used as it is.</summary>
     public CandidateEndpoint? Endpoint { get; init; }
 
-    /// <summary>مهلة تبادل المقدمة والرد بعد نجاح TCP.</summary>
+    /// <summary>The timeout for exchanging the preamble and the reply once TCP succeeds.</summary>
     public TimeSpan HandshakeTimeout { get; init; } = TimeSpan.FromSeconds(5);
 
-    /// <summary>النقل الذي يُفتح به المقبس إلى الـ Relay (Direct افتراضيًا؛ قابل للاستبدال في الاختبارات).</summary>
+    /// <summary>The transport the socket to the relay is opened with (Direct by default; replaceable in the tests).</summary>
     public ITunnelTransport Inner { get; init; } = new DirectTransport();
 }
 
 /// <summary>
-/// نقل عبر Relay: يفتح TCP إلى الـ Relay، يرسل مقدمة <see cref="RelayProtocol"/> (سحر، إصدار، دور، session_id، توكن موقَّع)،
-/// وينتظر <see cref="RelayStatus.Paired"/> قبل أن يسلّم الـ stream لأعلى. ما بعد ذلك بايتات معتمة: TLS والمصادقة يجريان
-/// بين الجهازين كما في المباشر تمامًا (ADR-0003 البند 5: النقل خلف <see cref="ITunnelTransport"/> من اليوم الأول).
+/// A transport over a relay: it opens TCP to the relay, sends a <see cref="RelayProtocol"/> preamble (the magic, the version, the role, the session_id, the signed token),
+/// and waits for <see cref="RelayStatus.Paired"/> before handing the stream upwards. Everything after that is opaque bytes: TLS and the authentication run
+/// between the two machines exactly as on the direct path (ADR-0003 item 5: the transport behind <see cref="ITunnelTransport"/> from day one).
 ///
-/// أثر التفعيل على بقية النظام: صفر. <c>TunnelSessionOptions.Transport = new RelayTransport(...)</c> فقط، ولا يتغير
-/// <see cref="SymmetricConnector"/> ولا <see cref="Mux.NerdbankMux"/> ولا سياسة الخروج.
+/// Its effect on the rest of the system when enabled: zero. Just <c>TunnelSessionOptions.Transport = new RelayTransport(...)</c>, and neither
+/// <see cref="SymmetricConnector"/> nor <see cref="Mux.NerdbankMux"/> nor the egress policy changes.
 ///
-/// WEEK 5/6: خدمة الـ Relay نفسها (تحقق التوكن، الاقتران، ضخ البايتات، الحدود) تُبنى فقط إن أغلقت بوابة ADR-0003.
-/// الاختبارات اليوم تشغّل Relay وهميًا داخل العملية يزاوج مقبسين.
+/// WEEK 5/6: the relay service itself (token verification, pairing, byte pumping, the limits) is built only if the ADR-0003 gate closes.
+/// The tests today run a fake in-process relay that pairs two sockets.
 ///
-/// نقطة مفتوحة للأسبوع 5/6 (لا تمس عقد اليوم): في المباشر يكون المستمع هو TLS Server، أما فوق الـ Relay فالطرفان
-/// متصلان، فيجب تثبيت من يقدّم الشهادة. الأرجح: المضيف دائمًا TLS Server (كما هو مرجع القبول)، والمقدمة تحمل الدور
-/// أصلًا فلا يتغير شيء في هذا الملف. لذلك اختبارات اليوم تتحقق من البايتات المعتمة لا من TLS فوق الـ Relay.
+/// An open point for week 5/6 (it does not touch today's contract): on the direct path the listener is the TLS server, but over the relay both sides are
+/// connectors, so whoever presents the certificate must be pinned down. Most likely: the host is always the TLS server (as it is the authority on acceptance), and the preamble already carries the role
+/// so nothing in this file changes. That is why today's tests check the opaque bytes rather than TLS over the relay.
 /// </summary>
 public sealed class RelayTransport : ITunnelTransport
 {
@@ -51,7 +51,7 @@ public sealed class RelayTransport : ITunnelTransport
 
     public string Name => "relay";
 
-    /// <summary>عنوان الـ Relay الفعلي المستعمل لمرشح ما (الإعداد يغلب المرشح).</summary>
+    /// <summary>The actual relay address used for a given candidate (the configuration beats the candidate).</summary>
     public CandidateEndpoint Target(CandidateEndpoint candidate) => _options.Endpoint ?? candidate;
 
     public async Task<Stream> ConnectAsync(CandidateEndpoint endpoint, TimeSpan timeout, CancellationToken ct)

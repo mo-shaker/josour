@@ -9,7 +9,7 @@ using Josour.Infrastructure.Control;
 namespace Josour.App.Services;
 
 /// <summary>
-/// The platform source of <see cref="ConnectivitySignal"/>s (plan 8.5: نوم الجهاز / تغيير الشبكة).
+/// The platform source of <see cref="ConnectivitySignal"/>s (plan 8.5: the machine sleeping / the network changing).
 /// <para>
 /// A network change is <see cref="NetworkChange.NetworkAddressChanged"/> on every platform. Waking from sleep is not so
 /// even: Windows raises <c>SystemEvents.PowerModeChanged</c>, and macOS only tells a process that has registered for

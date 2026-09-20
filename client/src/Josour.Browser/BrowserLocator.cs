@@ -5,13 +5,13 @@ using Josour.Core.Browser;
 
 namespace Josour.Browser;
 
-/// <param name="Source">من أين جاء المسار: app_paths:HKLM | app_paths:HKCU | app_paths:HKLM\WOW6432Node | default.</param>
-/// <param name="PublisherVerified">null = لم يُفحص (غير Windows).</param>
+/// <param name="Source">Where the path came from: app_paths:HKLM | app_paths:HKCU | app_paths:HKLM\WOW6432Node | default.</param>
+/// <param name="PublisherVerified">null = not checked (off Windows).</param>
 public sealed record BrowserLocation(BrowserKind Kind, string Path, string Source, bool? PublisherVerified, string? Publisher);
 
 /// <summary>
-/// يحدد chrome.exe / msedge.exe من App Paths (HKLM ثم HKCU ثم WOW6432Node) ثم المسارات الافتراضية، ويتحقق من ناشر توقيع
-/// Authenticode ("Google LLC" / "Microsoft Corporation") على Windows.
+/// It locates chrome.exe / msedge.exe from App Paths (HKLM, then HKCU, then WOW6432Node) and then the default paths, and verifies the Authenticode
+/// signature's publisher ("Google LLC" / "Microsoft Corporation") on Windows.
 /// </summary>
 public sealed class BrowserLocator
 {
@@ -52,7 +52,7 @@ public sealed class BrowserLocator
         return null;
     }
 
-    /// <summary>الترتيب: App Paths في HKLM ثم HKCU ثم HKLM\WOW6432Node ثم المسارات الافتراضية.</summary>
+    /// <summary>The order: App Paths in HKLM, then HKCU, then HKLM\WOW6432Node, then the default paths.</summary>
     public IReadOnlyList<(string Path, string Source)> CandidatePaths(BrowserKind kind)
     {
         var exe = ExeName(kind);
@@ -86,7 +86,7 @@ public sealed class BrowserLocator
         return list;
     }
 
-    /// <summary>مسارات Windows بفاصل '\' صراحةً (Path.Combine يعطي '/' على غير Windows، والاختبارات تعمل هنا على macOS).</summary>
+    /// <summary>Windows paths with an explicit '\' separator (Path.Combine gives '/' off Windows, and the tests run here on macOS).</summary>
     private static string Win(params string[] parts) => string.Join('\\', parts.Select(p => p.TrimEnd('\\')));
 
     private static void Add(List<(string, string)> list, string? path, string source)
@@ -98,7 +98,7 @@ public sealed class BrowserLocator
         list.Add((trimmed, source));
     }
 
-    /// <summary>WINDOWS-ONLY: X509Certificate.CreateFromSignedFile ثم O= من الموضوع. null على غير Windows.</summary>
+    /// <summary>WINDOWS-ONLY: X509Certificate.CreateFromSignedFile, then O= from the subject. null off Windows.</summary>
     public static (bool Verified, string? Publisher)? VerifyPublisher(string path)
     {
         if (!OperatingSystem.IsWindows()) return null;
@@ -113,7 +113,7 @@ public sealed class BrowserLocator
             using var signer = new X509Certificate2(X509Certificate.CreateFromSignedFile(path));
             var organization = signer.GetNameInfo(X509NameType.SimpleName, false);
             var o = ExtractOrganization(signer.Subject) ?? organization;
-            // نتحقق من هوية الناشر فقط؛ سلسلة الثقة تُترك لـ SmartScreen/النظام (الشهادة قد تكون منتهية في ملفات قديمة موقّعة بطابع زمني).
+            // We verify the publisher's identity only; the trust chain is left to SmartScreen/the system (the certificate may be expired in old files signed with a timestamp).
             return (o is not null, o);
         }
         catch (Exception)
@@ -122,7 +122,7 @@ public sealed class BrowserLocator
         }
     }
 
-    /// <summary>O=… من Distinguished Name (يتعامل مع القيم المقتبسة).</summary>
+    /// <summary>O=… from a distinguished name (handling quoted values).</summary>
     public static string? ExtractOrganization(string subject)
     {
         if (string.IsNullOrEmpty(subject)) return null;

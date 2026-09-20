@@ -1,6 +1,6 @@
 namespace Josour.Tunnel.Mux;
 
-/// <summary>غلاف يعدّ البايتات المقروءة والمكتوبة ويمرر الإغلاق النصفي إلى الداخل. يملك الـ stream الداخلي.</summary>
+/// <summary>A wrapper that counts the bytes read and written and passes the half-close inward. It owns the inner stream.</summary>
 public sealed class CountingStream : Stream, IHalfClosable
 {
     private readonly Stream _inner;

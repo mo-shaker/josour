@@ -4,12 +4,12 @@ using System.Net.Sockets;
 
 namespace Josour.Tunnel.Candidates;
 
-/// <summary>قراءة عناوين واجهات الجهاز. لا يرمي أبدًا؛ أخطاء التعداد تعطي نتائج فارغة.</summary>
+/// <summary>Reading the machine's interface addresses. It never throws; enumeration errors give empty results.</summary>
 public static class LocalNetwork
 {
     public sealed record LocalAddress(IPAddress Address, NetworkInterface Interface, UnicastIPAddressInformation Info);
 
-    /// <summary>عناوين unicast لكل الواجهات غير loopback (الواجهات العاملة فقط عند onlyUp).</summary>
+    /// <summary>The unicast addresses of every non-loopback interface (the interfaces that are up only, when onlyUp).</summary>
     public static IReadOnlyList<LocalAddress> GetUnicastAddresses(bool onlyUp = true)
     {
         var result = new List<LocalAddress>();
@@ -28,13 +28,13 @@ public static class LocalNetwork
             }
             catch
             {
-                // واجهة واحدة معطوبة لا تمنع الباقي
+                // One broken interface does not stop the rest
             }
         }
         return result;
     }
 
-    /// <summary>كل عناوين الجهاز (بما فيها loopback والواجهات المتوقفة) وبواباته الافتراضية، لسياسة IpRangePolicy على المضيف.</summary>
+    /// <summary>Every address of the machine (loopback and down interfaces included) and its default gateways, for IpRangePolicy on the host.</summary>
     public static IReadOnlyList<IPAddress> GetPolicyLocalAddresses()
     {
         var result = new List<IPAddress>();
@@ -52,7 +52,7 @@ public static class LocalNetwork
             }
             catch
             {
-                // تجاهل
+                // ignore
             }
         }
         return result;
@@ -61,7 +61,7 @@ public static class LocalNetwork
     public static bool IsLanIPv4(IPAddress address)
         => address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address) && !address.Equals(IPAddress.Any);
 
-    /// <summary>IPv6 عام: ليس loopback ولا link-local ولا site-local ولا ULA ولا multicast ولا v4-mapped ولا Teredo.</summary>
+    /// <summary>Public IPv6: not loopback, not link-local, not site-local, not ULA, not multicast, not v4-mapped and not Teredo.</summary>
     public static bool IsGlobalIPv6(IPAddress address)
         => address.AddressFamily == AddressFamily.InterNetworkV6
            && !IPAddress.IsLoopback(address)
@@ -73,10 +73,10 @@ public static class LocalNetwork
            && !address.IsIPv4MappedToIPv6
            && !address.IsIPv6Teredo;
 
-    /// <summary>ليس عنوانًا مؤقتًا (privacy/random suffix) ولا transient ولا في حالة DAD غير مفضّلة. الخصائص غير المدعومة على المنصة تُتجاهل.</summary>
+    /// <summary>Not a temporary address (a privacy/random suffix), not transient, and not in a non-preferred DAD state. Properties the platform does not support are ignored.</summary>
     public static bool IsStableAddress(UnicastIPAddressInformation info)
     {
-        // WINDOWS-ONLY: SuffixOrigin/IsTransient/DuplicateAddressDetectionState تُقرأ على Windows فقط؛ على غيره تُعتبر كل العناوين مستقرة.
+        // WINDOWS-ONLY: SuffixOrigin/IsTransient/DuplicateAddressDetectionState are read on Windows only; elsewhere every address is treated as stable.
         if (!OperatingSystem.IsWindows()) return true;
         try
         {

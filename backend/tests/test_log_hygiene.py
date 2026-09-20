@@ -1,7 +1,8 @@
 """The server never logs browsing content, credentials or key material.
 
-Product document sections 14 ("عدم تسجيل محتوى التصفح") and 15 ("تسجيل بيانات الجلسة الإدارية
-فقط"), and the deployed check ``scripts/security/check-logs-clean.sh`` - whose patterns are
+Product document sections 14 ("Not logging browsing content") and 15 ("Recording
+administrative session data only"), and the deployed check ``scripts/security/check-logs-clean.sh``
+- whose patterns are
 mirrored in :data:`FORBIDDEN_PATTERNS` so the same rule is enforced before a release, not only
 after one.
 

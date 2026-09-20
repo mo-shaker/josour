@@ -3,7 +3,7 @@ using Josour.Core.Browser;
 
 namespace Josour.Browser;
 
-/// <param name="Findings">مثل "HKLM:ProxyMode=system" للتشخيص.</param>
+/// <param name="Findings">Such as "HKLM:ProxyMode=system", for the diagnostics.</param>
 public sealed record BrowserPolicyStatus(bool ProxyManaged, bool UserDataDirManaged, IReadOnlyList<string> Findings)
 {
     public bool AnyManaged => ProxyManaged || UserDataDirManaged;
@@ -11,8 +11,8 @@ public sealed record BrowserPolicyStatus(bool ProxyManaged, bool UserDataDirMana
 }
 
 /// <summary>
-/// يكشف سياسات المؤسسة التي تُبطل --proxy-server أو --user-data-dir: HKLM/HKCU SOFTWARE\Policies\Google\Chrome و\Microsoft\Edge،
-/// القيم ProxySettings / ProxyMode / ProxyServer / UserDataDir. أي قيمة موجودة (ولو ProxyMode=system) = مُدار، لأن السياسة تتقدم على سطر الأوامر.
+/// It detects the enterprise policies that override --proxy-server or --user-data-dir: HKLM/HKCU SOFTWARE\Policies\Google\Chrome and \Microsoft\Edge,
+/// the values ProxySettings / ProxyMode / ProxyServer / UserDataDir. Any value present (even ProxyMode=system) = managed, because the policy takes precedence over the command line.
 /// </summary>
 public static class PolicyDetector
 {

@@ -28,12 +28,12 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-15}
       REFRESH_TOKEN_DAYS: ${REFRESH_TOKEN_DAYS:-30}
-      # تحديد المعدل (ADR-0008). الافتراضات هنا هي افتراضات الكود؛ تُذكر صراحة ليستطيع المشغّل ضبطها.
+      # Rate limiting (ADR-0008). The defaults here are the code's defaults; they are stated explicitly so the operator can tune them.
       RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
       LOGIN_RATE_LIMIT_PER_MINUTE: ${LOGIN_RATE_LIMIT_PER_MINUTE:-30}
       LOGIN_EMAIL_RATE_LIMIT: ${LOGIN_EMAIL_RATE_LIMIT:-5}
       LOGIN_EMAIL_RATE_LIMIT_WINDOW_MINUTES: ${LOGIN_EMAIL_RATE_LIMIT_WINDOW_MINUTES:-15}
-      # كشف الأجهزة المشبوهة (ADR-0008). صفر لأي عتبة يعطّل قاعدتها وحدها.
+      # Suspicious-device detection (ADR-0008). A zero for any threshold disables that rule alone.
       DEVICE_RISK_ENABLED: ${DEVICE_RISK_ENABLED:-true}
       DEVICE_RISK_INTERVAL_SECONDS: ${DEVICE_RISK_INTERVAL_SECONDS:-300}
       DEVICE_RISK_WINDOW_MINUTES: ${DEVICE_RISK_WINDOW_MINUTES:-60}

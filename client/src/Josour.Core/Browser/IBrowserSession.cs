@@ -8,11 +8,11 @@ public enum BrowserLaunchFailure { NotFound, ManagedByPolicy, InstanceHandoff, P
 
 public sealed record BrowserLaunchResult(bool Success, BrowserLaunchFailure? Failure, string? Detail);
 
-/// <summary>متصفح العمل: تشغيل داخل Job Object وإغلاق مهذب ثم قسري. المسار B يوفر التنفيذ في Josour.Browser.</summary>
+/// <summary>The work browser: launched inside a Job Object, with a polite close then a forced one. Track B provides the implementation in Josour.Browser.</summary>
 public interface IBrowserSession : IAsyncDisposable
 {
     bool IsRunning { get; }
-    /// <summary>معرّفات عمليات المتصفح داخل الـ Job، لفحص PID المالك في الـ Proxy.</summary>
+    /// <summary>The browser's process ids inside the job, for the owning-PID check in the proxy.</summary>
     bool OwnsProcess(int pid);
     Task<BrowserLaunchResult> LaunchAsync(BrowserLaunchOptions options, CancellationToken ct);
     Task CloseAsync(TimeSpan graceful, CancellationToken ct);
