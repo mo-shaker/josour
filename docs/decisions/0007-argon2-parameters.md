@@ -1,50 +1,66 @@
-# ADR-0007: معاملات argon2id مقابل سقف الـ VPS
+# ADR-0007: argon2id parameters against the VPS ceiling
 
-**الحالة:** **معتمد بتاريخ 2026-09-05** باختيار صاحب المنتج للخيار (ب). منفَّذ ومقيس.
+**Status:** **accepted on 2026-09-05** with the product owner choosing option (b). Implemented and measured.
 
-## السياق
+## Context
 
-تخزين كلمات المرور بـ argon2id متطلب في القسم 14 من وثيقة المنتج، ومنفَّذ منذ الأسبوع الأول. لكن قياس التحميل في الأسبوع الخامس (`docs/load-test-week5.md`) أظهر أن تكلفته على نواة واحدة معتبرة:
+Storing passwords with argon2id is required by section 14 of the product document, and has been implemented since
+week one. But the week-five load test (`docs/load-test-week5.md`) showed its cost on a single core is
+considerable:
 
-- **نحو 210 مللي ثانية من المعالج لكل تسجيل دخول** بالمعاملات الحالية.
-- الخادم يعمل بعامل واحد عمدًا (قرار الخطة، القسم 2)، فهذه التكلفة تنافس حلقة الأحداث نفسها.
-- خُففت الحدة بنقل الاشتقاق خارج حلقة الأحداث وتحديد التزامن باثنين (سقف ذاكرة نحو 128 ميغابايت)، لكن الطابور يبقى: **20 تسجيل دخول متزامنًا يرفع زمن الجلسة الكاملة من 78 مللي ثانية إلى نحو 10.7 ثانية** عند 200 اتصال.
+- **About 210 ms of CPU per sign-in** with the current parameters.
+- The server runs with one worker deliberately (plan decision, section 2), so this cost competes with the event
+  loop itself.
+- It was softened by moving the derivation off the event loop and capping concurrency at two (a memory ceiling of
+  about 128 MB), but the queue remains: **20 concurrent sign-ins take a full session from 78 ms to about 10.7
+  seconds** at 200 connections.
 
-## ما يخفف الخطر فعليًا
+## What actually reduces the risk
 
-تسجيل الدخول الكامل نادر في التشغيل الطبيعي: رمز الوصول يعيش 15 دقيقة ورمز التحديث 30 يومًا، فإعادة تشغيل الخادم **لا** تسبب عاصفة تسجيل دخول (العملاء يعيدون الاتصال برمز موجود). العاصفة الواقعية الوحيدة هي أول تشغيل لأسطول جديد، أو بعد تدوير `JWT_SECRET`.
+A full sign-in is rare in normal operation: the access token lives 15 minutes and the refresh token 30 days, so
+restarting the server does **not** cause a sign-in storm (clients reconnect with a token they already have). The
+only real storm is the first run of a new fleet, or the aftermath of rotating `JWT_SECRET`.
 
-## الخيارات
+## Options
 
-| الخيار | الأثر | الكلفة |
+| Option | Effect | Cost |
 |---|---|---|
-| **أ. الإبقاء كما هو** | أقوى مقاومة للتخمين دون تغيير | عاصفة تسجيل دخول تُبطئ الجلسات لثوانٍ |
-| **ب. معاملات OWASP الموصى بها** (m=19 MiB، t=2، p=1) | نحو خُمس التكلفة، ويبقى ضمن التوصية المنشورة | مقاومة أقل نظريًا لهجوم عتادي |
-| **ج. الإبقاء مع تحديد معدل على تسجيل الدخول لكل حساب** | يحدّ العاصفة دون إضعاف الاشتقاق | لا يحل أول تشغيل لأسطول |
+| **a. Leave it as it is** | The strongest resistance to guessing, unchanged | A sign-in storm slows sessions by seconds |
+| **b. OWASP's recommended parameters** (m=19 MiB, t=2, p=1) | About a fifth of the cost, still within published guidance | Theoretically less resistance to a hardware attack |
+| **c. Keep it, and rate-limit sign-in per account** | Bounds the storm without weakening the derivation | Does not help the first run of a fleet |
 
-## القرار
+## Decision
 
-**(ب)**: `m=19 MiB، t=2، p=1`. المعاملات المقترحة من OWASP كافية لتخزين كلمات مرور خلف تحديد معدل وقفل حساب، وكلاهما منفَّذ في هذا الخادم؛ والسقف التشغيلي على VPS بنواة واحدة اعتبار حقيقي لا نظري.
+**(b)**: `m=19 MiB, t=2, p=1`. OWASP's parameters are sufficient for storing passwords behind rate limiting and
+account lockout, both of which this server implements; and the operational ceiling of a single-core VPS is a real
+constraint rather than a theoretical one.
 
-## الأثر المقيس
+## The measured effect
 
-قياس على الهدف الحقيقي: حاوية صورة الإنتاج بـ `--cpus 1 --memory 2g`، عشرون تسجيل دخول متزامنًا، مستخدمون منفصلون لكل مجموعة معاملات حتى لا تلوّث إعادةُ التجزئة القياس، وجولتان لكل حالة (الثانية هي الحالة المستقرة).
+Measured against the real target: the production image in a container limited to `--cpus 1 --memory 2g`, twenty
+concurrent sign-ins, separate users per parameter set so that rehashing does not contaminate the measurement, and
+two rounds per case (the second being the steady state).
 
-| المعاملات | الزمن الكلي | p50 | p99 |
+| Parameters | Total time | p50 | p99 |
 |---|---|---|---|
-| قبل: m=64 MiB، t=3، p=4 | 4770 و4778 ms | نحو 2710 ms | نحو 4700 ms |
-| **بعد: m=19 MiB، t=2، p=1** | **367 و361 ms** | **نحو 241 ms** | **نحو 346 ms** |
+| Before: m=64 MiB, t=3, p=4 | 4770 and 4778 ms | about 2710 ms | about 4700 ms |
+| **After: m=19 MiB, t=2, p=1** | **367 and 361 ms** | **about 241 ms** | **about 346 ms** |
 
-**تحسن نحو 13 ضعفًا** في الزمن الكلي للدفعة. وتكلفة الاشتقاق الواحد على جهاز التطوير نزلت من 25 إلى 13 مللي ثانية، وعلى الحاوية المقيَّدة من نحو 210 إلى نحو 16.
+**About thirteen times better** on the batch's total time. A single derivation on the development machine went
+from 25 ms to 13, and in the constrained container from about 210 to about 16.
 
-## التوافق مع الحسابات القائمة
+## Compatibility with existing accounts
 
-المعاملات مخزّنة داخل التجزئة نفسها (`$argon2id$v=19$m=19456,t=2,p=1$…`)، فكلمات المرور القديمة:
-- **تبقى صالحة**: التحقق يقرأ معاملاتها من التجزئة.
-- **تُرقّى تلقائيًا** عند أول تسجيل دخول ناجح، عبر `password_needs_rehash` المربوط في `app/services/auth.py`.
+The parameters live inside the hash itself (`$argon2id$v=19$m=19456,t=2,p=1$…`), so old passwords:
+- **stay valid**: verification reads their parameters out of the hash;
+- **are upgraded automatically** on the first successful sign-in, through `password_needs_rehash` wired in
+  `app/services/auth.py`.
 
-مثبَّت باختبارين في `tests/test_security.py`: أحدهما يثبّت المعاملات نفسها (فتغييرها يصير قرارًا لا انزلاقًا)، والآخر يتحقق أن تجزئة بالمعاملات القديمة ما زالت تعمل وتُعلَّم للترقية.
+Pinned by two tests in `tests/test_security.py`: one fixes the parameters themselves (so changing them is a
+decision rather than a drift), and the other checks that a hash with the old parameters still works and is marked
+for upgrade.
 
-## ملاحظة تكميلية
+## A note
 
-الخيار (ج) (تحديد معدل لتسجيل الدخول لكل حساب) يبقى مقترحًا نافعًا ولم يُنفَّذ؛ الموجود حاليًا تحديد معدل حسب عنوان IP وقفل حساب بعد عشر محاولات فاشلة.
+Option (c) — rate-limiting sign-in per account — remains a useful proposal and is not implemented; what exists
+today is rate limiting by IP address and account lockout after ten failed attempts.

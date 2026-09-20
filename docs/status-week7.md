@@ -1,69 +1,102 @@
-# حالة الأسبوع 7 (بتاريخ 2026-09-09)
+# Week 7 status (2026-09-09)
 
-الأسبوع الذي صار فيه المنتج يعمل. **معلم M2 تحقق**: جلسة كاملة بين جهازين على شبكتين مختلفتين، والمواقع رأت عنوان المضيف.
+The week the product started working. **Milestone M2 reached**: a full session between two machines on two different
+networks, with the sites seeing the host's address.
 
-## ما اكتمل وتحقق منه
+## What was completed and verified
 
-| المخرج | التحقق |
+| Output | Verification |
 |---|---|
-| **خدمة الـ Relay** كاملة: عقد السلك، تحقق التوكن، الاقتران، ضخّ البايتات، الحدود، Docker وCI | **51 اختبارًا**، ruff نظيف، وتشغيل حيّ للخدمة المبنيّة |
-| **وصلها من طرف إلى طرف**: الخادم يصدر توكنًا لكل طرف، `session.created.relay` يحمله، والعميل يسابق به المسار المباشر | 5 اختبارات تقيم جلسة عبر Relay حقيقي بلا أي مسار مباشر |
-| **قياس الـ Relay** بمنهج الأسبوع الخامس | [`performance-relay.md`](performance-relay.md) |
-| **إعادة التسمية** إلى جسور: 340 ملفًا، 15 مشروعًا، معرّفات وقت التشغيل داخل العقود | بناء بلا تحذير، والاختبارات خضراء |
-| **كل المواقع عبر المضيف** ([ADR-0010](decisions/0010-route-all-through-host.md)) | 1310 اختبارًا في العميل، 345 في الخادم |
-| **خمسة أعطال أُغلقت** — تفصيلها أدناه | لكلٍّ اختبار انحدار |
+| **The relay service** complete: the wire contract, token verification, pairing, byte pumping, the limits, Docker and CI | **51 tests**, ruff clean, and a live run of the built service |
+| **Wiring it end to end**: the server issues a token per side, `session.created.relay` carries it, and the client races it against the direct path | 5 tests that stand up a session over a real relay with no direct path at all |
+| **Measuring the relay** by week five's method | [`performance-relay.md`](performance-relay.md) |
+| **The rename** to Josour: 340 files, 15 projects, runtime identifiers inside the contracts | Builds with no warnings, and the tests are green |
+| **All sites through the host** ([ADR-0010](decisions/0010-route-all-through-host.md)) | 1310 tests on the client, 345 on the server |
+| **Five failures closed** — detailed below | A regression test for each |
 
-**الإجمالي:** 345 في الخادم، **1320** في العميل (بفلتر CI `Category!=Benchmark`)، 51 في الـ Relay.
+**The total:** 345 on the server, **1320** on the client (under the CI filter `Category!=Benchmark`), 51 in the relay.
 
-> اختبارات `Category=Benchmark` — الـ soak والـ fuzz والقياس — **تُستثنى من التشغيل العادي**: `WorkingTunnel_DoesNotGrowOverTime` وحده يعمل **30 دقيقة** افتراضيًا. تشغيل الحل بلا الفلتر يستدعي ساعةً من العمل المتعمَّد، ويبدو كتعليق لأن الـ soak ساكن بطبيعته.
+> The `Category=Benchmark` tests — the soak, the fuzz and the measurements — **are excluded from an ordinary run**:
+> `WorkingTunnel_DoesNotGrowOverTime` alone runs for **30 minutes** by default. Running the solution without the
+> filter asks for an hour of deliberate work, and looks like a hang, because a soak is quiet by nature.
 
-## قراران أُغلقا ببيانات لا بتقدير
+## Two decisions closed with data rather than estimates
 
-**[ADR-0009](decisions/0009-relay-default.md)** أغلق بوابة ظلّت مفتوحة منذ الأسبوع الأول. القياس على زوج حقيقي (مصر ↔ السعودية): مرشّح `public` واحد لكل طرف، بلا UPnP وبلا IPv6 عام، وفشل مرتين عند مهلة الاتصال. النموذج القديم **يكتشف** قابلية وصول قائمة ولا **ينشئها**، فحين يكون الطرفان خلف CGNAT لا يوجد ما يُكتشف.
+**[ADR-0009](decisions/0009-relay-default.md)** closed a gate that had stayed open since week one. The measurement on a
+real pair (Egypt ↔ Saudi Arabia): one `public` candidate per side, no UPnP and no public IPv6, and failure twice at the
+connect timeout. The old model **discovers** existing reachability and does not **create** it, so when both ends are
+behind CGNAT there is nothing to discover.
 
-وتصحيح مفاهيمي قاد القرار: **hole punching تحسين تكلفة لا ميزة موثوقية** — يقلّل ما يمر بالـ Relay ولا يغني عنه، لأنه يفشل حتميًا مع CGNAT↔CGNAT.
+And a conceptual correction drove the decision: **hole punching is a cost optimisation, not a reliability feature** —
+it reduces what goes through the relay and does not replace it, because it fails deterministically with CGNAT↔CGNAT.
 
-**[ADR-0010](decisions/0010-route-all-through-host.md)** جبّ ADR-0004: قائمة يديرها المسؤول تناقض غرض المنتج، لأن صفحة واحدة تسحب مواردها من عشرات النطاقات الفرعية.
+**[ADR-0010](decisions/0010-route-all-through-host.md)** superseded ADR-0004: a list an administrator manages
+contradicts the product's purpose, because a single page pulls its resources from dozens of subdomains.
 
-## خمسة أعطال، كلٌّ خفي بطريقة مختلفة
+## Five failures, each hidden in a different way
 
-| العطل | لماذا لم يُكشف |
+| The failure | Why it was not caught |
 |---|---|
-| **عنوان الـ Relay اسم مضيف** ومرّ إلى نقل يقبل عناوين حرفية فقط، فمات قبل فتح مقبس | الاختبار مرّر `127.0.0.1` — عنوانًا حرفيًا يسلك المسار الوحيد الذي يعمل |
-| **النسخة العربية تنهار عند الإقلاع** على اسم المنتج نفسه في ترويسة `User-Agent` | العطل يسكن ربط الخدمات في `Josour.App`، **ولا مشروع اختبار له**، ويعتمد على اللغة |
-| **ساعة متقدّمة تعطّل زرَّي القبول والرفض**: الطلب يُحسب منتهيًا قبل ظهور النافذة | العدّاد كان يقارن وقت الخادم بساعة الجهاز، والتطبيق **يعرف الانحراف** ويطبّقه في كل موضع آخر |
-| **الوكيل يرفض كل اتصال من متصفح العمل**: متصفح مضبوط + فاحص لا يتعرّف على أحد + رفض المجهول | افتراضي صحيح للاختبارات التي كتبته، خاطئ للمستدعي الوحيد الذي اعتمد عليه |
-| **نافذة الطلب تعرض جملة كاذبة**: «لا يمكن الوصول إلا إلى مواقع قائمة الشركة» فوق «سيتمكّن من تصفّح أي موقع» | نصّ ثابت في XAML لم يتبع ADR-0010 حين تبعه كل شيء آخر؛ والنافذة هي **الموضع الوحيد بلا مشروع اختبار** |
+| **The relay's address is a hostname** and was passed to a transport that accepts only address literals, so it died before opening a socket | The test passed `127.0.0.1` — a literal, which takes the one path that works |
+| **The Arabic build crashes at startup** on the product's own name in the `User-Agent` header | The failure lives in the service wiring in `Josour.App`, **which has no test project**, and it depends on the language |
+| **A fast clock disables the accept and reject buttons**: the request counts as expired before the window appears | The counter compared the server's time with the machine's clock, while the application **knows the drift** and applies it everywhere else |
+| **The proxy refuses every connection from the work browser**: a configured browser + a checker that recognises nobody + refusing the unknown | A correct default for the tests that wrote it, wrong for the one caller that relied on it |
+| **The request window shows a false sentence**: "only the company's listed sites are reachable" above "they will be able to browse any site" | Static text in XAML that did not follow ADR-0010 when everything else did; and the window is **the one place with no test project** |
 
-**الخيط الجامع:** ثلاثة كُشفت بجعل البرمجية تقول ما تعرفه أصلًا — عدّادات الوكيل، وسكربت تشخيص المتصفح، والمقياس المعاير. والرابع بتشغيل الملف المنشور لا باختبار. **والخامس بقراءة النص قبل الجولة اليدوية**: لو بدأت الجولة لسقط البند 4 بعد جلسة كاملة على جهازين، بدل دقيقتين من القراءة.
+**The common thread:** three were caught by making the software say what it already knows — the proxy's counters, the
+browser diagnostic script, and the calibrated counter. The fourth by running the published file rather than by a test.
+**And the fifth by reading the text before the manual round**: had the round started, item 4 would have fallen after a
+full session on two machines, instead of two minutes of reading.
 
-وثلاثة من الخمسة — النسخة العربية، والعدّاد، والنافذة — تسكن `Josour.App`. **الدين له اسم واحد، وقد جبى ثلاث مرات.**
+And three of the five — the Arabic build, the counter and the window — live in `Josour.App`. **The debt has one name,
+and it has collected three times.**
 
-## ما مُنع تكراره
+## What was stopped from recurring
 
-- **تركيبة وكيل لا تقبل أحدًا** ترفض الإنشاء من الأصل برسالة تقول ما يُغيَّر.
-- **العميل لا يحكم بانتهاء طلب لم يره حيًّا**: انحراف الساعة صار رقمًا خاطئًا لا منتجًا معطّلًا.
-- **حساب العدّاد خرج من نافذة WPF** إلى طبقة مُختبَرة، **وتبعه نصّ الإفصاح** إلى `DisclosureText`.
-- **نصف إعداد Relay يوقف الخادم** عند الإقلاع بدل السقوط الصامت إلى المباشر.
+- **A proxy configuration that accepts nobody** refuses construction from the start, with a message saying what to
+  change.
+- **The client does not judge a request it never saw alive to be expired**: clock drift became a wrong number rather
+  than a broken product.
+- **The counter's arithmetic left the WPF window** for a tested layer, **and the disclosure text followed it** into
+  `DisclosureText`.
+- **Half a relay configuration stops the server** at startup instead of falling silently back to direct.
 
-## المقياس يقول ما لا يستطيع
+## The benchmark says what it cannot
 
-الـ Relay ليس عنق الزجاجة: **2 Gbit/s** لجلسة واحدة (تسعة أضعاف أسرع ما قيس للنفق)، وزمن مضاف **دون مللي ثانية**، واقتران **0.6 ms**، وعدالة بين عشرين جلسة ضمن **0.2%**.
+The relay is not the bottleneck: **2 Gbit/s** for one session (nine times the fastest thing measured for the tunnel),
+added latency **below a millisecond**, pairing at **0.6 ms**, and fairness between twenty sessions within **0.2%**.
 
-لكن جهاز القياس **لا يبلّغ معالج ولا ذاكرة العملية** — عملية أحرقت 4 ثوانٍ تبلّغ صفرًا، وأخرى تحجز 300 ميغابايت تبلّغ 6.1. الأعمدة محذوفة لا مملوءة بأصفار، والأداة **تفحص ذلك بنفسها** فتظهر تلقائيًا على مضيف النشر. **تحفّظ ADR-0009 على تكلفة معالج asyncio ما زال مفتوحًا.**
+But the measuring machine **reports neither CPU nor the process's memory** — a process that burned 4 seconds reports
+zero, and another holding 300 megabytes reports 6.1. The columns are omitted rather than filled with zeros, and the
+tool **checks that itself**, so they appear automatically on the deployment host. **ADR-0009's reservation about
+asyncio's CPU cost is still open.**
 
-## ما يحتاج تدخلًا بشريًا
+## What needs human intervention
 
-1. ~~شهادة توقيع الكود~~ — **حُسم 2026-09-10: لا تُشترى** ([ADR-0011](decisions/0011-no-code-signing-certificate.md)). ثلاثة إلى خمسة مستخدمين معروفين، وشهادة OV لا تلغي SmartScreen عند هذا العدد. التوزيع ملف واحد تُطابَق بصمته، ومعلم M4 خرج من المسار الحرج.
-2. **قائمة القبول الـ 18** — [مُلئت من السجلات ثم أُوقفت بقرار](acceptance-checklist.md) في 2026-09-10 عند: **5 محققة، 6 جزئية، 6 لم تُختبر، وواحد لن يُنفَّذ**. الباقي يُغلق بجلسة واحدة مدتها 15 دقيقة متى استُؤنفت.
-3. **اعتماد [ADR-0001](decisions/0001-ui-framework-wpf.md)** — ما زال «مقترح» بعد أن بُني عليه المشروع كله.
-4. **تشغيل `python -m bench` على مضيف النشر** — أمر واحد يغلق نصف تحفّظ ADR-0009.
+1. ~~The code-signing certificate~~ — **settled 2026-09-10: it is not bought**
+   ([ADR-0011](decisions/0011-no-code-signing-certificate.md)). Three to five known users, and an OV certificate does
+   not remove SmartScreen at that number. Distribution is one file whose hash is matched, and milestone M4 left the
+   critical path.
+2. **The 18-item acceptance list** — [filled in from the logs and then stopped by decision](acceptance-checklist.md) on
+   2026-09-10 at: **5 met, 6 partial, 6 untested, and one that will not be implemented**. The rest closes with a single
+   15-minute session whenever it resumes.
+3. **Accepting [ADR-0001](decisions/0001-ui-framework-wpf.md)** — still "proposed" after the whole project was built on
+   it.
+4. **Running `python -m bench` on the deployment host** — one command that closes half of ADR-0009's reservation.
 
-## ديون مسجَّلة
+## Recorded debts
 
-- **لا مشروع اختبار لـ `Josour.App`**: ثلاثة من الخمسة عاشت هناك. ما يُنقل منها إلى طبقة مُختبَرة يُغطّى، وما يبقى في XAML لا يراه أحد حتى يقرأه إنسان.
-- **اختباران بيئيان** يفشلان تحت الحِمل، فيخفيان انحدارات في تشغيلة كاملة. الثالث لم يكن بيئيًا بل كان يختبر نظام التشغيل: `Port_IsAssigned_AndStopClosesTheSocket` كان يشترط `SocketException` بعد إغلاق المستمع، وويندوز 11 على ARM64 **يُسقط الـ SYN** بدل أن يرفضه، فيفشل **كل** تشغيل على مثل هذا الجهاز. صار يشترط أن الاتصال **لا ينجح** — وهو الادّعاء الحقيقي — أيًّا كانت الطريقة التي يعلن بها النظام إغلاق المنفذ.
-- ~~`cgnat_suspected` سلب كاذب~~ — **أُصلح 2026-09-10.** فُصل «لم يُفحص» عن «لا يوجد» بـ `cgnat_checked`، وأُضيف `nat_reachability` الذي يُجاب حتى حين يتعذّر الحكم على الـ CGNAT. 18 اختبارًا، وتحقق على الجهاز نفسه: البلاغ صار `checked=false, reachability=blocked` بدل `false` صامتة.
+- **No test project for `Josour.App`**: three of the five lived there. What is moved out of it into a tested layer gets
+  covered, and what stays in XAML nobody sees until a human reads it.
+- **Two environmental tests** fail under load, hiding regressions in a full run. The third was not environmental but was
+  testing the operating system: `Port_IsAssigned_AndStopClosesTheSocket` required a `SocketException` after closing the
+  listener, and Windows 11 on ARM64 **drops the SYN** rather than refusing it, so **every** run on such a machine
+  fails. It now requires that the connection **does not succeed** — which is the real claim — however the system
+  announces the port is closed.
+- ~~`cgnat_suspected` is a false negative~~ — **fixed 2026-09-10.** "Not checked" was separated from "not present" with
+  `cgnat_checked`, and `nat_reachability` was added, which is answered even when CGNAT cannot be judged. 18 tests, and
+  verification on the machine itself: the report became `checked=false, reachability=blocked` instead of a silent
+  `false`.
 
-## الأسبوع 8 (من الخطة)
-المراجعة الأمنية المشتركة، وتشغيل قائمة القبول الـ 18، وE2E على مصفوفة الأجهزة.
+## Week 8 (from the plan)
+The joint security review, running the 18-item acceptance list, and E2E across the device matrix.

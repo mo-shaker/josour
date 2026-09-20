@@ -1,42 +1,68 @@
-# ADR-0010: كل حركة متصفح العمل تمر عبر المضيف
+# ADR-0010: all work-browser traffic goes through the host
 
-**الحالة:** **معتمد من صاحب المنتج بتاريخ 2026-09-07.** **يَجُبّ [ADR-0004](0004-non-allowlisted-routing.md)** ويعدّل نص وثيقة المنتج (القسم 6.6).
+**Status:** **accepted by the product owner on 2026-09-07.** **Supersedes
+[ADR-0004](0004-non-allowlisted-routing.md)** and amends the product document (section 6.6).
 
-## السياق
+## Context
 
-صرّح صاحب المنتج بالغرض الأساسي من المنتج: **فتح مواقع لا تعمل إلا من داخل دولة المضيف** — مستخدم في مصر يتصفح بعنوان مضيف في السعودية، «ولا جدوى من المشروع بدون تحقيقه».
+The product owner stated the product's primary purpose: **opening sites that only work from inside the host's
+country** — a user in Egypt browsing with the address of a host in Saudi Arabia, and "the project has no point
+without it".
 
-نموذج ADR-0004 يناقض هذا الغرض عمليًا: المواقع المدرجة في القائمة فقط تمر عبر المضيف، وكل ما عداها يخرج من اتصال المستخدم. فأي موقع غير مُدرج يخرج من مصر ويُحجب. وحتى مع النية الحسنة، الإدراج اليدوي غير قابل للتطبيق: **صفحة واحدة تسحب مواردها من عشرات النطاقات الفرعية** (شبكات توصيل، وسائط، تتبّع، خطوط، واجهات برمجية)، فيصير على المستخدم اكتشاف كل نطاق وإضافته — وهي بالضبط الخطوة التقنية التي يهدف المنتج إلى إلغائها لجمهور بلا خبرة تقنية.
+The ADR-0004 model contradicts that purpose in practice: only listed sites go through the host, and everything else
+leaves from the user's own connection. So any unlisted site leaves from Egypt and is blocked. And even in good faith,
+listing by hand is unworkable: **a single page pulls its resources from dozens of subdomains** (delivery networks,
+media, analytics, fonts, APIs), so the user would have to discover every domain and add it — which is exactly the
+technical step the product exists to remove for an audience with no technical background.
 
-## القرار
+## Decision
 
-1. **كل ما يطلبه متصفح العمل يمر عبر المضيف.** لا يعود قرار التوجيه مشروطًا بمطابقة القائمة.
-2. **القائمة تصير ضابطًا اختياريًا** يملكه المسؤول لتقييد وجهات جلسة بعينها، ومعطّلة افتراضيًا. آلية `AllowlistMatcher` وإصداراتها المرقّمة تبقى كما هي؛ ما يتغير هو أنها لم تعد شرط المرور.
-3. **الـ Proxy المحلي لا يفتح اتصالًا مباشرًا بعد اليوم** في الوضع الافتراضي. كان المسار المباشر هو ما ينفّذ ADR-0004، وقد سقط معه.
+1. **Everything the work browser asks for goes through the host.** The routing decision is no longer conditional on
+   matching the list.
+2. **The list becomes an optional control** an administrator owns, to restrict the destinations of a particular
+   session, and it is off by default. The `AllowlistMatcher` mechanism and its numbered versions stay as they are;
+   what changes is that it is no longer the condition for passage.
+3. **The local proxy no longer opens a direct connection** in the default mode. The direct path was what implemented
+   ADR-0004, and it fell with it.
 
-## ما لا يتغيّر — وهذه أهم فقرة في هذا الـ ADR
+## What does not change — and this is the most important paragraph in this ADR
 
-«كل المواقع» تعني **رفع الشرط الثالث فقط** من خطوات سياسة الخروج الثماني في `docs/protocol.md` القسم 6. وما عداه يبقى نافذًا حرفيًا:
+"All sites" means **lifting the third condition only** of the eight egress-policy steps in section 6 of
+`docs/protocol.md`. Everything else stays in force, literally:
 
-| الخطوة | الحالة بعد هذا القرار |
+| Step | State after this decision |
 |---|---|
-| 1. رفض العنوان الحرفي (`ip_literal`) | **باقٍ** |
-| 2. تطبيع الاسم بـ STD3 | **باقٍ** |
-| 3. مطابقة القائمة (`not_allowed`) | **يُرفع افتراضيًا** ← موضوع هذا القرار |
-| 4. المنفذ ضمن `allowed_ports` (80، 443) | **باقٍ** |
-| 5. حل DNS مرة واحدة بمهلة | **باقٍ** |
-| 6. **رفض أي عنوان ناتج محظور (`private_ip`)** | **باقٍ — غير قابل للتفاوض** |
-| 7. الاتصال بالقائمة المفحوصة لا بالاسم | **باقٍ** |
-| 8. الحدود: 50 فتحًا/ثانية، سقف الـ streams | **باقٍ** |
+| 1. Refusing an address literal (`ip_literal`) | **Kept** |
+| 2. Normalising the name with STD3 | **Kept** |
+| 3. Matching the list (`not_allowed`) | **Lifted by default** ← the subject of this decision |
+| 4. The port is within `allowed_ports` (80, 443) | **Kept** |
+| 5. Resolving DNS once, with a timeout | **Kept** |
+| 6. **Refusing any resulting blocked address (`private_ip`)** | **Kept — not negotiable** |
+| 7. Connecting to the checked list, not to the name | **Kept** |
+| 8. The limits: 50 opens/second, the stream ceiling | **Kept** |
 
-الخطوة 6 هي الحدّ الأمني الحقيقي: هي ما يمنع الضيف من الوصول إلى شبكة المضيف المحلية وصفحة راوتره وخدمات `localhost` وعنوانه العام. **«مرّر كل شيء» لا تعني إطلاقًا تعطيل هذا الحارس**، ومعيار القبول رقم 15 يبقى كما هو ويجب أن يبقى أخضر.
+Step 6 is the real security boundary: it is what keeps the guest away from the host's local network, their router's
+page, their `localhost` services and their public address. **"Pass everything" does not in any way mean disabling
+that guard**, and acceptance criterion 15 stays as it is and must stay green.
 
-وكذلك **لا يتأثر نطاق التنفيذ:** الـ Proxy يخدم **متصفح العمل وحده** (فحص PID المالك ضمن Job Object). فـ Teams وOutlook والمتصفح العادي تبقى على اتصال المستخدم بعنوانه هو. معيار القبول رقم 10 يبقى قائمًا، والمنتج لا يصير VPN على مستوى الجهاز.
+Likewise **the scope of enforcement is unaffected:** the proxy serves **the work browser alone** (the owning-PID check
+inside a Job Object). So Teams, Outlook and the ordinary browser stay on the user's own connection with their own
+address. Acceptance criterion 10 still stands, and the product does not become a device-wide VPN.
 
-## النتائج
+## Consequences
 
-- **مكسب لم يكن مقصودًا: حل DNS يجري على المضيف.** وهو ما يجعل شبكات توصيل المحتوى تعيد عناوين قريبة من المضيف، فيكتمل الأثر الجغرافي بدل أن يقتصر على عنوان الخروج. مع ADR-0004 كانت النطاقات غير المدرجة تُحل محليًا في مصر.
-- **إفصاح المضيف يتغيّر جوهريًا.** كانت نافذة الطلب تعرض **قائمة المواقع الفعلية** للإصدار المطلوب (متطلب القسم 15 من وثيقة المنتج). لم تعد هذه الصيغة صادقة: على النافذة أن تقول صراحة إن الضيف سيتمكن من تصفّح **أي موقع** عبر اتصال المضيف وبعنوانه. هذا **توسيع حقيقي لمسؤولية المضيف** ويجب أن تكون الموافقة مبنية عليه. تحديث `AllowlistDisclosure` وشاشة الطلب شرط لإغلاق هذا الـ ADR.
-- **استهلاك نطاق المضيف والـ Relay يرتفع** من «بعض النطاقات» إلى «كل التصفح». مقبول عند خمسة مستخدمين ([ADR-0009](0009-relay-default.md))، ويُعاد تقييمه بالقياس إن تغيّر العدد.
-- **`session_domains` يصير أوسع أثرًا على الخصوصية.** كان يسجّل نطاقات مُدرجة سلفًا ومعروفة للطرفين؛ صار قادرًا على تسجيل **كامل تاريخ تصفح** الضيف. يبقى `log_domains` معطّلًا افتراضيًا، ويجب أن يظل كذلك، وأي تفعيل له يحتاج إفصاحًا للضيف لا للمضيف وحده.
-- **ADR-0004 يُوسم مجبوبًا**، ومعه يسقط «خيار حظر بدل التمرير» المؤجل للإصدار الثاني لأن محلّه زال.
+- **An unintended gain: DNS resolution happens at the host.** That is what makes content delivery networks return
+  addresses near the host, so the geographic effect is complete rather than limited to the exit address. Under
+  ADR-0004, unlisted domains were resolved locally in Egypt.
+- **The host's disclosure changes fundamentally.** The request window used to show **the actual list of sites** for the
+  requested version (a requirement of section 15 of the product document). That wording is no longer truthful: the
+  window must say plainly that the guest will be able to browse **any site** over the host's connection and with their
+  address. This is **a real widening of the host's responsibility** and consent must be built on it. Updating
+  `AllowlistDisclosure` and the request screen is a condition for closing this ADR.
+- **The host's and the relay's bandwidth use rises** from "some domains" to "all browsing". Acceptable at five users
+  ([ADR-0009](0009-relay-default.md)), and re-evaluated by measurement if the number changes.
+- **`session_domains` becomes far more consequential for privacy.** It used to record domains listed in advance and
+  known to both parties; it can now record the guest's **entire browsing history**. `log_domains` stays off by default
+  and must stay that way, and enabling it needs a disclosure to the guest, not to the host alone.
+- **ADR-0004 is marked superseded**, and with it the "block instead of pass" option deferred to version two falls away,
+  because there is no longer anything for it to apply to.

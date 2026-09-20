@@ -1,60 +1,74 @@
-# حالة الأسبوع 6 (بتاريخ 2026-09-05)
+# Week 6 status (2026-09-05)
 
-بلا مسار D بطلب صاحب المشروع. أغلب بنود الأسبوع السادس في الخطة كانت أُنجزت مبكرًا، فوُجّهت المسارات إلى ما بقي فعلًا.
+Without track D, at the project owner's request. Most of week six's items in the plan had been finished early, so the
+tracks were pointed at what actually remained.
 
-## ما اكتمل وتحقق منه
+## What was completed and verified
 
-| المسار | المخرج | التحقق |
+| Track | Output | Verification |
 |---|---|---|
-| A: الخادم | إغلاق التحفّظين المفتوحين من مراجعة الأمن: **سياسة تحديد معدل تطابق التهديد** ([ADR-0008](decisions/0008-rate-limit-policy.md))، و**كشف آلي للأجهزة المشبوهة** من إشارات كانت موجودة وغير مستهلَكة؛ واستقبال `listener_unauthenticated`؛ ومراجعة كاملة لتوثيق OpenAPI باختبار يمنع تعفّنه | ruff نظيف؛ **328 اختبارًا** على PostgreSQL (كانت 282) |
-| B: الشبكات | **اختبار تحمّل 32 دقيقة** تحت حِمل وأخرى في السكون، و**fuzzing لطبقة الإطارات** وهي أخطر محلّل في المنتج ولم تكن مفحوصة | **924** اختبارًا في طبقات B (كانت 833) |
-| C: التطبيق | تحذير VPN، والقائمة بإصدارها المحدد، وإرسال الإشارة الأمنية، وإزالة الازدواج، و**تجربة تشغيل أول وإعدادات وشاشة دعم** — التطبيق كان غير قابل للضبط من مستخدمه | **350** اختبارًا (كانت 278) |
+| A: the server | Closing the two reservations left open by the security review: **a rate-limit policy that matches the threat** ([ADR-0008](decisions/0008-rate-limit-policy.md)), and **automatic detection of suspicious devices** from signals that already existed and were unconsumed; receiving `listener_unauthenticated`; and a full review of the OpenAPI documentation with a test that stops it rotting | ruff clean; **328 tests** on PostgreSQL (was 282) |
+| B: networking | **A 32-minute soak test** under load and another at idle, and **fuzzing of the framing layer**, the most dangerous parser in the product and one that had not been exercised | **924** tests across the B layers (was 833) |
+| C: the application | The VPN warning, the list at its specific version, sending the security signal, removing the duplication, and **a first-run experience, settings and a support screen** — the application could not be configured by its own user | **350** tests (was 278) |
 
-**الإجمالي:** 328 اختبارًا في الخادم و**1274** في العميل، بلا تحذيرات، و5 تشغيلات كاملة بلا فشل.
+**The total:** 328 tests on the server and **1274** on the client, with no warnings, and 5 full runs with no failures.
 
-## سياسة تحديد المعدل: الرقم وحده لم يكن كافيًا
+## The rate-limit policy: the number alone was not enough
 
-الحد كان 5 طلبات في الدقيقة لكل عنوان IP، وهو يفشل في الاتجاهين: تتجاوزه عشرون عنوانًا مختلفًا، ويعاقب في المقابل فريقًا كاملًا خلف NAT واحد.
+The limit was 5 requests a minute per IP address, and it fails in both directions: twenty different addresses get past
+it, and in return it punishes a whole team behind one NAT.
 
-| المسار | المفتاح | الحد |
+| Path | Key | Limit |
 |---|---|---|
-| `POST /auth/login` | عنوان IP | 30/دقيقة |
-| `POST /auth/login` | **البريد المُرسَل** | 5 لكل 15 دقيقة، تُعاد عند النجاح |
-| `POST /auth/refresh` | عنوان IP | 60/دقيقة |
-| `POST /probe` | `user_id` | 10/دقيقة |
+| `POST /auth/login` | IP address | 30/minute |
+| `POST /auth/login` | **the submitted email** | 5 per 15 minutes, returned on success |
+| `POST /auth/refresh` | IP address | 60/minute |
+| `POST /probe` | `user_id` | 10/minute |
 
-المعايرة هي الجزء المقصود: سعة الحد بالبريد (5) **أقل من عتبة قفل الحساب** (10)، فلا تستطيع دفعة أن تقفل حسابًا — والقفل حرمان من الخدمة يستطيع مهاجم إطلاقه. وإعادة الرصيد عند نجاح الدخول تجعل الإخفاقات وحدها تستهلك الحصة، فيصير الحد غير مرئي لمستخدم حقيقي. والحد على `probe` يغلق بابًا كان يجعل الخادم ماسح منافذ بطيئًا بهويته.
+The calibration is the deliberate part: the email limit's capacity (5) is **below the account-lockout threshold** (10),
+so no burst can lock an account — and the lockout is a denial of service an attacker can trigger. And returning the
+credit on a successful sign-in makes failures alone consume the quota, so the limit becomes invisible to a real user.
+And the limit on `probe` closes a door that made the server a slow port scanner under its own identity.
 
-## سبعة اكتشافات من الـ fuzzing
+## Seven findings from the fuzzing
 
-| # | الخطورة | الاكتشاف |
+| # | Severity | Finding |
 |---|---|---|
-| F-1 | متوسطة | إطار تحكم مشوّه من النظير كان **ينهي النفق كإغلاق نظيف**، فيُبلَّغ الخادم بإنهاء عادي. **هذه ثالث مرة يظهر فيها هذا الصنف** بعد الأسبوعين 2 و5 |
-| F-2 | متوسطة | مسار قبول القنوات بلا سقف خاص به، فمضيف عدائي يفرض إنشاء قنوات بلا حد على المستخدم |
-| F-3 | منخفضة | أعطال `Completion` كانت تصير استثناءات غير مرصودة: انهيار عملية على أي مضيف يفعّل ذلك |
-| F-4 | منخفضة-متوسطة | بايتات توكن الـ Relay تُفكّ بتساهل فتُعاد كتابتها صامتة، وفرع الرفض ميت |
-| F-5 | متوسطة | صف تشخيص لكل اتصال وارد أثناء نافذة الاتصال: نمو ذاكرة يقوده غريب، ويتجاوز حد 64 KB **فيمحو الفيضُ دليلَ نفسه** |
-| F-6 | منخفضة | كل PING يحتفظ بتسجيل إلغاء طوال عمر النفق |
-| F-7 | متوسطة | **كل جلسة سليمة كانت تسجّل إشارة أمنية كاذبة**: الاتصال الخاسر في السباق المتماثل يُغلق بلا رد وفق العقد، وكان يُحسب محاولة غير مصادَقة |
+| F-1 | Medium | A malformed control frame from the peer **ended the tunnel as a clean close**, so the server is told of an ordinary end. **This is the third time this class has appeared**, after weeks 2 and 5 |
+| F-2 | Medium | The channel-acceptance path had no ceiling of its own, so a hostile host can force unbounded channel creation on the user |
+| F-3 | Low | `Completion` failures became unobserved exceptions: a process crash on any host that triggers it |
+| F-4 | Low-medium | The relay token's bytes were decoded leniently and so rewritten silently, with the rejection branch dead |
+| F-5 | Medium | A diagnostic row per inbound connection during the connect window: memory growth driven by a stranger, and it exceeds the 64 KB limit **so the flood erases its own evidence** |
+| F-6 | Low | Every PING held a cancellation registration for the tunnel's whole lifetime |
+| F-7 | Medium | **Every healthy session recorded a false security signal**: the losing connection in the symmetric race is closed without a reply per the contract, and it was counted as an unauthenticated attempt |
 
-F-7 أخطرها عمليًا: إشارة أمنية تُطلق في كل جلسة عادية إشارة لا قيمة لها.
+F-7 is the most serious in practice: a security signal fired by every ordinary session is a signal with no value.
 
-## اختبار التحمّل: لا تسريب
+## The soak test: no leak
 
-32 دقيقة تحت حِمل (2355 stream، 16.9 غيغابايت) و32 دقيقة في السكون. الكومة والملفات المفتوحة والخيوط وطلبات PING المعلّقة: **لا شيء يتزايد باطراد**. وزمن الاستجابة ثابت عند ضعف زمن الذهاب والإياب.
+32 minutes under load (2355 streams, 16.9 gigabytes) and 32 minutes at idle. The heap, open files, threads and
+outstanding PINGs: **nothing grows steadily**. And latency is constant at twice the round-trip time.
 
-## الازدواج أُزيل
+## The duplication was removed
 
-كان فحص الجدار الناري منفَّذًا مرتين، في `Josour.Tunnel` و`Josour.Infrastructure`، باستدعاءين مختلفين لـ `netsh` وتفسيرين مختلفين لنصه. كل مسار توقف عند حدوده بحق ولم يعدّل ملفات الآخر، فأتممت الدمج بنفسي: تنفيذ واحد في `Josour.Core` والطرفان يستدعيانه.
+The firewall check was implemented twice, in `Josour.Tunnel` and `Josour.Infrastructure`, with two different `netsh`
+invocations and two different readings of its text. Each track rightly stopped at its own boundary and did not modify
+the other's files, so I completed the merge myself: one implementation in `Josour.Core`, called by both sides.
 
-## نقاط تعاقدية حُسمت
-- **`GET /healthz`** صار يحمل علامة منتج وإصدارًا. شاشتا التشغيل الأول والإعدادات تقرران منه «هل هذا خادم Josour»، وكان الفحص يستند إلى `{"status":"ok"}` وحده وهو ما يقلّده أي وسيط، فيعود عنوان خاطئ لاحقًا في صورة «كلمة مرور خاطئة».
-- **`vpn_holds_default_route`**: المفتاح القديم يقول إن محوّل VPN موجود، والجديد يقول إنه يملك مسار الخروج فعلًا — وهذا وحده ما يتنبأ بعنوان خروج مفاجئ.
-- **`unauthenticated_peers_distinct`** محجوز: يميّز مسحًا من عشرات المصادر عن محاولات متكررة من مصدر واحد.
-- **دلالة العدّاد صفرًا**: الخادم لا يكتب حدثًا إلا لقيمة موجبة، وقرار الإرسال للمرسِل.
+## Contract points settled
+- **`GET /healthz`** now carries a product marker and a version. The first-run and settings screens decide from it "is
+  this a Josour server", and the check rested on `{"status":"ok"}` alone, which any intermediary imitates, so a wrong
+  address came back later in the shape of "wrong password".
+- **`vpn_holds_default_route`**: the old key says a VPN adapter exists, and the new one says it actually holds the
+  egress route — and that alone predicts a surprising exit address.
+- **`unauthenticated_peers_distinct`** is reserved: it distinguishes a scan from dozens of sources from repeated
+  attempts from one.
+- **The meaning of a zero counter**: the server writes an event only for a positive value, and the decision to send is
+  the sender's.
 
-## ما يحتاج تدخلًا بشريًا
-لم يتغير: شهادة توقيع الكود، خادم اختبار (الـ workflow ينقصه أربعة أسرار)، تشغيل أداة `session` على جهازي Windows (بوابة Relay معلّقة عليه)، وفحص QA.
+## What needs human intervention
+Unchanged: the code-signing certificate, a staging server (the workflow lacks four secrets), running the `session`
+tool on two Windows machines (the relay gate hangs on it), and QA.
 
-## الأسبوع 7 (من الخطة)
-إصلاحات التكامل وضبط المهلات، وتشغيل E2E على مصفوفة الأجهزة، والأداء على شبكة حقيقية.
+## Week 7 (from the plan)
+Integration fixes and timeout tuning, running E2E across the device matrix, and performance on a real network.

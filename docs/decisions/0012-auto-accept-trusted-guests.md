@@ -1,50 +1,86 @@
-# ADR-0012: القبول التلقائي لضيوف يثق بهم المضيف
+# ADR-0012: auto-accepting guests the host trusts
 
-**الحالة:** مقترح بتاريخ 2026-09-18. يضيف [القسم 5أ](../ws-protocol.md#5أ-القبول-التلقائي-لضيف-موثوق) إلى عقد WebSocket. لا يَجُبّ شيئًا.
+**Status:** proposed on 2026-09-18. Adds [section 5a](../ws-protocol.md#5a-auto-accepting-a-trusted-guest) to the
+WebSocket contract. Supersedes nothing.
 
-## السياق
+## Context
 
-حتى اليوم كل جلسة تبدأ بنافذة يقرأها المضيف ويضغط فيها «أوافق». هذا صحيح للجلسة الأولى، ومرهق في الحالة التي يعيشها المنتج فعليًا: **نفس الشخصين، كل يوم**. المضيف الذي يشارك اتصاله مع أخيه أو زميله لا يريد أن يُسأل السؤال نفسه عن الشخص نفسه اثنتي عشرة مرة في الأسبوع، وأسوأ من الإرهاق أثره: سؤال يُطرح كل يوم عن الجواب نفسه يُجاب عنه بلا قراءة، فتصير النافذة طقسًا لا موافقة. ثم إن المضيف قد يكون بعيدًا عن جهازه فيفوت الطلب ويعود الضيف بلا شيء.
+Until today every session begins with a window the host reads and presses "Accept" in. That is right for the first
+session, and wearing in the situation the product actually lives in: **the same two people, every day**. A host
+sharing their connection with their brother or their colleague does not want to be asked the same question about the
+same person twelve times a week, and worse than the tedium is its effect: a question asked daily with the same answer
+gets answered without being read, and the window becomes a ritual rather than a consent. And the host may be away from
+their machine, so the request is missed and the guest gets nothing.
 
-طُلبت الميزة بصيغة «تتم الموافقة تلقائيًا دون تدخل المضيف». الصياغة تحتمل معنيين متباعدين، والفرق بينهما هو كل شيء:
+The feature was requested as "approval happens automatically without the host intervening". That wording admits two
+far-apart meanings, and the difference between them is everything:
 
-- **أن يوافق أحد نيابةً عن المضيف** — الخادم أو المسؤول. هذا إلغاء للموافقة لا تأجيل لها.
-- **أن يوافق المضيف مسبقًا** فيُنفَّذ قراره لاحقًا بلا حضوره. الموافقة هنا قائمة كاملة؛ ما تغيّر لحظة إعطائها.
+- **Someone approving on the host's behalf** — the server or an administrator. That abolishes the consent rather than
+  deferring it.
+- **The host approving in advance**, their decision being carried out later without them present. The consent here is
+  complete; what changed is the moment it was given.
 
-## القرار
+## Decision
 
-**المعنى الثاني، وبالشروط التالية مجتمعة.**
+**The second meaning, and under all of the following conditions together.**
 
-1. **القرار في عميل المضيف وحده.** الخادم لا يحفظ قوائم ثقة ولا يوافق نيابة عن أحد. عميل المضيف هو من يطابق القاعدة ويجيب `request.accept` بـ `auto: true`.
-2. **مفتاح القاعدة `(guest_user_id, guest_device_id)`** لا الاسم المعروض. لذلك أُضيف الحقلان إلى `request.incoming` و`peer`.
-3. **مفتاح عام مطفأ افتراضيًا**، وإطفاؤه يوقف كل القواعد فورًا دون حذفها.
-4. **سقف مدة لكل قاعدة**، افتراضه مدة الطلب الذي منح المضيف الثقة عنده.
-5. **أجل لكل قاعدة**: أسبوع (الافتراضي) أو شهر أو دائمًا.
-6. **إعلام لا استئذان**: إشعار غير حاجب عند كل قبول تلقائي، وإنهاء الجلسة متاح في أي لحظة.
-7. **حدث أمن `request_auto_accepted`** على الخادم منسوبًا إلى المضيف.
-8. **الثقة تُمنح من نافذة الطلب وحدها** — الشاشة الوحيدة التي يرى فيها المضيف من يسأله — وتُسحب من الإعدادات.
+1. **The decision is in the host's client alone.** The server stores no trust lists and approves on nobody's behalf.
+   The host's client is what matches the rule and answers `request.accept` with `auto: true`.
+2. **The rule's key is `(guest_user_id, guest_device_id)`**, not the display name. That is why the two fields were
+   added to `request.incoming` and `peer`.
+3. **A master switch, off by default**, whose switching off stops every rule at once without deleting them.
+4. **A duration ceiling per rule**, defaulting to the duration of the request at which the host granted trust.
+5. **An expiry per rule**: a week (the default), a month, or forever.
+6. **Inform, do not ask**: a non-blocking notification on every automatic acceptance, and ending the session is
+   available at any moment.
+7. **A `request_auto_accepted` security event** on the server, attributed to the host.
+8. **Trust is granted from the request window alone** — the one screen where the host sees who is asking — and
+   withdrawn from the settings.
 
-## الأسباب
+## Reasons
 
-**لماذا العميل لا الخادم؟** لأن «تلقائي» هنا يعني أن تطبيق المضيف يجيب بدل إنسانه، لا أن الخادم يجيب بدل جهازه. ولأن المضيف المنقطع عن `/ws` خارج `hosts.*` أصلًا فلا طلب يصله، فالقبول من الخادم لن يضيف حالة يعمل فيها ما لا يعمل بدونه — سيضيف فقط طرفًا ثالثًا يملك قرارًا ليس له. وللسبب نفسه رُفض خيار «سياسة يضبطها المسؤول»: من يشارك عنوانه هو من يقرر مع من.
+**Why the client and not the server?** Because "automatic" here means the host's application answers instead of their
+person, not that the server answers instead of their machine. And because a host disconnected from `/ws` is outside
+`hosts.*` to begin with, so no request reaches them — acceptance by the server would not add a case where it works
+where it otherwise would not; it would only add a third party holding a decision that is not theirs. For the same
+reason the "a policy the administrator sets" option was rejected: whoever shares their address decides who with.
 
-**لماذا الهوية لا الاسم؟** `guest_name` يختاره الضيف ويغيّره متى شاء وقد يتكرر بين مستخدمين. قاعدة مكتوبة على اسم تُورّث قرارًا اتُّخذ في حق شخص إلى غريب أعاد التسمية، وهذا خلل أمني صامت لأن كل ما يراه المضيف حينها هو الاسم الذي وثق به.
+**Why the identity and not the name?** `guest_name` is chosen by the guest, changed whenever they like, and may repeat
+between users. A rule written on a name bequeaths a decision taken about one person to a stranger who renamed
+themselves, and that is a silent security defect, because all the host sees at that point is the name they trusted.
 
-**لماذا الجهاز جزء من المفتاح؟** حتى لا يمنح اختراقُ حساب الضيف — أو تسجيلُه جهازًا جديدًا — وصولًا تلقائيًا. الضيف الذي يعيد التثبيت يُسأل عنه مرة أخرى، تمامًا كما يفعل `known_hosts`، وهو ثمن صغير مقابل ما يشتريه.
+**Why is the device part of the key?** So that compromising the guest's account — or their registering a new device —
+does not grant automatic access. A guest who reinstalls is asked about once more, exactly as `known_hosts` does, and
+that is a small price for what it buys.
 
-**لماذا سقف المدة؟** لأن من وافق على نصف ساعة لم يوافق على يوم عمل. القاعدة تُكتب عند طلب محدد المدة، فمن المعقول أن يكون ذلك الرقم هو سقفها.
+**Why a duration ceiling?** Because someone who agreed to half an hour did not agree to a working day. The rule is
+written at a request with a definite duration, so it is reasonable for that number to be its ceiling.
 
-**لماذا أجل افتراضي؟** ثقة تنتهي وحدها هي ثقة يمكن نسيان مراجعتها بلا ضرر. «دائمًا» متاح لمن أراده، لكنه ليس ما تفعله الخانة إن تُركت.
+**Why a default expiry?** Trust that ends by itself is trust whose review can be forgotten harmlessly. "Forever" is
+available to whoever wants it, but it is not what the field does if left alone.
 
-**لماذا الإشعار؟** لأن المضيف الذي لا يعلم باستخدام اتصاله إلا من فاتورة أو من بطء لم يُبلَّغ، والإبلاغ هو الجزء من الموافقة الذي لا يجوز للقبول التلقائي أن ينفقه. الإشعار غير حاجب: يُعلم ولا يسأل.
+**Why the notification?** Because a host who learns their connection was used only from a bill or from slowness was not
+told, and being told is the part of consent that automatic acceptance may not spend. The notification is
+non-blocking: it informs and does not ask.
 
-**لماذا حدث الأمن؟** لأن هذه هي الموافقة الوحيدة التي لم يشهدها إنسان لحظة وقوعها، فهي أولى الموافقات بأن تكون على السجل. وهي لا تُلغي شيئًا ولا تُسقط جهازًا ([ADR-0008](0008-rate-limit-policy.md)) — هي أثر يُراجَع لا إجراء يُتخذ.
+**Why the security event?** Because this is the one consent no human witnessed as it happened, so it is the consent
+most in need of being on the record. It revokes nothing and drops no device ([ADR-0008](0008-rate-limit-policy.md)) —
+it is a trace to be reviewed, not an action to be taken.
 
-## النتائج
+## Consequences
 
-- **المضيف يتحمل مسؤولية أوسع بعلمه.** بعد [ADR-0010](0010-route-all-through-host.md) الجلسة تعني «أي موقع بعنوان المضيف»، والقبول التلقائي يعني ذلك **بلا نافذة في كل مرة**. لهذا تعرض الإعدادات تحذيرًا صريحًا ما دام المفتاح مفعّلًا، ولهذا تُمنح الثقة من نافذة الإفصاح وحدها.
-- **`enforce_allowlist` يقيّد القاعدة.** حين تكون القائمة نافذة، تغيّر `allowlist_version` عن المسجَّل وقت منح الثقة يعيد السؤال: ما يمنحه الطلب لم يعد ما وافق عليه المضيف. وحيث لا تُنفَّذ القائمة (الافتراضي، ADR-0010) لا معنى للمقارنة فلا تجري.
-- **خادم أقدم من هذا القرار لا يرسل الهوية**، فتصل `Guid.Empty`. السياسة ترفض المطابقة عليها صراحةً، وإلا صارت قاعدة واحدة قاعدةً عن الجميع. هذا مُختبَر.
-- **ملف `auto-accept.json` سجل موافقة**، لذا يُقرأ فشل قراءته على أنه «مطفأ» ويُسجَّل خطأً. الفشل في هذا الاتجاه مزعج؛ الفشل في الاتجاه الآخر كارثي.
-- **المفتاح وقائمة الثقة يُطبَّقان فور تغييرهما لا عند الحفظ.** مضيف ألغى التفعيل ثم أغلق النافذة يجب ألّا يبقى قابلًا تلقائيًا.
-- **`request.accept` صار يحمل حقلًا جديدًا افتراضه `false`**، فعميل أقدم يبقى صحيحًا ولا يُسجَّل يومًا على أنه تخطّى نافذة عرضها.
+- **The host takes on a wider responsibility knowingly.** After [ADR-0010](0010-route-all-through-host.md) a session
+  means "any site, with the host's address", and automatic acceptance means that **with no window each time**. That is
+  why the settings show an explicit warning for as long as the switch is on, and why trust is granted from the
+  disclosure window alone.
+- **`enforce_allowlist` constrains the rule.** When the list is in force, an `allowlist_version` that differs from the
+  one recorded when trust was granted asks again: what the request grants is no longer what the host agreed to. Where
+  the list is not enforced (the default, ADR-0010) the comparison is meaningless and is not made.
+- **A server older than this decision does not send the identity**, so `Guid.Empty` arrives. The policy explicitly
+  refuses to match on it, otherwise one rule would become a rule about everybody. This is tested.
+- **The `auto-accept.json` file is a record of consent**, so a failure to read it is read as "off" and logged as an
+  error. Failing in that direction is annoying; failing in the other is catastrophic.
+- **The switch and the trust list apply the moment they change, not on save.** A host who turned the switch off and
+  then closed the window must not still be accepting automatically.
+- **`request.accept` now carries a new field defaulting to `false`**, so an older client stays correct and is never
+  recorded as having skipped a window it did show.

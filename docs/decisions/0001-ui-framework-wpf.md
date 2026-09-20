@@ -1,17 +1,22 @@
-# ADR-0001: واجهة العميل WPF على .NET 8
+# ADR-0001: the client interface on WPF and .NET 8
 
-**الحالة:** **مجبوب بـ [ADR-0013](0013-avalonia-and-macos.md)** بتاريخ 2026-09-18 (لم يُعتمد قط). أسبابه تبقى صحيحة على Windows، لكن دعم macOS أخرج الاختيار من يد WPF.
+**Status:** **superseded by [ADR-0013](0013-avalonia-and-macos.md)** on 2026-09-18 (it was never accepted). Its
+reasoning still holds on Windows, but supporting macOS took the choice out of WPF's hands.
 
-## السياق
-الوثيقة تركت الاختيار بين WinUI 3 وWPF بعد نموذج تقني قصير. التطبيق يعيش في System Tray معظم الوقت ويحتاج إشعارات بأزرار قبول/رفض خارج MSIX.
+## Context
+The product document left the choice between WinUI 3 and WPF to a short technical prototype. The application lives
+in the system tray most of the time and needs notifications with accept/reject buttons from outside MSIX.
 
-## القرار
-WPF على .NET 8 مع `WPF-UI` للمظهر، `CommunityToolkit.Mvvm`، `H.NotifyIcon.Wpf`، `Microsoft.Toolkit.Uwp.Notifications`.
+## Decision
+WPF on .NET 8 with `WPF-UI` for the look, `CommunityToolkit.Mvvm`, `H.NotifyIcon.Wpf` and
+`Microsoft.Toolkit.Uwp.Notifications`.
 
-## الأسباب
-- WinUI 3 بلا Tray رسمي، ويحتاج Windows App SDK Runtime، وقصة الإشعارات خارج MSIX أحدث وأقل نضجًا.
-- كل مكونات WPF المطلوبة ناضجة ومستقرة، والمخاطر أقل لجدول 9 أسابيع.
+## Reasons
+- WinUI 3 has no official tray support, needs the Windows App SDK Runtime, and its notification story outside MSIX
+  is newer and less settled.
+- Every WPF component this needs is mature and stable, which is less risk on a nine-week schedule.
 
-## النتائج
-- مظهر حديث كافٍ عبر WPF-UI؛ ليس Fluent الأصلي.
-- الانتقال إلى WinUI 3 لاحقًا ممكن لأن المنطق كله في مكتبات مستقلة عن الواجهة.
+## Consequences
+- A modern enough look through WPF-UI; not native Fluent.
+- Moving to WinUI 3 later stays possible, because all the logic lives in libraries that know nothing about the
+  interface.

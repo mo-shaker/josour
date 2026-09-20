@@ -1,17 +1,21 @@
-# ADR-0005: مثبّت موقّع غير مغلف (Inno Setup) بدل MSIX
+# ADR-0005: a signed unpackaged installer (Inno Setup) instead of MSIX
 
-**الحالة:** معتمد، **ومُعدَّل بـ [ADR-0011](0011-no-code-signing-certificate.md) بتاريخ 2026-09-10**: شرط التوقيع أُسقط، والمثبّت خرج من المسار الحرج.
+**Status:** accepted, and **amended by [ADR-0011](0011-no-code-signing-certificate.md) on 2026-09-10**: the signing
+requirement was dropped, and the installer left the critical path.
 
-## السياق
-الوثيقة تسمح بـ «MSIX أو مثبّت موقّع». التطبيق يشغّل Chrome/Edge كعملية فرعية ويحتاج قاعدة Windows Firewall للمستمع.
+## Context
+The product document allows "MSIX or a signed installer". The application runs Chrome/Edge as a child process and
+needs a Windows Firewall rule for its listener.
 
-## القرار
-Inno Setup موقّع رقميًا. المثبّت المرتفع الصلاحية يضيف قاعدة جدار ناري للتنفيذي. الترقية التلقائية (Velopack) في الإصدار الثاني.
+## Decision
+A digitally signed Inno Setup installer. The elevated installer adds a firewall rule for the executable.
+Auto-update (Velopack) waits for the second release.
 
-## الأسباب
-- العمليات الفرعية من تطبيق MSIX تورّث هوية الحزمة والافتراضية الملفّية، فيتغير مسار Profile المتصفح وتتعقد بيئة Chrome.
-- MSIX لا يستطيع إضافة قواعد جدار ناري أثناء التثبيت.
+## Reasons
+- Child processes of an MSIX application inherit the package identity and its file virtualisation, which moves the
+  browser's profile path and complicates Chrome's environment.
+- MSIX cannot add firewall rules during installation.
 
-## النتائج
-- طلب شهادة توقيع الكود في اليوم الأول (الاستخراج يستغرق أيامًا).
-- إعادة النظر في MSIX لاحقًا بعد اختبار أنماط الخروج من هوية الحزمة.
+## Consequences
+- Request the code-signing certificate on day one (issuance takes days).
+- Revisit MSIX later, after testing how egress behaves from inside a package identity.

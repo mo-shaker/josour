@@ -1,55 +1,74 @@
-# حالة الأسبوع 4 (بتاريخ 2026-09-05)
+# Week 4 status (2026-09-05)
 
-## ما اكتمل وتحقق منه
+## What was completed and verified
 
-| المسار | المخرج | التحقق |
+| Track | Output | Verification |
 |---|---|---|
-| A: الخادم | دورة الجلسة كاملة: `session.endpoint` بتبادل مستقل عن الترتيب، `session.connected` (المضيف فقط) و`session.active`، `session.connect_failed` مع تسجيل التشخيص، `session.stats` رتيبة، `session.end` بتحقق من الدور؛ مؤقتا مهلة الاتصال و`expires_at` على المجدول نفسه، وإلغاؤهما داخل مسار الإنهاء الوحيد؛ ملخص `end_reason` في تقرير المسؤول | ruff نظيف؛ **262 اختبارًا + 1 متخطى** على SQLite و**263** على PostgreSQL (كانت 197) |
-| C: التطبيق | `SessionCoordinator` صار المنسّق الحقيقي: بناء النفق من `session.created`، تبادل نقاط النهاية، الاتصال، تشغيل متصفح العمل وانتظار صفحة الفحص، عدّاد رتيب، إحصاءات كل 30 ثانية، وإنهاء واحد عديم التكرار مهما تعددت المحفزات؛ لوحة جلسة كاملة في الواجهة | **207** اختبارًا (كانت 183) |
-| B: الأداة والتقوية | أمر `session` بلا واجهة يقود المكدس الحقيقي على جهازين، بسجل أحداث JSON وأكواد خروج؛ وتقوية المحلّلات الأمنية | **698** اختبارًا في طبقات B (كانت 488) |
-| D: DevOps | نشر staging آليًا من CI مع نسخة احتياطية قبل النشر وتراجع تلقائي عند الفشل؛ **تجربة استعادة كاملة على بيئة نظيفة**؛ توثيق الثغرات كبنود انحدار في قائمة القبول | كل ملفات CI صالحة؛ الاستعادة نجحت فعليًا |
+| A: the server | The session cycle complete: `session.endpoint` with an order-independent exchange, `session.connected` (the host only) and `session.active`, `session.connect_failed` with diagnostics recorded, monotonic `session.stats`, `session.end` with a role check; the connect-timeout and `expires_at` timers on the same scheduler, cancelled inside the single termination path; an `end_reason` summary in the administrator's report | ruff clean; **262 tests + 1 skipped** on SQLite and **263** on PostgreSQL (was 197) |
+| C: the application | `SessionCoordinator` became the real coordinator: building the tunnel from `session.created`, exchanging endpoints, connecting, launching the work browser and waiting for the check page, a monotonic counter, statistics every 30 seconds, and a single idempotent termination however many things trigger it; a complete session panel in the interface | **207** tests (was 183) |
+| B: the tool and hardening | A `session` command with no interface, driving the real stack on two machines, with a JSON event log and exit codes; and hardening of the security parsers | **698** tests across the B layers (was 488) |
+| D: DevOps | Deploying staging automatically from CI with a backup before deployment and an automatic rollback on failure; **a full restore exercise on a clean environment**; documenting the vulnerabilities as regression items in the acceptance list | Every CI file is valid; the restore actually succeeded |
 
-**الإجمالي:** 263 اختبارًا في الخادم و**905** في العميل، والبناء بلا تحذيرات.
+**The total:** 263 tests on the server and **905** on the client, and the build has no warnings.
 
-## ثلاث ثغرات أمنية حقيقية أُغلقت
+## Three real vulnerabilities closed
 
-اكتُشفت أثناء تقوية المحلّلات، وكلها كانت قابلة للاستغلال:
+Found while hardening the parsers, and all of them exploitable:
 
-1. **حقن ترويسات (HTTP request smuggling):** قيم الترويسات وسطر الطلب لم تُفحص من المحارف الضابطة، فسطر `LF` داخل ترويسة كان يحقن ترويسة أو طلبًا ثانيًا في اتصال الأصل على مسار http المباشر.
-2. **SSRF من جانب المستخدم:** العناوين الحرفية كانت مرفوضة، لكن **اسم مضيف يُحل إلى** loopback أو عنوان خاص كان يُتصل به، فيصير الـ Proxy المحلي جسرًا إلى ما يستمع عليه جهاز المستخدم. صار الفحص بعد الحل وقبل أي مقبس.
-3. **تطبيع أسماء يفشل مفتوحًا:** `IdnMapping` بلا STD3 كان يمرر NUL و`:` و`/` والمسافات إلى استعلام DNS وترويسة `Host`. صار التحقق صارمًا، وأُغلق كذلك التفاف IPv4 المهمل `::a.b.c.d`.
+1. **Header injection (HTTP request smuggling):** header values and the request line were not checked for control
+   characters, so an `LF` inside a header injected a second header or request into the origin connection on the direct
+   http path.
+2. **SSRF from the user's side:** address literals were refused, but **a hostname that resolves to** loopback or a
+   private address was connected to, making the local proxy a bridge to whatever the user's machine is listening on.
+   The check now happens after resolution and before any socket.
+3. **Name normalisation failing open:** `IdnMapping` without STD3 passed NUL, `:`, `/` and spaces through to the DNS
+   query and the `Host` header. Validation is now strict, and the deprecated IPv4 wrapping `::a.b.c.d` was closed too.
 
-موثقة كبنود انحدار في `docs/acceptance-checklist.md`.
+Documented as regression items in `docs/acceptance-checklist.md`.
 
-## تعارضان في العقد اكتُشفا وحُسما
+## Two contract conflicts found and settled
 
-كان المسار A والمسار C يبنيان طرفي الرسالة نفسها بفهمين مختلفين، وهو ما لا يظهر إلا في التكامل:
+Track A and track C were building the two ends of the same message with two different understandings, which only
+surfaces in integration:
 
-- **العميل كان يدّعي `expired`** عند انتهاء المدة، والخادم يرده `bad_request` لأنه حكم من أحكامه. الحسم: العميل يفكك محليًا فورًا بلا `session.end` وينتظر `session.terminate`. **أكّدته الجلسة الحية:** انتهت بـ `Expired` عبر الخادم، ولم يرسل العميل `session.end` ولا مرة.
-- **موت النفق** كان يقترح `guest_disconnected`/`host_disconnected` والخادم يرفضهما، مع أن العميل هو المصدر الوحيد لهذا الخبر حين تبقى قناتا التحكم حيتين. الحسم: الخادم يقبلهما بقاعدة معكوسة (كل طرف يسمّي من اختفى)، ويظل يرفض أحكامه الثلاثة.
+- **The client claimed `expired`** when the duration ran out, and the server refused it with `bad_request` because it
+  is one of the server's own judgements. The resolution: the client tears down locally at once with no `session.end`
+  and waits for `session.terminate`. **The live session confirmed it:** it ended as `Expired` through the server, and
+  the client never sent `session.end` once.
+- **The tunnel's death** suggested `guest_disconnected`/`host_disconnected` and the server refused both, even though
+  the client is the only source of that news while both control channels stay alive. The resolution: the server
+  accepts them under an inverted rule (each side names whoever disappeared), and still refuses its own three
+  judgements.
 
-جدول مرجعية أسباب الإنهاء صار في `docs/ws-protocol.md` القسم 9.
+The reference table of end reasons is now in section 9 of `docs/ws-protocol.md`.
 
-## ازدواج المنسّق حُسم
+## The duplicated coordinator was settled
 
-كتب المساران منسّقين للجلسة، أي نسختين من ترتيب التنظيف الأمني. وُحّدا على `SessionCoordinator`، وحُذف الآخر، وأُعيد ربط الأداة به. كشف التوحيد ثغرة ثالثة: سبب `expired` كان يمكن أن يتسرب من رسالة وداع النظير، فأُضيف حارس مركزي.
+Both tracks wrote a session coordinator — that is, two copies of the security cleanup order. They were unified on
+`SessionCoordinator`, the other was deleted, and the tool was rewired to it. The unification uncovered a third
+vulnerability: the `expired` reason could leak in from the peer's farewell message, so a central guard was added.
 
-## التحقق الحي (مستقل)
+## Live verification (independent)
 
-جلسة كاملة بين عمليتين مقابل خادم حقيقي: تسجيل دخول ← قناة تحكم ← طلب وقبول ← تبادل نقاط النهاية ← اتصال عبر `lan` في 45 ms بـ TLS 1.2 ← `curl` عبر النفق أعاد **200 وعنوان IP العام في الجسم** ← إحصاءات كل 30 ثانية ← انتهاء المدة. سجل الخادم: `ended / expired / lan / 1.2 / connect_result=ok`، و`session_keys` فارغ.
+A full session between two processes against a real server: sign-in → control channel → request and acceptance →
+endpoint exchange → connection over `lan` in 45 ms with TLS 1.2 → `curl` through the tunnel returned **200 and the
+public IP address in the body** → statistics every 30 seconds → the duration expiring. The server's log:
+`ended / expired / lan / 1.2 / connect_result=ok`, and `session_keys` empty.
 
-## استقرار الاختبارات
-عولجت ثلاثة اختبارات متقطعة جديدة بالأسلوب نفسه. **8 تشغيلات كاملة، 7240 نتيجة، بلا فشل.**
+## Test stability
+Three new intermittent tests were treated the same way. **8 full runs, 7240 results, no failures.**
 
-## ما يحتاج تدخلًا بشريًا
-لم يتغير منذ الأسبوع الأول ولم يبدأ بعد. صار الآن أكثر إلحاحًا لأن الأسبوع الرابع سلّم أداة تجعل الاختبار على Windows ممكنًا بلا انتظار الواجهة:
-1. **شهادة توقيع الكود** (على المسار الحرج للأسبوع 6).
-2. **VPS للاختبار** ونشر الخادم عليه (الـ workflow جاهز وينقصه أربعة أسرار).
-3. **النموذج التقني على Windows** وفق `docs/spike-runbook.md`، بما فيه أمر `session` بين جهازين حقيقيين: وحده يثبت خروج الحركة من عنوان الجهاز الآخر.
-4. **فحص QA لتطبيق WPF** لاعتماد ADR-0001.
+## What needs human intervention
+Unchanged since week one and not started yet. It is now more urgent, because week four delivered a tool that makes
+testing on Windows possible without waiting for the interface:
+1. **The code-signing certificate** (on the critical path for week 6).
+2. **A staging VPS** and deploying the server on it (the workflow is ready and lacks four secrets).
+3. **The technical prototype on Windows** per `docs/spike-runbook.md`, including the `session` command between two
+   real machines: it alone proves traffic leaves from the other machine's address.
+4. **QA of the WPF application** to accept ADR-0001.
 
-## الأسبوع 5 (من الخطة)
-- A: تقوية وتنظيف، ودعم Relay إن فُتحت البوابة.
-- B: ما تكشفه بيانات الأزواج العشرة.
-- C: صقل الواجهة وحالات الحافة المتبقية.
-- D: تشغيل runbook على VPS نظيف، وفحص SmartScreen للمثبّت الموقّع.
+## Week 5 (from the plan)
+- A: hardening and cleanup, and relay support if the gate opens.
+- B: whatever the ten pairs' data reveals.
+- C: polishing the interface and the remaining edge cases.
+- D: running the runbook on a clean VPS, and checking SmartScreen on the signed installer.

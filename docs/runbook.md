@@ -1,8 +1,8 @@
-# Runbook: تشغيل خادم Josour على VPS
+# Runbook: running the Josour server on a VPS
 
-الهدف: VPS Linux صغير (1 vCPU / 2 GB) يشغّل Caddy + FastAPI + PostgreSQL + نسخ احتياطي يومي بـ Docker Compose.
+The goal: a small Linux VPS (1 vCPU / 2 GB) running Caddy + FastAPI + PostgreSQL + a daily backup with Docker Compose.
 
-## 1. تجهيز الخادم (مرة واحدة)
+## 1. Preparing the server (once)
 
 ```bash
 # Ubuntu 24.04 LTS
@@ -15,82 +15,95 @@ dpkg-reconfigure -plow unattended-upgrades
 curl -fsSL https://get.docker.com | sh
 ```
 
-- أنشئ سجل DNS من نوع A لـ `rb.example.com` يشير إلى IP الخادم قبل التشغيل الأول (Caddy يحتاجه لإصدار الشهادة).
-- SSH بمفتاح فقط (`PasswordAuthentication no` في `sshd_config`).
+- Create an A record for `rb.example.com` pointing at the server's IP before the first run (Caddy needs it to issue the
+  certificate).
+- SSH by key only (`PasswordAuthentication no` in `sshd_config`).
 
-## 2. النشر الأول
+## 2. The first deployment
 
 ```bash
 git clone <repo> /opt/routebridge && cd /opt/routebridge/deploy
 cp .env.example .env
-# عدّل DOMAIN وACME_EMAIL وكلمة مرور PostgreSQL وJWT_SECRET (openssl rand -base64 48)
+# set DOMAIN, ACME_EMAIL, the PostgreSQL password and JWT_SECRET (openssl rand -base64 48)
 docker compose up -d --build
-docker compose logs -f api   # انتظر: "Application startup complete"
-# المسؤول الأول
+docker compose logs -f api   # wait for: "Application startup complete"
+# the first administrator
 docker compose exec api python manage.py create-admin --email admin@example.com --password '…' --display-name "Admin"
-curl -s https://rb.example.com/healthz     # فحص الحياة خارج /api/v1، بلا مصادقة
+curl -s https://rb.example.com/healthz     # the health check, outside /api/v1 and unauthenticated
 ```
 
-## 3. النشر الآلي إلى staging
+## 3. Automatic deployment to staging
 
-`.github/workflows/deploy-staging.yml` ينشر تلقائيًا عند نجاح `ci-backend` على `main`، أو يدويًا من تبويب Actions.
+`.github/workflows/deploy-staging.yml` deploys automatically when `ci-backend` succeeds on `main`, or by hand from the
+Actions tab.
 
-الأسرار المطلوبة في إعدادات المستودع (Settings ← Secrets ← Actions)، تحت بيئة باسم `staging`:
+The secrets required in the repository's settings (Settings → Secrets → Actions), under an environment named
+`staging`:
 
-| السر | المحتوى |
+| Secret | Contents |
 |---|---|
-| `STAGING_HOST` | عنوان الخادم أو اسمه |
-| `STAGING_USER` | مستخدم SSH |
-| `STAGING_SSH_KEY` | مفتاح ed25519 خاص بلا عبارة مرور، ونظيره في `authorized_keys` على الخادم |
-| `STAGING_PATH` | مسار المستودع على الخادم، مثل `/opt/routebridge` |
+| `STAGING_HOST` | The server's address or name |
+| `STAGING_USER` | The SSH user |
+| `STAGING_SSH_KEY` | A private ed25519 key with no passphrase, with its counterpart in `authorized_keys` on the server |
+| `STAGING_PATH` | The repository's path on the server, e.g. `/opt/routebridge` |
 
-الخطوات التي ينفذها: نسخة احتياطية قبل أي تغيير ← `git reset --hard origin/main` ← إعادة بناء `api` ← انتظار `/healthz` حتى 150 ثانية ← تشغيل سكربتَي أمان (مفاتيح الجلسات ونظافة السجلات) ← **تراجع تلقائي إلى الإصدار السابق عند أي فشل**.
+The steps it performs: a backup before any change → `git reset --hard origin/main` → rebuilding `api` → waiting for
+`/healthz` for up to 150 seconds → running two security scripts (session keys and log cleanliness) → **an automatic
+rollback to the previous version on any failure**.
 
-الخادم يجب أن يكون مجهّزًا مسبقًا وفق القسم 1 وفيه `deploy/.env` جاهز؛ الـ workflow لا ينشئ البيئة من الصفر.
+The server must already be prepared per section 1 with `deploy/.env` in place; the workflow does not create the
+environment from scratch.
 
-## 4. الترقية
+## 4. Upgrading
 
 ```bash
 cd /opt/routebridge && git pull
 cd deploy && docker compose build api && docker compose up -d api
 docker compose logs --tail=50 api
 ```
-الترحيلات تُطبَّق تلقائيًا عند إقلاع `api` (`alembic upgrade head`). عند ترحيل خطير: خذ نسخة يدوية أولًا (`docker compose exec backup /usr/local/bin/backup.sh`).
+Migrations are applied automatically when `api` starts (`alembic upgrade head`). For a risky migration: take a manual
+backup first (`docker compose exec backup /usr/local/bin/backup.sh`).
 
-## 5. النسخ الاحتياطي والاستعادة
+## 5. Backup and restore
 
-- تلقائي: خدمة `backup` تكتب `deploy/backups/josour-<UTC>.sql.gz` يوميًا وتحذف ما يتجاوز `BACKUP_RETENTION_DAYS`.
-- انسخ المجلد خارج الخادم (rsync أو S3) يوميًا؛ النسخة على القرص نفسه ليست خطة كوارث.
-- الاستعادة: `./backup/restore.sh backups/josour-….sql.gz` (يوقف `api`، يعيد إنشاء القاعدة، يستورد، يشغّل `api`).
-- اختبر الاستعادة على خادم staging مرة شهريًا.
+- Automatic: the `backup` service writes `deploy/backups/josour-<UTC>.sql.gz` daily and deletes anything older than
+  `BACKUP_RETENTION_DAYS`.
+- Copy the directory off the server (rsync or S3) daily; a copy on the same disk is not a disaster plan.
+- Restoring: `./backup/restore.sh backups/josour-….sql.gz` (stops `api`, recreates the database, imports, starts `api`).
+- Test the restore on the staging server once a month.
 
-### نتيجة تجربة الاستعادة (2026-09-05)
+### The restore exercise's result (2026-09-05)
 
-جُرِّبت الدورة كاملة على بيئة نظيفة: تشغيل المكدس، إنشاء مسؤول ومستخدم وقائمة مواقع، أخذ نسخة، حذف كل الصفوف عمدًا، ثم `restore.sh`.
+The full cycle was exercised on a clean environment: starting the stack, creating an administrator, a user and a site
+list, taking a backup, deliberately deleting every row, then `restore.sh`.
 
-| الفحص | النتيجة |
+| Check | Result |
 |---|---|
-| السكربت أنهى بلا خطأ | ✅ |
-| صفوف المستخدمين والمواقع وإصدارات القائمة | ✅ عادت كاملة |
-| تسجيل دخول بحساب مستعاد | ✅ يعمل |
-| حالة الترحيلات (`alembic_version`) | ✅ سليمة |
-| `/healthz` بعد الاستعادة | ✅ 200 |
+| The script finished with no error | ✅ |
+| The user, site and list-version rows | ✅ came back complete |
+| Signing in with a restored account | ✅ works |
+| The migration state (`alembic_version`) | ✅ sound |
+| `/healthz` after the restore | ✅ 200 |
 
-**ملاحظة تشغيلية:** السكربت يستدعي `docker compose` باسم المشروع الافتراضي المشتق من اسم المجلد (`deploy`). إن شُغّل المكدس باسم مشروع مخصص (`-p`) فمرّر `COMPOSE_PROJECT_NAME` نفسه عند الاستعادة.
+**An operational note:** the script calls `docker compose` with the default project name derived from the directory's
+name (`deploy`). If the stack was started under a custom project name (`-p`), pass the same `COMPOSE_PROJECT_NAME` when
+restoring.
 
-## 6. المراقبة والسجلات
+## 6. Monitoring and logs
 
 ```bash
 docker compose ps
 docker compose logs --since 1h api
 docker compose exec db psql -U routebridge -c "select status, count(*) from sessions group by 1;"
 ```
-- `api` يعمل بـ worker واحد عمدًا (سجل اتصالات WebSocket في الذاكرة). لا ترفع `--workers` قبل إضافة Redis Pub/Sub.
-- إعادة تشغيل `api` تقطع كل اتصالات WebSocket؛ العملاء يعيدون الاتصال بتراجع أسّي والجلسات النشطة تُنهى (بحسب العقد).
+- `api` runs with a single worker deliberately (the WebSocket connection registry is in memory). Do not raise
+  `--workers` before adding Redis Pub/Sub.
+- Restarting `api` drops every WebSocket connection; clients reconnect with exponential backoff and active sessions are
+  ended (per the contract).
 
-## 7. الأمان
+## 7. Security
 
-- `/docs` معطّل في `ENV=prod`.
-- لا تفتح منفذ PostgreSQL للخارج؛ الوصول عبر `docker compose exec db psql` فقط.
-- دوّر `JWT_SECRET` فقط مع تسجيل خروج جماعي مخطط (يبطل كل access tokens فورًا).
-- إن أُضيف Relay لاحقًا: خدمة منفصلة خلف Caddy بـ SNI مستقل على 443.
+- `/docs` is disabled with `ENV=prod`.
+- Do not open PostgreSQL's port to the outside; access is through `docker compose exec db psql` only.
+- Rotate `JWT_SECRET` only alongside a planned mass sign-out (it invalidates every access token at once).
+- If a relay is added later: a separate service behind Caddy with its own SNI on 443.

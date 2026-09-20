@@ -1,137 +1,201 @@
-# عقد القناة بين الجهازين (Tunnel Protocol)
+# The channel contract between the two machines (the tunnel protocol)
 
-الإصدار: 1 (مجمّد نهاية الأسبوع 1). المالك: المسار B. المستهلك: المسار C عبر واجهات `Josour.Core`.
+Version: 1 (frozen at the end of week 1). Owner: track B. Consumer: track C through the `Josour.Core` interfaces.
 
-## 1. الأدوار
+## 1. The roles
 
-- **Guest (المستخدم):** يشغّل `ConnectProxyServer` محليًا ويفتح streams عبر النفق. يتكلم أولًا في المصادقة دائمًا.
-- **Host (المضيف):** يشغّل `OpenHandler` وينفّذ `EgressPolicy`. هو المرجع الوحيد في قبول الاتصال (`session.connected`).
-- أي طرف قد يكون **المتصل** أو **المستمع** على مستوى TCP (اتصال متماثل). الدور المنطقي لا يتغير.
+- **Guest (the user):** runs `ConnectProxyServer` locally and opens streams through the tunnel. It always speaks first
+  in the authentication.
+- **Host:** runs `OpenHandler` and enforces `EgressPolicy`. It is the sole authority on accepting the connection
+  (`session.connected`).
+- Either side may be **the connector** or **the listener** at the TCP level (a symmetric connection). The logical role
+  does not change.
 
-## 2. إنشاء الاتصال
+## 2. Establishing the connection
 
-1. عند `session.created` كل طرف:
-   - يولّد شهادة ذاتية: ECDSA P-256، الموضوع `CN=josour`, EKU `serverAuth` + `clientAuth`, الصلاحية من الآن − 5 دقائق إلى `expires_at` + ساعة. تُصدَّر PFX وتُعاد استيرادها بـ `X509KeyStorageFlags.UserKeySet` (بلا `PersistKeySet`) لتعمل مع Schannel وتُحذف حاوية المفتاح عند `Dispose`.
-   - يفتح مستمع TCP على `[::]:0` بـ `DualMode=true` ويقرأ المنفذ.
-   - يطلب تعيين UPnP/NAT-PMP بـ Mono.Nat لهذا المنفذ (عمر التعيين = المدة المتبقية + 5 دقائق).
-   - يجمع المرشحين ويرسل `session.endpoint` مع بصمة الشهادة (SHA-256 على `RawData`, hex صغير).
-2. أنواع المرشحين وترتيب الأولوية: `lan` (فقط إذا `same_public_ip=true`), `v6` (عناوين IPv6 عامة غير مؤقتة), `upnp` (IP:Port الخارجي من الراوتر), `public` (IP الذي يراه الخادم + المنفذ المحلي؛ يعمل إن كان المنفذ مفتوحًا أو الجهاز بعنوان عام).
-3. عند `session.peer_endpoint` يتصل كل طرف بكل مرشحي الآخر بالتوازي بمهلة 5 ثوانٍ لكل مرشح، ويستمر في قبول الاتصالات الواردة.
-4. لكل اتصال TCP: مصافحة TLS بمهلة 10 ثوانٍ ثم مصادقة بمهلة 5 ثوانٍ.
-5. المضيف يبقي **أول** اتصال يجتاز `AUTH1`، ويرسل `AUTH2` عليه **فقط**، ويغلق أي اتصال آخر بلا رد. بذلك لا يرى المستخدم إلا `AUTH2` واحدًا، فاختياره لـ «أول اتصال مصادَق» هو بالضرورة اختيار المضيف. ثم يرسل المضيف `session.connected`. الطرفان يغلقان المستمع ويزيلان تعيين UPnP ويلغيان المحاولات الأخرى. في التشخيص قد تختلف تسمية `winner_type` بين الطرفين للاتصال نفسه؛ تسمية المضيف هي المعتمدة.
-6. إن لم يُصادَق شيء خلال 30 ثانية من `session.created`: `session.connect_failed` مع التشخيص.
+1. On `session.created` each side:
+   - Generates a self-signed certificate: ECDSA P-256, subject `CN=josour`, EKU `serverAuth` + `clientAuth`, validity
+     from now − 5 minutes to `expires_at` + an hour. It is exported as PFX and re-imported with
+     `X509KeyStorageFlags.UserKeySet` (without `PersistKeySet`) so that it works with Schannel and the key container is
+     deleted on `Dispose`.
+   - Opens a TCP listener on `[::]:0` with `DualMode=true` and reads the port.
+   - Requests a UPnP/NAT-PMP mapping with Mono.Nat for that port (the mapping's lifetime = the remaining duration + 5
+     minutes).
+   - Gathers the candidates and sends `session.endpoint` with the certificate's fingerprint (SHA-256 over `RawData`,
+     lowercase hex).
+2. The candidate types and their priority order: `lan` (only if `same_public_ip=true`), `v6` (public, non-temporary
+   IPv6 addresses), `upnp` (the external IP:Port from the router), `public` (the IP the server sees + the local port;
+   it works if the port is open or the machine has a public address).
+3. On `session.peer_endpoint` each side connects to all of the other's candidates in parallel with a 5-second timeout
+   per candidate, and keeps accepting inbound connections.
+4. For every TCP connection: a TLS handshake with a 10-second timeout, then authentication with a 5-second timeout.
+5. The host keeps the **first** connection that passes `AUTH1`, sends `AUTH2` on that one **only**, and closes any
+   other connection with no reply. So the user sees only one `AUTH2`, and its choice of "the first authenticated
+   connection" is necessarily the host's choice. The host then sends `session.connected`. Both sides close the
+   listener, remove the UPnP mapping and cancel the other attempts. In the diagnostics the two sides may label
+   `winner_type` differently for the same connection; the host's label is authoritative.
+6. If nothing authenticates within 30 seconds of `session.created`: `session.connect_failed` with the diagnostics.
 
-قيود المستمع: 4 اتصالات غير مصادقة معلّقة كحد أقصى؛ أي اتصال زائد يُغلق فورًا. المستمع لا يُفتح إلا بين `session.created` و`session.connected`.
+The listener's limits: at most 4 pending unauthenticated connections; any beyond that is closed at once. The listener
+is only open between `session.created` and `session.connected`.
 
 ## 3. TLS
 
-- `SslStream` مع `SslProtocols.None` (افتراضي النظام). بعد المصافحة: إن كان `SslProtocol < Tls12` يُغلق الاتصال ويُسجَّل `tls_too_old`. الإصدار المتفاوَض عليه يُرسل في `session.connected`.
-- الطرف الذي يتصل (Client في TLS) يقدّم `TargetHost="josour"` ويقبل الشهادة فقط إذا طابقت `SHA256(RawData)` بصمة الطرف الآخر من `session.peer_endpoint`؛ يتجاهل أخطاء السلسلة والاسم؛ `CertificateRevocationCheckMode=NoCheck`.
-- الطرف الذي يستمع (Server في TLS) يقدّم شهادته الذاتية ولا يطلب شهادة عميل.
-- **فوق الـ Relay (أُضيف في 2026-09-07 بـ [ADR-0009](decisions/0009-relay-default.md)):** لا مستمع أصلًا — الطرفان يتصلان خارجًا بالـ Relay، فقاعدة «المستمع هو Server» لا معنى لها ولو تُركت لانتظر كلاهما مصافحة الآخر إلى الأبد. القاعدة على هذا المسار: **المضيف هو TLS Server دائمًا** (يقدّم شهادته)، **والمستخدم TLS Client** (يثبّت بصمة المضيف). وهو الاختيار المتسق مع كون المضيف مرجع القبول في القسم 2. وتبعًا لذلك `listener_cert_fp` في القسم 4 هو **بصمة شهادة المضيف** على هذا المسار — يعرفها الطرفان (المضيف من شهادته، والمستخدم من `session.peer_endpoint`)، فلا يتغير حساب `AUTH1`/`AUTH2` ولا بايت واحد.
-- لا يُكتب أي بايت خارج TLS.
+- `SslStream` with `SslProtocols.None` (the system default). After the handshake: if `SslProtocol < Tls12` the
+  connection is closed and `tls_too_old` recorded. The negotiated version is sent in `session.connected`.
+- The connecting side (the TLS client) presents `TargetHost="josour"` and accepts the certificate only if
+  `SHA256(RawData)` matches the other side's fingerprint from `session.peer_endpoint`; it ignores chain and name
+  errors; `CertificateRevocationCheckMode=NoCheck`.
+- The listening side (the TLS server) presents its self-signed certificate and does not request a client certificate.
+- **Over the relay (added on 2026-09-07 by [ADR-0009](decisions/0009-relay-default.md)):** there is no listener at all
+  — both sides connect outbound to the relay, so the rule "the listener is the server" is meaningless, and had it been
+  left in place both would have waited for the other's handshake forever. The rule on this path: **the host is always
+  the TLS server** (presenting its certificate), **and the user is the TLS client** (pinning the host's fingerprint).
+  It is the choice consistent with the host being the authority on acceptance in section 2. Accordingly
+  `listener_cert_fp` in section 4 is **the host's certificate fingerprint** on this path — known to both sides (the
+  host from its certificate, the user from `session.peer_endpoint`), so not a single byte of the `AUTH1`/`AUTH2`
+  computation changes.
+- Not a single byte is written outside TLS.
 
-## 4. المصادقة داخل TLS
+## 4. Authentication inside TLS
 
-بعد المصافحة، Guest يرسل `AUTH1` ثم ينتظر `AUTH2`. Host صامت حتى يتحقق من `AUTH1`.
+After the handshake, the guest sends `AUTH1` and then waits for `AUTH2`. The host is silent until it has verified
+`AUTH1`.
 
 ```
-AUTH1 (Guest → Host), 81 بايت:
+AUTH1 (Guest → Host), 81 bytes:
   u8   version = 1
-  16B  session_id (UUID bytes, big-endian كما في RFC 4122)
+  16B  session_id (UUID bytes, big-endian as in RFC 4122)
   32B  client_random
   32B  mac1 = HMAC-SHA256(secret, "rb-auth1" || session_id || client_random || listener_cert_fp)
 
-AUTH2 (Host → Guest), 32 بايت:
+AUTH2 (Host → Guest), 32 bytes:
   32B  mac2 = HMAC-SHA256(secret, "rb-auth2" || session_id || client_random || listener_cert_fp)
 ```
 
-- `secret` = 32 بايت من `secret_b64` في `session.created`.
-- `listener_cert_fp` = 32 بايت SHA-256 لشهادة **الطرف الذي يعمل كـ TLS Server** في هذا الاتصال (أيًا كان دوره المنطقي). كلا الطرفين يعرفانها: المستمع من شهادته، والمتصل من `session.peer_endpoint`.
-- النصوص `"rb-auth1"` و`"rb-auth2"` ASCII بلا فاصل.
-- المقارنة بـ `CryptographicOperations.FixedTimeEquals`.
-- الفشل: إغلاق الاتصال بلا رد. عند النجاح يبدأ الـ Mux فورًا.
-- عند انتهاء الجلسة: مسح `secret` من الذاكرة (`CryptographicOperations.ZeroMemory`) و`Dispose` للشهادات.
+- `secret` = the 32 bytes from `secret_b64` in `session.created`.
+- `listener_cert_fp` = the 32-byte SHA-256 of the certificate of **the side acting as the TLS server** in this
+  connection (whatever its logical role). Both sides know it: the listener from its own certificate, the connector from
+  `session.peer_endpoint`.
+- The strings `"rb-auth1"` and `"rb-auth2"` are ASCII with no separator.
+- Comparison uses `CryptographicOperations.FixedTimeEquals`.
+- Failure: the connection is closed with no reply. On success the mux starts at once.
+- When the session ends: `secret` is wiped from memory (`CryptographicOperations.ZeroMemory`) and the certificates are
+  disposed.
 
-## 5. الإطارات (يُستخدم إن لم يُعتمد Nerdbank في ADR-0006)
+## 5. The frames (used if Nerdbank is not adopted in ADR-0006)
 
-رأس ثابت 8 بايت، Big-endian:
+A fixed 8-byte header, big-endian:
 
 ```
 u8  type | u8 flags | u16 length | u32 stream_id
 ```
 
-| type | الاسم | الحمولة | ملاحظات |
+| type | Name | Payload | Notes |
 |---|---|---|---|
-| 0x01 | `OPEN` | `u16 port` + `u8 hostlen` + `host` (UTF-8, ASCII/Punycode) | من Guest فقط. `stream_id` فردي متزايد |
-| 0x02 | `OPEN_OK` | لا شيء | |
+| 0x01 | `OPEN` | `u16 port` + `u8 hostlen` + `host` (UTF-8, ASCII/Punycode) | From the guest only. `stream_id` is odd and increasing |
+| 0x02 | `OPEN_OK` | nothing | |
 | 0x03 | `OPEN_FAIL` | `u8 reason` | 1 `not_allowed`, 2 `private_ip`, 3 `port_not_allowed`, 4 `dns_failed`, 5 `connect_failed`, 6 `limit`, 7 `ip_literal` |
-| 0x04 | `DATA` | بايتات ≤ 16384 | |
+| 0x04 | `DATA` | bytes ≤ 16384 | |
 | 0x05 | `WINDOW_UPDATE` | `u32 increment` | |
-| 0x06 | `CLOSE` | لا شيء | إغلاق نصفي (لن يرسل هذا الطرف DATA بعده) |
-| 0x07 | `RST` | لا شيء | إنهاء فوري للـ stream في الاتجاهين |
-| 0x08 | `PING` | 8 بايت معتمة | `stream_id = 0` |
-| 0x09 | `PONG` | نفس الـ 8 بايت | `stream_id = 0` |
-| 0x0A | `GOAWAY` | `u8 reason` | `stream_id = 0`؛ 1 `session_end`, 2 `protocol_error`, 3 `expired` |
+| 0x06 | `CLOSE` | nothing | A half-close (this side will send no more DATA) |
+| 0x07 | `RST` | nothing | Immediate termination of the stream in both directions |
+| 0x08 | `PING` | 8 opaque bytes | `stream_id = 0` |
+| 0x09 | `PONG` | the same 8 bytes | `stream_id = 0` |
+| 0x0A | `GOAWAY` | `u8 reason` | `stream_id = 0`; 1 `session_end`, 2 `protocol_error`, 3 `expired` |
 
-قواعد:
-- `length` ≤ 16384 لكل الأنواع؛ تجاوزه = `GOAWAY(protocol_error)` وإغلاق الاتصال.
-- `stream_id` غير معروف في `DATA`/`CLOSE`/`WINDOW_UPDATE` → `RST` لذلك المعرّف.
-- **نافذة استقبال لكل stream تُشتق من زمن الذهاب والإياب**، لأن سقف الـ stream الواحد هو حاصل قسمة النافذة على RTT بالضبط (قياسات `docs/performance-week5.md`: الكفاءة 99% إلى 102%):
+Rules:
+- `length` ≤ 16384 for every type; exceeding it = `GOAWAY(protocol_error)` and closing the connection.
+- An unknown `stream_id` in `DATA`/`CLOSE`/`WINDOW_UPDATE` → `RST` for that id.
+- **A per-stream receiving window derived from the round-trip time**, because a single stream's ceiling is exactly the
+  window divided by the RTT (the measurements in `docs/performance-week5.md`: 99% to 102% efficiency):
 
-| RTT المقيس | النافذة | السقف النظري للـ stream الواحد |
+| Measured RTT | Window | Theoretical ceiling for one stream |
 |---|---|---|
 | ≤ 60 ms | 1 MiB | ≥ 140 Mbit/s |
 | ≤ 150 ms | 2 MiB | ≥ 110 Mbit/s |
-| > 150 ms | 4 MiB | ≥ 110 Mbit/s حتى 300 ms |
+| > 150 ms | 4 MiB | ≥ 110 Mbit/s up to 300 ms |
 
-  المرسل لا يتجاوز رصيده. المستقبل يعيد الرصيد **بعد** كتابة البايتات إلى المقبس الوجهة، ويرسل `WINDOW_UPDATE` عندما يبلغ المستهلَك 25% من النافذة.
+  The sender does not exceed its credit. The receiver returns credit **after** writing the bytes to the destination
+  socket, and sends `WINDOW_UPDATE` when the consumed amount reaches 25% of the window.
 
-  **مصدر القياس (صُحّح في الأسبوع 5):** ذهاب وإياب واحد صريح على الـ stream المصادَق بعد `AUTH2` وقبل إنشاء الـ Mux. **لا يُستخدم `connect_ms`**: فهو يقيس الاتصال كله (TCP ثم TLS ثم المصادقة، زائد سباق المرشحين والفارق بين لحظتَي بدء الطرفين) فيبلغ نحو ثلاثة إلى أربعة أضعاف الـ RTT الحقيقي، ما يرفع الجلسة درجة أو درجتين ويخفض حد الـ streams المتزامنة بلا داعٍ حتى يصطدم به متصفح على صفحة ثقيلة.
+  **The measurement's source (corrected in week 5):** one explicit round trip on the authenticated stream after `AUTH2`
+  and before the mux is created. **`connect_ms` is not used**: it measures the whole connection (TCP, then TLS, then
+  authentication, plus the candidate race and the gap between the two sides' start times) and so comes to about three
+  or four times the real RTT, which raises the session a band or two and lowers the concurrent stream limit needlessly
+  until a browser on a heavy page runs into it.
 
-  النافذة خاصية **مستقبِل** يعلنها كل طرف عن نفسه، فلا يلزم أن يتفق الطرفان على درجة واحدة؛ لكن كل طرف يحرس ميزانية ذاكرته بنفسه (انظر حد الذاكرة أدناه). قناة التحكم المزروعة (المعرّف 0) لا تتبادل عرضًا وقبولًا فتُثبَّت على 4 MiB فوق كل الدرجات.
+  The window is a **receiver's** property that each side announces about itself, so the two sides need not agree on one
+  band; but each side guards its own memory budget (see the memory limit below). The seeded control channel (id 0)
+  exchanges no offer and accept, so it is pinned at 4 MiB across every band.
 
-  **سبب التدرّج:** نافذة 1 MiB ثابتة كانت تحدّ التنزيل الواحد بـ 56 Mbit/s على RTT مقداره 150 ms و28 Mbit/s على 300 ms. تحميل الصفحات لا يتأثر (يستخدم عشرات الـ streams، والزيادة على الاتصال المباشر 0% إلى 2%)، والفيديو لا يتأثر، لكن **تنزيل ملف عمل واحد** يتأثر وهو استخدام تعدّه وثيقة المنتج متوقعًا (القسم 13.1).
+  **Why the banding:** a fixed 1 MiB window limited a single download to 56 Mbit/s at an RTT of 150 ms and 28 Mbit/s at
+  300 ms. Page loading is unaffected (it uses dozens of streams, and the increase over a direct connection is 0% to
+  2%), and video is unaffected, but **downloading a single work file** is affected, and that is a use the product
+  document treats as expected (section 13.1).
 
-  **حد الذاكرة:** النافذة رصيد لا حجز مسبق، فالاستهلاك الفعلي محكوم بحاصل ضرب النطاق في التأخير للحركة الجارية. الحد النظري الأسوأ (كل الـ streams متوقفة ونوافذها ممتلئة) هو 256 × النافذة؛ عند 4 MiB يصير 1 GiB على جهاز قد يكون حاسوبًا شخصيًا، لذلك **يُخفَّض الحد الأقصى للـ streams المتزامنة إلى 64 عندما تكون النافذة 4 MiB** (سقف 256 MiB) وإلى 128 عند 2 MiB، ويبقى 256 عند 1 MiB.
-- كاتب واحد لكل اتصال يفرّغ قناة محدودة (32 إطارًا)؛ كل stream يملك إطار DATA واحدًا معلّقًا في القناة كحد أقصى.
-- حدود Host: عدد الـ streams المتزامنة بحسب جدول النافذة أعلاه (256 أو 128 أو 64)، و50 `OPEN` في الثانية؛ التجاوز يرد `OPEN_FAIL(limit)`.
-- حيوية: `PING` كل 20 ثانية من الطرفين؛ لا `PONG` خلال 60 ثانية = النفق ميت = إنهاء الجلسة.
+  **The memory limit:** the window is credit rather than a reservation, so actual consumption is governed by the
+  bandwidth-delay product of the traffic in flight. The theoretical worst case (every stream stalled with its window
+  full) is 256 × the window; at 4 MiB that is 1 GiB on what may be a personal computer, so **the maximum number of
+  concurrent streams is lowered to 64 when the window is 4 MiB** (a 256 MiB ceiling) and to 128 at 2 MiB, and stays 256
+  at 1 MiB.
+- One writer per connection drains a bounded channel (32 frames); every stream has at most one DATA frame outstanding
+  in the channel.
+- The host's limits: the number of concurrent streams per the window table above (256, 128 or 64), and 50 `OPEN`s a
+  second; exceeding them returns `OPEN_FAIL(limit)`.
+- Liveness: `PING` every 20 seconds from both sides; no `PONG` within 60 seconds = the tunnel is dead = the session
+  ends.
 
-## 6. سياسة الخروج على المضيف (`EgressPolicy`)
+## 6. The egress policy on the host (`EgressPolicy`)
 
-> **لماذا يُقبل مدخل مثل `portal.corp:8443` في القائمة؟** (سؤال تكرر في مراجعة أمن الأسبوع 5)
-> القائمة **تفويض** لا ضمان وصول: تحدد أي أسماء يُسمح بطلبها عبر المضيف. الحدّ الأمني الفعلي هو القاعدة 6 أدناه، وتُطبَّق **بعد حل الاسم وقبل فتح أي مقبس**، على الجانبين معًا: المضيف في `EgressPolicy`، والمستخدم على المسار المباشر في `ConnectProxyServer`. فاسم موجود في القائمة لكنه يُحل إلى عنوان داخلي **يُرفض**. لذلك لا يُرفض مثل هذا المدخل عند التحميل: رفضه يكسر عقد `api.md` بلا مكسب أمني، والحماية قائمة في موضعها الصحيح.
+> **Why is an entry like `portal.corp:8443` accepted in the list?** (a question that recurred in week five's security
+> review)
+> The list is an **authorisation**, not a guarantee of reachability: it determines which names may be requested through
+> the host. The actual security boundary is rule 6 below, and it is applied **after the name is resolved and before any
+> socket is opened**, on both sides: the host in `EgressPolicy`, and the user on the direct path in
+> `ConnectProxyServer`. So a name that is in the list but resolves to an internal address **is refused**. That is why
+> such an entry is not rejected at load time: rejecting it would break the `api.md` contract with no security gain,
+> while the protection stands in its proper place.
 
-عند `OPEN(host, port)` بالترتيب:
+On `OPEN(host, port)`, in order:
 
-1. إن كان `host` عنوان IP (v4 أو v6، ولو بين أقواس) → `OPEN_FAIL(ip_literal)`.
-2. تطبيع: أحرف صغيرة، حذف النقطة الأخيرة، تحويل IDN إلى Punycode.
-3. مطابقة القائمة (`AllowlistMatcher`) — **تُرفع افتراضيًا منذ [ADR-0010](decisions/0010-route-all-through-host.md)**: كل اسم مسموح ما لم يُفعّل المسؤول `enforce_allowlist`. لا يتغير شيء آخر في هذه الخطوات: الخطوة 6 (رفض أي عنوان ناتج محظور) هي الحدّ الأمني وتبقى نافذة كما هي، وكذلك رفض العناوين الحرفية والتطبيع الصارم وحدّ `allowed_ports`. «مرّر كل المواقع» ترفع شرط الاسم وحده:
-   - `example.com` يطابق `example.com` وكل نطاق فرعي.
-   - `=exact.com` يطابق `exact.com` فقط.
-   - لاحقة `:port` اختيارية تقيّد المنفذ؛ بدونها يُسمح بمنافذ `allowed_ports`.
-   - مدخلات مرفوضة عند التحميل: فارغة، `*`، تحتوي `/` أو مسافات.
-   - لا تطابق → `OPEN_FAIL(not_allowed)`.
-4. المنفذ ليس ضمن `allowed_ports` (افتراضيًا 80 و443) ولا يطابق قيد المدخل → `OPEN_FAIL(port_not_allowed)`.
-5. حل DNS مرة واحدة (`Dns.GetHostAddressesAsync`) بمهلة 5 ثوانٍ؛ فشل → `OPEN_FAIL(dns_failed)`.
-6. إن كان **أي** عنوان ناتج محظورًا (`IpRangePolicy`) → `OPEN_FAIL(private_ip)`. العناوين المحظورة:
-   - IPv4: `0.0.0.0/8`, `10.0.0.0/8`, `100.64.0.0/10`, `127.0.0.0/8`, `169.254.0.0/16`, `172.16.0.0/12`, `192.0.0.0/24`, `192.0.2.0/24`, `192.168.0.0/16`, `198.18.0.0/15`, `198.51.100.0/24`, `203.0.113.0/24`, `224.0.0.0/4`, `240.0.0.0/4`, `255.255.255.255/32`.
-   - IPv6: `::/128`, `::1/128`, `::ffff:0:0/96` و`64:ff9b::/96` و`2002::/16` و`2001::/32` (تُفك ويُفحص v4 المضمَّن), `fc00::/7`, `fe80::/10`, `ff00::/8`.
-   - كل عناوين واجهات المضيف نفسه، بواباته الافتراضية، وعنوانه العام كما يراه الخادم.
-7. الاتصال بـ `Socket.ConnectAsync(IPAddress[], port)` بالقائمة المفحوصة فقط، بمهلة 10 ثوانٍ؛ فشل → `OPEN_FAIL(connect_failed)`.
-8. `OPEN_OK` ثم ضخ ثنائي الاتجاه؛ عدّ البايتات في الاتجاهين؛ إضافة `host` لمجموعة النطاقات المميزة.
+1. If `host` is an IP address (v4 or v6, even in brackets) → `OPEN_FAIL(ip_literal)`.
+2. Normalisation: lowercase, strip the trailing dot, convert IDN to Punycode.
+3. Matching the list (`AllowlistMatcher`) — **lifted by default since
+   [ADR-0010](decisions/0010-route-all-through-host.md)**: every name is allowed unless an administrator turns on
+   `enforce_allowlist`. Nothing else in these steps changes: step 6 (refusing any resulting blocked address) is the
+   security boundary and stays in force as it is, as do refusing address literals, strict normalisation and the
+   `allowed_ports` limit. "Pass every site" lifts the name condition alone:
+   - `example.com` matches `example.com` and every subdomain.
+   - `=exact.com` matches `exact.com` only.
+   - An optional `:port` suffix restricts the port; without it the `allowed_ports` ports are permitted.
+   - Entries rejected at load time: empty, `*`, or containing `/` or spaces.
+   - No match → `OPEN_FAIL(not_allowed)`.
+4. The port is not within `allowed_ports` (80 and 443 by default) and does not match the entry's restriction →
+   `OPEN_FAIL(port_not_allowed)`.
+5. DNS resolution once (`Dns.GetHostAddressesAsync`) with a 5-second timeout; failure → `OPEN_FAIL(dns_failed)`.
+6. If **any** resulting address is blocked (`IpRangePolicy`) → `OPEN_FAIL(private_ip)`. The blocked addresses:
+   - IPv4: `0.0.0.0/8`, `10.0.0.0/8`, `100.64.0.0/10`, `127.0.0.0/8`, `169.254.0.0/16`, `172.16.0.0/12`,
+     `192.0.0.0/24`, `192.0.2.0/24`, `192.168.0.0/16`, `198.18.0.0/15`, `198.51.100.0/24`, `203.0.113.0/24`,
+     `224.0.0.0/4`, `240.0.0.0/4`, `255.255.255.255/32`.
+   - IPv6: `::/128`, `::1/128`, `::ffff:0:0/96`, `64:ff9b::/96`, `2002::/16` and `2001::/32` (unwrapped, with the
+     embedded v4 checked), `fc00::/7`, `fe80::/10`, `ff00::/8`.
+   - Every address of the host's own interfaces, its default gateways, and its public address as the server sees it.
+7. Connecting with `Socket.ConnectAsync(IPAddress[], port)` using the checked list only, with a 10-second timeout;
+   failure → `OPEN_FAIL(connect_failed)`.
+8. `OPEN_OK`, then bidirectional pumping; counting the bytes in both directions; adding `host` to the set of distinct
+   domains.
 
-## 7. ترتيب التنظيف عند انتهاء الجلسة
+## 7. The cleanup order when the session ends
 
-1. الـ Proxy يتوقف عن قبول اتصالات جديدة.
-2. إغلاق المتصفح المهذب (WM_CLOSE) ثم إغلاق الـ Job Object بعد 3 ثوانٍ.
-3. `GOAWAY(session_end)` وإغلاق النفق.
-4. إغلاق المستمع وإزالة تعيين UPnP.
-5. `Dispose` للشهادات ومسح السر.
-6. `session.end` بالإحصاءات والنطاقات.
+1. The proxy stops accepting new connections.
+2. A polite browser close (WM_CLOSE), then closing the Job Object after 3 seconds.
+3. `GOAWAY(session_end)` and closing the tunnel.
+4. Closing the listener and removing the UPnP mapping.
+5. Disposing the certificates and wiping the secret.
+6. `session.end` with the statistics and the domains.
 
-## 8. واجهات `Josour.Core` (ما يستهلكه المسار C)
+## 8. The `Josour.Core` interfaces (what track C consumes)
 
 ```csharp
 public interface ITunnelSession : IAsyncDisposable
@@ -149,4 +213,4 @@ public interface ITunnelSession : IAsyncDisposable
 public interface ITunnelTransport { Task<Stream> ConnectAsync(...); }   // Direct today, Relay later
 ```
 
-التعريف الملزم في `client/src/Josour.Core/Tunnel/*.cs`.
+The binding definition is in `client/src/Josour.Core/Tunnel/*.cs`.

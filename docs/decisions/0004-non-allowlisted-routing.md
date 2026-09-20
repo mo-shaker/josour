@@ -1,13 +1,17 @@
-# ADR-0004: المواقع غير المسموح بها تمر عبر اتصال المستخدم الطبيعي
+# ADR-0004: non-allow-listed sites go through the user's ordinary connection
 
-**الحالة:** ~~معتمد 2026-09-03~~ — **مجبوب بـ [ADR-0010](0010-route-all-through-host.md) بتاريخ 2026-09-07.** كل حركة متصفح العمل صارت تمر عبر المضيف؛ ما يلي محفوظ للسياق.
+**Status:** ~~accepted 2026-09-03~~ — **superseded by [ADR-0010](0010-route-all-through-host.md) on 2026-09-07.**
+Everything the work browser asks for now goes through the host; what follows is kept for context.
 
-## السياق
-القسم 6.6 من الوثيقة يذكر معًا «تمرير بقية المواقع عبر اتصال المستخدم الطبيعي» و«منع النطاقات غير المسموح بها».
+## Context
+Section 6.6 of the product document mentions, in the same breath, "pass the remaining sites through the user's
+ordinary connection" and "block domains that are not allow-listed".
 
-## القرار
-داخل متصفح العمل: النطاقات المسموح بها تمر عبر المضيف؛ غيرها يتصل به الـ Proxy المحلي مباشرة من جهاز المستخدم. «المنع» يعني منع المرور عبر المضيف، ويُنفَّذ على المضيف نفسه (`OPEN_FAIL(not_allowed)`) بغض النظر عن قرار المستخدم.
+## Decision
+Inside the work browser: allow-listed domains go through the host, and the local proxy connects to everything else
+directly from the user's machine. "Blocking" means blocking passage through the host, and it is enforced on the
+host itself (`OPEN_FAIL(not_allowed)`) regardless of what the user's machine decided.
 
-## النتائج
-- تجربة تصفح كاملة في متصفح العمل مع ظهور IP المضيف للمواقع المحددة فقط.
-- خيار «حظر بدل التمرير» يُضاف كإعداد لكل شركة في الإصدار الثاني.
+## Consequences
+- A complete browsing experience in the work browser, with the host's IP appearing only for the named sites.
+- A "block rather than pass through" option becomes a per-company setting in the second release.

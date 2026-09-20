@@ -1,87 +1,105 @@
 # Josour
 
-تطبيق سطح مكتب لـ Windows وmacOS يسمح لمستخدم (Guest) باستخدام اتصال الإنترنت الخاص بجهاز مستخدم آخر (Host) مؤقتًا وبموافقته الصريحة، فتصل المواقع التي لا تعمل إلا من داخل دولة المضيف — مغترب يريد بنكه أو بوّابة حكومته. كل ما يطلبه متصفح العمل يخرج من عنوان المضيف ([ADR-0010](docs/decisions/0010-route-all-through-host.md))، وبقية تطبيقات الجهاز لا تتأثر.
+A desktop application for Windows and macOS that lets one person (the guest) use another person's internet
+connection (the host's) temporarily and with their explicit consent, so that sites which only work from inside the
+host's country become reachable — an expatriate who needs their bank or their government's portal. Everything the
+work browser asks for leaves from the host's address ([ADR-0010](docs/decisions/0010-route-all-through-host.md)),
+and nothing else on either machine is affected.
 
-> ## اقرأ هذا قبل أن تكون مضيفًا
+> ## Read this before you host
 >
-> **حين تشارك اتصالك، تصبح المواقع ترى عنوانك أنت.** كل ما يتصفّحه ضيفك يبدو للعالم — ولمزوّد
-> خدمتك، ولأي جهة تحقّق لاحقًا — صادرًا **من منزلك ومن اسمك**. هذا ليس أثرًا جانبيًا، هو الغرض:
-> لا فائدة من الأداة بدونه.
+> **When you share your connection, sites see your address.** Everything your guest browses looks to the world —
+> and to your ISP, and to anyone investigating later — as if it came **from your home, under your name**. That is
+> not a side effect. It is the point: without it the tool does nothing.
 >
-> فلا تستضيف إلا من تتحمّل عنه ما لا تعرفه مسبقًا. الأداة تعطيك مدةً محدودة، وإنهاءً فوريًا، وسجلّ
-> جلسات — لكنها **لا تستطيع أن تجعل ما يفعله غيرك مسؤوليته وحده**، ولا برنامج يستطيع ذلك.
+> So host only for people whose unknown actions you are willing to answer for. The tool gives you a bounded
+> duration, an immediate disconnect and a session log — but it **cannot make what someone else does their
+> responsibility alone**, and no software can.
 >
-> وهذا صنف من البرمجيات (توجيه الحركة عبر عنوان منزلي) يُساء استعماله كثيرًا: احتيال إعلاني، حشو
-> بيانات اعتماد، التفاف على الحظر. تعرف ذلك وأنت تقرّر.
+> This is also a category of software (routing traffic through a residential address) that is widely abused: ad
+> fraud, credential stuffing, evading bans. Know that while you decide.
 >
-> ما **لا** يحدث: بقيّة تطبيقاتك لا تتأثر، ولا تصل شبكتك المحلية ولا خدمات `localhost` — والضيف
-> يمرّ بمتصفح عمل معزول وحده.
+> What does **not** happen: your other applications are unaffected, your local network and `localhost` services
+> stay out of reach, and the guest goes through an isolated work browser and nothing else.
 
-المضيف يستطيع أن يعفي نفسه من السؤال في كل مرة بوضع ضيوف بعينهم في قائمة ثقة، فتُقبل طلباتهم فورًا بلا نافذة ([ADR-0012](docs/decisions/0012-auto-accept-trusted-guests.md)). الموافقة تبقى موافقته هو، أُعطيت مسبقًا بدل أن تُعطى عند كل طلب، ومقيَّدة بسقف مدة وأجل، ومسحوبة متى شاء.
+A host can spare themselves the question every time by putting particular guests on a trusted list, after which
+their requests are accepted at once with no window shown
+([ADR-0012](docs/decisions/0012-auto-accept-trusted-guests.md)). The consent is still the host's — given in
+advance rather than at each request — capped by duration, expiring on its own, and withdrawable at any moment.
 
-إدارة المستخدمين — إنشاء الحسابات وتعطيلها وفكّ قفلها وتغيير كلمات المرور — **داخل التطبيق** لمن دوره `admin`، لا عبر
-سطر الأوامر وحده. ولا توجد لوحة ويب: لوحة إدارية على الإنترنت تكون أثمن هدف في النظام، وهذه لا تُعرّض شيئًا.
+User management — creating accounts, disabling them, unlocking them, setting passwords — happens **inside the
+application** for anyone whose role is `admin`, not only from the command line. There is no web panel: an
+administrative panel on the internet would be the highest-value target in the system, and this one exposes
+nothing.
 
-بيانات التصفح مشفّرة بين الجهازين طرفًا لطرف: **الخادم لا يستطيع قراءتها**. وحين يتعذّر الاتصال المباشر — وهو الحال بين شبكتَي محمول — تمر البايتات المعتمة عبر Relay لا يفهمها ([ADR-0009](docs/decisions/0009-relay-default.md))، فتقوم الجلسة بلا أي إعداد على الراوتر أو جدار الحماية.
+Browsing data is encrypted end to end between the two machines: **the server cannot read it**. When a direct
+connection is impossible — which is the normal case between two mobile networks — the opaque bytes travel through
+a relay that does not understand them ([ADR-0009](docs/decisions/0009-relay-default.md)), so a session works with
+no router or firewall configuration at all.
 
-## البنية
+## Layout
 
-| المجلد | المحتوى |
+| Directory | Contents |
 |---|---|
-| `backend/` | خادم التحكم: Python 3.12 + FastAPI + PostgreSQL + WebSockets |
-| `client/` | حل .NET 8: مكتبات النفق والـ Proxy والمنفذ والمتصفح + تطبيق Avalonia ([ADR-0013](docs/decisions/0013-avalonia-and-macos.md)) |
-| `relay/` | خدمة الـ Relay: تزاوج طرفَي الجلسة وتضخّ بايتات معتمة ([ADR-0009](docs/decisions/0009-relay-default.md)) |
-| `deploy/` | Docker Compose للإنتاج (Caddy + API + PostgreSQL + نسخ احتياطي) و**Relay مستقل** |
-| `docs/` | خطة التنفيذ، العقود (REST / WebSocket / بروتوكول القناة)، قرارات ADR، runbook |
+| `backend/` | Control server: Python 3.12 + FastAPI + PostgreSQL + WebSockets |
+| `client/` | .NET 8 solution: tunnel, proxy, egress and browser libraries + the Avalonia app ([ADR-0013](docs/decisions/0013-avalonia-and-macos.md)) |
+| `relay/` | Relay service: pairs the two ends of a session and pumps opaque bytes ([ADR-0009](docs/decisions/0009-relay-default.md)) |
+| `deploy/` | Production Docker Compose (Caddy + API + PostgreSQL + backups) and a **standalone relay** |
+| `docs/` | Implementation plan, the frozen contracts (REST / WebSocket / channel protocol), ADRs, runbook |
 
-**للاستضافة الذاتية:** [docs/self-hosting.md](docs/self-hosting.md) — دليل من الصفر لنشر الخادم وتثبيت التطبيق.
+**To self-host:** [docs/self-hosting.md](docs/self-hosting.md) — from nothing to a running server and an installed
+application.
 
-**الحالة:** جلسة كاملة بين جهازين على شبكتين مختلفتين تعمل منذ 2026-09-09 (معلم M2). آخر تقرير: [docs/status-week7.md](docs/status-week7.md).
+**Status:** a full session between two machines on different networks has been working since 2026-09-09 (milestone
+M2). Latest report: [docs/status-week7.md](docs/status-week7.md).
 
-الخطة الكاملة: [docs/Josour-MVP-Implementation-Plan.md](docs/Josour-MVP-Implementation-Plan.md)
+The full plan: [docs/Josour-MVP-Implementation-Plan.md](docs/Josour-MVP-Implementation-Plan.md)
 
-## حالة المشروع، بصراحة
+## Where this project stands, honestly
 
-مشروع يصونه شخص واحد ويُنشر كمساهمة للمجتمع. **بلا دعم، وبلا ضمان، وبلا مساهمات مقبولة** —
-المسائل وطلبات الدمج مغلقة، وذلك صدقٌ لا فظاظة: قبول تغيير في أداة توجّه حركة الناس يعني مراجعة كل
-سطر بحثًا عمّا إذا كان يوسّع سياسة الخروج بهدوء، ولا أملك وقتًا لأفعل ذلك كما ينبغي. انسخه وعدّله
-كما شئت ([Apache-2.0](LICENSE)).
+One person maintains it, and it is published as a contribution to the community. **No support, no warranty, and no
+contributions accepted** — issues and pull requests are closed, and that is honesty rather than rudeness: accepting
+a change to a tool that carries other people's traffic means reading every line for whether it quietly widens the
+egress policy, and I do not have the time to do that properly. Fork it and change it as you like
+([Apache-2.0](LICENSE)).
 
-**لا يوجد Relay عام يشغّله أحد.** من أراد استعماله يستضيف خادمه وRelayه بنفسه، والدليل كامل في
-[docs/self-hosting.md](docs/self-hosting.md).
+**Nobody runs a public relay.** Anyone who wants to use this hosts their own server and relay; the complete guide
+is [docs/self-hosting.md](docs/self-hosting.md).
 
-**macOS مدعوم بالدورين** — مضيفًا وضيفًا. ما لم يُجرَّب بعد: جلسة حقيقية بين mac وWindows، وهي تحتاج
-جهازين. التفصيل وما بقي في [docs/macos-port.md](docs/macos-port.md).
+**macOS is supported in both roles** — host and guest. What has not been tried yet: a real session between a Mac
+and a Windows machine, which needs two machines. The detail, and what remains, is in
+[docs/macos-port.md](docs/macos-port.md).
 
-للإبلاغ عن ثغرة أمنية: [SECURITY.md](SECURITY.md) — **لا تفتح مسألة عامة**.
+To report a security vulnerability: [SECURITY.md](SECURITY.md) — **do not open a public issue**.
 
-## العقود المجمّدة
+## The frozen contracts
 
-- [docs/api.md](docs/api.md): واجهات REST
-- [docs/ws-protocol.md](docs/ws-protocol.md): رسائل WebSocket ودورة حياة الجلسة
-- [docs/protocol.md](docs/protocol.md): القناة بين الجهازين (TLS، المصادقة، الإطارات)
-- [docs/decisions/](docs/decisions/): قرارات ADR
+- [docs/api.md](docs/api.md): the REST interfaces
+- [docs/ws-protocol.md](docs/ws-protocol.md): WebSocket messages and the session lifecycle
+- [docs/protocol.md](docs/protocol.md): the channel between the two machines (TLS, authentication, frames)
+- [docs/decisions/](docs/decisions/): the ADRs
 
-أي تغيير في عقد يمر بمراجعة الطرفين المتأثرين وتحديث الوثيقة قبل الكود.
+A change to a contract goes through review by both affected sides, and the document is updated before the code.
 
-## التشغيل المحلي
+## Running it locally
 
-### الخادم
+### The server
 
 ```bash
 cd backend
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-cp .env.example .env            # عدّل JWT_SECRET (32 بايت على الأقل) وDATABASE_URL
-docker compose -f docker-compose.dev.yml up -d db     # PostgreSQL 16 على المنفذ 5433
+cp .env.example .env            # set JWT_SECRET (32 bytes minimum) and DATABASE_URL
+docker compose -f docker-compose.dev.yml up -d db     # PostgreSQL 16 on port 5433
 alembic upgrade head
 python manage.py create-admin --email admin@example.com --password '…' --display-name Admin
 uvicorn app.main:app --reload
 ```
 
-الاختبارات: `pytest` يعمل على SQLite تلقائيًا؛ ومع `DATABASE_URL_TEST` يعمل على PostgreSQL ويشمل اختبار الترحيلات. `ruff check . && ruff format --check .` قبل الدمج.
+Tests: `pytest` runs on SQLite automatically; with `DATABASE_URL_TEST` set it runs on PostgreSQL and includes the
+migration test. `ruff check . && ruff format --check .` before merging.
 
-### العميل
+### The client
 
 ```bash
 cd client
@@ -89,20 +107,21 @@ dotnet build Josour.sln
 dotnet test Josour.sln
 ```
 
-`Josour.App` واجهة Avalonia واحدة تعمل على النظامين ([ADR-0013](docs/decisions/0013-avalonia-and-macos.md)). المشروع
-يستهدف `net8.0` و`net8.0-windows10.0.19041.0` معًا: الهدف الثاني لأجل إشعارات Windows بأزرارها وحدها، وكل شيء
-آخر — وكل شاشة — يُبنى مرة واحدة.
+`Josour.App` is a single Avalonia interface that runs on both systems
+([ADR-0013](docs/decisions/0013-avalonia-and-macos.md)). The project targets `net8.0` and
+`net8.0-windows10.0.19041.0` together: the second one exists for Windows toast notifications and their buttons
+alone, and everything else — every screen included — is built once.
 
 ```bash
-dotnet run --project src/Josour.App -f net8.0 -- --mock   # الواجهة بخادم محاكى، بلا خلفية
-dotnet test tests/Josour.App.Tests                          # اختبارات الواجهة بلا رأس
+dotnet run --project src/Josour.App -f net8.0 -- --mock   # the interface against a simulated server, no backend
+dotnet test tests/Josour.App.Tests                          # the headless interface tests
 ```
 
-**حالة macOS:** الدوران يعملان. فحص مالك الاتصال — الضابط الذي يُبقي الـ Proxy على متصفح العمل وحده —
-منفَّذ عبر `lsof`، والمتصفح يُشغَّل من داخل حزمته وتُقرأ ملكيته من شجرة العمليات. التفصيل في
-[docs/macos-port.md](docs/macos-port.md).
+**macOS status:** both roles work. The connection-owner check — the control that keeps the proxy serving the work
+browser alone — is implemented with `lsof`, and the browser is launched from inside its bundle with ownership read
+from the process tree. The detail is in [docs/macos-port.md](docs/macos-port.md).
 
-### الـ Relay
+### The relay
 
 ```bash
 cd relay
@@ -112,14 +131,15 @@ pytest -q && ruff check . && ruff format --check .
 RELAY_SECRET="$(openssl rand -base64 48)" RELAY_PORT=8443 python -m relay
 ```
 
-القياس: `pip install -e ".[bench]" && python -m bench` — التفصيل في [docs/performance-relay.md](docs/performance-relay.md).
+Benchmarks: `pip install -e ".[bench]" && python -m bench` — detail in
+[docs/performance-relay.md](docs/performance-relay.md).
 
-## المسارات
+## Tracks
 
-| المسار | النطاق |
+| Track | Scope |
 |---|---|
-| A: الخادم | `backend/` |
-| A: الخادم والـ Relay | `backend/`, `relay/` |
-| B: الشبكات | `client/src/Josour.{Core,Tunnel,Proxy,Egress,Browser}` + `client/tools/` |
-| C: التطبيق | `client/src/Josour.{Infrastructure,App}` |
+| A: the server | `backend/` |
+| A: the server and the relay | `backend/`, `relay/` |
+| B: networking | `client/src/Josour.{Core,Tunnel,Proxy,Egress,Browser}` + `client/tools/` |
+| C: the application | `client/src/Josour.{Infrastructure,App}` |
 | D: DevOps/QA | `deploy/`, `.github/`, `client/installer/`, `docs/runbook.md`, `docs/acceptance-checklist.md` |

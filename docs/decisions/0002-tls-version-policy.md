@@ -1,15 +1,19 @@
-# ADR-0002: سياسة إصدار TLS للقناة بين الجهازين
+# ADR-0002: the TLS version policy for the channel between the two machines
 
-**الحالة:** معتمد من صاحب المنتج بتاريخ 2026-09-03. يعدّل نص وثيقة المنتج (القسمان 10 و13: «TLS 1.3»).
+**Status:** accepted by the product owner on 2026-09-03. Amends the product document (sections 10 and 13, "TLS
+1.3").
 
-## السياق
-`SslStream` على Windows يستخدم Schannel. Windows 10 لا يدعم TLS 1.3، وطلب `SslProtocols.Tls13` صراحة يرمي `Win32Exception 0x80090304`. `CipherSuitesPolicy` غير مدعوم على Windows.
+## Context
+`SslStream` on Windows goes through Schannel. Windows 10 does not support TLS 1.3, and asking for
+`SslProtocols.Tls13` explicitly throws `Win32Exception 0x80090304`. `CipherSuitesPolicy` is not supported on
+Windows.
 
-## القرار
-- `SslProtocols.None` في الطرفين (افتراضي النظام).
-- بعد المصافحة: رفض أي اتصال بإصدار أدنى من TLS 1.2.
-- تسجيل الإصدار المتفاوَض عليه في `sessions.tls_version` لمعرفة توزيع Windows 10/11 الفعلي.
+## Decision
+- `SslProtocols.None` on both ends (the system default).
+- After the handshake: refuse any connection below TLS 1.2.
+- Record the negotiated version in `sessions.tls_version`, so the real Windows 10/11 distribution is known rather
+  than assumed.
 
-## النتائج
-- Windows 11 يتفاوض TLS 1.3 تلقائيًا؛ Windows 10 يعمل بـ TLS 1.2 مع AEAD.
-- المتطلب المُعاد صياغته: «TLS 1.3 حيث يدعمه النظام، وTLS 1.2 كحد أدنى».
+## Consequences
+- Windows 11 negotiates TLS 1.3 on its own; Windows 10 works over TLS 1.2 with AEAD.
+- The requirement, restated: "TLS 1.3 where the system supports it, and TLS 1.2 as the floor."

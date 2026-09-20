@@ -1,31 +1,39 @@
-# حالة الأسبوع 2 (بتاريخ 2026-09-04)
+# Week 2 status (2026-09-04)
 
-## ما اكتمل وتحقق منه
+## What was completed and verified
 
-| المسار | المخرج | التحقق |
+| Track | Output | Verification |
 |---|---|---|
-| A: الخادم | مسارات الإدارة كاملة (`users`, `devices`, `domains`, `sessions`, `security-events`, `diagnostics`, `settings`)، `GET /sessions/me`، `POST /diagnostics` لاستقبال نتائج النموذج، تحديد المعدل على تسجيل الدخول (5/دقيقة/IP)، تقييد `/docs` للمسؤول في الإنتاج، ناقل أحداث داخلي (`AllowlistPublished`, `SessionEnded`) و`SettingsService` كبذرة للأسبوع 3 | ruff نظيف؛ **127 اختبارًا + 1 متخطى** على SQLite و**128** على PostgreSQL؛ فحص حي أكد 401 للمجهول و200 للمسؤول على `/docs`، ورفض مدخل غير صالح ثم نشر الإصدار 1، و429 بعد المحاولة الخامسة |
-| B: الشبكات | **ADR-0006 معتمد**: `Nerdbank.Streams` خلف `IMuxConnection`/`IMuxAcceptor`. `Egress` (السياسة، معالج الفتح، العدّادات، جامع النطاقات، الحدود)، `Proxy` (CONNECT، صفحة الفحص، تحويل http إلى https، فحص PID المالك)، `Browser` (تحديد المسار، كشف السياسات، Job Object، الإغلاق المهذب)، أوامر Spike الجديدة (`browser`, `--post-to`) | **65** اختبار Tunnel، **99** Proxy، **50** Egress، **38** Browser، **7** تكامل داخل العملية؛ القياسات الخمسة للـ ADR مسجّلة بأرقامها |
-| C: التطبيق | `ApiClient` كامل بعقد `api.md`، `AuthSession` مع تدوير التوكن وتجديد واحد متزامن، `AppSettingsStore`، `MockControlChannel` يحاكي الخادم وفق `ws-protocol.md`، `ControlMessageSerializer`، شاشة الدخول وتدفق البدء (استعادة صامتة أو شاشة دخول)، `SessionCoordinator` لتتبع أطوار الجلسة، مفتاح `--uninstall-notifications` | **153** اختبارًا؛ بناء الحل كاملًا **بلا أخطاء ولا تحذيرات** |
-| D: DevOps | فحص Compose الإنتاجي محليًا (بناء الصورة، TLS عبر Caddy، تقييد `/docs`، تسجيل دخول، أول نسخة احتياطية)، تصحيح مسار فحص الحياة، خطوة إلغاء تسجيل الإشعارات في المثبّت، CI محدّث بالمشاريع الجديدة وفصل القياسات، مصفوفة تشغيل المتصفح في دليل النموذج | كل ما سبق مشغَّل فعليًا على هذا الجهاز |
+| A: the server | The admin paths complete (`users`, `devices`, `domains`, `sessions`, `security-events`, `diagnostics`, `settings`), `GET /sessions/me`, `POST /diagnostics` to receive the prototype's results, rate limiting on sign-in (5/minute/IP), restricting `/docs` to administrators in production, an internal event bus (`AllowlistPublished`, `SessionEnded`) and `SettingsService` as a seed for week 3 | ruff clean; **127 tests + 1 skipped** on SQLite and **128** on PostgreSQL; a live check confirmed 401 for the anonymous and 200 for the administrator on `/docs`, the refusal of an invalid entry followed by publishing version 1, and a 429 after the fifth attempt |
+| B: networking | **ADR-0006 accepted**: `Nerdbank.Streams` behind `IMuxConnection`/`IMuxAcceptor`. `Egress` (the policy, the open handler, the counters, the domain collector, the limits), `Proxy` (CONNECT, the check page, http-to-https redirection, the owning-PID check), `Browser` (locating the path, detecting policies, the Job Object, a polite shutdown), the new Spike commands (`browser`, `--post-to`) | **65** Tunnel tests, **99** Proxy, **50** Egress, **38** Browser, **7** in-process integration; the ADR's five measurements recorded with their numbers |
+| C: the application | `ApiClient` complete against the `api.md` contract, `AuthSession` with token rotation and a single concurrent refresh, `AppSettingsStore`, `MockControlChannel` simulating the server per `ws-protocol.md`, `ControlMessageSerializer`, the sign-in screen and the startup flow (a silent restore or the sign-in screen), `SessionCoordinator` to track the session's phases, the `--uninstall-notifications` switch | **153** tests; the whole solution builds **with no errors and no warnings** |
+| D: DevOps | Checking the production Compose locally (building the image, TLS through Caddy, restricting `/docs`, signing in, a first backup), correcting the health-check path, the notification-unregistration step in the installer, CI updated with the new projects and the benchmarks separated, the browser launch matrix in the prototype guide | All of the above actually run on this machine |
 
-**الإجمالي:** 128 اختبارًا في الخادم و**584** في العميل.
+**The total:** 128 tests on the server and **584** on the client.
 
-## عيبان حقيقيان اكتُشفا وأُصلحا في طبقة Multiplexing
+## Two real defects found and fixed in the multiplexing layer
 
-1. **عطل يتنكّر في صورة إغلاق نظيف.** كان `Fail` يلغي رمز الإلغاء قبل تثبيت الاستثناء، فتستيقظ حلقة التحكم وتُنهي المهمة بنجاح قبله. النتيجة: موت النفق بانتهاء مهلة الـ PONG كان يظهر أحيانًا كإغلاق عادي. أُعيد ترتيب العمليات ليُثبَّت السبب أولًا.
-2. **انتهاء النقل فجأة كان يُعدّ إغلاقًا نظيفًا.** انقطاع الشبكة أو موت عملية الطرف الآخر بلا `GOAWAY` كان يكمل المهمة بنجاح. صار يظهر عطلًا صريحًا.
+1. **A failure disguised as a clean close.** `Fail` was cancelling the cancellation token before setting the
+   exception, so the control loop woke up and completed the task successfully before it. The result: the tunnel dying
+   at the PONG timeout sometimes appeared as an ordinary close. The operations were reordered so the cause is set
+   first.
+2. **The transport ending abruptly counted as a clean close.** A network drop or the death of the other end's process
+   with no `GOAWAY` completed the task successfully. It now surfaces as an explicit failure.
 
-أهمية العيبين: التطبيق في الأسبوع الرابع سيقرر من هذه الإشارة أي سبب إنهاء يبلّغ به الخادم؛ ولولا الإصلاح لسجّل «إنهاء عادي» مكان «انقطاع».
+Why the two matter: in week four the application will decide from this signal which end reason to report to the
+server; without the fix it would have recorded "a normal end" in place of "a disconnection".
 
-## ما يحتاج تدخلًا بشريًا
-1. **شهادة توقيع الكود** إن لم تُطلب بعد (على المسار الحرج للأسبوع 6).
-2. **VPS للاختبار** ونشر الخادم عليه.
-3. **النموذج التقني على Windows** وفق `docs/spike-runbook.md`: `certtest` على Win10 وWin11، `gather` على راوترين أو ثلاثة، الأزواج العشرة لبوابة Relay، ومصفوفة المتصفح الثمانية.
-4. **فحص QA لتطبيق WPF** على Windows لاعتماد ADR-0001.
+## What needs human intervention
+1. **The code-signing certificate**, if it has not been requested yet (on the critical path for week 6).
+2. **A staging VPS** and deploying the server on it.
+3. **The technical prototype on Windows** per `docs/spike-runbook.md`: `certtest` on Win10 and Win11, `gather` on two
+   or three routers, the ten pairs for the relay gate, and the browser matrix of eight.
+4. **QA of the WPF application** on Windows to accept ADR-0001.
 
-## الأسبوع 3 (من الخطة)
-- A: طبقة WebSocket (`ConnectionManager`، النبض، `hello`)، الحضور وبث المضيفين، الطلبات إنشاءً وردًا وإلغاءً وانتهاءً.
-- B: تقوية `Core` و`Tunnel` باختبارات إضافية، ودعم ما تكشفه بيانات الأزواج العشرة.
-- C: `ControlChannel` الحقيقي عبر WSS بإعادة اتصال ونبض، والشاشة الرئيسية بقائمة المضيفين الحية.
-- D: سكربتات اختبارات الأمان (nmap، CONNECT لعناوين خاصة، فحص `session_keys`)، ومصفوفة أجهزة الاختبار.
+## Week 3 (from the plan)
+- A: the WebSocket layer (`ConnectionManager`, the heartbeat, `hello`), presence and broadcasting hosts, requests —
+  creation, answering, cancelling and expiry.
+- B: hardening `Core` and `Tunnel` with additional tests, and supporting whatever the ten pairs' data reveals.
+- C: the real `ControlChannel` over WSS with reconnection and a heartbeat, and the main screen with a live host list.
+- D: the security test scripts (nmap, CONNECT to private addresses, checking `session_keys`), and the test device
+  matrix.

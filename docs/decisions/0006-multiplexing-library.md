@@ -1,81 +1,116 @@
-# ADR-0006: مكتبة Multiplexing للنفق
+# ADR-0006: the multiplexing library for the tunnel
 
-**الحالة:** معتمد بتاريخ 2026-09-04 بعد نموذج الأسبوع 2 (يومان).
+**Status:** accepted on 2026-09-04 after the week-two prototype (two days).
 
-## السياق
-النفق بين الجهازين stream واحد مصادَق (`SslStream` من `SymmetricConnector`) يجب أن يحمل مئات الـ streams المتزامنة (اتصال TCP لكل `CONNECT` من المتصفح) مع Backpressure لكل stream على حدة، ورفض فتح الـ stream بسبب مرمّز (`OPEN_FAIL`)، وإغلاق نصفي نظيف. الخياران: `Nerdbank.Streams.MultiplexingStream` أو Framing يدوي وفق `docs/protocol.md` القسم 5.
+## Context
+The tunnel between the two machines is one authenticated stream (`SslStream` from `SymmetricConnector`) that has to
+carry hundreds of concurrent streams (a TCP connection for every `CONNECT` the browser makes) with per-stream
+backpressure, a coded refusal to open a stream (`OPEN_FAIL`), and a clean half-close. The two candidates:
+`Nerdbank.Streams.MultiplexingStream`, or hand-written framing following section 5 of `docs/protocol.md`.
 
-## القرار
-**`Nerdbank.Streams.MultiplexingStream` (الإصدار 2.13.31، بروتوكول 3)** خلف واجهتي `IMuxConnection` (جانب Guest) و`IMuxAcceptor` (جانب Host) في `Josour.Tunnel.Mux`. الفئة `NerdbankMux` تنفذ الواجهتين معًا وتُنشأ من الـ stream المصادَق بـ `NerdbankMux.Create(stream, role)`.
+## Decision
+**`Nerdbank.Streams.MultiplexingStream` (version 2.13.31, protocol 3)** behind the `IMuxConnection` (guest side) and
+`IMuxAcceptor` (host side) interfaces in `Josour.Tunnel.Mux`. The `NerdbankMux` class implements both and is created
+from the authenticated stream with `NerdbankMux.Create(stream, role)`.
 
-كيفية تحقيق عقد القسم 5 فوق Nerdbank:
-- **OPEN:** Guest يعرض قناة باسم `host:port`. المضيف يقبل القناة دائمًا ثم يكتب **بايت حالة واحدًا** كأول بايت فيها: `0` = `OPEN_OK` ويبدأ الضخ، وإلا رمز `OPEN_FAIL` نفسه (1 `not_allowed` … 7 `ip_literal`) ثم يكمل الكتابة. الرفض داخل القناة نفسها يضمن الترتيب ولا يحتاج قناة تحكم لكل فتح ولا الاعتماد على دلالات رفض Nerdbank (التي لا تحمل سببًا).
-- **PING/PONG/GOAWAY:** قناة مزروعة (seeded, id 0) لا تحتاج مصافحة، بإطارات ثابتة 9 بايت: `u8 type | 8 بايت حمولة`. `PING` كل 20 ثانية من الطرفين، ولا `PONG` خلال 60 ثانية = نفق ميت (`Completion` يفشل بـ `MuxClosedException`). `GOAWAY(reason)` يُرسل قبل الإغلاق ويظهر عند الطرف الآخر في `RemoteGoAway`.
-- **النافذة:** `DefaultChannelReceivingWindowSize = 1 MiB` لكل قناة (نفس القسم 5)؛ Backpressure من `System.IO.Pipelines`: الكاتب يتوقف عند امتلاء نافذة الطرف الآخر.
-- **الإغلاق النصفي:** `Output.Complete()` على القناة يظهر عند الطرف الآخر كـ EOF، و`StreamPump` يحوّله إلى `Shutdown(Send)` على المقبس الوجهة (`SocketStream`)، والعكس. القناة تُغلق ذاتيًا عندما يكمل الطرفان الكتابة.
-- **الحدود (256 stream، 50 OPEN/ث)** تُنفَّذ في `Josour.Egress.StreamLimiter` وترد `OPEN_FAIL(limit)`.
-- **التتبع:** `MuxOptions.Trace` يمرر `TraceSource` إلى Nerdbank لتسجيل الإطارات عند الأعطال؛ `MuxStats` تعطي بايتات النقل في الاتجاهين وعدد الـ streams المفتوحة.
+How the section-5 contract is met on top of Nerdbank:
+- **OPEN:** the guest offers a channel named `host:port`. The host always accepts the channel and then writes **one
+  status byte** as its first byte: `0` = `OPEN_OK` and pumping begins; otherwise the `OPEN_FAIL` code itself
+  (1 `not_allowed` … 7 `ip_literal`), and the write completes. Refusing inside the channel itself guarantees
+  ordering, needs no control channel per open, and does not rely on Nerdbank's own rejection semantics (which carry
+  no reason).
+- **PING/PONG/GOAWAY:** a seeded channel (id 0) that needs no handshake, with fixed 9-byte frames:
+  `u8 type | 8 payload bytes`. `PING` every 20 seconds from both ends, and no `PONG` within 60 seconds means a dead
+  tunnel (`Completion` fails with `MuxClosedException`). `GOAWAY(reason)` is sent before closing and appears at the
+  other end as `RemoteGoAway`.
+- **The window:** `DefaultChannelReceivingWindowSize = 1 MiB` per channel (the same as section 5); backpressure comes
+  from `System.IO.Pipelines` — the writer stops when the other end's window is full.
+- **Half-close:** `Output.Complete()` on the channel appears at the other end as EOF, and `StreamPump` turns that
+  into `Shutdown(Send)` on the destination socket (`SocketStream`), and the reverse. The channel closes itself once
+  both ends have finished writing.
+- **The limits (256 streams, 50 OPEN/s)** are enforced in `Josour.Egress.StreamLimiter` and answer with
+  `OPEN_FAIL(limit)`.
+- **Tracing:** `MuxOptions.Trace` passes a `TraceSource` to Nerdbank to record frames when things break; `MuxStats`
+  gives transferred bytes in both directions and the number of open streams.
 
-## أرقام النموذج (macOS، TLS 1.2 على loopback، `tests/Josour.Tunnel.Tests/Mux/MuxBenchmarks.cs` بوسم `Category=Benchmark`)
+## The prototype's numbers (macOS, TLS 1.2 over loopback, `tests/Josour.Tunnel.Tests/Mux/MuxBenchmarks.cs` tagged `Category=Benchmark`)
 
-| المعيار | النتيجة |
+| Benchmark | Result |
 |---|---|
-| (a) مستهلك بطيء على القناة A متوقف 3 ثوانٍ | القناة B نقلت **3005 MB في 3000 ms = 1002 MB/s** أثناء التوقف؛ A قبلت **1.0 MiB** فقط قبل أن تتوقف (النافذة) والمستهلك لم يستلم شيئًا حتى فُتحت البوابة |
-| (b) رفض الفتح بسبب مرمّز | الأسباب السبعة كلها تصل إلى Guest كما أُرسلت (`Open_Rejected_CarriesEncodedReason`) |
-| (c) 100 MB على قناة واحدة | Guest→Host **120 ms = 834 MB/s**؛ Host→Guest **116 ms = 861 MB/s**؛ حمل النقل 100,085,685 بايت لـ 100,000,000 بايت حمولة (زيادة 0.09%) |
-| (d) 256 قناة متزامنة × 1 MB في كل اتجاه | فتح 256 قناة في **26 ms**؛ النقل كاملًا في **688 ms = 744 MB/s** إجمالًا؛ عدّاد الـ streams يعود إلى 0 |
-| (e) الإغلاق النصفي | `CompleteWriting` على Guest → الطرف البعيد للمقبس يقرأ 0 (FIN) ويستطيع الرد بعدها؛ إغلاق الطرف البعيد → EOF عند Guest؛ التخلص عند Guest يغلق المقبس البعيد |
-| إضافي: 1000 فتح/إغلاق متتالٍ | **142 ms = 0.14 ms** لكل واحد، بلا تسريب |
-| إضافي: كشف النفق الميت | ابتلاع حركة المرور بصمت → `MuxClosedException` خلال `DeadAfter` |
+| (a) a slow consumer on channel A, stalled for 3 seconds | Channel B carried **3005 MB in 3000 ms = 1002 MB/s** during the stall; A accepted only **1.0 MiB** before stopping (the window), and the consumer received nothing until the gate opened |
+| (b) coded refusal to open | All seven reasons reach the guest as sent (`Open_Rejected_CarriesEncodedReason`) |
+| (c) 100 MB on a single channel | Guest→Host **120 ms = 834 MB/s**; Host→Guest **116 ms = 861 MB/s**; 100,085,685 bytes on the wire for 100,000,000 bytes of payload (0.09% overhead) |
+| (d) 256 concurrent channels × 1 MB each way | 256 channels opened in **26 ms**; the whole transfer in **688 ms = 744 MB/s** in total; the stream counter returns to 0 |
+| (e) half-close | `CompleteWriting` on the guest → the socket's far end reads 0 (FIN) and can still reply afterwards; closing the far end → EOF at the guest; disposing at the guest closes the far socket |
+| Extra: 1000 sequential open/close | **142 ms = 0.14 ms** each, with no leak |
+| Extra: dead-tunnel detection | Swallow traffic silently → `MuxClosedException` within `DeadAfter` |
 
-الحد الأدنى المقبول كان 30 MB في 3 ثوانٍ للمعيار (a) و60 ثانية للمعيارين (c) و(d)؛ النتائج أعلى بمرتبتين، فالمكتبة ليست عنق الزجاجة أمام أي وصلة إنترنت واقعية.
+The acceptable floor was 30 MB in 3 seconds for benchmark (a) and 60 seconds for (c) and (d); the results are two
+orders of magnitude above that, so the library is not the bottleneck in front of any realistic internet link.
 
-### تصحيح الأسبوع 5: هذه الأرقام قيست على RTT ≈ 0
+### The week-five correction: these numbers were measured at RTT ≈ 0
 
-**`docs/performance-week5.md` يحمل القياس نفسه فوق RTT دولي مُحاكى (50 و150 و300 ms) وسقوف نطاق.** خلاصته:
+**`docs/performance-week5.md` carries the same measurement over a simulated international RTT (50, 150 and 300 ms)
+and bandwidth ceilings.** Its conclusion:
 
-- **الاستنتاج أعلاه يبقى صحيحًا لكنه غير كافٍ.** المكتبة ليست عنق الزجاجة فعلًا: على 150 ms و300 ms بلغت الإنتاجية
-  **99–102% من السقف النظري**، وحمل النفق على صفحة ثقيلة (مستند + 80 موردًا على 30 مسارًا) بقي بين 0% و2% مقارنةً
-  باتصال TCP لكل مورد على الوصلة نفسها، وتكلفة فتح stream = **RTT واحد** أي تكلفة مصافحة TCP بالضبط.
-- **لكن السقف الذي كان غير مرئي على loopback صار حاكمًا:** إنتاجية الـ stream الواحد = **النافذة ÷ RTT**. بنافذة
-  1 MiB (هذا الـ ADR و`docs/protocol.md` القسم 5) يعني ذلك **56 Mbit/s على 150 ms و28 Mbit/s على 300 ms** لكل stream.
-  رقم «1002 MB/s» في المعيار (a) و«834 MB/s» في (c) لا يقولان شيئًا عن هذا لأن RTT كان صفرًا.
-- **الأثر العملي محصور لكنه حقيقي:** الصفحات والفيديو (5 Mbit/s مستمرة 60 ثانية بلا توقف ولا نمو ذاكرة) لا تتأثر،
-  و**تنزيل واحد كبير** على وصلة ≥ 100 Mbit/s عبر RTT عابر للقارات يتقيّد بالنافذة لا بالوصلة.
-- **عزل النافذة (المعيار a) صمد على RTT حقيقي:** 256 stream متزامنًا على 150 ms، منها 32 بمستهلك متوقف، قبِلت كلٌّ
-  منها **1.00 MiB بالضبط** (نافذة واحدة) بينما أنهت الـ 224 الأخرى نقلها في 1.7 RTT.
+- **The conclusion above stays true but is not enough.** The library really is not the bottleneck: at 150 ms and
+  300 ms throughput reached **99–102% of the theoretical ceiling**, the tunnel's overhead on a heavy page (a document
+  plus 80 resources over 30 paths) stayed between 0% and 2% compared to a TCP connection per resource on the same
+  link, and opening a stream costs **one RTT** — exactly the cost of a TCP handshake.
+- **But a ceiling that was invisible over loopback became the governing one:** a single stream's throughput is
+  **the window ÷ RTT**. With a 1 MiB window (this ADR and section 5 of `docs/protocol.md`) that means **56 Mbit/s at
+  150 ms and 28 Mbit/s at 300 ms** per stream. The "1002 MB/s" in benchmark (a) and the "834 MB/s" in (c) say nothing
+  about this, because RTT was zero.
+- **The practical effect is bounded but real:** pages and video (5 Mbit/s sustained for 60 seconds with no stall and
+  no memory growth) are unaffected, while **one large download** on a link of ≥ 100 Mbit/s across an intercontinental
+  RTT is limited by the window rather than by the link.
+- **Window isolation (benchmark a) held up at a real RTT:** 256 concurrent streams at 150 ms, 32 of them with a
+  stalled consumer, each accepted **exactly 1.00 MiB** (one window) while the other 224 finished their transfer in
+  1.7 RTT.
 
-**التوصية (لمالكي `docs/protocol.md` القسم 5):** اشتقاق النافذة من الـ RTT المقيس عند الاتصال — 1 MiB حتى 60 ms،
-2 MiB حتى 150 ms، 4 MiB فوقها — بحيث يبقى سقف الـ stream فوق 100 Mbit/s، مع ميزانية ذاكرة على مستوى الجلسة
-لأن 256 × 4 MiB = 1 GiB سقفًا نظريًا. القياس يثبت أن 4 MiB تعطي 224 Mbit/s على 150 ms و112 Mbit/s على 300 ms.
+**The recommendation (for the owners of `docs/protocol.md` section 5):** derive the window from the RTT measured at
+connect time — 1 MiB up to 60 ms, 2 MiB up to 150 ms, 4 MiB above that — so that a stream's ceiling stays above
+100 Mbit/s, with a session-level memory budget because 256 × 4 MiB = 1 GiB as a theoretical ceiling. The measurement
+shows 4 MiB gives 224 Mbit/s at 150 ms and 112 Mbit/s at 300 ms.
 
-### ما استقر عليه العقد: النافذة مشتقة من الـ RTT، لا 1 MiB ثابتة
+### What the contract settled on: the window is derived from the RTT, not a fixed 1 MiB
 
-**التوصية أعلاه اعتُمدت.** `docs/protocol.md` القسم 5 عُدِّل، فلم تعد النافذة في هذا الـ ADR رقمًا ثابتًا:
+**The recommendation above was adopted.** Section 5 of `docs/protocol.md` was amended, so the window in this ADR is no
+longer a fixed number:
 
-- **النافذة:** `DefaultChannelReceivingWindowSize` = ما تعيده `MuxWindow.ForRoundTrip(connect_ms)` في
-  `Josour.Tunnel.Mux`: **1 MiB حتى 60 ms، 2 MiB حتى 150 ms، 4 MiB فوقها**. من يستدعيها `TunnelSession`
-  بعد `SymmetricConnector` (أول موضع يُعرف فيه `connect_ms`). قياس فاسد (صفر أو سالب أو > 5 ثوانٍ) ⇒ الشريحة
-  الوسطى مع سبب مكتوب. `MuxOptions.ReceiveWindow` بقيت تجاوزًا صريحًا يفوز على الاشتقاق (الاختبارات وأداة Spike).
-- **الحدود:** الحد المتزامن يتبع النافذة (**256 / 128 / 64**) فيبقى الحاصل 256 MiB، ويصل إلى
-  `Josour.Egress.StreamLimiter` عبر `TunnelEgressContext.MaxConcurrentStreams`. حد الـ 50 `OPEN`/ثانية لم يتغير.
-  ويحجز الضيف مكان الـ stream محليًا قبل العرض بحد شريحته هو، حتى يبقى سقف ذاكرته 256 MiB لو وقع الطرفان في شريحتين
-  مختلفتين (المضيف يفرض حده على السلك؛ هذا يحمي ذاكرة الضيف نفسه).
-- **لا تفاوض على السلك:** نافذة الاستقبال في بروتوكول Nerdbank 3 خاصية **المستقبل** وتُعلَن لكل قناة في إطار
-  العرض/القبول (`localWindowSize` = ما أعلنّاه، `remoteWindowSize` = رصيد الإرسال كما أعلنه الطرف الآخر)، فكل طرف
-  يشتق نافذته من قياسه هو وقد تختلف الشريحتان بلا ضرر. القناة المزروعة وحدها (id 0) لا تمر بعرض/قبول، فنافذتها
-  مثبَّتة على 4 MiB عند الطرفين حتى لا تختلف باختلاف الشريحة.
-- **الأرقام بعد التعديل** (`docs/performance-week5.md` القسم 8، معيار `[derived]`): 162 Mbit/s على 50 ms،
-  و**113 Mbit/s على 150 ms** (كانت 56)، و**113 Mbit/s على 300 ms** (كانت 28)، بكفاءة 101–102% وسقف ذاكرة 256 MiB
-  في كل شريحة. وهناك أيضًا تحفّظ مهم: `connect_ms` يقيس الاتصال كله لا زمن ذهاب وإياب واحدًا.
+- **The window:** `DefaultChannelReceivingWindowSize` = whatever `MuxWindow.ForRoundTrip(connect_ms)` returns in
+  `Josour.Tunnel.Mux`: **1 MiB up to 60 ms, 2 MiB up to 150 ms, 4 MiB above that**. The caller is `TunnelSession`
+  after `SymmetricConnector` — the first point where `connect_ms` is known. A corrupt measurement (zero, negative, or
+  > 5 seconds) means the middle band with a written reason. `MuxOptions.ReceiveWindow` remains an explicit override
+  that beats the derivation (the tests and the spike tool).
+- **The limits:** the concurrency limit follows the window (**256 / 128 / 64**), so the product stays 256 MiB, and it
+  reaches `Josour.Egress.StreamLimiter` through `TunnelEgressContext.MaxConcurrentStreams`. The 50 `OPEN`/second limit
+  is unchanged. The guest also reserves the stream's slot locally before offering, against its own band's limit, so
+  its memory ceiling stays 256 MiB even if the two ends land in different bands (the host enforces its limit on the
+  wire; this protects the guest's own memory).
+- **Nothing is negotiated on the wire:** in Nerdbank protocol 3 the receiving window is a property of the **receiver**
+  and is announced per channel in the offer/accept frame (`localWindowSize` = what we announced, `remoteWindowSize` =
+  the sending credit as the other end announced it), so each side derives its window from its own measurement and the
+  two bands may differ harmlessly. Only the seeded channel (id 0) goes through no offer/accept, so its window is
+  pinned at 4 MiB on both ends so it cannot differ by band.
+- **The numbers after the change** (`docs/performance-week5.md` section 8, the `[derived]` benchmark): 162 Mbit/s at
+  50 ms, **113 Mbit/s at 150 ms** (was 56), and **113 Mbit/s at 300 ms** (was 28), at 101–102% efficiency and a
+  256 MiB memory ceiling in every band. There is also an important caveat: `connect_ms` measures the whole connection,
+  not a single round trip.
 
-## الأسباب
-- تحقق معايير القرار الأربعة كلها بلا Framing يدوي (نحو 600 سطر + اختبارات Fuzz) ولا إدارة نوافذ يدوية.
-- الاعتماد صغير ومعروف: `Nerdbank.Streams` 2.13.31 (MIT) + `Microsoft.VisualStudio.Threading.Only` 17.13.61 + `Microsoft.VisualStudio.Validation` 17.8.8 + `System.IO.Pipelines` 8.0.0.
-- ما يخص الأمن (السياسة، الحدود، DNS، الحظر) يبقى في كودنا (`Egress`) لا في المكتبة.
+## Reasons
+- It meets all four decision criteria with no hand-written framing (some 600 lines plus fuzz tests) and no hand-managed
+  windows.
+- The dependency is small and known: `Nerdbank.Streams` 2.13.31 (MIT) + `Microsoft.VisualStudio.Threading.Only`
+  17.13.61 + `Microsoft.VisualStudio.Validation` 17.8.8 + `System.IO.Pipelines` 8.0.0.
+- What concerns security (the policy, the limits, DNS, blocking) stays in our own code (`Egress`), not in the library.
 
-## النتائج
-- `docs/protocol.md` القسم 5 يبقى مرجعًا للدلالات (النافذة 1 MiB، الحدود، PING/PONG، أسباب OPEN_FAIL/GOAWAY) وللبديل اليدوي إن احتجناه؛ صيغة الإطارات على السلك هي صيغة Nerdbank v3 لا الرأس اليدوي ذا 8 بايت.
-- Guest و Host يستخدمان `NerdbankMux.Create` من الـ stream نفسه الذي يعيده `SymmetricConnector`؛ المسار C لا يرى سوى `IMuxConnection`/`IMuxAcceptor`.
-- يحتاج تحققًا على Windows: القياس نفسه فوق Schannel على Win10 (TLS 1.2) وWin11 (TLS 1.3). أما «RTT دولي» فقد سُحب
-  إلى الأسبوع 5 وقيس على وصلة مُحاكاة في `docs/performance-week5.md`؛ يبقى التحقق على شبكة حقيقية بين جهازين.
+## Consequences
+- Section 5 of `docs/protocol.md` stays the reference for the semantics (the window, the limits, PING/PONG, the
+  OPEN_FAIL/GOAWAY reasons) and for the hand-written alternative if we ever need it; the frame format on the wire is
+  Nerdbank v3's, not the hand-written 8-byte header.
+- Guest and host both use `NerdbankMux.Create` on the same stream `SymmetricConnector` returns; track C sees nothing
+  but `IMuxConnection`/`IMuxAcceptor`.
+- Verification is still needed on Windows: the same measurement over Schannel on Win10 (TLS 1.2) and Win11 (TLS 1.3).
+  "International RTT" was pulled forward into week five and measured on a simulated link in
+  `docs/performance-week5.md`; verification on a real network between two machines is still outstanding.

@@ -1,36 +1,39 @@
-# الإبلاغ عن ثغرة أمنية
+# Reporting a security vulnerability
 
-**لا تفتح مسألة عامة (issue) بثغرة أمنية.** هذا المشروع يوجّه حركة تصفّح أناس حقيقيين عبر عناوين
-منزلية لأناس آخرين، وثغرة تُنشر قبل أن تُفهم قد تُستعمل قبل أن يعلم بها من يشغّلونه.
+**Do not open a public issue for a security vulnerability.** This project routes real people's browsing through
+other people's home addresses, and a flaw published before it is understood can be used before the people running
+it know it exists.
 
-أرسل التفاصيل إلى: **mohamedshaker2293@gmail.com**
+Send the details to: **me@mohamedshaker.com**
 
-اكتب في الموضوع `Josour security`. وما يفيدني: أي إصدار أو commit، وأي نظام، وخطوات تكفي لإعادة
-إنتاج ما رأيته.
+Put `Josour security` in the subject. What helps: the version or commit, the operating system, and enough steps to
+reproduce what you saw.
 
-## ما ينبغي أن تتوقّعه
+## What to expect
 
-هذا مشروع يصونه شخص واحد في وقته الخاص، **ولا يقدّم دعمًا ولا يضمن زمن استجابة**. سأقرأ ما تُرسله،
-وسأصلح ما أستطيع، وقد لا أفعل. الترخيص ([Apache-2.0](LICENSE)) يوزّع البرنامج «كما هو» بلا ضمان،
-وهذا ليس إخلاءً شكليًا للمسؤولية بل وصفٌ صادق لما تحصل عليه.
+One person maintains this in their own time, and it **offers no support and guarantees no response time**. I will
+read what you send, and I will fix what I can, and sometimes I will not. The licence ([Apache-2.0](LICENSE))
+distributes the software "as is" with no warranty, and that is not a formality — it is an honest description of
+what you are getting.
 
-إن كان ما وجدته خطيرًا ولم أستجب، **انشره**. تحذير الناس أولى من انتظاري.
+If what you found is serious and I have not responded, **publish it**. Warning people matters more than waiting
+for me.
 
-## ما يهمّني أكثر من غيره
+## What I care about most
 
-الحدود التي يقوم عليها المنتج كله، مرتّبة بما يضرّ أكثر لو انكسر:
+The boundaries the whole product rests on, worst-first by what breaking them would cost:
 
-| الحدّ | أين هو | لماذا يهمّ |
+| Boundary | Where it lives | Why it matters |
 |---|---|---|
-| رفض العناوين الخاصة بعد حلّ الاسم | `IpRangePolicy`، الخطوة 6 في [docs/protocol.md](docs/protocol.md) | هو وحده ما يمنع الضيف من بلوغ شبكة المضيف المحلية وصفحة راوتره وخدمات `localhost` |
-| فحص مالك الاتصال | `OwnerPidChecker` | هو وحده ما يمنع المنتج من أن يصير VPN على مستوى جهاز الضيف، فيخرج **كل شيء** بعنوان المضيف |
-| موافقة المضيف | [ADR-0012](docs/decisions/0012-auto-accept-trusted-guests.md)، القسم 5أ في [docs/ws-protocol.md](docs/ws-protocol.md) | أي طريق يُنشئ جلسة بلا موافقة — أو يجعل قاعدة ثقة تنطبق على غير من كُتبت له — هو كسرٌ للمنتج لا عيبٌ فيه |
-| سرّ النفق وتوكن الـ Relay | `session_keys`، `relay_tokens` | التشفير طرفًا لطرف يقوم عليهما؛ والخادم لا يُفترض أن يقرأ شيئًا |
-| عزل متصفح العمل | `Josour.Browser` | بقيّة تطبيقات الجهاز يجب ألّا تمرّ من هنا أبدًا |
+| Refusing private addresses after name resolution | `IpRangePolicy`, step 6 in [docs/protocol.md](docs/protocol.md) | It alone keeps the guest away from the host's local network, their router's admin page and their `localhost` services |
+| The connection-owner check | `OwnerPidChecker` | It alone keeps the product from becoming a device-wide VPN on the guest's machine, sending **everything** out through the host's address |
+| The host's consent | [ADR-0012](docs/decisions/0012-auto-accept-trusted-guests.md), section 5a in [docs/ws-protocol.md](docs/ws-protocol.md) | Any path that creates a session without consent — or makes a trust rule apply to somebody it was not written about — breaks the product rather than having a bug in it |
+| The tunnel secret and the relay token | `session_keys`, `relay_tokens` | End-to-end encryption rests on them, and the server is not supposed to be able to read anything |
+| Work-browser isolation | `Josour.Browser` | The machine's other applications must never pass through here |
 
-## ما يختلف بين النظامين
+## What differs between the two systems
 
-فحص مالك الاتصال منفَّذ على الاثنين، بآليتين: `GetExtendedTcpTable` على Windows، و`lsof` على macOS — إذ
-لا نداء عام هناك يربط مقبسًا بعملية. وملكية المتصفح تُقرأ من Job Object على Windows ومن شجرة العمليات
-على macOS. إن وجدت طريقًا يجعل أيًّا منهما يقبل اتصالًا لم يفتحه متصفح العمل، فهذا ما أريد سماعه أكثر
-من أي شيء آخر.
+The connection-owner check is implemented on both, by two mechanisms: `GetExtendedTcpTable` on Windows and `lsof`
+on macOS, because there is no public call there that maps a socket to a process. Browser ownership comes from a Job
+Object on Windows and from the process tree on macOS. If you find a way to make either of them admit a connection
+the work browser did not open, that is what I want to hear about more than anything else.

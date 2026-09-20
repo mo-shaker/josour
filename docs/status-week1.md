@@ -1,28 +1,33 @@
-# حالة الأسبوع 1 (بتاريخ 2026-09-04)
+# Week 1 status (2026-09-04)
 
-## ما اكتمل وتحقق منه
+## What was completed and verified
 
-| المسار | المخرج | التحقق |
+| Track | Output | Verification |
 |---|---|---|
-| D | المستودع (git مهيأ بلا commits)، README، `.gitignore`، `.editorconfig`، CI للخادم (Postgres + ruff + pytest + docker build) وللعميل (Windows + Linux)، `deploy/` (Compose + Caddy + نسخ احتياطي واستعادة)، `docs/runbook.md`، `docs/acceptance-checklist.md`، `client/installer/Josour.iss` مع قاعدة Firewall | `docker compose config` وCaddy validate ناجحان |
-| العقود | `docs/api.md`، `docs/ws-protocol.md`، `docs/protocol.md`، ست وثائق ADR، واجهات `Josour.Core` (IControlChannel، ITunnelSession، ITunnelTransport، IBrowserSession، ISecretStore، رسائل WS) | مجمّدة؛ التغيير عبر مراجعة الطرفين |
-| A | نواة الخادم: النماذج كاملة (13 جدولًا) + ترحيل Alembic، argon2id + JWT + refresh rotation مع كشف إعادة الاستخدام، auth/me/hosts/domains/probe/healthz، قفل الحساب، `security_events`، CLI (create-admin, create-user, add-domain, list-domains)، Dockerfile | ruff نظيف؛ 77 اختبارًا + 1 متخطى على SQLite؛ 78 على PostgreSQL 16 شاملة الترحيل و`alembic check`؛ الصورة تُبنى |
-| B | `Core`: AllowlistMatcher، IpRangePolicy. `Tunnel`: SessionCertificate، TlsChannel (Pinning + حد أدنى 1.2)، AuthHandshake (AUTH1/AUTH2)، CandidateGatherer (Mono.Nat 3.0.4)، DirectTransport، TunnelListener، SymmetricConnector، HostDiagnostics. `Spike`: certtest / gather / symmetric / probe | 176 اختبارًا Core + 35 Tunnel؛ `certtest` يعمل؛ اتصال متماثل حقيقي بين عمليتين خلال ~50 ms |
-| C | `App`: نسخة واحدة، `--minimized`، Generic Host + Serilog، نافذة رئيسية بصفحتي المضيف والمستخدم، Tray بقائمة، Toast بأزرار قبول/رفض، نافذة الطلب الوارد Top-most بعدّاد 60 ثانية، تشغيل مع Windows، app.manifest PerMonitorV2. `Infrastructure`: DpapiSecretStore، DeviceInfoProvider، LoggingSetup | بناء Release للحل كاملًا بلا أخطاء ولا تحذيرات؛ 26 اختبارًا Infrastructure |
+| D | The repository (git initialised with no commits), README, `.gitignore`, `.editorconfig`, CI for the server (Postgres + ruff + pytest + docker build) and for the client (Windows + Linux), `deploy/` (Compose + Caddy + backup and restore), `docs/runbook.md`, `docs/acceptance-checklist.md`, `client/installer/Josour.iss` with the firewall rule | `docker compose config` and Caddy validate both pass |
+| Contracts | `docs/api.md`, `docs/ws-protocol.md`, `docs/protocol.md`, six ADRs, the `Josour.Core` interfaces (IControlChannel, ITunnelSession, ITunnelTransport, IBrowserSession, ISecretStore, the WS messages) | Frozen; changes go through review by both sides |
+| A | The server's core: the models complete (13 tables) + the Alembic migration, argon2id + JWT + refresh rotation with reuse detection, auth/me/hosts/domains/probe/healthz, account lockout, `security_events`, the CLI (create-admin, create-user, add-domain, list-domains), the Dockerfile | ruff clean; 77 tests + 1 skipped on SQLite; 78 on PostgreSQL 16 including the migration and `alembic check`; the image builds |
+| B | `Core`: AllowlistMatcher, IpRangePolicy. `Tunnel`: SessionCertificate, TlsChannel (pinning + a 1.2 floor), AuthHandshake (AUTH1/AUTH2), CandidateGatherer (Mono.Nat 3.0.4), DirectTransport, TunnelListener, SymmetricConnector, HostDiagnostics. `Spike`: certtest / gather / symmetric / probe | 176 Core tests + 35 Tunnel; `certtest` works; a real symmetric connection between two processes within ~50 ms |
+| C | `App`: a single instance, `--minimized`, Generic Host + Serilog, a main window with the host and user pages, a tray icon with a menu, a toast with accept/reject buttons, a top-most incoming-request window with a 60-second counter, start with Windows, app.manifest PerMonitorV2. `Infrastructure`: DpapiSecretStore, DeviceInfoProvider, LoggingSetup | A Release build of the whole solution with no errors and no warnings; 26 Infrastructure tests |
 
-## قرارات ADR
-- 0002 (TLS) و0003 (NAT/Relay) و0004 (التوجيه) و0005 (المثبّت): معتمدة.
-- 0001 (WPF): النموذج مبني ويُعتمد بعد فحص QA على Windows حقيقي.
-- 0006 (Mux): يُقرر في الأسبوع 2.
+## ADR decisions
+- 0002 (TLS), 0003 (NAT/relay), 0004 (routing) and 0005 (the installer): accepted.
+- 0001 (WPF): the prototype is built and will be accepted after QA on real Windows.
+- 0006 (mux): decided in week 2.
 
-## ما يحتاج تدخلًا بشريًا الآن
-1. **طلب شهادة توقيع الكود (OV/EV)** لأن الاستخراج يستغرق أيامًا.
-2. **تجهيز VPS للاختبار (staging)** وفق `docs/runbook.md` ونشر الخادم عليه.
-3. **تشغيل النموذج التقني على Windows** وفق `docs/spike-runbook.md`: `certtest` على Win10 وWin11، `gather` على راوترين أو ثلاثة، ثم بدء الأزواج العشرة.
-4. **فحص QA لتطبيق WPF على Windows** (Tray، Toast، النسخة الواحدة، التشغيل مع الدخول، الإخفاء إلى Tray، DPI) لاعتماد ADR-0001.
+## What needs human intervention now
+1. **Request the code-signing certificate (OV/EV)**, because issuance takes days.
+2. **Prepare a staging VPS** per `docs/runbook.md` and deploy the server on it.
+3. **Run the technical prototype on Windows** per `docs/spike-runbook.md`: `certtest` on Win10 and Win11, `gather` on
+   two or three routers, then start the ten pairs.
+4. **QA the WPF application on Windows** (tray, toast, single instance, start on login, hiding to the tray, DPI) to
+   accept ADR-0001.
 
-## الأسبوع 2 (من الخطة)
-- A: `admin_*`، rate limit، `GET /sessions/me`، اختبارات التكامل الإضافية. (ملاحظة: `/docs` حاليًا في `ENV=dev` فقط؛ تقييده للمسؤولين في الإنتاج ضمن أسبوع 2.)
-- B: نموذج Nerdbank مقابل Framing يدوي ← ADR-0006؛ Proxy أولي مع صفحة الفحص؛ مصفوفة تشغيل المتصفح؛ تجميع بيانات الأزواج العشرة.
-- C: `ApiClient` + شاشة الدخول ضد staging؛ `MockControlChannel` من `ws-protocol.md`؛ مفتاح `--uninstall-notifications`.
-- D: نشر staging، فحص SmartScreen للمثبّت الموقّع، تحديث قائمة القبول.
+## Week 2 (from the plan)
+- A: `admin_*`, rate limiting, `GET /sessions/me`, the additional integration tests. (Note: `/docs` is currently only
+  in `ENV=dev`; restricting it to administrators in production is part of week 2.)
+- B: the Nerdbank prototype against hand-written framing → ADR-0006; an initial proxy with the check page; the browser
+  launch matrix; gathering the ten pairs' data.
+- C: `ApiClient` + the sign-in screen against staging; `MockControlChannel` from `ws-protocol.md`; the
+  `--uninstall-notifications` switch.
+- D: deploying staging, checking SmartScreen on the signed installer, updating the acceptance list.
