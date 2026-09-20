@@ -1,237 +1,242 @@
-# مراجعة أمنية للخادم — مقابل القسمين 14 و15 من وثيقة المنتج
+# The server's security review — against sections 14 and 15 of the product document
 
-مراجعة بندًا بندًا لكل ما تطلبه **«14. متطلبات الأمان»** و**«15. متطلبات الخصوصية»** ويقع على
-عاتق الخادم. لكل بند: الحالة، والدليل في الكود، وما نقص.
+An item-by-item review of everything **"14. Security requirements"** and **"15. Privacy requirements"** ask for that
+falls on the server. For each item: its state, the evidence in the code, and what was missing.
 
-الحالات: **مستوفى** · **أُصلح في الأسبوع 5** · **اكتمل في الأسبوع 6** · **لا يخص الخادم**.
+The states: **met** · **fixed in week 5** · **completed in week 6** · **not the server's concern**.
 
-> **تحديث الأسبوع 6 (2026-09-05):** أُغلقت التحفّظات الأربعة كلها. لم يعد في هذه المراجعة بند
-> غير مستوفى ولا بند مستوفى بتحفّظ مفتوح. التفصيل في القسم 3.
+> **Week 6 update (2026-09-05):** all four reservations were closed. This review no longer contains an unmet item, nor
+> an item met under an open reservation. The detail is in section 3.
 
-**الحصيلة:** 34 بندًا —
+**The tally:** 34 items —
 
-| الحالة | العدد | البنود |
+| State | Count | The items |
 |---|---|---|
-| مستوفى قبل الأسبوع 5 | **21** | 14.2–14.8، 14.11–14.13، 14.16، 14.20، و15.1–15.5، و15.10–15.13 |
-| أُصلح في الأسبوع 5 | **3** | 14.10 (localhost في قائمة السماح)، 14.19 (الإنهاء المركزي من CLI)، 14.21 (تسريب معاملات SQL عند `ENV=dev`) |
-| **اكتمل في الأسبوع 6** | **2** | 14.17 (حدود REST الأربعة بمفاتيحها الصحيحة — ADR-0008)، 14.18 (كشف آلي للجهاز المشبوه + ابتلاع `listener_unauthenticated`) |
-| لا يخص الخادم | **8** | 14.1، 14.9، 14.14، 14.15، 15.6، 15.7–15.9 |
+| Met before week 5 | **21** | 14.2–14.8, 14.11–14.13, 14.16, 14.20, and 15.1–15.5, and 15.10–15.13 |
+| Fixed in week 5 | **3** | 14.10 (localhost in the allow list), 14.19 (central termination from the CLI), 14.21 (SQL parameters leaking with `ENV=dev`) |
+| **Completed in week 6** | **2** | 14.17 (the four REST limits with the right keys — ADR-0008), 14.18 (automatic suspicious-device detection + consuming `listener_unauthenticated`) |
+| Not the server's concern | **8** | 14.1, 14.9, 14.14, 14.15, 15.6, 15.7–15.9 |
 
-**المجموع 21 + 3 + 2 + 8 = 34.** البندان 14.17 و14.18 كانا محسوبين مستوفيين من قبل (الأول
-جزئيًا بميزانية إطارات WebSocket، والثاني بالحظر اليدوي) ونُقلا إلى صف الأسبوع 6 لأن ما نقصهما
-هو بالضبط ما أُغلق فيه.
+**The sum 21 + 3 + 2 + 8 = 34.** Items 14.17 and 14.18 were counted as met before (the first partly, by the WebSocket
+frame budget, and the second by manual blocking) and were moved to the week-6 row because what they lacked is exactly
+what was closed in it.
 
-**لا يوجد بند غير مستوفى.** كانت أربعة بنود **مستوفاة بتحفّظ**، وقد أُغلقت جميعًا:
+**There is no unmet item.** Four items were **met under a reservation**, and all of them have been closed:
 
-| التحفّظ | يخص | الحالة |
+| Reservation | Concerns | State |
 |---|---|---|
-| 3.1 | 14.17 | **مغلق (الأسبوع 6)** — [ADR-0008](decisions/0008-rate-limit-policy.md): حدّ ثانٍ بمفتاح البريد على الدخول، وحدّ على `/auth/refresh`، وحدّ لكل مستخدم على `/probe` |
-| 3.2 | 14.18 | **مغلق (الأسبوع 6)** — [ADR-0008](decisions/0008-rate-limit-policy.md) الجزء الثاني: كشف آلي بقاعدتين محافظتين، و`listener_unauthenticated` صار مبتلَعًا ومعروضًا |
-| 3.3 | 14.13 | **مغلق (الأسبوع 5)** — [ADR-0007](decisions/0007-argon2-parameters.md) معتمد 2026-09-05، معاملات OWASP (m=19 MiB، t=2، p=1): دفعة العشرين تسجيل دخول نزلت من 4770 إلى 367 مللي ثانية على حاوية 1 vCPU |
-| 3.4 | 14.9 | **مغلق كمسألة توثيق (الأسبوع 6)** — التقسيم مقصود ومنصوص عليه في `docs/protocol.md` القسم 6: قائمة السماح **تُصرّح**، و`IpRangePolicy` **يحرس الحدّ** بعد حل DNS على الطرفين، فالاسم الذي يُحل إلى عنوان خاص يُرفض عند الاتصال. لا تغيير في `validate_entry` |
+| 3.1 | 14.17 | **Closed (week 6)** — [ADR-0008](decisions/0008-rate-limit-policy.md): a second limit keyed by email on sign-in, a limit on `/auth/refresh`, and a per-user limit on `/probe` |
+| 3.2 | 14.18 | **Closed (week 6)** — [ADR-0008](decisions/0008-rate-limit-policy.md) part two: automatic detection with two conservative rules, and `listener_unauthenticated` is now consumed and displayed |
+| 3.3 | 14.13 | **Closed (week 5)** — [ADR-0007](decisions/0007-argon2-parameters.md) adopted 2026-09-05, the OWASP parameters (m=19 MiB, t=2, p=1): the batch of twenty sign-ins went from 4770 to 367 milliseconds on a 1 vCPU container |
+| 3.4 | 14.9 | **Closed as a documentation matter (week 6)** — the division is deliberate and stated in section 6 of `docs/protocol.md`: the allow list **authorises**, and `IpRangePolicy` **guards the boundary** after DNS resolution on both sides, so a name that resolves to a private address is refused at connect time. No change to `validate_entry` |
 
-وإضافة إلى ذلك، أُصلح في الأسبوع 5 بندان لا يقابلهما سطر في الوثيقة لكنهما يخدمان 14.13
-و**توافر** الخادم: نقل argon2 خارج حلقة الأحداث، وسقف تزامن للاشتقاق. تفصيلهما في
-`docs/load-test-week5.md`.
+In addition, two things were fixed in week 5 that have no matching line in the document but serve 14.13 and the
+server's **availability**: moving argon2 off the event loop, and a concurrency ceiling for the derivation. Their detail
+is in `docs/load-test-week5.md`.
 
 ---
 
-## 1. القسم 14 — متطلبات الأمان
+## 1. Section 14 — the security requirements
 
-| # | البند | الحالة | الدليل / ما ينقص |
+| # | Item | State | Evidence / what is missing |
 |---|---|---|---|
-| 14.1 | تشفير الاتصال بين الجهازين | لا يخص الخادم | النفق TLS بين العميلين مباشرة. دور الخادم أن ينقل `cert_fp_sha256` بين الطرفين ولا يفكه؛ يتحقق من شكله (64 hex صغيرة) في `app/ws/protocol.py::_cert_fingerprint`. **حد ثقة موثق:** الخادم يعرف سر الجلسة وبصمة الشهادة، فخادم مخترق يستطيع نظريًا اعتراض النفق (ADR في خطة القسم 2؛ مقبول في MVP) |
-| 14.2 | تشفير الاتصال بين التطبيق والخادم | مستوفى | `deploy/Caddyfile` ينهي TLS تلقائيًا و`deploy/docker-compose.yml` لا ينشر منفذ الـ API إلى المضيف (`expose: 8000` فقط) |
-| 14.3 | استخدام HTTPS وWSS | مستوفى | Caddy يحوّل 80←443 تلقائيًا ويرسل `Strict-Transport-Security: max-age=31536000; includeSubDomains`، ويمرر Upgrade للـ WebSocket. العقد يفرض `wss://` في `ws-protocol.md` القسم 1، والتوكن **لا يوضع في Query String** |
-| 14.4 | استخدام رموز جلسات مؤقتة | مستوفى | access JWT 15 دقيقة و`typ=access` مفروض (`app/core/security.py::decode_access_token`)؛ refresh 30 يومًا **بتدوير عند كل استخدام** وكشف إعادة الاستخدام يلغي سلسلة الجهاز كلها (`app/services/tokens.py::rotate_refresh_token`)؛ سر الجلسة `secret_b64` يعيش عمر الجلسة فقط |
-| 14.5 | عدم إعادة استخدام مفاتيح الجلسات | مستوفى | `secrets.token_bytes(32)` جديد داخل مسار القبول الوحيد (`app/services/requests.py::accept`)، وصف واحد في `session_keys` لكل جلسة. اختبار جديد: `tests/test_ws_sessions.py::test_every_session_gets_a_fresh_key_and_none_survives_the_end` |
-| 14.6 | موافقة المضيف على كل جلسة | مستوفى | لا يوجد مسار ينشئ `Session` إلا `requests.accept`، وهي مقصورة على الجهاز المخاطَب (`_load_pending(is_host=True)` وإلا `forbidden`). لا قبول تلقائي ولا «تذكّر موافقتي» في أي مكان |
-| 14.7 | انتهاء تلقائي للجلسة | مستوفى | مؤقتان يُسلَّحان عند القبول: مهلة الاتصال و`expires_at` (`app/services/session_flow.py::schedule_timers`)، ويُعاد تسليحهما بعد إعادة التشغيل (`reschedule_timers`)، وكنس عند الإقلاع ينهي كل جلسة نجت (`sessions.end_dangling_sessions`) |
-| 14.8 | إلغاء المفاتيح بعد انتهاء الجلسة | مستوفى | `sessions.end_session` هي **المسار الوحيد** للإنهاء، وتحذف صف `session_keys` وتلغي المؤقتين مهما كان السبب (عميل، انقطاع، مهلة، مسؤول، إقلاع). مثبت في `tests/test_log_hygiene.py` و`tests/test_cli_sessions.py` |
-| 14.9 | منع الوصول إلى الشبكة المحلية للمضيف | لا يخص الخادم (جزئيًا) | الفرض على العميل بعد حل DNS (`IpRangePolicy`، وثغرة الأسبوع 4 رقم 2). دور الخادم هو ما **يخزّنه ويقدّمه** في قائمة السماح: `allowlist.validate_entry` يرفض أي عنوان IP حرفي، والنجمة، والشرطة المائلة. أما قبول أسماء تُحل محليًا فمقصود ومغلق كمسألة توثيق — البند 3.4 أدناه |
-| 14.10 | منع الوصول إلى Localhost | **أُصلح في الأسبوع 5** | كانت `localhost` مدخلًا صالحًا في قائمة السماح. صارت مرفوضة هي وكل ما تحتها (RFC 6761 §6.3): `app/services/allowlist.py::LOOPBACK_NAME`. اختبارات في `tests/test_domains.py`. وفي مسار آخر: فحص قابلية الوصول و`POST /probe` يرفضان loopback والخاص والمحجوز قبل فتح أي مقبس (`reachability_probe.forbidden_target_reason`، مع فك IPv4 المضمّن في 6to4 وTeredo والمعيّن) |
-| 14.11 | منع الوصول إلى عناوين IP الداخلية | مستوفى (جانب الخادم) | لا يمكن إدخال عنوان IP في قائمة السماح أصلًا؛ ومرشحو `session.endpoint` تُتحقق صحتها وتُخزَّن معيارية ولا يتصل بها الخادم أبدًا (`protocol.Candidate`). الفرض النهائي على العميل |
-| 14.12 | عدم تخزين كلمات المرور مكشوفة | مستوفى | لا عمود لكلمة مرور صريحة في أي نموذج؛ `users.password_hash` فقط. أسرار الأجهزة وrefresh tokens تُخزَّن كـ SHA-256 وتُقارن بـ `hmac.compare_digest` |
-| 14.13 | تخزين كلمات المرور بخوارزمية Hash آمنة | مستوفى | argon2id عبر `argon2-cffi` بمعاملات OWASP (m=19 MiB، t=2، p=1) المعتمدة في [ADR-0007](decisions/0007-argon2-parameters.md)، مع `check_needs_rehash` وترقية تلقائية عند أول دخول ناجح. التحقق يجري دائمًا حتى لمستخدم غير موجود (`_DUMMY_HASH`) لتسوية التوقيت، ويجري خارج حلقة الأحداث بسقف تزامن. **تحفّظ الأداء (3.3) مغلق** |
-| 14.14 | توقيع تطبيق Windows | لا يخص الخادم | مسار البناء والتوزيع |
-| 14.15 | توزيع التحديثات من مصدر موثوق | لا يخص الخادم | مسار التوزيع |
-| 14.16 | تسجيل محاولات الدخول | مستوفى | `security_events` يسجّل `login_success` و`login_failed` (بالسبب: `unknown_user`, `bad_password`, `device_secret_invalid`, `device_revoked`, `account_disabled`) و`login_locked` و`logout` و`refresh_reuse` و`device_revoked` و`session_admin_terminated`، كلها بالـ IP. `GET /admin/security-events` يعرضها |
-| 14.17 | تحديد معدل الطلبات | **مستوفى (اكتمل في الأسبوع 6)** | ثلاث طبقات: **ميزانية إطارات لكل اتصال WebSocket** (100 إطارًا/10 ثوانٍ، `app/ws/connection_manager.py::FRAME_BUDGET`) ترد `error(rate_limited)` وتُسقط الإطار دون قطع الاتصال (أُضيفت في الأسبوع 5)؛ و**أربعة حدود REST** بـ [ADR-0008](decisions/0008-rate-limit-policy.md): `/auth/login` بمفتاح IP (30/دقيقة) **وبمفتاح البريد** (5 لكل 15 دقيقة، تُعاد عند النجاح)، و`/auth/refresh` (60/دقيقة/IP)، و`/probe` (10/دقيقة لكل مستخدم)؛ وقفل الحساب 15 دقيقة بعد 10 إخفاقات كشبكة أمان أخيرة. التفصيل في 3.1 |
-| 14.18 | حظر الأجهزة المشبوهة | **مستوفى (اكتمل في الأسبوع 6)** | يدويًا: إلغاء الجهاز من المسؤول أو من صاحبه يلغي refresh tokens، ويصفّر الحضور، **ويغلق قناة التحكم الحية فورًا بالكود 4403** (`notify.close_device`). وآليًا (ADR-0008): **مهمة دورية** على جدول المؤقتات القائم تقرأ `security_events` وتلغي الجهاز على نمطين محافظين (10 `device_secret_invalid` في ساعة بلا دخول ناجح، أو 3 `refresh_reuse`)، بالمسار نفسه وبصف تدقيق يشرح المُطلِق. وكشف إعادة استخدام refresh يبقى يلغي سلسلة الجهاز كلها فورًا. التفصيل في 3.2 |
-| 14.19 | إمكانية إنهاء الجلسة مركزيًا | **أُصلح في الأسبوع 5 (اكتمل)** | `POST /admin/sessions/{id}/terminate` كان موجودًا؛ أُضيف `manage.py end-session` الذي يمر بالمسار نفسه (`sessions.admin_terminate`) فيُنهي الصف ويحذف المفتاح ويكتب صف التدقيق مع `via: "cli"`. أُضيف `manage.py list-sessions`. تحذير صريح في المخرجات: النسخة السطرية تعمل خارج عملية الـ API فلا ترسل `session.terminate` للعميلين |
-| 14.20 | عدم فك تشفير HTTPS | مستوفى بالتصميم | لا يمر بايت واحد من التصفح عبر FastAPI؛ الخادم منصة تحكم فقط (القرار التقني 17). لا يوجد في المستودع كله عميل HTTP صادر إلا فحص قابلية الوصول، **وهو لا يرسل بايتًا**: يفتح TCP ويقيس ويغلق (`reachability_probe.tcp_probe`) |
-| 14.21 | عدم تسجيل محتوى التصفح | **أُصلح في الأسبوع 5** | لم يكن أي كود يسجّل محتوى، لكن `ENV=dev` يضبط الجذر على DEBUG، وعندها **تطبع SQLAlchemy الاستعلامات مع معاملاتها المربوطة** — أي أسماء النطاقات المتصفَّحة وعناوين الحضور. أُضيف تثبيت `sqlalchemy` و`aiosqlite` و`asyncpg` فوق DEBUG مهما كان مستوى التطبيق (`app/core/logging.py::STATEMENT_LOGGERS`). و`RedactingFilter` يستبدل قيم كل مفتاح يحمل `password`/`secret`/`token`/`authorization`/`cookie`. الاختبار الجديد `tests/test_log_hygiene.py` يقود دورة جلسة كاملة بـ `log_domains=true` ثم يفتّش كل سجل صادر بأنماط `scripts/security/check-logs-clean.sh` نفسها زائد نمطين |
+| 14.1 | Encrypting the connection between the two machines | Not the server's concern | The tunnel is TLS directly between the two clients. The server's role is to carry `cert_fp_sha256` between the two sides without decoding it; it checks its shape (64 lowercase hex) in `app/ws/protocol.py::_cert_fingerprint`. **A documented trust boundary:** the server knows the session secret and the certificate fingerprint, so a compromised server could in theory intercept the tunnel (an ADR in the plan's section 2; accepted in the MVP) |
+| 14.2 | Encrypting the connection between the application and the server | Met | `deploy/Caddyfile` terminates TLS automatically and `deploy/docker-compose.yml` does not publish the API's port to the host (`expose: 8000` only) |
+| 14.3 | Using HTTPS and WSS | Met | Caddy redirects 80→443 automatically and sends `Strict-Transport-Security: max-age=31536000; includeSubDomains`, and passes the WebSocket upgrade through. The contract requires `wss://` in section 1 of `ws-protocol.md`, and the token is **not put in the query string** |
+| 14.4 | Using temporary session tokens | Met | The access JWT lasts 15 minutes with `typ=access` enforced (`app/core/security.py::decode_access_token`); the refresh token lasts 30 days **with rotation on every use**, and reuse detection revokes the device's whole chain (`app/services/tokens.py::rotate_refresh_token`); the session secret `secret_b64` lives only as long as the session |
+| 14.5 | Not reusing session keys | Met | A fresh `secrets.token_bytes(32)` inside the single acceptance path (`app/services/requests.py::accept`), and one `session_keys` row per session. A new test: `tests/test_ws_sessions.py::test_every_session_gets_a_fresh_key_and_none_survives_the_end` |
+| 14.6 | The host's consent to every session | Met | No path creates a `Session` except `requests.accept`, and it is restricted to the addressed device (`_load_pending(is_host=True)`, otherwise `forbidden`). There is no automatic acceptance and no "remember my consent" anywhere |
+| 14.7 | The session ending automatically | Met | Two timers are armed on acceptance: the connect timeout and `expires_at` (`app/services/session_flow.py::schedule_timers`), they are re-armed after a restart (`reschedule_timers`), and a sweep at startup ends any session that survived (`sessions.end_dangling_sessions`) |
+| 14.8 | Revoking the keys after the session ends | Met | `sessions.end_session` is **the only path** to termination, and it deletes the `session_keys` row and cancels both timers whatever the reason (a client, a disconnection, a timeout, an administrator, startup). Pinned in `tests/test_log_hygiene.py` and `tests/test_cli_sessions.py` |
+| 14.9 | Stopping access to the host's local network | Not the server's concern (partly) | Enforcement is on the client after DNS resolution (`IpRangePolicy`, and week four's vulnerability 2). The server's role is what it **stores and serves** in the allow list: `allowlist.validate_entry` refuses any IP literal, the asterisk, and the slash. As for accepting names that resolve locally, that is deliberate and closed as a documentation matter — item 3.4 below |
+| 14.10 | Stopping access to localhost | **Fixed in week 5** | `localhost` used to be a valid entry in the allow list. It and everything beneath it are now refused (RFC 6761 §6.3): `app/services/allowlist.py::LOOPBACK_NAME`. Tests in `tests/test_domains.py`. And on another path: the reachability probe and `POST /probe` refuse loopback, private and reserved addresses before opening any socket (`reachability_probe.forbidden_target_reason`, unwrapping the IPv4 embedded in 6to4, Teredo and mapped forms) |
+| 14.11 | Stopping access to internal IP addresses | Met (the server's side) | An IP address cannot be entered in the allow list at all; and `session.endpoint`'s candidates are validated, stored canonically and never connected to by the server (`protocol.Candidate`). The final enforcement is on the client |
+| 14.12 | Not storing passwords in the clear | Met | There is no plaintext password column in any model; only `users.password_hash`. Device secrets and refresh tokens are stored as SHA-256 and compared with `hmac.compare_digest` |
+| 14.13 | Storing passwords with a secure hash | Met | argon2id through `argon2-cffi` with the OWASP parameters (m=19 MiB, t=2, p=1) adopted in [ADR-0007](decisions/0007-argon2-parameters.md), with `check_needs_rehash` and an automatic upgrade on the first successful sign-in. Verification always runs, even for a user who does not exist (`_DUMMY_HASH`), to level the timing, and it runs off the event loop with a concurrency ceiling. **The performance reservation (3.3) is closed** |
+| 14.14 | Signing the Windows application | Not the server's concern | The build and distribution path |
+| 14.15 | Distributing updates from a trusted source | Not the server's concern | The distribution path |
+| 14.16 | Recording sign-in attempts | Met | `security_events` records `login_success` and `login_failed` (with the reason: `unknown_user`, `bad_password`, `device_secret_invalid`, `device_revoked`, `account_disabled`) and `login_locked` and `logout` and `refresh_reuse` and `device_revoked` and `session_admin_terminated`, all with the IP. `GET /admin/security-events` displays them |
+| 14.17 | Rate limiting | **Met (completed in week 6)** | Three layers: **a frame budget per WebSocket connection** (100 frames/10 seconds, `app/ws/connection_manager.py::FRAME_BUDGET`) answering `error(rate_limited)` and dropping the frame without cutting the connection (added in week 5); and **four REST limits** by [ADR-0008](decisions/0008-rate-limit-policy.md): `/auth/login` keyed by IP (30/minute) **and keyed by email** (5 per 15 minutes, returned on success), and `/auth/refresh` (60/minute/IP), and `/probe` (10/minute per user); and the 15-minute account lockout after 10 failures as a last safety net. The detail is in 3.1 |
+| 14.18 | Blocking suspicious devices | **Met (completed in week 6)** | By hand: revoking a device, by an administrator or by its owner, revokes the refresh tokens, clears the presence, **and closes the live control channel at once with code 4403** (`notify.close_device`). And automatically (ADR-0008): **a periodic task** on the existing timer schedule reads `security_events` and revokes the device on two conservative patterns (10 `device_secret_invalid` in an hour with no successful sign-in, or 3 `refresh_reuse`), by the same path and with an audit row explaining what fired it. And refresh-reuse detection still revokes the device's whole chain at once. The detail is in 3.2 |
+| 14.19 | The ability to end a session centrally | **Fixed in week 5 (completed)** | `POST /admin/sessions/{id}/terminate` existed; `manage.py end-session` was added, going through the same path (`sessions.admin_terminate`), so it ends the row, deletes the key and writes the audit row with `via: "cli"`. `manage.py list-sessions` was added. An explicit warning in the output: the command-line version runs outside the API's process, so it does not send `session.terminate` to the two clients |
+| 14.20 | Not decrypting HTTPS | Met by design | Not one byte of browsing passes through FastAPI; the server is a control plane only (technical decision 17). In the whole repository there is no outbound HTTP client except the reachability probe, **and it sends no byte**: it opens TCP, measures and closes (`reachability_probe.tcp_probe`) |
+| 14.21 | Not logging browsing content | **Fixed in week 5** | No code was logging content, but `ENV=dev` set the root to DEBUG, and then **SQLAlchemy prints the queries with their bound parameters** — that is, the names of the sites browsed and presence addresses. `sqlalchemy`, `aiosqlite` and `asyncpg` were pinned above DEBUG whatever the application's level (`app/core/logging.py::STATEMENT_LOGGERS`). And `RedactingFilter` replaces the value of every key carrying `password`/`secret`/`token`/`authorization`/`cookie`. The new test `tests/test_log_hygiene.py` drives a full session cycle and then searches every emitted log with the same patterns as `scripts/security/check-logs-clean.sh` plus two more |
 
 ---
 
-## 2. القسم 15 — متطلبات الخصوصية
+## 2. Section 15 — the privacy requirements
 
-### 2.1 ما يُعرض للمضيف قبل قبول الطلب
+### 2.1 What is shown to the host before they accept the request
 
-الخادم مسؤول عن **تزويد** العميل بهذه الحقول في `request.incoming`؛ العرض نفسه على المسار C.
+The server is responsible for **supplying** the client with these fields in `request.incoming`; the display itself is
+track C's.
 
-| # | البند | الحالة | الدليل |
+| # | Item | State | Evidence |
 |---|---|---|---|
-| 15.1 | اسم المستخدم الطالب | مستوفى | `request.incoming.guest_name` من `users.display_name` |
-| 15.2 | اسم الجهاز | مستوفى | `request.incoming.guest_device` من `devices.name` |
-| 15.3 | مدة الاتصال المطلوبة | مستوفى | `request.incoming.duration_min`، محقّقة ضد `max_session_minutes` قبل إنشاء الطلب |
-| 15.4 | المواقع أو الفئات المسموح بها | مستوفى | `request.incoming.allowlist_version` + `GET /domains` (بـ ETag وطلب إصدار محدد). المضيف يرى **الإصدار نفسه** الذي سيُطبَّق، لا قائمة قد تكون قديمة |
-| 15.5 | إمكانية قطع الاتصال | مستوفى | `session.end` مقبولة **من أي طرف** في الحالتين `connecting` و`active`، وقطع قناة التحكم ينهي الجلسة فورًا بـ `host_disconnected` |
-| 15.6 | تنبيه بأن المواقع سترى عنوان المضيف | لا يخص الخادم | نص في واجهة العميل. الخادم يزوّده بما يلزم: `session.created.peer_public_ip` و`same_public_ip` |
+| 15.1 | The requesting user's name | Met | `request.incoming.guest_name` from `users.display_name` |
+| 15.2 | The device's name | Met | `request.incoming.guest_device` from `devices.name` |
+| 15.3 | The requested connection duration | Met | `request.incoming.duration_min`, validated against `max_session_minutes` before the request is created |
+| 15.4 | The allowed sites or categories | Met | `request.incoming.allowlist_version` + `GET /domains` (with an ETag and a specific-version request). The host sees **the same version** that will be applied, not a list that may be stale |
+| 15.5 | The ability to disconnect | Met | `session.end` is accepted **from either side** in both the `connecting` and `active` states, and cutting the control channel ends the session at once with `host_disconnected` |
+| 15.6 | A warning that the sites will see the host's address | Not the server's concern | Text in the client's interface. The server supplies what it needs: `session.created.peer_public_ip` and `same_public_ip` |
 
-### 2.2 ما توضحه سياسة الاستخدام
+### 2.2 What the usage policy sets out
 
-| # | البند | الحالة | ملاحظة |
+| # | Item | State | Note |
 |---|---|---|---|
-| 15.7 | منع الأنشطة غير القانونية | لا يخص الخادم | نص سياسة (منتج/قانوني) |
-| 15.8 | عدم مشاركة الاتصال مع غير الموثوقين | لا يخص الخادم | نص سياسة. يسنده تقنيًا أن الـ Proxy المحلي يقبل متصفح العمل وحده (فحص PID، قرار الخطة 2) |
-| 15.9 | الالتزام بشروط المواقع | لا يخص الخادم | نص سياسة |
-| 15.10 | مسؤولية المستخدم عن الجلسة | مستوفى (بالسجل) | كل جلسة مربوطة بالمستخدمين والأجهزة الأربعة في `sessions`، ولا تُحذف |
-| 15.11 | مسؤولية الشركة عن تحديد المواقع المسموح بها | مستوفى | القائمة مركزية ومحكومة بالمسؤول: `PUT /admin/domains` يتحقق من **كل** المدخلات ويرفض الطلب كله عند أي خطأ، وينشر إصدارًا غير قابل للتعديل (`allowlist_versions`) ويبثّ `allowlist.updated`. لا مسار يسمح لمستخدم عادي بتوسيع القائمة |
-| 15.12 | عدم تسجيل محتوى التصفح | مستوفى / مُشدَّد | انظر 14.21. لا مسار في الخادم يستقبل عنوان URL أو ترويسة أو جسم طلب أصلًا: أوسع ما يصل هو `session.end.domains` (أسماء مضيفين فقط) |
-| 15.13 | تسجيل بيانات الجلسة الإدارية فقط | مستوفى | صف `sessions` يحفظ: الطرفين، الأوقات، سبب الإنهاء، مجموع البايتات، ونتيجة الاتصال ونوع المرشح الفائز وإصدار TLS. **لا محتوى.** أسماء النطاقات تُحفظ في `session_domains` فقط حين يكون `log_domains` مفعّلًا (الافتراضي **false**)، وتُطبَّع وتُحد بـ 200 نطاقًا مميزًا، ولا تُسجَّل قط. والمهم للشفافية: قيمة `log_domains` تُرسل لكل عميل في `hello.ack.settings`، فالمضيف يعرف مسبقًا ما إذا كانت النطاقات ستُحفظ |
+| 15.7 | Prohibiting illegal activity | Not the server's concern | Policy text (product/legal) |
+| 15.8 | Not sharing the connection with people who are not trusted | Not the server's concern | Policy text. It is technically supported by the local proxy accepting the work browser alone (the PID check, plan decision 2) |
+| 15.9 | Abiding by the sites' terms | Not the server's concern | Policy text |
+| 15.10 | The user's responsibility for the session | Met (by the record) | Every session is bound to all four users and devices in `sessions`, and is never deleted |
+| 15.11 | The company's responsibility for determining the allowed sites | Met | The list is central and governed by an administrator: `PUT /admin/domains` validates **every** entry and refuses the whole request on any error, and publishes an immutable version (`allowlist_versions`) and broadcasts `allowlist.updated`. No path lets an ordinary user widen the list |
+| 15.12 | Not logging browsing content | Met / hardened | See 14.21. No path in the server receives a URL, a header or a request body at all: the widest thing that arrives is `session.end.domains` (hostnames only) |
+| 15.13 | Recording administrative session data only | Met | The `sessions` row stores: the two parties, the times, the end reason, the byte totals, and the connect result, the winning candidate's type and the TLS version. **No content.** Domain names are stored in `session_domains` only when `log_domains` is on (the default is **false**), and they are normalised and capped at 200 distinct domains, and never written to the log. And, importantly for transparency: the value of `log_domains` is sent to every client in `hello.ack.settings`, so the host knows in advance whether the domains will be stored |
 
 ---
 
-## 3. التحفّظات — كلها مغلقة الآن
+## 3. The reservations — all of them now closed
 
-### 3.1 تحديد المعدل لا يغطي `/auth/refresh` ولا `/probe`، وحد الدخول بالـ IP فقط — **مغلق**
+### 3.1 Rate limiting covers neither `/auth/refresh` nor `/probe`, and the sign-in limit is by IP only — **closed**
 
-**ما كان:** `POST /auth/login` محدود بـ 5/دقيقة **لكل IP** فقط. فريق كامل خلف NAT واحد يتقاسم
-الحصة (إزعاج مشروع)، وبالمقابل عشرون عنوانًا مختلفًا يتجاوزان الحد تمامًا — وقياس الأسبوع 5
-أظهر أن عشرين تسجيل دخول متزامنًا يرفع زمن دورة الجلسة من 78 ms إلى 10.7 ثانية على نواة واحدة
-(`docs/load-test-week5.md` القسم 5.2). و`POST /auth/refresh` بلا حد وغير مصادق، و`POST /probe`
-مصادق وبلا حد ويجعل الخادم يفتح TCP إلى أي عنوان عام يطلبه المستخدم — ماسح منافذ بطيء بهوية
-الخادم.
+**What it was:** `POST /auth/login` was limited to 5/minute **per IP** only. A whole team behind one NAT shares the
+quota (a legitimate annoyance), and in return twenty different addresses get past the limit entirely — and week five's
+measurement showed twenty concurrent sign-ins raising the session cycle from 78 ms to 10.7 seconds on one core
+(`docs/load-test-week5.md` section 5.2). And `POST /auth/refresh` was unlimited and unauthenticated, and
+`POST /probe` was authenticated and unlimited and made the server open TCP to any public address the user asked for — a
+slow port scanner wearing the server's identity.
 
-**ما نُفِّذ ([ADR-0008](decisions/0008-rate-limit-policy.md)، الأسبوع 6):** أربعة سطول
-token bucket، كلها ترد الظرف القائم `rate_limited` مع `Retry-After`، وكلها تُعطَّل بمفتاح
-`RATE_LIMIT_ENABLED` الموجود:
+**What was implemented ([ADR-0008](decisions/0008-rate-limit-policy.md), week 6):** four token buckets, all answering
+with the existing `rate_limited` envelope and a `Retry-After`, and all disabled by the existing `RATE_LIMIT_ENABLED`
+key:
 
-| المسار | المفتاح | الحد |
+| Path | Key | Limit |
 |---|---|---|
-| `POST /auth/login` | عنوان المتصل | 30/دقيقة |
-| `POST /auth/login` | **البريد المُرسَل** (مجزّأ SHA-256) | 5 لكل 15 دقيقة، **يُعاد الرمز عند النجاح** فلا يستهلك الميزانية إلا الإخفاق |
-| `POST /auth/refresh` | عنوان المتصل | 60/دقيقة |
-| `POST /probe` | `user_id` | 10/دقيقة |
+| `POST /auth/login` | the caller's address | 30/minute |
+| `POST /auth/login` | **the submitted email** (SHA-256 hashed) | 5 per 15 minutes, **the token is returned on success**, so only failure consumes the budget |
+| `POST /auth/refresh` | the caller's address | 60/minute |
+| `POST /probe` | `user_id` | 10/minute |
 
-المعايرة مقابل **قفل الحساب** صريحة: سعة سطل البريد (5) **أقل من عتبة القفل (10)**، فدفعة واحدة
-لا تستطيع قفل حساب مهما تسارعت — والقفل حرمان خدمة يستطيع المهاجم إطلاقه، فوجب أن يعضّ حدّ
-المعدل أولًا. والوصول إلى عشر محاولات فاشلة صار يستغرق ربع ساعة على الأقل، ويترك أثرًا واضحًا في
-`GET /admin/security-events`. والتماسك مع `MAX_CONCURRENT_KDF` موثّق في ADR-0008: الحدود تضبط
-**معدّل الوصول** (فما يُرفض لا يكلّف اشتقاقًا أصلًا)، والسقف يضبط **تزامن** الاشتقاق وذروة
-ذاكرته (~38 MiB بمعاملات ADR-0007).
+The calibration against **the account lockout** is explicit: the email bucket's capacity (5) is **below the lockout
+threshold (10)**, so one burst cannot lock an account however fast it goes — and the lockout is a denial of service an
+attacker can trigger, so the rate limit had to bite first. And reaching ten failed attempts now takes at least a
+quarter of an hour, and leaves a clear trace in `GET /admin/security-events`. And the coherence with
+`MAX_CONCURRENT_KDF` is documented in ADR-0008: the limits govern **the arrival rate** (so what is refused costs no
+derivation at all), and the ceiling governs the derivation's **concurrency** and its peak memory (~38 MiB with the
+ADR-0007 parameters).
 
-**تغيير قيمة موثّقة (يحتاج مالك `docs/api.md`):** سطر «5 طلبات/دقيقة/IP» صار 30، ومعه ثلاثة
-حدود جديدة. لا تغيير في أي شكل من أشكال العقد.
+**A documented value changed (it needs the owner of `docs/api.md`):** the "5 requests/minute/IP" line became 30, and
+three new limits came with it. No shape in the contract changed.
 
-الاختبارات: `tests/test_rate_limit.py` (15 اختبارًا بالحدود **مفعَّلة**)، وفيها صراحة أن مكتبًا
-خلف NAT واحد لا يتأثر بخطأ زميل، وأن الدفعة لا تصل إلى القفل أبدًا.
+The tests: `tests/test_rate_limit.py` (15 tests with the limits **enabled**), which state explicitly that an office
+behind one NAT is unaffected by a colleague's mistake, and that a burst never reaches the lockout.
 
-### 3.2 لا كشف آلي لجهاز «مشبوه» (14.18) — **مغلق**
+### 3.2 No automatic detection of a "suspicious" device (14.18) — **closed**
 
-**ما كان:** الحظر يدوي (إلغاء الجهاز) أو غير مباشر (قفل الحساب، كشف إعادة استخدام refresh)،
-والإشارات كلها في `security_events` وغير مستهلَكة، و`listener_unauthenticated` مجرد `TODO`.
+**What it was:** blocking was manual (revoking a device) or indirect (the account lockout, refresh-reuse detection),
+and the signals were all in `security_events` and unconsumed, and `listener_unauthenticated` was a mere `TODO`.
 
-**ما نُفِّذ ([ADR-0008](decisions/0008-rate-limit-policy.md) الجزء الثاني):**
+**What was implemented ([ADR-0008](decisions/0008-rate-limit-policy.md) part two):**
 
-1. **`listener_unauthenticated` صار منفَّذًا** بالعقد المثبَّت في `docs/api.md`: كائن `data` في
-   `POST /diagnostics` الذي يحمل المفتاح بقيمة عددية موجبة يكتب صف `security_events` إلى جانب
-   صف التشخيص المعتاد، مع `listener_port` و`unauthenticated_peers` (≤10). الابتلاع في
-   `services/diagnostics.store` لا في المسار، فلا سبيل لتخزين مثل هذه الحمولة بلا رفع الإشارة.
-   **لا حمولات ولا أسماء نطاقات:** كل ما ليس عنوان IP يُسقَط، والعدّاد يُقصَر.
-2. **مهمة دورية** على **جدول المؤقتات القائم نفسه** (`session_timer.scheduler`، مفتاح
-   `device-risk-sweep`) — لا آلية جدولة ثانية — بقاعدتين محافظتين:
-   - **10** أحداث `login_failed` بالسبب `device_secret_invalid` لنفس الجهاز خلال **60 دقيقة**،
-     **ولا** `login_success` لذلك الجهاز داخل النافذة.
-   - **3** أحداث `refresh_reuse` لنفس الجهاز خلال النافذة (لا واحد: أول إعادة استخدام تلغي
-     السلسلة كلها فقد يرتد رمز كان في الطريق).
-3. كل إلغاء آلي يمر بـ `services.devices.revoke_device` نفسها، فيلغي رموز التجديد، ويصفّر
-   الحضور، **ويكتب صف `device_revoked` يشرح المُطلِق**
-   (`{"by": "auto", "rule": …, "matches": …, "window_minutes": …}`)، **ويغلق قناة التحكم الحية
-   بالكود 4403**. ظاهر في `GET /admin/security-events`، وidempotent.
-4. العتبات كلها إعدادات (`DEVICE_RISK_*`)، وقيمها الافتراضية فوق ما يولّده الاستعمال العادي
-   بكثير، والقاعدة تُعطَّل بصفر والكشف كله بمفتاح واحد — لأن الإلغاء الخاطئ يقطع مستخدمًا حقيقيًا
-   عن جهازه.
+1. **`listener_unauthenticated` is now implemented** against the contract pinned in `docs/api.md`: a `data` object in
+   `POST /diagnostics` carrying the key with a positive numeric value writes a `security_events` row alongside the
+   usual diagnostic row, with `listener_port` and `unauthenticated_peers` (≤10). The consumption is in
+   `services/diagnostics.store` rather than in the route, so there is no way to store such a payload without raising
+   the signal. **No payloads and no domain names:** anything that is not an IP address is dropped, and the counter is
+   bounded.
+2. **A periodic task** on **the same existing timer schedule** (`session_timer.scheduler`, the key
+   `device-risk-sweep`) — no second scheduling mechanism — with two conservative rules:
+   - **10** `login_failed` events with the reason `device_secret_invalid` for the same device within **60 minutes**,
+     **and no** `login_success` for that device inside the window.
+   - **3** `refresh_reuse` events for the same device inside the window (not one: the first reuse revokes the whole
+     chain, so a token that was in flight may bounce back).
+3. Every automatic revocation goes through the same `services.devices.revoke_device`, so it revokes the refresh
+   tokens, clears the presence, **writes a `device_revoked` row explaining what fired it**
+   (`{"by": "auto", "rule": …, "matches": …, "window_minutes": …}`), **and closes the live control channel with code
+   4403**. It appears in `GET /admin/security-events`, and it is idempotent.
+4. The thresholds are all settings (`DEVICE_RISK_*`), their defaults are far above what ordinary use generates, a rule
+   is disabled with a zero and the whole detection with one key — because a wrong revocation cuts a real user off from
+   their device.
 
-**إشارات لا تُلغي جهازًا عمدًا:** `listener_unauthenticated` (تصف الشبكة حول المضيف لا سلوكه؛
-لو ألغينا عليها لصار أي ماسح منافذ قادرًا على قطع موظف عن حاسوبه)، و`bad_password` (يخصّ حسابًا
-لا جهازًا، ومعالجته حدّ البريد ثم القفل).
+**Signals that deliberately do not revoke a device:** `listener_unauthenticated` (it describes the network around the
+host, not its behaviour; if we revoked on it, any port scanner could cut an employee off from their computer), and
+`bad_password` (it concerns an account, not a device, and its handling is the email limit then the lockout).
 
-الاختبارات: `tests/test_device_risk.py` (16 اختبارًا: كل قاعدة تنطلق، وكل قاعدة **لا** تنطلق عند
-الاقتراب، والإلغاء idempotent، والقناة الحية تُغلق بـ 4403)، و`tests/test_diagnostics.py`
-لابتلاع الإشارة.
+The tests: `tests/test_device_risk.py` (16 tests: every rule fires, every rule does **not** fire just short of the
+threshold, the revocation is idempotent, and the live channel is closed with 4403), and `tests/test_diagnostics.py`
+for consuming the signal.
 
-### 3.3 معاملات argon2 مقابل نواة واحدة (14.13) — **مغلق في الأسبوع 5**
+### 3.3 The argon2 parameters against a single core (14.13) — **closed in week 5**
 
-المعاملات القديمة (t=3، m=64 MiB، p=4) كانت تكلّف ~210 ms من زمن المعالج لكل عملية على الـ VPS
-المستهدف. **اعتُمد [ADR-0007](decisions/0007-argon2-parameters.md) بتاريخ 2026-09-05** باختيار
-صاحب المنتج لمعاملات OWASP (m=19 MiB، t=2، p=1) ونُفِّذت: دفعة العشرين تسجيل دخول على حاوية
-1 vCPU نزلت من **4770 إلى 367 مللي ثانية** (نحو 13 ضعفًا)، والاشتقاق الواحد من ~210 إلى ~16
-مللي ثانية. الحسابات القائمة تبقى صالحة وتُرقّى تلقائيًا عند أول دخول ناجح
-(`check_needs_rehash`)، ومثبَّت باختبارين في `tests/test_security.py`.
+The old parameters (t=3, m=64 MiB, p=4) cost ~210 ms of CPU time per operation on the target VPS.
+**[ADR-0007](decisions/0007-argon2-parameters.md) was adopted on 2026-09-05** with the product owner choosing the
+OWASP parameters (m=19 MiB, t=2, p=1) and they were implemented: the batch of twenty sign-ins on a 1 vCPU container
+went from **4770 to 367 milliseconds** (about thirteen times), and a single derivation from ~210 to ~16 milliseconds.
+Existing accounts stay valid and are upgraded automatically at the first successful sign-in (`check_needs_rehash`),
+pinned by two tests in `tests/test_security.py`.
 
-### 3.4 قائمة السماح تقبل أسماء تُحل داخل الشبكة (14.9) — **مغلق كمسألة توثيق، بلا تغيير كود**
+### 3.4 The allow list accepts names that resolve inside the network (14.9) — **closed as a documentation matter, with no code change**
 
-المدخل مثل `intranet:80` أو `portal.corp:8443` يبقى **مقبولًا عمدًا**، والقرار موثَّق الآن في
-`docs/protocol.md` القسم 6:
+An entry such as `intranet:80` or `portal.corp:8443` remains **deliberately accepted**, and the decision is now
+documented in section 6 of `docs/protocol.md`:
 
-> القائمة **تفويض** لا ضمان وصول: تحدد أي أسماء يُسمح بطلبها. الحدّ الأمني الفعلي هو القاعدة 6
-> (`IpRangePolicy`)، وتُطبَّق **بعد حل الاسم وقبل فتح أي مقبس**، على الجانبين معًا: المضيف في
-> `EgressPolicy` والمستخدم على المسار المباشر في `ConnectProxyServer`.
+> The list is an **authorisation**, not a guarantee of reachability: it determines which names may be requested. The
+> actual security boundary is rule 6 (`IpRangePolicy`), and it is applied **after the name is resolved and before any
+> socket is opened**, on both sides: the host in `EgressPolicy` and the user on the direct path in
+> `ConnectProxyServer`.
 
-فاسمٌ في القائمة يُحل إلى عنوان داخلي **يُرفض عند الاتصال** بـ `OPEN_FAIL(private_ip)`. رفضه
-عند التحميل بدل ذلك يكسر عقد `docs/api.md` **بلا مكسب أمني**، لأن أي اسم عام قد يشير إلى عنوان
-خاص فالفحص عند الحل ضروري في الحالتين. `validate_entry` تبقى كما هي (وتبقى ترفض `localhost`
-وكل ما تحتها، وعناوين IP الحرفية، والنجمة، والشرطة المائلة).
+So a name in the list that resolves to an internal address **is refused at connect time** with
+`OPEN_FAIL(private_ip)`. Refusing it at load time instead would break the `docs/api.md` contract **with no security
+gain**, because any public name may point at a private address, so the check at resolution is necessary either way.
+`validate_entry` stays as it is (and still refuses `localhost` and everything beneath it, IP literals, the asterisk and
+the slash).
 
-### 3.5 (ملاحظة صغيرة، **ما تزال مفتوحة**) معاملات الاستعلام تظهر في سجل الوصول
-`uvicorn.access` يسجّل المسار كاملًا، و`GET /admin/users?q=…` قد يحمل بريدًا. ليس سرًا ولا محتوى
-تصفح، لكنه بيان شخصي في سجل نصي. لم تكن يومًا تحفّظًا على بند من القسمين 14 و15 — ولذلك بقيت
-مفتوحة بينما أُغلقت التحفّظات الأربعة. تُعالَج بإسقاط سجل الوصول أو تجريد الـ query عند أول
-تنظيف.
+### 3.5 (A small note, **still open**) Query parameters appear in the access log
+`uvicorn.access` records the full path, and `GET /admin/users?q=…` may carry an email. It is not a secret nor browsing
+content, but it is personal data in a text log. It was never a reservation against an item of sections 14 and 15 — and
+that is why it stayed open while the four reservations were closed. It is dealt with by dropping the access log or
+stripping the query at the first cleanup.
 
 ---
 
-## 4. ما يجب التحقق منه على الخادم المنشور (لا يمكن لاختبار إثباته)
+## 4. What must be verified on the deployed server (no test can prove it)
 
-| # | التحقق | كيف |
+| # | The verification | How |
 |---|---|---|
-| 1 | TLS فعلي وHSTS | `curl -sI https://<domain>/healthz` يعيد 200 ورأس `Strict-Transport-Security`؛ و`curl -sI http://<domain>/` يعيد تحويلًا إلى 443 |
-| 2 | الـ API غير منشور مباشرة | من خارج الخادم: لا استجابة على 8000؛ `ufw status` يظهر 80 و443 فقط؛ PostgreSQL بلا منفذ منشور |
-| 3 | `ENV=prod` فعلًا | `GET /docs` بلا توكن يعيد 401 لا صفحة Swagger؛ و`GET /openapi.json` كذلك |
-| 4 | `JWT_SECRET` سر حقيقي | ≥ 32 بايتًا عشوائيًا وليس نص `.env.example`؛ ولا يظهر في `docker inspect` لأي شخص غير مخوَّل |
-| 5 | السجل نظيف بعد جلسة حقيقية | `scripts/security/check-logs-clean.sh` مقابل `docker compose logs api` عقب جلسة كاملة بين جهازي Windows |
-| 6 | `session_keys` فارغ بعد الإنهاء | `scripts/security/check-session-keys.sh` (وهو أصلًا بند في `docs/acceptance-checklist.md`) |
-| 7 | **لا تمر بيانات تصفح بحاوية الـ API، ولا يستطيع الخادم قراءة ما يمر بالـ Relay** | أثناء تشغيل فيديو داخل الجلسة: `docker stats api` يبقى عند مستوى النبضات، بينما `docker stats relay` يرتفع — والبايتات هناك معتمة، إذ تجري مصافحة TLS وتثبيت الشهادة و`AUTH1`/`AUTH2` **بين الجهازين داخل** مجرى الـ Relay. سجل الـ Relay يحمل معرّف الجلسة والأحجام، **بلا اسم نطاق واحد** (معيار النجاح 16، [ADR-0009](decisions/0009-relay-default.md)) |
-| 8 | النسخ الاحتياطي وصلاحياته | ملفات `/backups` غير مقروءة للعموم، وتجربة استعادة دورية (أُجريت في الأسبوع 4) |
-| 9 | ضبط الساعة | كل مؤقتات القسم 5 مشتقة من `expires_at`؛ انحراف الساعة يعني جلسات تنتهي مبكرًا أو متأخرًا. تأكد من `systemd-timesyncd`/`chrony` |
-| 10 | fail2ban على الـ 443 | مذكور في `docs/runbook.md`؛ تأكد أن قواعده تراقب سجل Caddy فعلًا |
-| 11 | أثر حدّ الدخول لكل IP | من عنوان واحد ببريد مختلف في كل مرة: المحاولة **الحادية والثلاثون** خلال دقيقة تعيد 429 برأس `Retry-After` (ADR-0008) |
-| 12 | أثر حدّ الدخول لكل حساب | من **عناوين مختلفة** على البريد نفسه بكلمة مرور خاطئة: المحاولة السادسة تعيد 429 و`Retry-After: 180`، والحساب **لا يُقفل** (يبقى `failed_logins = 5`) |
-| 13 | حدّ `/probe` لكل مستخدم | بتوكن واحد: الطلب الحادي عشر خلال دقيقة يعيد 429 ولو من عنوان آخر |
-| 14 | الكشف الآلي يعمل ولا يفرط | `GET /admin/security-events?type=device_revoked` بعد أسبوع تشغيل: كل صف `by: "auto"` يجب أن يقابله سبب مفهوم. **صفر إلغاءات آلية على أسطول سليم هو النتيجة المتوقَّعة**؛ أي إلغاء آلي غير مبرَّر يعني رفع العتبة في `DEVICE_RISK_*` |
+| 1 | Real TLS and HSTS | `curl -sI https://<domain>/healthz` returns 200 and a `Strict-Transport-Security` header; and `curl -sI http://<domain>/` returns a redirect to 443 |
+| 2 | The API is not published directly | From outside the server: no response on 8000; `ufw status` shows 80 and 443 only; PostgreSQL with no published port |
+| 3 | `ENV=prod` in earnest | `GET /docs` with no token returns 401 rather than a Swagger page; and so does `GET /openapi.json` |
+| 4 | `JWT_SECRET` is a real secret | ≥ 32 random bytes and not the text from `.env.example`; and it does not appear in `docker inspect` to anyone unauthorised |
+| 5 | The log is clean after a real session | `scripts/security/check-logs-clean.sh` against `docker compose logs api` after a full session between two Windows machines |
+| 6 | `session_keys` is empty after termination | `scripts/security/check-session-keys.sh` (which is already an item in `docs/acceptance-checklist.md`) |
+| 7 | **No browsing data passes through the API container, and the server cannot read what passes through the relay** | While a video plays inside the session: `docker stats api` stays at the heartbeat level, while `docker stats relay` rises — and the bytes there are opaque, since the TLS handshake, the certificate pinning and `AUTH1`/`AUTH2` run **between the two machines, inside** the relay's stream. The relay's log carries the session id and the sizes, **with not one domain name** (success criterion 16, [ADR-0009](decisions/0009-relay-default.md)) |
+| 8 | The backups and their permissions | The `/backups` files are not world-readable, and a periodic restore exercise (carried out in week 4) |
+| 9 | Clock discipline | All of section 5's timers derive from `expires_at`; clock drift means sessions ending early or late. Confirm `systemd-timesyncd`/`chrony` |
+| 10 | fail2ban on 443 | Mentioned in `docs/runbook.md`; confirm its rules actually watch Caddy's log |
+| 11 | The per-IP sign-in limit's effect | From one address with a different email each time: the **thirty-first** attempt within a minute returns 429 with a `Retry-After` header (ADR-0008) |
+| 12 | The per-account sign-in limit's effect | From **different addresses** against the same email with a wrong password: the sixth attempt returns 429 and `Retry-After: 180`, and the account **is not locked** (`failed_logins` stays at 5) |
+| 13 | The per-user `/probe` limit | With one token: the eleventh request within a minute returns 429 even from another address |
+| 14 | The automatic detection works and does not overreach | `GET /admin/security-events?type=device_revoked` after a week of operation: every `by: "auto"` row must have an understandable cause. **Zero automatic revocations on a healthy fleet is the expected result**; any unjustified automatic revocation means raising the threshold in `DEVICE_RISK_*` |
 
 ---
 
-## 5. التغطية الاختبارية
+## 5. Test coverage
 
-### 5.1 المضافة في الأسبوع 5
+### 5.1 Added in week 5
 
-| الملف | ما يثبته |
+| File | What it proves |
 |---|---|
-| `tests/test_log_hygiene.py` | دورة جلسة كاملة بـ `log_domains=true` لا تكتب في السجل أي نطاق متصفَّح، ولا URL، ولا ترويسة، ولا توكن، ولا `secret_b64` — بأنماط `check-logs-clean.sh` نفسها، وبمستوى DEBUG (أعلى إسهاب يضبطه التطبيق). ويثبت أن الصف المحفوظ بيانات إدارية فقط، وأن النطاقات لا تُحفظ إطلاقًا حين يكون `log_domains=false` |
-| `tests/test_ws_sessions.py` | كل جلسة تحصل على مفتاح 32 بايتًا جديدًا، والمفتاحان مختلفان، ولا صف `session_keys` ينجو من الإنهاء |
-| `tests/test_ws_hello.py` | ميزانية الإطارات ترد `rate_limited` على الإطار الزائد فقط، ولا تقطع الاتصال، وهي لكل اتصال لا مشتركة |
-| `tests/test_domains.py` | `localhost` و`app.localhost` و`=localhost` و`localhost:8080` مرفوضة |
-| `tests/test_cli_sessions.py` | `end-session` ينهي الصف ويحذف المفتاح ويكتب صف تدقيق بـ `via: "cli"`، ويرفض المجهول والمنتهي |
-| `tests/test_ws_presence.py` | البث لا يحدث بلا تغيّر، ومع ذلك يبقى لكل مستلم رؤيته الصحيحة |
+| `tests/test_log_hygiene.py` | A full session cycle with `log_domains=true` writes no browsed domain, no URL, no header, no token and no `secret_b64` into the log — with the same patterns as `check-logs-clean.sh`, and at DEBUG level (the most verbose the application sets). And it proves the stored row is administrative data only, and that the domains are never stored when `log_domains=false` |
+| `tests/test_ws_sessions.py` | Every session gets a fresh 32-byte key, the two keys differ, and no `session_keys` row survives termination |
+| `tests/test_ws_hello.py` | The frame budget answers `rate_limited` on the excess frame only, does not cut the connection, and is per connection rather than shared |
+| `tests/test_domains.py` | `localhost`, `app.localhost`, `=localhost` and `localhost:8080` are refused |
+| `tests/test_cli_sessions.py` | `end-session` ends the row, deletes the key and writes an audit row with `via: "cli"`, and refuses an unknown or already-ended session |
+| `tests/test_ws_presence.py` | The broadcast does not happen with no change, and even so every recipient keeps their correct view |
 
-### 5.2 المضافة في الأسبوع 6
+### 5.2 Added in week 6
 
-| الملف | ما يثبته |
+| File | What it proves |
 |---|---|
-| `tests/test_rate_limit.py` | الحدود الأربعة بالحدّ **مفعَّلًا**: حساب واحد لا يُهاجَم من عشرين عنوانًا، والدفعة **لا تصل إلى قفل الحساب أبدًا** (`failed_logins = 5 < 10`)، ومكتب خلف NAT واحد لا يتأثر بأخطاء زميل ويُدخل عشرة موظفين تباعًا، وتسجيل الدخول الناجح **لا يستهلك** ميزانية البريد، وحدّ `/probe` لكل مستخدم لا يُتجاوز بتبديل العنوان، و401 يسبق 429 على المسار المصادَق، وسطل الرموز يعيد رمزًا واحدًا لا أكثر |
-| `tests/test_device_risk.py` | كل قاعدة تنطلق عند عتبتها و**لا** تنطلق عند العتبة ناقص واحد؛ ودخول ناجح داخل النافذة يبطل الشبهة؛ والأحداث خارج النافذة لا تُحسب؛ والعدّ لكل **جهاز** لا لكل مستخدم؛ والإلغاء idempotent (صف تدقيق واحد لا اثنان)؛ ويلغي رموز التجديد؛ ويغلق القناة الحية بـ **4403**؛ و`listener_unauthenticated` و`bad_password` **لا يلغيان جهازًا أبدًا**؛ والعتبات تُضبط وتُعطَّل |
-| `tests/test_diagnostics.py` | ابتلاع `listener_unauthenticated`: صف تشخيص وصف أمني معًا، والقيمة المنطقية `true` لا تُحسب عددًا، والأقران محدودون بعشرة ومعياريون وبلا تكرار، و**كل ما ليس عنوان IP يُسقَط** (اسم نطاق أو URL في الحمولة لا يصل إلى `security_events`)، والإشارة ظاهرة في `GET /admin/security-events` |
-| `tests/test_openapi.py` | كل مسار في الوثيقة المولَّدة يحمل `summary` **صريحًا** (لا الاسم الذي يخترعه FastAPI) ووصفًا حقيقيًا، ويوثّق أخطاءه، وكل خطأ يُرسم بالظرف المشترك (فلا يبقى `HTTPValidationError` من FastAPI)، ولكل نموذج طلب/رد مثال، ولكل وسم وصف |
+| `tests/test_rate_limit.py` | The four limits with limiting **enabled**: one account is not attacked from twenty addresses, a burst **never reaches the account lockout** (`failed_logins = 5 < 10`), an office behind one NAT is unaffected by a colleague's mistakes and signs ten employees in one after another, a successful sign-in **does not consume** the email budget, the per-user `/probe` limit is not evaded by changing address, 401 precedes 429 on the authenticated path, and the bucket returns one token and no more |
+| `tests/test_device_risk.py` | Every rule fires at its threshold and does **not** fire at the threshold minus one; a successful sign-in inside the window clears the suspicion; events outside the window are not counted; the count is per **device** and not per user; the revocation is idempotent (one audit row, not two); it revokes the refresh tokens; it closes the live channel with **4403**; `listener_unauthenticated` and `bad_password` **never revoke a device**; and the thresholds can be set and disabled |
+| `tests/test_diagnostics.py` | Consuming `listener_unauthenticated`: a diagnostic row and a security row together, the boolean `true` is not counted as a number, the peers are capped at ten and canonical and deduplicated, and **anything that is not an IP address is dropped** (a domain name or a URL in the payload does not reach `security_events`), and the signal is visible in `GET /admin/security-events` |
+| `tests/test_openapi.py` | Every path in the generated document carries an **explicit** `summary` (not the name FastAPI invents) and a real description, documents its errors, every error is rendered with the shared envelope (so no FastAPI `HTTPValidationError` is left), every request/response model has an example, and every tag has a description |

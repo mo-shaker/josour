@@ -1,16 +1,17 @@
-# اختبار الحمل — الأسبوع 5
+# The load test — week 5
 
-الهدف: إثبات معيار النجاح 18 («عمل النظام من خلال VPS صغير منخفض التكلفة») برقم بدل تقدير، وقياس
-سقف نموذج **worker واحد** المقصود في الخطة (القسم 2) بدل الاكتفاء بملاحظة المخاطر «كافٍ للمئات».
+The goal: to prove success criterion 18 ("the system working on a small, low-cost VPS") with a number rather than an
+estimate, and to measure the ceiling of the **single-worker** model the plan intends (section 2), rather than settling
+for the risk note "enough for hundreds".
 
-كل الأرقام أدناه من تشغيل فعلي: خادم uvicorn حقيقي، PostgreSQL في Docker، واتصالات WebSocket
-حقيقية بمصافحة `hello` كاملة. لا شيء منها من محاكاة داخل العملية.
+Every number below comes from an actual run: a real uvicorn server, PostgreSQL in Docker, and real WebSocket
+connections with a complete `hello` handshake. None of it is from an in-process simulation.
 
 ---
 
-## 1. الأداة
+## 1. The tool
 
-`backend/loadtest/ws_load.py` — سكربت مستقل خارج حزمة `app`:
+`backend/loadtest/ws_load.py` — a standalone script outside the `app` package:
 
 ```bash
 cd backend
@@ -23,206 +24,212 @@ LOADTEST_ADMIN_PASSWORD='…' .venv/bin/python -m loadtest.ws_load \
     --json  /tmp/rb-load-500.json
 ```
 
-- `--server-pid` أو `--server-container NAME`: أيّهما يقيس ذاكرة الخادم ومعالجه.
-- `--state`: ملف يعيد استخدام الحسابات والتوكنات بين التشغيلات (تجهيز 500 مستخدم يكلّف 500
-  عملية argon2، فلا داعي لتكراره).
-- `--no-announce-listen-port`: إعلان `host.available` بلا منفذ، فلا يجري فحص قابلية الوصول.
+- `--server-pid` or `--server-container NAME`: whichever measures the server's memory and CPU.
+- `--state`: a file that reuses the accounts and tokens between runs (preparing 500 users costs 500 argon2 operations,
+  so there is no point repeating it).
+- `--no-announce-listen-port`: announcing `host.available` with no port, so no reachability probe runs.
 
-ما تفعله بالترتيب:
+What it does, in order:
 
-1. تنشئ `--users` مستخدمًا عبر `POST /admin/users`، وتسجّل دخول كل واحد عبر `POST /auth/login`
-   (وهو ما يسجّل جهازه ويعيد التوكن).
-2. تفتح اتصال WebSocket لكل جهاز بمصافحة `hello` حقيقية، وترد على `ping` طوال التشغيل.
-3. تجعل نسبة `--host-fraction` منهم يعلنون `host.available` **واحدًا تلو الآخر**، وتقيس بعد كل
-   إعلان زمن وصول `hosts.update` إلى آخر اتصال — أي كلفة البث **بينما يكبر عدد المضيفين**، وهو
-   بالضبط ما يقلق في القسم 8 من `ws-protocol.md` (الإطار يُبنى لكل مستلم على حدة).
-4. تقود دورات كاملة `request.create → request.incoming → accept → session.created → تبادل نقاط
-   النهاية → connected → active → stats → end → terminate` بين أزواج عشوائية بمعدل `--rate`.
-5. تطبع: توزيع زمن الإعداد، وزمن الرسائل (p50/p95/p99)، وكلفة البث، وعدد الأخطاء بحسب الكود،
-   وأي اتصال سقط، وذاكرة الخادم ومعالجه.
+1. Creates `--users` users through `POST /admin/users`, and signs each one in through `POST /auth/login` (which
+   registers their device and returns the token).
+2. Opens a WebSocket connection per device with a real `hello` handshake, and answers `ping` throughout the run.
+3. Makes a `--host-fraction` of them announce `host.available` **one after another**, and after each announcement
+   measures how long `hosts.update` takes to reach the last connection — that is, the broadcast's cost **as the number
+   of hosts grows**, which is exactly the worry in section 8 of `ws-protocol.md` (the frame is built per recipient).
+4. Drives complete cycles of `request.create → request.incoming → accept → session.created → the endpoint exchange →
+   connected → active → stats → end → terminate` between random pairs at a rate of `--rate`.
+5. Prints: the distribution of setup times, the message latencies (p50/p95/p99), the broadcast's cost, the number of
+   errors by code, any connection that dropped, and the server's memory and CPU.
 
-**ملاحظة تشغيل:** يجب تشغيل الخادم تحت الاختبار بـ `RATE_LIMIT_ENABLED=false`، لأن
-`POST /auth/login` محدود بـ 5 طلبات/دقيقة/IP (`docs/api.md`) وكل المستخدمين الوهميين يأتون من
-عنوان واحد. هذا القيد نفسه ملاحظة أمنية مسجّلة في `docs/security-review-server.md`.
+**An operational note:** the server under test must be run with `RATE_LIMIT_ENABLED=false`, because `POST /auth/login`
+is limited to 5 requests/minute/IP (`docs/api.md`) and all the fake users come from one address. That same constraint
+is a security note recorded in `docs/security-review-server.md`.
 
-قياس الخادم: `--server-pid` عبر `ps`، أو `--server-container` عبر عدّادات cgroup داخل الحاوية
-(`memory.current` و`cpu.stat`)، وهي الطريقة التي أعطت أرقام الـ 1 vCPU أدناه.
+Measuring the server: `--server-pid` through `ps`, or `--server-container` through the cgroup counters inside the
+container (`memory.current` and `cpu.stat`), which is the method that produced the 1 vCPU numbers below.
 
 ---
 
-## 2. الأرقام **قبل** الإصلاح
+## 2. The numbers **before** the fix
 
-جهاز التطوير (macOS، معالج متعدد الأنوية؛ الخادم والأداة وقاعدة البيانات على الجهاز نفسه):
+The development machine (macOS, a multi-core processor; the server, the tool and the database all on the same
+machine):
 
-| الاتصالات | المضيفون | `hello`→`hosts.snapshot` p50/p99 | `request.create`→`request.incoming` p50 | الدورة الكاملة p50 | `hosts.update` إلى آخر مستلم | RSS | دورات ناجحة/فاشلة |
+| Connections | Hosts | `hello`→`hosts.snapshot` p50/p99 | `request.create`→`request.incoming` p50 | Full cycle p50 | `hosts.update` to the last recipient | RSS | Cycles succeeded/failed |
 |---|---|---|---|---|---|---|---|
 | 50 | 20 | 187 / 403 ms | 21 ms | 155 ms | 24 ms | 157 MB | 60 / 0 |
 | 200 | 80 | 617 / 1737 ms | 12 ms | 347 ms | 336 ms | 199 MB | 60 / 0 |
 | **500** | **200** | **1311 / 6351 ms** | **3768 ms** | **35 370 ms** | **1495 ms** | **779 MB** | **23 / 2** |
 
-عند 500 اتصال ظهرت أخطاء حقيقية لأول مرة: `not_found` ست مرات و`host_unavailable` مرة —
-جلسات انتهت بمهلة الاتصال (30 ثانية) بينما كانت إطاراتها ما تزال في طابور خلف البث.
+At 500 connections real errors appeared for the first time: `not_found` six times and `host_unavailable` once —
+sessions that expired at the connect timeout (30 seconds) while their frames were still queued behind the broadcast.
 
-### أين ينكسر ولماذا
+### Where it breaks and why
 
-ثلاثة مصادر هدر، كلها في مسار `hosts.update`:
+Three sources of waste, all of them in the `hosts.update` path:
 
-1. **استعلام لكل مستخدم متصل.** `broadcast_hosts_update` كانت تنفّذ استعلام التوافر مرة لكل
-   مستخدم (لأن القائمة تستثني أجهزته). 500 اتصال = 500 استعلام لكل تغيّر واحد في الحضور.
-2. **تسلسل JSON لكل مستلم.** الإطار كان يُبنى ويُسلسل 500 مرة لقائمة من 200 عنصر: نصف مليون
-   عملية تسلسل للحقل الواحد.
-3. **بث لتغيّر لم يحدث.** كل `hello` وكل انقطاع كانا يبثّان، مع أن اتصال عميل عادي **لا يغيّر**
-   قائمة المضيفين إطلاقًا. فتح N اتصالًا كان يكلّف N بثًا إلى N مستلمًا — أي O(N²) — وهذا هو
-   سبب الـ 1.3 ثانية في المصافحة و6.3 ثانية عند p99.
+1. **A query per connected user.** `broadcast_hosts_update` ran the availability query once per user (because the list
+   excludes their own devices). 500 connections = 500 queries for every single presence change.
+2. **JSON serialisation per recipient.** The frame was built and serialised 500 times for a list of 200 items: half a
+   million serialisation operations for one field.
+3. **Broadcasting for a change that did not happen.** Every `hello` and every disconnection broadcast, even though an
+   ordinary client connecting **does not change** the host list at all. Opening N connections cost N broadcasts to N
+   recipients — that is, O(N²) — and that is the cause of the 1.3 seconds in the handshake and the 6.3 seconds at p99.
 
-وسبب رابع خارج البث: **argon2id على حلقة الأحداث.** كل تسجيل دخول كان يحجز الحلقة كاملة لمدة
-الاشتقاق، فيتوقف كل نبض وكل بث وكل إطار جلسة على الخادم كله طوال تلك المدة.
+And a fourth cause outside the broadcast: **argon2id on the event loop.** Every sign-in held the whole loop for the
+duration of the derivation, so every heartbeat, every broadcast and every session frame on the entire server stopped
+for that long.
 
 ---
 
-## 3. ما أُصلح
+## 3. What was fixed
 
-| # | الإصلاح | الملف | الأثر |
+| # | The fix | File | Effect |
 |---|---|---|---|
-| 1 | استعلام توافر **واحد** لكل بث، والاستثناء يُطبَّق في الذاكرة | `app/ws/notify.py` | 500 استعلام ← 1 |
-| 2 | تسلسل **واحد** يُعاد استخدامه لكل مستلم لا يملك جهازًا في القائمة؛ ومن يملك يحصل على نسخته وحده | `app/ws/notify.py` + `Connection.send_text` | O(اتصالات × مضيفين) ← O(مضيفين) + O(اتصالات) |
-| 3 | **إسقاط البث إذا لم تتغير القائمة** عمّا بُث آخر مرة | `app/ws/notify.py` | يلغي عاصفة الاتصال O(N²) بالكامل، ويلغي البث الثاني المهدور بعد فحص قابلية الوصول حين لا تتغير النتيجة |
-| 4 | argon2 خارج حلقة الأحداث (`asyncio.to_thread`) | `app/core/security.py` | تسجيل الدخول لم يعد يجمّد قناة التحكم |
-| 5 | سقف تزامن للاشتقاق (`MAX_CONCURRENT_KDF = 2`) | `app/core/security.py` | يحصر ذروة ذاكرة argon2 عند ~128 MiB بدل 64 MiB × عدد خيوط المجمّع |
+| 1 | **One** availability query per broadcast, with the exclusion applied in memory | `app/ws/notify.py` | 500 queries → 1 |
+| 2 | **One** serialisation reused for every recipient who owns no device in the list; whoever does gets their own copy alone | `app/ws/notify.py` + `Connection.send_text` | O(connections × hosts) → O(hosts) + O(connections) |
+| 3 | **Dropping the broadcast if the list has not changed** since the last one | `app/ws/notify.py` | It eliminates the O(N²) connection storm entirely, and eliminates the wasted second broadcast after a reachability probe when the result does not change |
+| 4 | argon2 off the event loop (`asyncio.to_thread`) | `app/core/security.py` | Signing in no longer freezes the control channel |
+| 5 | A concurrency ceiling for the derivation (`MAX_CONCURRENT_KDF = 2`) | `app/core/security.py` | It bounds argon2's peak memory at ~128 MiB instead of 64 MiB × the pool's thread count |
 
-الإصلاحات 1–3 **لا تمس العقد**: الإطار المرسل مطابق بايتًا بايت لما كان يُرسَل، والقسم 4 يطلب
-`hosts.update` «عند أي تغير» — وحين لا يوجد تغير لا يوجد ما يُرسَل. العميل الجديد يستلم قائمته
-في `hosts.snapshot` كالمعتاد.
+Fixes 1–3 **do not touch the contract**: the frame sent is byte-for-byte what used to be sent, and section 4 asks for
+`hosts.update` "on any change" — and when there is no change there is nothing to send. A new client receives its list
+in `hosts.snapshot` as usual.
 
-اختبارات جديدة تثبّت السلوك في `tests/test_ws_presence.py`: اتصال أو انقطاع لا يغيّر القائمة لا
-يبثّ شيئًا، وتكرار `host.available` بالحالة نفسها لا يبثّ، وكل مستلم ما يزال يرى قائمته هو.
+New tests pin the behaviour in `tests/test_ws_presence.py`: a connection or disconnection that does not change the list
+broadcasts nothing, a repeated `host.available` with the same state broadcasts nothing, and every recipient still sees
+their own list.
 
 ---
 
-## 4. الأرقام **بعد** الإصلاح
+## 4. The numbers **after** the fix
 
-### 4.1 جهاز التطوير (نفس ظروف القسم 2)
+### 4.1 The development machine (the same conditions as section 2)
 
-| الاتصالات | المضيفون | المصافحة p50/p99 | `request.create`→`incoming` p50 | الدورة الكاملة p50 | البث إلى آخر مستلم | RSS | دورات |
+| Connections | Hosts | Handshake p50/p99 | `request.create`→`incoming` p50 | Full cycle p50 | The broadcast to the last recipient | RSS | Cycles |
 |---|---|---|---|---|---|---|---|
 | 50 | 20 | 177 / 234 ms | 22 ms | 64 ms | 4.7 ms | 153 MB | 60 / 0 |
 | 200 | 80 | 59 / 212 ms | 22 ms | 102 ms | 28 ms | 173 MB | 60 / 0 |
 | 500 | 200 | 55 / 238 ms | 17 ms | **194 ms** | **135 ms** | 200 MB | 60 / 0 |
 | 1000 | 400 | 54 / 210 ms | 329 ms | 1518 ms | 506 ms | 300 MB | 55 / 0 |
 
-عند 500: المصافحة أسرع **24 ضعفًا** عند p50 و**27 ضعفًا** عند p99، والدورة الكاملة أسرع
-**182 ضعفًا**، والبث أسرع **11 ضعفًا**، ولا خطأ واحد.
+At 500: the handshake is **24 times** faster at p50 and **27 times** at p99, the full cycle is **182 times** faster,
+the broadcast is **11 times** faster, and there is not one error.
 
-### 4.2 على 1 vCPU / 2 GB فعليًا
+### 4.2 On 1 vCPU / 2 GB in earnest
 
-نفس صورة الإنتاج (`backend/Dockerfile`) داخل `docker run --cpus 1 --memory 2g`، وهي أقرب ما
-يمكن قياسه هنا من الـ VPS المستهدف:
+The same production image (`backend/Dockerfile`) inside `docker run --cpus 1 --memory 2g`, which is as close as can be
+measured here to the target VPS:
 
-| الاتصالات | المضيفون | المصافحة p50/p99 | `request.create`→`incoming` p50 | الدورة الكاملة p50 | البث إلى آخر مستلم | CPU للبث الواحد | RSS (KB/اتصال) | دورات | اتصالات ساقطة |
+| Connections | Hosts | Handshake p50/p99 | `request.create`→`incoming` p50 | Full cycle p50 | The broadcast to the last recipient | CPU per broadcast | RSS (KB/connection) | Cycles | Dropped connections |
 |---|---|---|---|---|---|---|---|---|---|
 | 50 | 20 | 164 / 233 ms | 13.5 ms | 37 ms | 4.9 ms | 10 ms | 78 MB (109) | 60 / 0 | 0 |
 | 200 | 80 | 65 / 205 ms | 13.9 ms | 77 ms | 27 ms | 22 ms | 91 MB (60) | 60 / 0 | 0 |
 | 500 | 200 | 54 / 231 ms | 12.6 ms | 172 ms | 135 ms | 84 ms | 121 MB (49) | 60 / 0 | 0 |
 
-الذروة اللحظية للذاكرة كانت 225 MB، وكلها من argon2 أثناء تجهيز المستخدمين، لا من الاتصالات.
+The instantaneous memory peak was 225 MB, all of it from argon2 while preparing the users, not from the connections.
 
-**تحذير منهجي:** قاعدة البيانات هنا في حاوية أخرى بميزانية معالج خاصة بها، بينما تتقاسم
-الـ VPS الحقيقية نواة واحدة بين FastAPI وPostgreSQL وCaddy. الأرقام أعلاه متفائلة بهذا القدر.
+**A methodological warning:** the database here is in another container with its own CPU budget, while a real VPS
+shares one core between FastAPI, PostgreSQL and Caddy. The numbers above are optimistic by that much.
 
 ---
 
-## 5. السقف الحقيقي
+## 5. The real ceiling
 
-### 5.1 ما يحدّ فعلًا
+### 5.1 What actually limits it
 
-ليس عدد الاتصالات. الاتصال الخامل يكلّف **~49 KB** من ذاكرة الخادم ولا شيء تقريبًا من المعالج
-(نبضة كل 20 ثانية). 500 اتصال = 121 MB، أي 6% من 2 GB.
+Not the number of connections. An idle connection costs **~49 KB** of the server's memory and almost nothing in CPU (a
+beat every 20 seconds). 500 connections = 121 MB, that is 6% of 2 GB.
 
-الذي يحدّ هو **معدّل تغيّر الحضور**، لأن كلفة `hosts.update` تنمو في حاصل ضرب
-(الاتصالات × المضيفين):
+What limits it is **the rate of presence change**, because `hosts.update`'s cost grows in the product of (connections ×
+hosts):
 
-| الاتصالات × المضيفون | CPU للبث الواحد (1 vCPU) |
+| Connections × hosts | CPU per broadcast (1 vCPU) |
 |---|---|
 | 50 × 20 = 1 000 | 10 ms |
 | 200 × 80 = 16 000 | 22 ms |
 | 500 × 200 = 100 000 | 84 ms |
 
-أي **≈ 0.85 ميكروثانية لكل (اتصال × مضيف)** بعد الإصلاح. إذا خصصنا 10% من النواة للبث:
+That is **≈ 0.85 microseconds per (connection × host)** after the fix. If we allocate 10% of the core to broadcasting:
 
-`أقصى تغيّرات حضور في الثانية ≈ 0.1 / (0.85e-6 × الاتصالات × المضيفين)`
+`the maximum presence changes per second ≈ 0.1 / (0.85e-6 × connections × hosts)`
 
-- 200 اتصال / 80 مضيفًا ← **~7 تغيّرات/ثانية**
-- 500 اتصال / 200 مضيف ← **~1.2 تغيّر/ثانية**
-- 1000 اتصال / 400 مضيف ← **~0.3 تغيّر/ثانية** (هنا يبدأ الانحدار: الدورة الكاملة 1.5 ثانية)
+- 200 connections / 80 hosts → **~7 changes/second**
+- 500 connections / 200 hosts → **~1.2 changes/second**
+- 1000 connections / 400 hosts → **~0.3 changes/second** (this is where the decline starts: the full cycle takes 1.5
+  seconds)
 
-ما الذي يولّد تغيّرًا؟ مضيف يفعّل «متاح» أو يلغيه، وبدء جلسة (المضيف يغادر القائمة)، ونهايتها،
-ونتيجة فحص قابلية الوصول. لفريق من 500 مستخدم بعشرات الجلسات في الساعة هذا أقل من 0.05
-تغيّر/ثانية — أي أقل من 5% من السقف. **المسافة كبيرة، لكنها تضيق تربيعيًا.**
+What generates a change? A host enabling "available" or disabling it, a session starting (the host leaves the list),
+its ending, and the reachability probe's result. For a team of 500 users with tens of sessions an hour, that is below
+0.05 changes/second — under 5% of the ceiling. **The margin is large, but it narrows quadratically.**
 
-### 5.2 نقطة الانهيار الحقيقية: تسجيل الدخول
+### 5.2 The real breaking point: signing in
 
-> **حُسم بعد كتابة هذا القسم:** اعتُمدت معاملات OWASP (m=19 MiB، t=2، p=1) في [ADR-0007](decisions/0007-argon2-parameters.md) بتاريخ 2026-09-05، فنزلت دفعة العشرين تسجيل دخول من 4770 إلى 367 مللي ثانية على الحاوية نفسها. الأرقام أدناه تصف الحالة **قبل** ذلك.
+> **Settled after this section was written:** the OWASP parameters (m=19 MiB, t=2, p=1) were adopted in
+> [ADR-0007](decisions/0007-argon2-parameters.md) on 2026-09-05, so the batch of twenty sign-ins went from 4770 to 367
+> milliseconds on the same container. The numbers below describe the state **before** that.
 
-argon2id بالمعاملات الموصى بها في المكتبة (t=3، m=64 MiB، p=4) يكلّف **~210 ms من زمن المعالج
-لكل تسجيل دخول** على نواة واحدة. أُجري اختبار A/B صريح على الحاوية المقيّدة، بـ 200 اتصال حي:
+argon2id with the library's recommended parameters (t=3, m=64 MiB, p=4) costs **~210 ms of CPU time per sign-in** on
+one core. An explicit A/B test was run on the constrained container with 200 live connections:
 
-| | الدورة الكاملة p50 | الدورة p95 | CPU p95 |
+| | Full cycle p50 | Cycle p95 | CPU p95 |
 |---|---|---|---|
-| بلا تسجيل دخول | **78 ms** | 83 ms | 37% |
-| مع 20 تسجيل دخول متزامنًا | **10 752 ms** | 16 586 ms | 103% |
+| With no sign-ins | **78 ms** | 83 ms | 37% |
+| With 20 concurrent sign-ins | **10 752 ms** | 16 586 ms | 103% |
 
-إنتاجية تسجيل الدخول تحت الضغط: **4.7/ثانية** بزمن استجابة p50 يبلغ 4.6 ثانية. لم يسقط أي
-اتصال ولم يظهر أي خطأ — النظام يتباطأ ولا ينكسر.
+Sign-in throughput under pressure: **4.7/second** with a p50 latency of 4.6 seconds. No connection dropped and no error
+appeared — the system slows down and does not break.
 
-نقل argon2 إلى خيط منفصل منع **تجميد** الحلقة، لكنه لا يخلق نواة ثانية: على 1 vCPU يتنافس
-الاشتقاق مع الحلقة على المعالج نفسه. الحمايتان القائمتان هما حدّ 5 طلبات/دقيقة/IP وسقف التزامن
-`MAX_CONCURRENT_KDF`، ولا تكفيان أمام عشرين عنوانًا مختلفًا.
+Moving argon2 to a separate thread stopped the loop **freezing**, but it does not create a second core: on 1 vCPU the
+derivation competes with the loop for the same processor. The two existing protections are the limit of 5
+requests/minute/IP and the `MAX_CONCURRENT_KDF` concurrency ceiling, and they do not suffice against twenty different
+addresses.
 
-**تخفيف واقعي:** انقطاع الخادم لا يسبب عاصفة تسجيل دخول، لأن العميل يعيد الاتصال بـ `hello`
-بتوكن الوصول الذي يعيش 15 دقيقة، ولا يسجّل دخولًا إلا إذا انتهى. أي إعادة تشغيل تكتمل خلال 15
-دقيقة تمر بلا أي argon2.
+**A realistic mitigation:** the server going down does not cause a sign-in storm, because the client reconnects with
+`hello` using an access token that lives 15 minutes, and only signs in if it has expired. Any restart that completes
+within 15 minutes passes with no argon2 at all.
 
-### 5.3 التوصية لمعيار النجاح 18
+### 5.3 The recommendation for success criterion 18
 
-> **VPS بنواة واحدة و2 GB يحمل 500 اتصال تحكم متزامن مريحًا**، بذاكرة 121 MB وزمن إعداد جلسة
-> 172 ms عند الوسيط، وبلا اتصال ساقط ولا خطأ واحد.
+> **A VPS with one core and 2 GB carries 500 concurrent control channels comfortably**, with 121 MB of memory and a
+> median session setup of 172 ms, with no dropped connection and not one error.
 
-بالتفصيل:
+In detail:
 
-| المدى | الحكم |
+| Range | Verdict |
 |---|---|
-| حتى 200 اتصال | مريح جدًا: الدورة الكاملة 77 ms، والبث 27 ms، وسبعة تغيّرات حضور في الثانية |
-| 200–500 اتصال | **النطاق الموصى به للإنتاج على 1 vCPU** |
-| 500–1000 | يعمل ويتباطأ: الدورة تصل إلى 1.5 ثانية عند 1000، وتغيّر حضور واحد يكلّف ثلث ثانية |
-| فوق 1000 | لا يُنصح به على نواة واحدة قبل ترقية Redis Pub/Sub الموثقة في الخطة |
+| Up to 200 connections | Very comfortable: a full cycle of 77 ms, a broadcast of 27 ms, and seven presence changes a second |
+| 200–500 connections | **The recommended production range on 1 vCPU** |
+| 500–1000 | It works and slows down: the cycle reaches 1.5 seconds at 1000, and one presence change costs a third of a second |
+| Above 1000 | Not advised on one core before the Redis Pub/Sub upgrade documented in the plan |
 
-شرطان لهذا الرقم:
-1. **PostgreSQL يتقاسم النواة نفسها في الإنتاج**، فاطرح هامشًا. إن تجاوز الاستخدام 300 اتصالًا
-   نشطًا فالترقية الأرخص هي نواة ثانية، لا worker ثانٍ (السجل في الذاكرة، والخطة تعرف ذلك).
-2. **راقب معدّل تغيّر الحضور**، لا عدد الاتصالات. هو المتغيّر الذي يتحرك تربيعيًا.
-
----
-
-## 6. ملاحظات على العقد (لم تُنفَّذ — تحتاج مراجعة المسارين A وC)
-
-1. **`hosts.update` يحمل القائمة كاملة.** هذا هو مصدر النمو التربيعي: تغيّر مضيف واحد يرسل
-   قائمة كل المضيفين إلى كل عميل. إطار فرقي (`hosts.added` / `hosts.removed` بجهاز واحد) يجعل
-   الكلفة O(الاتصالات) بدل O(الاتصالات × المضيفين)، ويرفع السقف بأكثر من عشرة أضعاف. هذا
-   **تغيير عقد** ويستلزم تعديل `ws-protocol.md` القسمين 4 و8 والعميل معه.
-2. **لا حد لمعدّل الرسائل في العقد.** أُضيفت ميزانية إطارات لكل اتصال ترد بـ `rate_limited`
-   (وهو كود موجود أصلًا في مفردات القسم 2)، لكن العقد لا يذكر متى يُستخدم. يستحسن توثيقه في
-   القسم 2 عند أول مراجعة.
-3. **`POST /auth/login` محدود بالـ IP فقط.** فريق كامل خلف NAT واحد يتقاسم 5 محاولات في
-   الدقيقة، وعشرون عنوانًا مختلفًا يتجاوزان الحد تمامًا. التفصيل في
-   `docs/security-review-server.md`.
+Two conditions attach to that number:
+1. **PostgreSQL shares the same core in production**, so subtract a margin. If usage passes 300 active connections the
+   cheapest upgrade is a second core, not a second worker (the registry is in memory, and the plan knows that).
+2. **Watch the rate of presence change**, not the number of connections. That is the variable that moves quadratically.
 
 ---
 
-## 7. ما لم يُقس
+## 6. Notes on the contract (not implemented — they need review by tracks A and C)
 
-- **لا قياس عبر شبكة حقيقية:** كل شيء على `localhost`، فلا زمن انتشار ولا فقد حزم ولا TLS من
-  Caddy. الأرقام هي كلفة الخادم، لا زمن المستخدم النهائي.
-- **لا قياس تحت Caddy:** إنهاء TLS وإعادة التوجيه يضيفان كلفة لم تدخل في هذه الأرقام.
-- **لا قياس لعمر طويل:** أطول تشغيل كان دقائق، فلا شيء هنا يقول شيئًا عن تسرب ذاكرة عبر أيام.
-  يُقاس على الـ VPS بعد النشر.
-- **لا قياس لـ PostgreSQL تحت ضغط**: قاعدة البيانات لم تكن يومًا هي العنق في هذه التشغيلات.
+1. **`hosts.update` carries the whole list.** That is the source of the quadratic growth: one host changing sends every
+   host to every client. A delta frame (`hosts.added` / `hosts.removed` with one device) makes the cost
+   O(connections) instead of O(connections × hosts), and raises the ceiling more than tenfold. This is **a contract
+   change** and requires amending sections 4 and 8 of `ws-protocol.md` and the client with it.
+2. **There is no message rate limit in the contract.** A per-connection frame budget answering with `rate_limited` was
+   added (a code that already exists in section 2's vocabulary), but the contract does not say when it is used. It
+   should be documented in section 2 at the first review.
+3. **`POST /auth/login` is limited by IP only.** A whole team behind one NAT shares 5 attempts a minute, and twenty
+   different addresses get past the limit entirely. The detail is in `docs/security-review-server.md`.
+
+---
+
+## 7. What was not measured
+
+- **No measurement over a real network:** everything is on `localhost`, so there is no propagation delay, no packet
+  loss, and no TLS from Caddy. The numbers are the server's cost, not the end user's latency.
+- **No measurement under Caddy:** terminating TLS and proxying add a cost that did not enter these numbers.
+- **No long-lived measurement:** the longest run was minutes, so nothing here says anything about a memory leak over
+  days. It is measured on the VPS after deployment.
+- **No measurement of PostgreSQL under pressure**: the database was never the bottleneck in these runs.

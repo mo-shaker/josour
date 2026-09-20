@@ -70,7 +70,12 @@ is [docs/self-hosting.md](docs/self-hosting.md).
 and a Windows machine, which needs two machines. The detail, and what remains, is in
 [docs/macos-port.md](docs/macos-port.md).
 
-To report a security vulnerability: [SECURITY.md](SECURITY.md) — **do not open a public issue**.
+**Getting in touch:** issues and pull requests are closed, so anything you want to say comes by email —
+**me@mohamedshaker.com**. That is not a support channel and there is no response time; it is simply the one address
+that reaches me.
+
+To report a security vulnerability: [SECURITY.md](SECURITY.md) — **do not open a public issue**, write to the same
+address.
 
 ## The frozen contracts
 

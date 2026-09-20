@@ -1,266 +1,310 @@
-# دليل النموذج التقني: قياس الاتصال المباشر على 10 أزواج حقيقية
+# The technical prototype's guide: measuring the direct connection on 10 real pairs
 
-الهدف: تغذية بوابة قرار Relay (ADR-0003) ببيانات حقيقية بنهاية الأسبوع 2. الأداة: `client/tools/Josour.Spike`.
+The goal: to feed the relay decision gate (ADR-0003) with real data by the end of week 2. The tool:
+`client/tools/Josour.Spike`.
 
-## المتطلبات على كل جهاز
-- Windows 10 أو 11 مع .NET 8 SDK (أو نشر الأداة كـ self-contained من CI).
-- السماح للتنفيذي في Windows Firewall عند أول تشغيل (أو تثبيت المثبّت الذي يضيف القاعدة).
-- معرفة IP العام للجهاز كما يراه الإنترنت (`curl ifconfig.me`).
+## Requirements on each machine
+- Windows 10 or 11 with the .NET 8 SDK (or the tool published as self-contained from CI).
+- Allowing the executable in Windows Firewall on the first run (or installing the installer, which adds the rule).
+- Knowing the machine's public IP as the internet sees it (`curl ifconfig.me`).
 
-## 1. فحص الشهادة وTLS (كل جهاز على حدة)
+## 1. Checking the certificate and TLS (each machine separately)
 ```
 dotnet run --project tools/Josour.Spike -c Release -- certtest
 ```
-المتوقع: `tls_loopback: ok (server 1.3 …)` على Windows 11 و`1.2` على Windows 10، و`disposed: True`. سجّل الإصدار.
+Expected: `tls_loopback: ok (server 1.3 …)` on Windows 11 and `1.2` on Windows 10, and `disposed: True`. Record the
+version.
 
-## 2. المرشحون وUPnP (كل جهاز على حدة)
+## 2. The candidates and UPnP (each machine separately)
 ```
-dotnet run --project tools/Josour.Spike -c Release -- gather --port 40000 --public-ip <IP العام>
+dotnet run --project tools/Josour.Spike -c Release -- gather --port 40000 --public-ip <the public IP>
 ```
-سجّل من JSON: `upnp_found`, `mapping_ok`, `upnp_external_ip`, `cgnat_suspected`, `ipv6_global`, `firewall_rule_present`, `vpn_adapter`, `system_proxy_present`.
+Record from the JSON: `upnp_found`, `mapping_ok`, `upnp_external_ip`, `cgnat_suspected`, `ipv6_global`,
+`firewall_rule_present`, `vpn_adapter`, `system_proxy_present`.
 
-## 3. الاتصال المتماثل (زوج من جهازين)
-ولّد معرّف جلسة وسرًا مشتركين مرة واحدة وشاركهما مع الطرف الآخر:
-- PowerShell: `[guid]::NewGuid()` و`[Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))`
-- macOS/Linux: `uuidgen` و`head -c 32 /dev/urandom | base64`
+## 3. The symmetric connection (a pair of machines)
+Generate a shared session id and secret once and share them with the other side:
+- PowerShell: `[guid]::NewGuid()` and
+  `[Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))`
+- macOS/Linux: `uuidgen` and `head -c 32 /dev/urandom | base64`
 
-الجهاز A (المضيف):
+Machine A (the host):
 ```
 dotnet run --project tools/Josour.Spike -c Release -- symmetric --role host --session <GUID> --secret-b64 <SECRET> --public-ip <IP A> --peer-file endpoint-guest.json
 ```
-الجهاز B (المستخدم):
+Machine B (the user):
 ```
 dotnet run --project tools/Josour.Spike -c Release -- symmetric --role guest --session <GUID> --secret-b64 <SECRET> --public-ip <IP B> --peer-file endpoint-host.json
 ```
-كل طرف يطبع سطر JSON بنقطة نهايته ويكتب `endpoint-<role>.json`. انقل ملف A إلى مجلد B والعكس (أو الصق سطر JSON على stdin بدون `--peer-file`). خيارات: `--same-public-ip` على الطرفين إن كانا خلف الـ IP العام نفسه، `--no-upnp` لتخطي الاكتشاف، `--timeout-s N` (افتراضي 30).
+Each side prints a JSON line with its endpoint and writes `endpoint-<role>.json`. Move A's file into B's directory and
+the reverse (or paste the JSON line on stdin without `--peer-file`). The options: `--same-public-ip` on both sides if
+they are behind the same public IP, `--no-upnp` to skip discovery, `--timeout-s N` (30 by default).
 
-أكواد الخروج: 0 اتصال + hello ناجح، 2 لا اتصال، 3 اتصال لكن hello فشل.
+The exit codes: 0 a connection + a successful hello, 2 no connection, 3 a connection but hello failed.
 
-## 4. ما يُسجَّل لكل زوج (جدول القياس)
-| الحقل | المصدر |
+## 4. What is recorded per pair (the measurement table)
+| Field | Source |
 |---|---|
-| نوع شبكة كل طرف (منزل / مكتب / هاتف / CGNAT) | يدوي |
-| `winner` و`tls_version` و`connect_ms` | JSON الناتج (اعتمد تسمية المضيف لـ `winner_type`) |
-| المحاولات الفاشلة: `{direction,type,ip,port,ms,stage,error}` | JSON الناتج |
-| `inbound_attempts` | JSON الناتج |
-| تشخيص `gather` للطرفين | الخطوة 2 |
+| Each side's network type (home / office / phone / CGNAT) | By hand |
+| `winner`, `tls_version` and `connect_ms` | The resulting JSON (take the host's label for `winner_type`) |
+| The failed attempts: `{direction,type,ip,port,ms,stage,error}` | The resulting JSON |
+| `inbound_attempts` | The resulting JSON |
+| The `gather` diagnostics for both sides | Step 2 |
 
-**عتبة البوابة:** 10 أزواج على الأقل خلال أسبوعين؛ إن كانت نسبة الاتصال خلال 10 ثوانٍ أقل من 85% تُنفَّذ خدمة Relay في الأسبوعين 5 و6.
+**The gate's threshold:** at least 10 pairs over two weeks; if the rate of connecting within 10 seconds is below 85%,
+the relay service is implemented in weeks 5 and 6.
 
-## 5. ما يحتاج تحققًا على Windows وراوترات حقيقية (من تقرير المسار B)
-1. مسار Schannel للمفتاح: إعادة استيراد PFX بـ `UserKeySet` وقبول `SslStream` له على Win10 و11، واختفاء حاوية المفتاح بعد `Dispose` (`certutil -user -key`).
-2. تفاوض TLS 1.3 على Win11 وسلوك `SslProtocols.None` على Win10 (ADR-0002).
-3. Mono.Nat على راوترين أو ثلاثة: الاكتشاف خلال 4 ثوانٍ، نجاح التعيين، هل يحترم الراوتر المنفذ المطلوب أم يعيد آخر، الإبلاغ عن IP الخارجي، إزالة التعيين.
-4. صحة `cgnat_suspected` على شبكة CGNAT واحدة وشبكة NAT مزدوج واحدة على الأقل.
-5. تصفية مرشحي IPv6 على Windows (العناوين المؤقتة وحالة DAD).
-6. `HostDiagnostics` عبر `netsh`: كشف قاعدة «Josour Tunnel» ومحلل `currentprofile` على Windows غير الإنجليزي، وقراءة `ProxyEnable`.
-7. المستمع والمتصل بوضع DualMode على Windows، بما فيها أجهزة IPv6 معطّل (يسقط إلى IPv4).
-8. تفاعل Windows Firewall: القبول الوارد على المنفذ المؤقت مع القاعدة وبدونها.
-9. سلوك `Socket.Close(0)` للاتصالات الزائدة عن السعة على Windows.
+## 5. What needs verifying on Windows and on real routers (from track B's report)
+1. Schannel's key path: re-importing the PFX with `UserKeySet` and `SslStream` accepting it on Win10 and 11, and the
+   key container disappearing after `Dispose` (`certutil -user -key`).
+2. TLS 1.3 negotiation on Win11 and `SslProtocols.None`'s behaviour on Win10 (ADR-0002).
+3. Mono.Nat on two or three routers: discovery within 4 seconds, the mapping succeeding, whether the router honours the
+   requested port or returns another, reporting the external IP, and removing the mapping.
+4. The accuracy of `cgnat_suspected` on at least one CGNAT network and one double-NAT network.
+5. Filtering IPv6 candidates on Windows (temporary addresses and the DAD state).
+6. `HostDiagnostics` through `netsh`: detecting the "Josour Tunnel" rule and the `currentprofile` parser on non-English
+   Windows, and reading `ProxyEnable`.
+7. The listener and the connector in DualMode on Windows, including machines with IPv6 disabled (falling back to IPv4).
+8. The Windows Firewall interaction: accepting inbound on the ephemeral port with the rule and without it.
+9. The behaviour of `Socket.Close(0)` for connections over capacity on Windows.
 
 ---
 
-# مصفوفة تشغيل المتصفح (الأسبوع 2)
+# The browser launch matrix (week 2)
 
-الهدف: إثبات أن متصفح العمل يمر فعلًا عبر الـ Proxy المحلي، وكشف الحالات التي تتجاوز فيها سياسات الشركة سطر الأوامر. الأداة: `dotnet run --project tools/Josour.Spike -c Release -- browser --self-hosted [--browser chrome|edge]`.
+The goal: to prove the work browser actually goes through the local proxy, and to expose the cases where corporate
+policies override the command line. The tool:
+`dotnet run --project tools/Josour.Spike -c Release -- browser --self-hosted [--browser chrome|edge]`.
 
-مع `--self-hosted` تشغّل الأداة `ConnectProxyServer` بقائمة مواقع فارغة (كل شيء مباشر) وتفتح المتصفح على `http://check.josour/`، ثم تطبع JSON يشمل: مسار المتصفح، التحقق من ناشره، حالة السياسات، نتيجة التشغيل، هل حدث Handoff، زمن وصول صفحة الفحص، وعدّادات الـ Proxy.
+With `--self-hosted` the tool runs `ConnectProxyServer` with an empty site list (everything direct) and opens the
+browser on `http://check.josour/`, then prints JSON including: the browser's path, its publisher verification, the
+policy state, the launch result, whether a handoff happened, how long the check page took to arrive, and the proxy's
+counters.
 
-## الخانات الثماني المطلوب تعبئتها
+## The eight cells to be filled in
 
-| # | النظام | المتصفح | مُدار بسياسة | المتوقع |
+| # | System | Browser | Policy-managed | Expected |
 |---|---|---|---|---|
-| 1 | Windows 10 | Chrome | لا | `probe_hit_ms` < 10000، `handoff` = false |
-| 2 | Windows 10 | Edge | لا | نفسه |
-| 3 | Windows 11 | Chrome | لا | نفسه |
-| 4 | Windows 11 | Edge | لا | نفسه |
-| 5 | Windows 11 | Chrome | نعم (`ProxySettings`) | `policy.proxy_managed` = true، ولا تصل صفحة الفحص |
-| 6 | Windows 11 | Edge | نعم (`ProxySettings`) | نفسه |
-| 7 | Windows 11 | Chrome | نعم (`UserDataDir`) | `policy.user_data_dir_managed` = true |
-| 8 | Windows 11 | Chrome | نسخة تعمل بالفعل بنفس الـ Profile | `handoff` = true |
+| 1 | Windows 10 | Chrome | No | `probe_hit_ms` < 10000, `handoff` = false |
+| 2 | Windows 10 | Edge | No | The same |
+| 3 | Windows 11 | Chrome | No | The same |
+| 4 | Windows 11 | Edge | No | The same |
+| 5 | Windows 11 | Chrome | Yes (`ProxySettings`) | `policy.proxy_managed` = true, and the check page does not arrive |
+| 6 | Windows 11 | Edge | Yes (`ProxySettings`) | The same |
+| 7 | Windows 11 | Chrome | Yes (`UserDataDir`) | `policy.user_data_dir_managed` = true |
+| 8 | Windows 11 | Chrome | An instance already running with the same profile | `handoff` = true |
 
-لمحاكاة الإدارة في الخانات 5 إلى 7 (على جهاز اختبار فقط): أضف القيم تحت `HKLM\SOFTWARE\Policies\Google\Chrome` أو `\Microsoft\Edge` ثم احذفها بعد الاختبار.
+To simulate management in cells 5 to 7 (on a test machine only): add the values under
+`HKLM\SOFTWARE\Policies\Google\Chrome` or `\Microsoft\Edge` and then delete them after the test.
 
-## ما يُسجَّل لكل خانة
-`browser`, `path`, `publisher_verified`, `policy.*`, `launch.success`, `launch.failure`, `handoff`, `exit_type_set`, `probe_hit_ms`, `close_ms`, و`proxy_counters`.
+## What is recorded per cell
+`browser`, `path`, `publisher_verified`, `policy.*`, `launch.success`, `launch.failure`, `handoff`, `exit_type_set`,
+`probe_hit_ms`, `close_ms`, and `proxy_counters`.
 
-**معيار القبول:** الخانات 1 إلى 4 تعطي صفحة فحص خلال 10 ثوانٍ وإغلاقًا نظيفًا؛ الخانات 5 إلى 8 تُكتشف قبل التشغيل أو خلال 10 ثوانٍ فينتهي المسار بـ `browser_not_proxied` بدل جلسة تتصفح بعنوان المستخدم دون أن يدري.
+**The acceptance criterion:** cells 1 to 4 give a check page within 10 seconds and a clean close; cells 5 to 8 are
+detected before launching or within 10 seconds, so the path ends with `browser_not_proxied` rather than a session
+browsing on the user's address without them knowing.
 
 ---
 
-# جلسة كاملة بلا واجهة: أمر `session` (الأسبوع 4)
+# A full session with no interface: the `session` command (week 4)
 
-الهدف: تشغيل **جلسة حقيقية بين جهازي Windows** بالمكدّس الإنتاجي كاملًا — تسجيل دخول عبر `ApiClient`/`AuthSession`، قناة تحكم حقيقية على WSS، `TunnelSession` بالدورين، سياسة الخروج على المضيف، والـ Proxy المحلي على المستخدم — قبل أن يجهز تطبيق WPF. الأداة هي نفسها `client/tools/Josour.Spike`، والأمر `session`.
+The goal: to run **a real session between two Windows machines** with the entire production stack — signing in through
+`ApiClient`/`AuthSession`, a real control channel over WSS, `TunnelSession` in both roles, the egress policy at the
+host, and the local proxy at the user — before the WPF application is ready. The tool is the same
+`client/tools/Josour.Spike`, and the command is `session`.
 
-ما يُثبته هذا الأمر ولا يُثبته `symmetric`: أن الخادم والعميل يتفقان على دورة الجلسة كاملة (`session.created` ← `endpoint` ← `peer_endpoint` ← `connected` ← `active` ← `stats` ← `end`)، وأن حركة المرور تخرج فعلًا من عنوان المضيف.
+What this command proves and `symmetric` does not: that the server and the client agree on the whole session cycle
+(`session.created` ← `endpoint` ← `peer_endpoint` ← `connected` ← `active` ← `stats` ← `end`), and that the traffic
+really does leave from the host's address.
 
-## 0. المتطلبات
+## 0. Requirements
 
-- جهازان (أو جهاز واحد بمجلدَي حالة مختلفين للتجربة الجافة)، على كل منهما .NET 8 SDK ونسخة من المستودع.
-- حسابان مختلفان على الخادم (`POST /admin/users`). **جهاز المستخدم لا يستطيع طلب جهاز من أجهزة المستخدم نفسه** (`bad_request`).
-- قائمة مواقع فيها نطاق واحد على الأقل لاختباره (`PUT /admin/domains`)، مثل `api.ipify.org`.
-- السماح للتنفيذي في Windows Firewall عند أول تشغيل (نافذة الاتصال تفتح مستمعًا على منفذ مؤقت).
+- Two machines (or one machine with two different state directories for a dry run), each with the .NET 8 SDK and a copy
+  of the repository.
+- Two different accounts on the server (`POST /admin/users`). **The user's machine cannot request a device belonging to
+  the same user** (`bad_request`).
+- A site list with at least one domain to test (`PUT /admin/domains`), such as `api.ipify.org`.
+- Allowing the executable in Windows Firewall on the first run (the connect window opens a listener on an ephemeral
+  port).
 
-## 1. الأوامر بالضبط
+## 1. The exact commands
 
-على **جهاز المضيف** (الجهاز الذي ستخرج منه حركة المرور)، شغّل أولًا وأبقه يعمل:
+On the **host machine** (the machine the traffic will leave from), run this first and leave it running:
 
 ```
 dotnet run --project tools/Josour.Spike -c Release -- session ^
-  --api https://<الخادم> --email host@example.com --password '<كلمة السر>' ^
+  --api https://<the server> --email host@example.com --password '<the password>' ^
   --role host --available > host.jsonl
 ```
 
-على **جهاز المستخدم**، تعرّف على المضيفين المتاحين ثم اطلب أحدهم:
+On the **user's machine**, find the available hosts and then request one of them:
 
 ```
 dotnet run --project tools/Josour.Spike -c Release -- session ^
-  --api https://<الخادم> --email guest@example.com --password '<كلمة السر>' ^
+  --api https://<the server> --email guest@example.com --password '<the password>' ^
   --role guest --list-hosts
 
 dotnet run --project tools/Josour.Spike -c Release -- session ^
-  --api https://<الخادم> --email guest@example.com --password '<كلمة السر>' ^
-  --role guest --host-device <معرّف الجهاز أو اسمه> --minutes 30 ^
+  --api https://<the server> --email guest@example.com --password '<the password>' ^
+  --role guest --host-device <the device's id or name> --minutes 30 ^
   --curl-test https://api.ipify.org > guest.jsonl
 ```
 
-المضيف يقبل الطلب تلقائيًا، فيتصل الطرفان، ثم يطبع المستخدم منفذ الـ Proxy المحلي وينفّذ طلب HTTP GET عبر الـ Proxy نفسه بلا متصفح. **الدليل المطلوب:** جسم الرد في حدث `curl.result` يساوي عنوان المضيف العام (`public_ip` في `hello.ack` على جهاز المضيف)، لا عنوان جهاز المستخدم.
+The host accepts the request automatically, so the two sides connect, and then the user prints the local proxy's port
+and makes an HTTP GET request through that same proxy with no browser. **The evidence required:** the response body in
+the `curl.result` event equals the host's public address (`public_ip` in `hello.ack` on the host's machine), not the
+user's machine's address.
 
-خيارات إضافية:
+Additional options:
 
-| الخيار | الدور | المعنى |
+| Option | Role | Meaning |
 |---|---|---|
-| `--available` / `--no-available` | مضيف | الإعلان هو الافتراضي؛ `--no-available` يبقي الجهاز متصلًا وغير ظاهر لأي مستخدم (لاختبار القناة وحدها) |
-| `--auto-reject` | مضيف | يرفض أول طلب وارد ثم يخرج بالكود 0 (لاختبار مسار الرفض) |
-| `--listen-port N` | كلاهما | يربط مستمع النفق على منفذ ثابت؛ وعلى المضيف يُرسل أيضًا في `host.available.listen_port` فيصير فحص قابلية الوصول ذا معنى |
-| `--browser chrome\|edge` | مستخدم | يشغّل متصفح العمل الحقيقي على صفحة الفحص بدل `--curl-test` (لا يجتمعان: مع متصفح يُفعَّل فحص PID المالك فيُرفض طلب الأداة نفسها) |
-| `--profile <path>` | مستخدم | مجلد ملف تعريف المتصفح |
-| `--minutes N` | مستخدم | مدة الجلسة المطلوبة (1..`max_session_minutes`) |
-| `--no-upnp` | كلاهما | تخطي اكتشاف UPnP (أسرع على شبكة بلا راوتر متعاون) |
-| `--connect-timeout-s N` | كلاهما | مهلة الاتصال المتماثل (الافتراضي 30، وهي مهلة الخادم نفسها) |
-| `--stats-interval-s N` | مضيف | دورية `session.stats` (الافتراضي 30) |
-| `--state-dir <path>` | كلاهما | مجلد الحالة بجوار التنفيذي (الافتراضي `spike-state/`): `settings.json` وسر الجهاز والـ refresh token. **هويتان على الجهاز نفسه = مجلدان مختلفان** |
-| `--reset-device` | كلاهما | يمسح هوية الجهاز والتوكنات فيسجّل الدخول التالي جهازًا جديدًا (بعد إلغاء الجهاز من الخادم) |
-| `--quiet` | كلاهما | يوقف الأسطر البشرية على stderr ويُبقي JSON فقط |
+| `--available` / `--no-available` | host | Announcing is the default; `--no-available` keeps the machine connected and invisible to any user (to test the channel alone) |
+| `--auto-reject` | host | Rejects the first incoming request and then exits with code 0 (to test the rejection path) |
+| `--listen-port N` | both | Binds the tunnel's listener to a fixed port; and on the host it is also sent in `host.available.listen_port`, which makes the reachability probe meaningful |
+| `--browser chrome\|edge` | user | Launches the real work browser on the check page instead of `--curl-test` (the two do not combine: with a browser the owning-PID check is enabled, so the tool's own request is refused) |
+| `--profile <path>` | user | The browser's profile directory |
+| `--minutes N` | user | The requested session duration (1..`max_session_minutes`) |
+| `--no-upnp` | both | Skips UPnP discovery (faster on a network with no cooperative router) |
+| `--connect-timeout-s N` | both | The symmetric connection's timeout (30 by default, which is the server's own timeout) |
+| `--stats-interval-s N` | host | How often `session.stats` is sent (30 by default) |
+| `--state-dir <path>` | both | The state directory beside the executable (`spike-state/` by default): `settings.json`, the device secret and the refresh token. **Two identities on the same machine = two different directories** |
+| `--reset-device` | both | Wipes the device identity and the tokens, so the next sign-in registers a new device (after the device is revoked on the server) |
+| `--quiet` | both | Stops the human lines on stderr and keeps the JSON only |
 
-سر الجهاز يُحفظ في `<state-dir>/secrets/` بـ DPAPI على Windows، وبنص صريح موسوم على غير Windows (تطوير فقط). لا تنقل هذا المجلد بين الأجهزة.
+The device secret is stored in `<state-dir>/secrets/` with DPAPI on Windows, and as marked plaintext off Windows
+(development only). Do not move that directory between machines.
 
-`Ctrl+C` في أي لحظة ينفّذ ترتيب التنظيف في `docs/protocol.md` القسم 7 كاملًا ويرسل `session.end` بسبب الدور (`host_ended` أو `guest_ended`) بدل قتل العملية.
+`Ctrl+C` at any moment carries out the whole cleanup order in section 7 of `docs/protocol.md` and sends `session.end`
+with the reason for the role (`host_ended` or `guest_ended`) instead of killing the process.
 
-## 2. مجرى الأحداث: JSON على stdout وملخص بشري على stderr
+## 2. The event stream: JSON on stdout and a human summary on stderr
 
-كل حدث سطر JSON واحد. المظروف ثابت:
+Every event is one JSON line. The envelope is fixed:
 
 ```json
 {"ts":"2026-09-05T09:12:33.4210000Z","seq":14,"role":"guest","event":"tunnel.connected","winner_type":"upnp","connect_ms":812,"tls_version":"1.3","proxy_port":51544,"probe_url":"http://check.josour/"}
 ```
 
-`ts` بـ ISO-8601 UTC، و`seq` عدّاد يبدأ من 1، و`role` هو `host` أو `guest`. الأسطر البشرية تذهب إلى stderr، فـ `> run.jsonl` يعطي ملفًا صالحًا للتحليل بينما تبقى المتابعة على الشاشة.
+`ts` is ISO-8601 UTC, `seq` is a counter starting at 1, and `role` is `host` or `guest`. The human lines go to stderr,
+so `> run.jsonl` gives a file fit for analysis while you keep watching on the screen.
 
-**الإعداد والدخول**
+**Setup and sign-in**
 
-| الحدث | الحقول | المعنى |
+| Event | Fields | Meaning |
 |---|---|---|
-| `tool.start` | `api`, `state_dir`, `os`, `reset_device` | بداية التشغيل |
-| `auth.signed_in` | `user_id`, `email`, `display_name`, `device_id`, `device_name`, `app_version` | نجح الدخول؛ `device_id` هو ما يُكتب في `--host-device` على الطرف الآخر |
-| `auth.failed` | `code`, `status`, `message` | فشل الدخول (`invalid_credentials`, `account_locked`, `device_revoked`, `unavailable`) |
+| `tool.start` | `api`, `state_dir`, `os`, `reset_device` | The run begins |
+| `auth.signed_in` | `user_id`, `email`, `display_name`, `device_id`, `device_name`, `app_version` | The sign-in succeeded; `device_id` is what goes into `--host-device` on the other side |
+| `auth.failed` | `code`, `status`, `message` | The sign-in failed (`invalid_credentials`, `account_locked`, `device_revoked`, `unavailable`) |
 | `channel.state` | `state` | `Connecting` / `Connected` / `Reconnecting` / `Disconnected` |
-| `channel.closed` | `reason`, `close_code`, `description` | إغلاق نهائي لا إعادة اتصال بعده (4401 / 4403 / 4409) |
-| `channel.connect_failed` | `error` | لم تُفتح القناة أصلًا |
-| `hello.ack` | `server_time`, `public_ip`, `allowed_ports`, `allowlist_version`, `max_session_minutes`, `request_timeout_seconds`, `log_domains` | **`public_ip` هنا على جهاز المضيف هو العنوان الذي يجب أن تراه المواقع** |
-| `allowlist.loaded` | `version`, `entries`, `skipped` | قائمة المواقع من `GET /domains`؛ `skipped` مدخلات رفضها المحلل |
-| `frame.in` | `type` + ملخص | كل إطار وارد من الخادم (يشمل `ping`/`pong`) |
-| `frame.out` | `type` | كل إطار صادر من دورة الجلسة |
+| `channel.closed` | `reason`, `close_code`, `description` | A terminal close with no reconnection after it (4401 / 4403 / 4409) |
+| `channel.connect_failed` | `error` | The channel never opened |
+| `hello.ack` | `server_time`, `public_ip`, `allowed_ports`, `allowlist_version`, `max_session_minutes`, `request_timeout_seconds`, `log_domains` | **`public_ip` here on the host's machine is the address the sites must see** |
+| `allowlist.loaded` | `version`, `entries`, `skipped` | The site list from `GET /domains`; `skipped` is the entries the parser refused |
+| `frame.in` | `type` + a summary | Every frame inbound from the server (including `ping`/`pong`) |
+| `frame.out` | `type` | Every frame outbound from the session cycle |
 
-**دورة الطلب**
+**The request cycle**
 
-| الحدث | الحقول | المعنى |
+| Event | Fields | Meaning |
 |---|---|---|
-| `host.available` | `available`, `listen_port` | المضيف أعلن نفسه (أو لم يفعل مع `--no-available`) |
-| `hosts` | `count`, `hosts[]` | لقطة المضيفين (`device_id`, `user_display_name`, `device_name`, `reachable`) |
-| `host.selected` | `device_id`, `device_name`, `reachable` | المضيف الذي طابق `--host-device` |
-| `host.not_found` | `wanted`, `available` | لا مضيف يطابق، أو أكثر من واحد يطابق (الغموض = لا اختيار) |
-| `request.created` | `request_id`, `expires_at` | الخادم قَبِل الطلب وهو معلّق |
-| `request.incoming` | `request_id`, `guest_name`, `guest_device`, `duration_min`, `expires_at` | وصل الطلب إلى المضيف |
-| `request.accepted` / `request.rejected` | `request_id` | قرار المضيف التلقائي |
-| `request.result` | `request_id`, `accepted`, `reason` | نتيجة الطلب عند المستخدم (`rejected`/`expired`/`cancelled`/`host_unavailable`) |
-| `request.rejected_by_server` | `code`, `message` | `request.create` رُفض (`host_unavailable`, `session_exists`, `request_pending`, `bad_request`…) |
-| `session.created` | `session_id`, `peer_display_name`, `peer_device_name`, `peer_public_ip`, `same_public_ip`, `expires_at` | بدأت الجلسة؛ من هنا يتولى `SessionCoordinator` (نفس منسّق الجلسة الذي يقوده تطبيق WPF) |
+| `host.available` | `available`, `listen_port` | The host announced itself (or did not, with `--no-available`) |
+| `hosts` | `count`, `hosts[]` | A snapshot of the hosts (`device_id`, `user_display_name`, `device_name`, `reachable`) |
+| `host.selected` | `device_id`, `device_name`, `reachable` | The host that matched `--host-device` |
+| `host.not_found` | `wanted`, `available` | No host matches, or more than one matches (ambiguity = no choice) |
+| `request.created` | `request_id`, `expires_at` | The server accepted the request and it is pending |
+| `request.incoming` | `request_id`, `guest_name`, `guest_device`, `duration_min`, `expires_at` | The request reached the host |
+| `request.accepted` / `request.rejected` | `request_id` | The host's automatic decision |
+| `request.result` | `request_id`, `accepted`, `reason` | The request's outcome at the user (`rejected`/`expired`/`cancelled`/`host_unavailable`) |
+| `request.rejected_by_server` | `code`, `message` | `request.create` was refused (`host_unavailable`, `session_exists`, `request_pending`, `bad_request`…) |
+| `session.created` | `session_id`, `peer_display_name`, `peer_device_name`, `peer_public_ip`, `same_public_ip`, `expires_at` | The session began; from here `SessionCoordinator` takes over (the same session coordinator the WPF application drives) |
 
-**النفق**
+**The tunnel**
 
-| الحدث | الحقول | المعنى |
+| Event | Fields | Meaning |
 |---|---|---|
 | `tunnel.state` | `state` | `Listening` → `Connecting` → `Authenticating` → `Connected` → `Ended` |
-| `tunnel.prepared` | `listen_port`, `cert_fp_sha256`, `candidates[]` | ما أُرسل في `session.endpoint`: بصمة الشهادة والمرشحون (`lan`/`v6`/`upnp`/`public`) |
-| `tunnel.peer_endpoint` | `cert_fp_sha256`, `candidates[]` | مرشحو الطرف الآخر؛ بدأ الاتصال المتوازي |
-| `tunnel.connected` | `winner_type`, `connect_ms`, `tls_version`, `proxy_port`, `probe_url` | **نجح النفق.** `winner_type` عند المضيف هو المعتمد، و`tls_version` يجب أن يكون `1.3` على Win11 و`1.2` على Win10 |
-| `tunnel.connect_failed` | `reason`, `role`, `candidates[]` بزمن وخطأ كل مرشح | فشل الاتصال؛ هذا هو نفس التشخيص المرفوع في `session.connect_failed` وهو ما تغذّى به بوابة Relay |
-| `tunnel.died` | `suggested_reason` | النفق مات بعد أن عمل (اختفى الطرف الآخر أو انتهت مهلة PONG) |
-| `proxy.ready` | `port`, `probe_url` | منفذ الـ Proxy المحلي على 127.0.0.1 لدى المستخدم |
-| `curl.result` | `url`, `status`, `elapsed_ms`, `bytes`, `body_prefix` | **الدليل:** طلب HTTP GET عبر الـ Proxy نجح، و`body_prefix` أول 200 حرف من الرد |
-| `curl.failed` | `url`, `error` | الطلب عبر الـ Proxy فشل |
-| `browser.launch` | `browser`, `success`, `failure`, `detail`, `handoff`, `pid` | نتيجة تشغيل متصفح العمل مع `--browser` |
-| `session.active` | `expires_at` | الخادم حوّل الجلسة إلى نشطة |
-| `session.stats` | `bytes_up`, `bytes_down`, `open_streams` | من المضيف كل 30 ثانية (نفس ما يُرسل في `session.stats`) |
-| `session.terminate` | `reason` | الخادم أنهى الجلسة |
-| `session.ending` / `session.ended` | `kind`, `reason`, `bytes_up`, `bytes_down`, `domains`, `server_already_ended` | ترتيب التنظيف بدأ / اكتمل |
-| `tool.exit` | `code`, `kind`, `end_reason`, `bytes_up`, `bytes_down`, `domains` | آخر سطر دائمًا؛ `code` هو رمز خروج العملية |
+| `tunnel.prepared` | `listen_port`, `cert_fp_sha256`, `candidates[]` | What was sent in `session.endpoint`: the certificate fingerprint and the candidates (`lan`/`v6`/`upnp`/`public`) |
+| `tunnel.peer_endpoint` | `cert_fp_sha256`, `candidates[]` | The other side's candidates; the parallel connecting began |
+| `tunnel.connected` | `winner_type`, `connect_ms`, `tls_version`, `proxy_port`, `probe_url` | **The tunnel succeeded.** `winner_type` at the host is the authoritative one, and `tls_version` must be `1.3` on Win11 and `1.2` on Win10 |
+| `tunnel.connect_failed` | `reason`, `role`, `candidates[]` with each candidate's timing and error | The connection failed; this is the same diagnostic uploaded in `session.connect_failed`, and it is what fed the relay gate |
+| `tunnel.died` | `suggested_reason` | The tunnel died after having worked (the other side disappeared or the PONG timeout expired) |
+| `proxy.ready` | `port`, `probe_url` | The local proxy's port on 127.0.0.1 at the user |
+| `curl.result` | `url`, `status`, `elapsed_ms`, `bytes`, `body_prefix` | **The evidence:** an HTTP GET request through the proxy succeeded, and `body_prefix` is the first 200 characters of the response |
+| `curl.failed` | `url`, `error` | The request through the proxy failed |
+| `browser.launch` | `browser`, `success`, `failure`, `detail`, `handoff`, `pid` | The result of launching the work browser with `--browser` |
+| `session.active` | `expires_at` | The server moved the session to active |
+| `session.stats` | `bytes_up`, `bytes_down`, `open_streams` | From the host every 30 seconds (the same as what is sent in `session.stats`) |
+| `session.terminate` | `reason` | The server ended the session |
+| `session.ending` / `session.ended` | `kind`, `reason`, `bytes_up`, `bytes_down`, `domains`, `server_already_ended` | The cleanup order started / completed |
+| `tool.exit` | `code`, `kind`, `end_reason`, `bytes_up`, `bytes_down`, `domains` | Always the last line; `code` is the process's exit code |
 
-قيم `kind` في `session.ended` و`tool.exit`: `Terminated` (الخادم أنهى)، `Expired` (انتهت المدة)، `LocalEnd` (Ctrl+C أو إنهاء مقصود)، `ConnectFailed`، `TunnelDied`، `ChannelLost` (سقطت قناة التحكم أثناء الجلسة)، `ProtocolError` (خرق للعقد، أو `browser_not_proxied` مع `--browser`).
+The `kind` values in `session.ended` and `tool.exit`: `Terminated` (the server ended it), `Expired` (the duration ran
+out), `LocalEnd` (Ctrl+C or a deliberate end), `ConnectFailed`, `TunnelDied`, `ChannelLost` (the control channel
+dropped during the session), `ProtocolError` (a breach of the contract, or `browser_not_proxied` with `--browser`).
 
-بلا `--browser` لا متصفح عمل أصلًا، فلا انتظار لصفحة الفحص ولا `browser_not_proxied`: الـ Proxy يقوم ويبقى، ويثبته `--curl-test` بنفسه. مع `--browser` يبقى السلوك كاملًا — يُشغَّل المتصفح عند `session.active`، وغياب صفحة الفحص خلال 10 ثوانٍ ينهي الجلسة بـ `browser_not_proxied`.
+Without `--browser` there is no work browser at all, so there is no waiting for the check page and no
+`browser_not_proxied`: the proxy stands up and stays, and `--curl-test` proves it by itself. With `--browser` the
+behaviour stays complete — the browser is launched at `session.active`, and the check page not arriving within 10
+seconds ends the session with `browser_not_proxied`.
 
-## 3. أكواد الخروج
+## 3. The exit codes
 
-| الكود | المعنى | ماذا يعني لـ QA |
+| Code | Meaning | What it means for QA |
 |---|---|---|
-| `0` | الجلسة عملت وانتهت نهاية متوقَّعة، أو `--list-hosts` نجح، أو `--auto-reject` رفض | نجاح |
-| `1` | سوء استعمال المعاملات، أو لا مضيف يطابق `--host-device` | خطأ في الأمر لا في المنتج |
-| `2` | لم يقم نفق: فشل الاتصال المتماثل، أو رُفض الطلب أو انتهت مهلته، أو المضيف غير متاح | يُسجَّل في جدول بوابة Relay |
-| `3` | النفق قام ثم مات، أو سقطت قناة التحكم أثناء الجلسة | عطل شبكة أو استقرار |
-| `4` | فشل مصادقة أو خرق للعقد من الخادم | يُرفع للمسار A أو C |
-| `130` | Ctrl+C قبل قيام الجلسة | ليس فشلًا |
+| `0` | The session worked and ended as expected, or `--list-hosts` succeeded, or `--auto-reject` rejected | Success |
+| `1` | Misused arguments, or no host matches `--host-device` | An error in the command, not in the product |
+| `2` | No tunnel stood up: the symmetric connection failed, or the request was rejected or timed out, or the host is unavailable | Recorded in the relay gate's table |
+| `3` | The tunnel stood up and then died, or the control channel dropped during the session | A network or stability failure |
+| `4` | An authentication failure or a breach of the contract by the server | Raised to track A or C |
+| `130` | Ctrl+C before the session stood up | Not a failure |
 
-## 4. ماذا يسجّل QA لكل تشغيل
+## 4. What QA records per run
 
-احفظ `host.jsonl` و`guest.jsonl` كاملين، واملأ من الحدثين `tunnel.connected` و`tool.exit`:
+Keep `host.jsonl` and `guest.jsonl` complete, and fill in from the `tunnel.connected` and `tool.exit` events:
 
-| الحقل | من أين |
+| Field | From where |
 |---|---|
-| نوع شبكة كل طرف (منزل / مكتب / هاتف / CGNAT) | يدوي |
-| `winner_type`, `connect_ms`, `tls_version` | `tunnel.connected` على جهاز المضيف (تسميته هي المعتمدة) |
-| المحاولات الفاشلة `{direction,type,ip,port,ms,stage,error}` | `tunnel.connect_failed.candidates` |
-| `public_ip` لكل طرف | `hello.ack` على كل جهاز |
-| ‏IP الذي رآه الموقع | `curl.result.body_prefix` على جهاز المستخدم |
-| `bytes_up` / `bytes_down` / `domains` | `tool.exit` على جهاز المضيف |
-| رمز الخروج لكل طرف | `tool.exit.code` |
+| Each side's network type (home / office / phone / CGNAT) | By hand |
+| `winner_type`, `connect_ms`, `tls_version` | `tunnel.connected` on the host's machine (its label is the authoritative one) |
+| The failed attempts `{direction,type,ip,port,ms,stage,error}` | `tunnel.connect_failed.candidates` |
+| `public_ip` for each side | `hello.ack` on each machine |
+| The IP the site saw | `curl.result.body_prefix` on the user's machine |
+| `bytes_up` / `bytes_down` / `domains` | `tool.exit` on the host's machine |
+| Each side's exit code | `tool.exit.code` |
 
-**معيار القبول لتشغيل ناجح:** رمز خروج `0` على الطرفين، و`tunnel.connected` خلال 10 ثوانٍ من `session.created`، و`curl.result.status` يساوي 200، و`body_prefix` يطابق `public_ip` الخاص بالمضيف، و`session.ended.kind` ليس `TunnelDied`.
+**The acceptance criterion for a successful run:** exit code `0` on both sides, `tunnel.connected` within 10 seconds of
+`session.created`, `curl.result.status` equal to 200, `body_prefix` matching the host's `public_ip`, and
+`session.ended.kind` not being `TunnelDied`.
 
-## 5. حالات فشل شائعة وتفسيرها
+## 5. Common failures and what they mean
 
-| ما يظهر | التفسير |
+| What appears | The explanation |
 |---|---|
-| `request.rejected_by_server` بـ `host_unavailable` | المضيف غير متصل، أو لم يُعلن `--available`، أو عنده جلسة غير منتهية، أو يردّ على طلب آخر |
-| `request.rejected_by_server` بـ `bad_request` | الجهازان لنفس المستخدم — استخدم حسابين مختلفين |
-| `request.rejected_by_server` بـ `session_exists` | جلسة سابقة لم تُنهَ؛ أنهها من `POST /admin/sessions/{id}/terminate` |
-| `host.not_found` مع `available > 0` | الاسم يطابق أكثر من مضيف؛ استخدم `device_id` من `--list-hosts` |
-| `tunnel.connect_failed` بـ `peer_endpoint_timeout` | الطرف الآخر لم يرسل `session.endpoint` خلال المهلة (أو الخادم لم يمرره) |
-| `tunnel.connect_failed` وكل المرشحين `stage=tcp` | الوارد محجوب على الطرفين — هذه هي الحالة التي تفتح بوابة Relay |
-| `curl.failed` بـ 403 والنطاق في القائمة | المضيف رفض العنوان بعد الحل (`private_ip`): الاسم يحل إلى عنوان داخلي على شبكة المضيف |
-| `session.ended.kind = ChannelLost` | انقطعت قناة التحكم فأنهى الخادم الجلسة بـ `*_disconnected` |
-| `session.ended.kind = TunnelDied` و`session.end` بـ `guest_disconnected`/`host_disconnected` | مات النفق والقناتان حيتان: **الاسم اسم النظير** لا اسم المُرسِل (ws-protocol القسم 9) |
-| `session.ended.kind = ProtocolError` بـ `browser_not_proxied` (مع `--browser` فقط) | متصفح العمل قام لكنه لم يمر بالـ Proxy (سياسة مؤسسية أو تسليم لنسخة قائمة) |
-| `channel.closed` بالكود `4409` | نسخة أخرى من الأداة تعمل بنفس `--state-dir` على جهاز آخر |
+| `request.rejected_by_server` with `host_unavailable` | The host is not connected, or did not announce `--available`, or has an unfinished session, or is answering another request |
+| `request.rejected_by_server` with `bad_request` | Both machines belong to the same user — use two different accounts |
+| `request.rejected_by_server` with `session_exists` | An earlier session was not ended; end it from `POST /admin/sessions/{id}/terminate` |
+| `host.not_found` with `available > 0` | The name matches more than one host; use the `device_id` from `--list-hosts` |
+| `tunnel.connect_failed` with `peer_endpoint_timeout` | The other side did not send `session.endpoint` within the timeout (or the server did not pass it on) |
+| `tunnel.connect_failed` with every candidate at `stage=tcp` | Inbound is blocked on both sides — this is the case that opens the relay gate |
+| `curl.failed` with 403 while the domain is in the list | The host refused the address after resolution (`private_ip`): the name resolves to an internal address on the host's network |
+| `session.ended.kind = ChannelLost` | The control channel dropped, so the server ended the session with `*_disconnected` |
+| `session.ended.kind = TunnelDied` with `session.end` carrying `guest_disconnected`/`host_disconnected` | The tunnel died while both channels were alive: **the name is the peer's name**, not the sender's (ws-protocol section 9) |
+| `session.ended.kind = ProtocolError` with `browser_not_proxied` (with `--browser` only) | The work browser started but did not go through the proxy (a corporate policy or a handoff to an existing instance) |
+| `channel.closed` with code `4409` | Another copy of the tool is running with the same `--state-dir` on another machine |
 
-## 6. ما لم يُتحقق منه بعد على Windows (من تقرير المسار B للأسبوع 4)
+## 6. What has not been verified on Windows yet (from track B's week-4 report)
 
-يضاف إلى قائمة القسم 5 أعلاه:
+Added to the list in section 5 above:
 
-10. الجلسة كاملة بين جهازي Windows حقيقيين: `session --role host` و`session --role guest` حتى `tool.exit` بالكود 0 على الطرفين.
-11. `curl.result.body_prefix` يساوي `public_ip` الخاص بالمضيف (إثبات الخروج من عنوانه).
-12. `--browser` على Win10 وWin11: تشغيل متصفح العمل من داخل الجلسة، وصول صفحة الفحص، ثم إغلاقه في الخطوة 2 من ترتيب التنظيف عند `Ctrl+C`.
-13. `Ctrl+C` على الطرفين: `session.end` يصل بالسبب الصحيح، والمستمع يُغلق وتُزال تعيينات UPnP (`netsh` و`certutil -user -key` بعدها).
-14. `--listen-port N` على المضيف: يظهر `reachable=true` في `hosts` لدى المستخدم.
-15. سر الجهاز بـ DPAPI في `<state-dir>/secrets/` على Windows، و`--reset-device` يعيد التسجيل بعد إلغاء الجهاز.
+10. A full session between two real Windows machines: `session --role host` and `session --role guest` through to
+    `tool.exit` with code 0 on both sides.
+11. `curl.result.body_prefix` equalling the host's `public_ip` (proof of egress from its address).
+12. `--browser` on Win10 and Win11: launching the work browser from inside the session, the check page arriving, then
+    it being closed in step 2 of the cleanup order at `Ctrl+C`.
+13. `Ctrl+C` on both sides: `session.end` arriving with the right reason, and the listener closing and the UPnP
+    mappings being removed (`netsh` and `certutil -user -key` afterwards).
+14. `--listen-port N` on the host: `reachable=true` appearing in `hosts` at the user.
+15. The device secret under DPAPI in `<state-dir>/secrets/` on Windows, and `--reset-device` re-registering after the
+    device is revoked.

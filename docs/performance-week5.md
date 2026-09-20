@@ -1,99 +1,111 @@
-# أداء النفق تحت ظروف واقعية (الأسبوع 5)
+# The tunnel's performance under realistic conditions (week 5)
 
-المالك: المسار B. يمدّد أرقام `docs/decisions/0006-multiplexing-library.md` التي قيست على loopback بـ RTT ≈ 0،
-وينفّذ عمود B من صف الأسبوع 7 في الخطة (12.3): «الأداء (صفحات ثقيلة، فيديو، 256 stream، RTT دولي)» مسحوبًا إلى الأمام.
+Owner: track B. It extends the numbers in `docs/decisions/0006-multiplexing-library.md`, which were measured over
+loopback at RTT ≈ 0, and carries out column B of week 7's row in the plan (12.3): "performance (heavy pages, video, 256
+streams, an international RTT)", pulled forward.
 
-**الخلاصة في سطرين:** سقف الـ stream الواحد هو **النافذة ÷ RTT** بالضبط، وقد تحقق بكفاءة 99–102% في القياسات المسجَّلة أدناه (±2 نقطة بين التشغيلات).
-بنافذة 1 MiB يعني ذلك 163 Mbit/s على 50 ms، و**56 Mbit/s على 150 ms**، و**28 Mbit/s على 300 ms** لكل stream.
-هذا كافٍ لكل ما يفعله متصفح عمل عدا حالة واحدة: **تنزيل ضخم واحد على وصلة سريعة عبر RTT عابر للقارات**.
-التوصية في القسم 7، وما نُفِّذ منها فعلًا بعد تعديل العقد في القسم 8 (56 → 113 Mbit/s عند 150 ms، و28 → 113 عند 300).
+**The conclusion in two lines:** a single stream's ceiling is exactly **the window ÷ the RTT**, and it was achieved at
+99–102% efficiency in the measurements recorded below (±2 points between runs). With a 1 MiB window that means
+163 Mbit/s at 50 ms, and **56 Mbit/s at 150 ms**, and **28 Mbit/s at 300 ms** per stream. That is enough for everything
+a work browser does except one case: **one large download on a fast link across an intercontinental RTT**. The
+recommendation is in section 7, and what was actually implemented from it, after the contract was amended, is in
+section 8 (56 → 113 Mbit/s at 150 ms, and 28 → 113 at 300).
 
 ---
 
-## 1. الاستعمال
+## 1. Usage
 
 ```bash
 export DOTNET_ROOT="$HOME/.dotnet"; export PATH="$HOME/.dotnet:$PATH"
 
-# كل المعايير (معايير ADR-0006 على loopback + معايير الأسبوع 5 على RTT مُحاكى). نحو 4 دقائق.
+# every benchmark (the ADR-0006 benchmarks over loopback + the week-5 benchmarks at a simulated RTT). About 4 minutes.
 dotnet test client/tests/Josour.Tunnel.Tests -c Release \
   --filter 'Category=Benchmark' --logger "console;verbosity=detailed"
 
-# معيار واحد
+# one benchmark
 dotnet test client/tests/Josour.Tunnel.Tests -c Release \
   --filter 'FullyQualifiedName~WanBenchmarks.PerStreamThroughput' --logger "console;verbosity=detailed"
 
-# التشغيل الافتراضي (بلا معايير) يبقى سريعًا كما كان
+# the default run (with no benchmarks) stays as fast as it was
 dotnet test client/tests/Josour.Tunnel.Tests --filter 'Category!=Benchmark'
 ```
 
-الأسطر المطبوعة تبدأ بـ `[throughput]` و`[derived]` و`[page]` و`[video]` و`[256]`، وهي مصدر الجداول أدناه حرفيًا.
-معيار الفيديو 60 ثانية افتراضيًا؛ `RB_VIDEO_SECONDS=10` يختصره أثناء التطوير (الأرقام المسجَّلة هنا من التشغيل الكامل).
+The printed lines start with `[throughput]`, `[derived]`, `[page]`, `[video]` and `[256]`, and they are the source of
+the tables below, verbatim. The video benchmark runs 60 seconds by default; `RB_VIDEO_SECONDS=10` shortens it during
+development (the numbers recorded here are from the full run).
 
-**الملفات:**
+**The files:**
 
-| الملف | الدور |
+| File | Role |
 |---|---|
-| `client/tests/Josour.Tunnel.Tests/Perf/LinkSimulator.cs` | محاكي الوصلة (تأخير، ارتجاف، سقف نطاق، فقد) |
-| `client/tests/Josour.Tunnel.Tests/Perf/LinkSimulatorTests.cs` | اختبارات المحاكي نفسه (سريعة، بلا وسم Benchmark) |
-| `client/tests/Josour.Tunnel.Tests/Perf/PerfSupport.cs` | زوج Mux فوق الوصلة، بروتوكول الموارد، ملف الصفحة، وجهة مُعدَّلة الإيقاع |
-| `client/tests/Josour.Tunnel.Tests/Perf/WanBenchmarks.cs` | المعايير الخمسة (منها معيار النافذة المشتقة في القسم 8) |
+| `client/tests/Josour.Tunnel.Tests/Perf/LinkSimulator.cs` | The link simulator (delay, jitter, a bandwidth ceiling, loss) |
+| `client/tests/Josour.Tunnel.Tests/Perf/LinkSimulatorTests.cs` | Tests of the simulator itself (fast, with no Benchmark tag) |
+| `client/tests/Josour.Tunnel.Tests/Perf/PerfSupport.cs` | A mux pair over the link, the resource protocol, the page file, and a paced destination |
+| `client/tests/Josour.Tunnel.Tests/Perf/WanBenchmarks.cs` | The five benchmarks (including the derived-window benchmark in section 8) |
 
 ---
 
-## 2. المنهج
+## 2. The method
 
-### 2.1 محاكي الوصلة
+### 2.1 The link simulator
 
-`LatencyStream` غلاف `Stream` يوضع **بين المقبس الخام وTLS**، فيصير التركيب:
+`LatencyStream` is a `Stream` wrapper placed **between the raw socket and TLS**, so the composition becomes:
 
 ```
-مقبس loopback ← LatencyStream ← SslStream ← NerdbankMux ← streams التطبيق
+a loopback socket ← LatencyStream ← SslStream ← NerdbankMux ← the application's streams
 ```
 
-كل كتابة تُجدوَل على `LinkMedium` (سلك باتجاه واحد) الذي يحسب وقت وصولها المطلق، ثم تُسلَّم إلى المقبس في وقتها.
-الوصلة كاملة الازدواج: وسيط لكل اتجاه. أوقات الوصول **مطلقة** لا تراكمية، فخطأ مؤقّت واحد لا يتراكم على ما بعده.
+Every write is scheduled on a `LinkMedium` (a one-way wire) that computes its absolute arrival time, and it is then
+delivered to the socket at that time. The link is full duplex: a medium per direction. The arrival times are
+**absolute** rather than cumulative, so one timer error does not accumulate onto what follows.
 
-ما يُنمذَج، ولماذا هذا القدر:
+What is modelled, and why to this extent:
 
-- **التأخير:** نصف الـ RTT في كل اتجاه. هذا هو المتغير الحاكم لبروتوكول ذي نافذة.
-- **سقف النطاق:** طابور تسلسل مشترك — الكتابة التالية لا تبدأ قبل أن تفرغ السابقة من السلك. عدة streams تتشارك
-  نسخة `LinkMedium` واحدة فتتشارك عنق زجاجة واحدًا، كما في وصلة حقيقية. عند امتلاء الطابور أكثر من ثانية
-  يُبطَّأ الكاتب (مخزن محدود بدل نمو بلا حد).
-- **الارتجاف:** تباين في زمن الوصول **بلا إعادة ترتيب**. المستقبل خلف TCP لا يرى إعادة ترتيب أبدًا — يراها TCP
-  ويخفيها — بل يرى تباينًا في وقت تسليم البايتات. الوصول مقيَّد بالرتابة لهذا السبب.
-- **الفقد:** لا يمكن «إسقاط» بايتات من تيار موثوق دون إفساده، وإسقاطها يقيس شيئًا لا يحدث. الفقد يظهر للطبقة
-  الأعلى **حجبًا لرأس الطابور**: الحزمة المفقودة تؤخر كل ما بعدها حتى تُعاد. فيُنمذَج تأخيرًا تراكميًا
-  (RTO لكل حزمة مفقودة) يصيب البايتات التالية كلها. `LinkSimulatorTests.Loss_AddsDelay_ButNeverCorruptsOrDrops`
-  يثبت أن التيار يصل كاملًا وسليمًا ومتأخرًا.
+- **Delay:** half the RTT in each direction. This is the governing variable for a windowed protocol.
+- **The bandwidth ceiling:** a shared serialisation queue — the next write does not start before the previous one has
+  left the wire. Several streams share one `LinkMedium` instance and so share one bottleneck, as on a real link. When
+  the queue exceeds a second, the writer is slowed (a bounded buffer instead of unbounded growth).
+- **Jitter:** variation in the arrival time **with no reordering**. The receiver behind TCP never sees reordering —
+  TCP sees it and hides it — but sees variation in when the bytes are delivered. Arrival is constrained to be
+  monotonic for that reason.
+- **Loss:** bytes cannot be "dropped" from a reliable stream without corrupting it, and dropping them measures
+  something that does not happen. Loss appears to the layer above as **head-of-line blocking**: the lost packet delays
+  everything after it until it is retransmitted. So it is modelled as a cumulative delay (an RTO per lost packet)
+  affecting all the following bytes. `LinkSimulatorTests.Loss_AddsDelay_ButNeverCorruptsOrDrops` proves the stream
+  arrives complete and intact and late.
 
-**ما لا يُنمذَج:** نافذة ازدحام TCP وبدؤها البطيء. أي أن الأرقام متفائلة بمقدار أول بضع RTT من كل اتصال TCP،
-وهذا **يصب في مصلحة المسار المباشر لا النفق**: النفق اتصال واحد طويل العمر يدفع بدءًا بطيئًا واحدًا في العمر كله،
-بينما المسار المباشر يدفعه لكل اتصال جديد. فحكم «النفق لا يضيف شيئًا» في القسم 4 محافظ.
+**What is not modelled:** TCP's congestion window and its slow start. That is, the numbers are optimistic by the first
+few RTTs of every TCP connection, and that **favours the direct path rather than the tunnel**: the tunnel is one
+long-lived connection paying one slow start in its whole lifetime, while the direct path pays it for every new
+connection. So the verdict in section 4 that "the tunnel adds nothing" is conservative.
 
-**المحاكي نفسه مُقاس:** ستة اختبارات سريعة تثبت أنه يضيف التأخير الذي يدّعيه، ويحترم السقف، ويشارك السلك بين
-الاتصالات، ولا يعيد الترتيب تحت ارتجاف عنيف. وكل معيار يطبع **الـ RTT المقيس بـ PING عبر المكدس كله** إلى جانب
-الاسمي؛ الفارق بينهما بقي ≤ 4 ms في كل التشغيلات، وهو مقدار خطأ القياس في الأرقام أدناه.
+**The simulator itself is measured:** six fast tests prove it adds the delay it claims, respects the ceiling, shares
+the wire between connections, and does not reorder under violent jitter. And every benchmark prints **the RTT measured
+by PING through the whole stack** alongside the nominal one; the difference between them stayed ≤ 4 ms in every run,
+and that is the measurement error in the numbers below.
 
-### 2.2 البيئة
+### 2.2 The environment
 
-Apple M5 (10 أنوية)، macOS 26.6.2، .NET 8.0.424، بناء **Release**، TLS **1.2** (ما تفاوض عليه المكدس على هذه المنصة؛ مطبوع في مخرجات كل قياس)، نافذة الاستقبال 1 MiB
-لكل stream إلا حيث يُذكر خلاف ذلك. الأرقام من تشغيل واحد كامل بتاريخ 2026-09-05.
+Apple M5 (10 cores), macOS 26.6.2, .NET 8.0.424, a **Release** build, TLS **1.2** (what the stack negotiated on this
+platform; printed in every measurement's output), a 1 MiB receiving window per stream except where stated otherwise.
+The numbers come from one complete run on 2026-09-05.
 
-### 2.3 حدود الأرقام
+### 2.3 The numbers' limits
 
-- **جهاز واحد، عمليتان منطقيتان داخل عملية واحدة.** لا Schannel، ولا مكدس TCP حقيقي بين مدينتين، ولا ازدحام
-  حقيقي على الطريق. المحاكي يعطي RTT صادقًا وسقف نطاق صادقًا، لا شبكة صادقة.
-- **لا TLS نحو الأصل ولا DNS** في معيار الصفحة، على المسارين معًا. الهدف عزل مساهمة النفق، لا محاكاة متصفح كامل.
-- **Windows لم يُقَس بعد** (Schannel، TLS 1.2 على Win10). انظر القسم 9.
+- **One machine, two logical processes inside one process.** No Schannel, no real TCP stack between two cities, and no
+  real congestion on the way. The simulator gives an honest RTT and an honest bandwidth ceiling, not an honest network.
+- **No TLS to the origin and no DNS** in the page benchmark, on both paths. The aim is to isolate the tunnel's
+  contribution, not to simulate a whole browser.
+- **Windows has not been measured yet** (Schannel, TLS 1.2 on Win10). See section 9.
 
 ---
 
-## 3. سقف الإنتاجية لكل stream
+## 3. The per-stream throughput ceiling
 
-`PerStreamThroughput_IsBoundedByWindowOverRtt`. تنزيل واحد على stream واحد بلا سقف نطاق: القيد الوحيد هو النافذة والـ RTT.
+`PerStreamThroughput_IsBoundedByWindowOverRtt`. One download on one stream with no bandwidth ceiling: the only
+constraint is the window and the RTT.
 
-| RTT اسمي | RTT مقيس | النافذة | الحجم | الزمن | المقيس | السقف = النافذة ÷ RTT | الكفاءة | زمن OPEN |
+| Nominal RTT | Measured RTT | Window | Size | Time | Measured | The ceiling = window ÷ RTT | Efficiency | OPEN time |
 |---|---|---|---|---|---|---|---|---|
 | 50 ms | 51.6 ms | 1 MiB | 64 MB | 3174 ms | **20.16 MB/s (161 Mbit/s)** | 20.32 MB/s (163 Mbit/s) | 99% | 53 ms = 1.0 RTT |
 | 150 ms | 152.2 ms | 1 MiB | 28 MB | 3950 ms | **6.98 MB/s (55.8 Mbit/s)** | 6.89 MB/s (55.1 Mbit/s) | 101% | 151 ms = 1.0 RTT |
@@ -101,207 +113,233 @@ Apple M5 (10 أنوية)، macOS 26.6.2، .NET 8.0.424، بناء **Release**، 
 | 150 ms | 153.8 ms | **4 MiB** | 64 MB | 2290 ms | **27.95 MB/s (224 Mbit/s)** | 27.27 MB/s (218 Mbit/s) | 102% | 152 ms = 1.0 RTT |
 | 300 ms | 303.4 ms | **4 MiB** | 55 MB | 3946 ms | **14.01 MB/s (112 Mbit/s)** | 13.82 MB/s (111 Mbit/s) | 101% | 302 ms = 1.0 RTT |
 
-**القراءة:** الصيغة تنطبق بلا تحفّظ. لا يوجد أي عنق زجاجة آخر — لا في Nerdbank ولا في TLS ولا في `StreamPump` —
-حتى 224 Mbit/s على stream واحد. الكفاءة فوق 100% في بعض الصفوف هي مخزن الوصلة (بايتات في السلك عند إيقاف الساعة)
-وفرق الـ 1–4 ms بين الـ RTT الاسمي والمقيس؛ ليست إعجازًا.
+**The reading:** the formula applies without qualification. There is no other bottleneck — not in Nerdbank, not in
+TLS, not in `StreamPump` — up to 224 Mbit/s on a single stream. The efficiency above 100% in some rows is the link's
+buffer (bytes on the wire when the clock stops) and the 1–4 ms difference between the nominal and the measured RTT;
+it is not a miracle.
 
-**تكلفة فتح stream = RTT واحد بالضبط**، أي ما يدفعه اتصال TCP مباشر تمامًا. هذا رقم مهم لأنه يعني أن الـ mux
-لا يضيف جولة زائدة قبل أول بايت، وهو ما يفسّر نتيجة القسم 4.
+**The cost of opening a stream = exactly one RTT**, precisely what a direct TCP connection pays. That is an important
+number because it means the mux adds no extra round trip before the first byte, which is what explains section 4's
+result.
 
 ---
 
-## 4. صفحة ثقيلة
+## 4. A heavy page
 
-`HeavyPageLoad_TunnelVersusDirect`. مستند 60 KiB ثم **80 موردًا فرعيًا** بأحجام مختلطة (8 سكربتات × 120 KiB،
-6 أنماط × 40 KiB، 40 صورة × 25 KiB، 20 خطًا × 12 KiB، 6 XHR × 8 KiB) = **2548 KiB** موزّعة على **30 مسارًا متزامنًا**
-يُعاد استعمال كل منها لموارده بالتتابع (نظير keep-alive، وهو سلوك المتصفح مع 6 اتصالات × ~5 أصول).
+`HeavyPageLoad_TunnelVersusDirect`. A 60 KiB document, then **80 subresources** of mixed sizes (8 scripts × 120 KiB,
+6 stylesheets × 40 KiB, 40 images × 25 KiB, 20 fonts × 12 KiB, 6 XHR × 8 KiB) = **2548 KiB** spread over **30
+concurrent paths**, each reused for its resources in sequence (the equivalent of keep-alive, which is the browser's
+behaviour with 6 connections × ~5 assets).
 
-خط الأساس «مباشرةً»: نفس الموارد على نفس الوصلة وبنفس عنق الزجاجة المشترك، باتصال TCP لكل مسار يدفع **RTT مصافحة**
-قبل أول طلب، وبلا mux. الساعة تتوقف عند آخر بايت مورد لا بعد تفكيك الاتصالات — أي زمن تحميل الصفحة كما يراه المستخدم.
+The "direct" baseline: the same resources on the same link with the same shared bottleneck, with a TCP connection per
+path paying **a handshake RTT** before the first request, and with no mux. The clock stops at the last resource byte
+rather than after the connections are torn down — that is, the page load time as the user sees it.
 
-| الوصلة | أول OPEN | المستند (نفق) | المستند (مباشر) | الصفحة كاملة (نفق) | الصفحة كاملة (مباشر) | **حمل النفق** |
+| The link | First OPEN | The document (tunnel) | The document (direct) | The whole page (tunnel) | The whole page (direct) | **The tunnel's overhead** |
 |---|---|---|---|---|---|---|
-| RTT 50 ms، بلا سقف | 52 ms = 1.04 RTT | 105 ms | 103 ms | 319 ms | 311 ms | **+2% (7 ms)** |
-| RTT 150 ms، بلا سقف | 152 ms = 1.01 RTT | 302 ms | 304 ms | 925 ms | 912 ms | **+1% (13 ms)** |
-| RTT 300 ms، بلا سقف | 302 ms = 1.01 RTT | 613 ms | 602 ms | 1829 ms | 1812 ms | **+1% (17 ms)** |
-| RTT 150 ms، 50 Mbit/s | 155 ms = 1.03 RTT | 316 ms | 314 ms | 1158 ms | 1156 ms | **+0% (2 ms)** |
-| RTT 150 ms، 10 Mbit/s | 162 ms = 1.08 RTT | 363 ms | 356 ms | 2718 ms | 2699 ms | **+1% (20 ms)** |
+| RTT 50 ms, no ceiling | 52 ms = 1.04 RTT | 105 ms | 103 ms | 319 ms | 311 ms | **+2% (7 ms)** |
+| RTT 150 ms, no ceiling | 152 ms = 1.01 RTT | 302 ms | 304 ms | 925 ms | 912 ms | **+1% (13 ms)** |
+| RTT 300 ms, no ceiling | 302 ms = 1.01 RTT | 613 ms | 602 ms | 1829 ms | 1812 ms | **+1% (17 ms)** |
+| RTT 150 ms, 50 Mbit/s | 155 ms = 1.03 RTT | 316 ms | 314 ms | 1158 ms | 1156 ms | **+0% (2 ms)** |
+| RTT 150 ms, 10 Mbit/s | 162 ms = 1.08 RTT | 363 ms | 356 ms | 2718 ms | 2699 ms | **+1% (20 ms)** |
 
-**القراءة:** الحمل الذي يضيفه النفق على صفحة ثقيلة **ضمن ضوضاء القياس** (0% إلى 2%، أي 2 إلى 20 ms على صفحة
-تستغرق ثلث ثانية إلى ثلاث ثوانٍ). السبب مباشر: تكلفة فتح الـ stream = RTT واحد = تكلفة مصافحة TCP بالضبط، وذهاب
-وإياب الطلب/الرد على stream دافئ = **1.00–1.04 RTT** (مقيس مستقلًا في نفس المعيار)، والنافذة 1 MiB أكبر بكثير من
-أي مورد في الملف. والصفحة عند 300 ms تكلّف 1.8 ثانية على المسارين معًا؛ الـ RTT هو العدو، لا النفق.
+**The reading:** the overhead the tunnel adds to a heavy page is **within the measurement noise** (0% to 2%, that is,
+2 to 20 ms on a page that takes a third of a second to three seconds). The reason is direct: the cost of opening a
+stream = one RTT = exactly the cost of a TCP handshake, and a request/response round trip on a warm stream =
+**1.00–1.04 RTT** (measured independently in the same benchmark), and the 1 MiB window is far larger than any resource
+in the file. And the page at 300 ms costs 1.8 seconds on both paths; the RTT is the enemy, not the tunnel.
 
-ولا يتغير الحكم بوجود سقف نطاق: عند 50 Mbit/s و10 Mbit/s يصير السلك عنق الزجاجة على المسارين معًا، وحمل التأطير
-والتشفير (0.09% من البايتات وفق ADR-0006) يظل تحت ضوضاء القياس.
+And the verdict does not change with a bandwidth ceiling: at 50 Mbit/s and 10 Mbit/s the wire becomes the bottleneck on
+both paths, and the framing and encryption overhead (0.09% of the bytes per ADR-0006) stays under the measurement
+noise.
 
 ---
 
-## 5. بث مستمر بمعدل ثابت
+## 5. A sustained constant-rate stream
 
-`SustainedVideoStream_NoStall_NoMemoryGrowth`. تنزيل واحد بمعدل **5 Mbit/s لمدة 60 ثانية** (37.5 MB) على RTT 150 ms،
-بينما **20 stream آخر** نشطة تجلب 32 KiB كل 200 ms طوال المدة.
+`SustainedVideoStream_NoStall_NoMemoryGrowth`. One download at **5 Mbit/s for 60 seconds** (37.5 MB) at RTT 150 ms,
+while **20 other streams** are active fetching 32 KiB every 200 ms throughout.
 
-| القياس | النتيجة |
+| Measurement | Result |
 |---|---|
-| المستلَم | 37.5 MB في 60.0 s = **5.0 Mbit/s** (المعدل المطلوب بلا نقص) |
-| حركة الخلفية أثناءها | 110.8 MB على 20 stream |
-| زمن بين الوصولات: p50 | 0.0 ms (القطعة الواحدة تصل في عدة قراءات متلاحقة) |
+| Received | 37.5 MB in 60.0 s = **5.0 Mbit/s** (the requested rate with no shortfall) |
+| Background traffic during it | 110.8 MB over 20 streams |
+| Inter-arrival time: p50 | 0.0 ms (one chunk arrives across several successive reads) |
 | p95 / p99 | 102.9 ms / 104.0 ms |
-| **أقصى فجوة** | **109 ms** — أي إيقاع المنتج نفسه (قطعة كل 100 ms)، لا توقف |
-| الذاكرة المُدارة | 15.2 MiB قبل → 30.3 MiB في المنتصف → **8.9 MiB بعد الاستقرار** |
+| **The largest gap** | **109 ms** — that is, the producer's own cadence (a chunk every 100 ms), not a stall |
+| Managed memory | 15.2 MiB before → 30.3 MiB in the middle → **8.9 MiB after settling** |
 
-**القراءة:** لا توقف ولا تراكم تأخير: البث انتهى في زمنه لا بعده. الارتجاف الذي يراه المستهلك هو ارتجاف المنتج نفسه؛
-النفق لم يضف شيئًا مقيسًا. والذاكرة عادت **أقل** من خط الأساس، فلا تسرّب: النوافذ تُخصَّص عند الحاجة
-(`System.IO.Pipelines`) ولا تُحجز 21 × 1 MiB مسبقًا.
+**The reading:** no stall and no accumulating delay: the stream finished in its time rather than after it. The jitter
+the consumer sees is the producer's own jitter; the tunnel added nothing measurable. And the memory came back **below**
+the baseline, so there is no leak: the windows are allocated on demand (`System.IO.Pipelines`) and 21 × 1 MiB is not
+reserved in advance.
 
 ---
 
-## 6. 256 stream متزامنًا مع مستهلكين متوقفين
+## 6. 256 concurrent streams with stalled consumers
 
-`Concurrent256Streams_SlowConsumersDoNotStarveTheRest`. الحد الأقصى في `docs/protocol.md` القسم 5 (256 stream)
-على RTT 150 ms، منها **32 وجهتها متوقفة تمامًا** (المستهلك لا يقرأ)، بينما تجلب الـ 224 الأخرى 256 KiB لكل منها.
-ADR-0006 أثبت هذا العزل على RTT = 0 فقط، حيث النافذة لا تُختبَر أصلًا.
+`Concurrent256Streams_SlowConsumersDoNotStarveTheRest`. The maximum in section 5 of `docs/protocol.md` (256 streams) at
+RTT 150 ms, of which **32 have a completely stalled destination** (the consumer does not read), while the other 224
+fetch 256 KiB each. ADR-0006 proved this isolation at RTT = 0 only, where the window is not exercised at all.
 
-| القياس | النتيجة |
+| Measurement | Result |
 |---|---|
-| فتح 256 stream | **177 ms = 1.1 RTT** إجماليًا (0.69 ms لكل واحد بالتوازي) |
-| ما قبِلته كل stream متوقفة | **1.00 MiB بالضبط** من 8 MiB معروضة — أي نافذة واحدة، والباقي محجوز عند المرسل |
-| ما استلمته وجهاتها | **0 بايت** (المستهلك متوقف فعلًا) |
-| الـ 224 السليمة | 59 MB في **258 ms = 1.7 RTT** = 228 MB/s إجمالًا (1824 Mbit/s) |
-| تصريف الـ 32 بعد رفع التوقف | 8 MiB لكل واحدة، اكتملت عند 1403 ms |
+| Opening 256 streams | **177 ms = 1.1 RTT** in total (0.69 ms each, in parallel) |
+| What each stalled stream accepted | **Exactly 1.00 MiB** of 8 MiB offered — that is, one window, with the rest held at the sender |
+| What their destinations received | **0 bytes** (the consumer really is stalled) |
+| The 224 healthy ones | 59 MB in **258 ms = 1.7 RTT** = 228 MB/s in total (1824 Mbit/s) |
+| Draining the 32 after the stall is lifted | 8 MiB each, completed at 1403 ms |
 
-**القراءة:** العزل يعمل على RTT حقيقي كما عمل على صفر: المرسل توقف عند نافذة واحدة (1.00 MiB لا 8 MiB)، والـ 224
-الأخرى أنهت عملها في 1.7 RTT — أي أن الـ streams المتوقفة لم تكلّفها شيئًا مقيسًا. وفتح 256 قناة يكلّف RTT واحدًا
-إجماليًا لأن الفتوحات تتوازى.
+**The reading:** the isolation works at a real RTT as it did at zero: the sender stopped at one window (1.00 MiB, not
+8 MiB), and the other 224 finished their work in 1.7 RTT — that is, the stalled streams cost them nothing measurable.
+And opening 256 channels costs one RTT in total because the opens are parallel.
 
-**السقف النظري للذاكرة عند الحد الأقصى:** 256 stream × 1 MiB = 256 MiB لو امتلأت كل النوافذ معًا. لم يحدث في
-أي قياس (القسم 5 يقيس 21 stream بذروة 30 MiB مُدارة)، لكنه سقف حقيقي يجب أن يُذكر عند أي رفع للنافذة — انظر القسم 7.
+**The theoretical memory ceiling at the maximum:** 256 streams × 1 MiB = 256 MiB if every window filled at once. It
+happened in no measurement (section 5 measures 21 streams with a 30 MiB managed peak), but it is a real ceiling that
+must be mentioned at any raising of the window — see section 7.
 
 ---
 
-## 7. الحكم على النافذة، والتوصية
+## 7. The verdict on the window, and the recommendation
 
-### 7.1 هل 1 MiB كافية؟
+### 7.1 Is 1 MiB enough?
 
-لثلاث حالات من أربع: نعم بوضوح.
+For three cases out of four: clearly yes.
 
-| الاستعمال | ما يحتاجه | 1 MiB على 150 ms (56 Mbit/s) | 1 MiB على 300 ms (28 Mbit/s) |
+| Use | What it needs | 1 MiB at 150 ms (56 Mbit/s) | 1 MiB at 300 ms (28 Mbit/s) |
 |---|---|---|---|
-| صفحات ثقيلة | متوازية، كل مورد < 1 MiB | كافٍ (حمل ≤ 2%) | كافٍ (حمل ≤ 2%) |
-| فيديو 1080p | 5–8 Mbit/s | كافٍ بفارق 7× | كافٍ بفارق 3.5× |
-| فيديو 4K | 20–25 Mbit/s | كافٍ بفارق 2× | **على الحافة** |
-| تنزيل ملف واحد كبير | كل ما تعطيه الوصلة | **يقيّد إلى 56 Mbit/s** | **يقيّد إلى 28 Mbit/s** |
+| Heavy pages | Parallel, every resource < 1 MiB | Enough (≤ 2% overhead) | Enough (≤ 2% overhead) |
+| 1080p video | 5–8 Mbit/s | Enough by 7× | Enough by 3.5× |
+| 4K video | 20–25 Mbit/s | Enough by 2× | **On the edge** |
+| Downloading one large file | Everything the link gives | **Limited to 56 Mbit/s** | **Limited to 28 Mbit/s** |
 
-الحالة التي تفشل صريحة: **تنزيل واحد كبير عبر HTTP/2** (وهو اتصال TCP واحد = stream واحد في نفقنا) على وصلة
-100 Mbit/s فأعلى مع RTT عابر للقارات. المستخدم على وصلة 100 Mbit/s يرى 56 Mbit/s عند 150 ms و28 Mbit/s عند 300 ms،
-وسيقول إن «النفق أبطأ»، وسيكون محقًا. وليس هذا خللًا في المكتبة ولا في الكود: هو حاصل ضرب النافذة في مقلوب الـ RTT.
-كتمانه داخل متوسط لطيف يخدع.
+The case that fails is explicit: **one large download over HTTP/2** (which is one TCP connection = one stream in our
+tunnel) on a link of 100 Mbit/s or more with an intercontinental RTT. A user on a 100 Mbit/s link sees 56 Mbit/s at
+150 ms and 28 Mbit/s at 300 ms, and will say "the tunnel is slower", and will be right. And that is not a defect in the
+library nor in the code: it is the window multiplied by the reciprocal of the RTT. Hiding it inside a pleasant average
+is deceptive.
 
-**لا يوجد ما يعوّض ذلك تلقائيًا:** لا نافذة على مستوى الاتصال في بروتوكول Nerdbank 3 (فالسقف الإجمالي ليس مقيَّدًا،
-وهو ما تؤكده 228 MB/s الإجمالية في القسم 6)، لكن السقف **لكل stream** مقيَّد، والتنزيل الواحد stream واحد.
+**Nothing compensates for it automatically:** there is no connection-level window in Nerdbank protocol 3 (so the
+aggregate ceiling is not constrained, which the total of 228 MB/s in section 6 confirms), but the **per-stream** ceiling
+is constrained, and a single download is a single stream.
 
-### 7.2 التوصية
+### 7.2 The recommendation
 
-**نافذة مشتقة من الـ RTT المقيس عند الاتصال، بميزانية ذاكرة على مستوى الجلسة.** الأجزاء الثلاثة:
+**A window derived from the RTT measured at connect time, with a session-level memory budget.** The three parts:
 
-1. **قِس الـ RTT مرة واحدة عند بدء النفق.** الرقم متاح مجانًا: `connect_ms` في `session.connected`، أو
-   `IMuxEndpoint.PingAsync` مباشرة بعد المصافحة.
-2. **اختر النافذة منه** بحيث يبقى سقف الـ stream الواحد **فوق 100 Mbit/s** (بعدها تصير وصلة المستخدم هي القيد
-   لا نحن). بتطبيق النافذة ÷ RTT — وهي صيغة تحققت بكفاءة 99–102% في القسم 3، فالحساب ليس تخمينًا:
+1. **Measure the RTT once when the tunnel starts.** The number is free: `connect_ms` in `session.connected`, or
+   `IMuxEndpoint.PingAsync` right after the handshake.
+2. **Choose the window from it** so that a single stream's ceiling stays **above 100 Mbit/s** (beyond which the user's
+   own link becomes the constraint rather than us). Applying window ÷ RTT — a formula that held at 99–102% efficiency
+   in section 3, so the arithmetic is not guesswork:
 
-   | RTT المقيس | النافذة | سقف الـ stream الناتج |
+   | Measured RTT | Window | The resulting stream ceiling |
    |---|---|---|
-   | ≤ 60 ms | 1 MiB (كما اليوم) | ≥ 140 Mbit/s |
-   | 60–150 ms | 2 MiB | 112 Mbit/s عند 150 ms |
-   | > 150 ms | 4 MiB | **112 Mbit/s عند 300 ms** (مقيس: 112.2) |
+   | ≤ 60 ms | 1 MiB (as today) | ≥ 140 Mbit/s |
+   | 60–150 ms | 2 MiB | 112 Mbit/s at 150 ms |
+   | > 150 ms | 4 MiB | **112 Mbit/s at 300 ms** (measured: 112.2) |
 
-   `MuxOptions.ReceiveWindow` تقبل القيمة أصلًا؛ التغيير هو **من يملأها**: `TunnelSession` بعد المصافحة.
-3. **اربطها بحد الـ streams.** 256 × 4 MiB = **1 GiB** سقفًا نظريًا، وهو غير مقبول على جهاز مكتبي. الذاكرة
-   تُخصَّص عند الحاجة لا مسبقًا (القسم 5 يقيس 30 MiB لـ 21 stream نشطة)، فالسقف النظري نادر — لكن سقفًا بـ 1 GiB
-   لا يُترك بلا حارس. الأنظف ميزانية بايتات مخزّنة على مستوى الجلسة يقتسمها الـ streams؛ والأبسط خفض الحد
-   المتزامن كلما كبرت النافذة بحيث يبقى الحاصل ثابتًا عند 256 MiB.
+   `MuxOptions.ReceiveWindow` already accepts the value; the change is **who fills it**: `TunnelSession` after the
+   handshake.
+3. **Tie it to the stream limit.** 256 × 4 MiB = **1 GiB** as a theoretical ceiling, which is unacceptable on a desktop
+   machine. Memory is allocated on demand rather than in advance (section 5 measures 30 MiB for 21 active streams), so
+   the theoretical ceiling is rare — but a 1 GiB ceiling is not left unguarded. The cleanest is a session-level budget
+   of buffered bytes shared among the streams; the simplest is lowering the concurrency limit as the window grows, so
+   that the product stays fixed at 256 MiB.
 
-**البديل الأرخص إن رُفض التكيّف:** ثبّت النافذة على 4 MiB واخفض الحد المتزامن من 256 إلى 64. يغطي الحالات كلها
-بسقف ذاكرة 256 MiB وبلا أي منطق تكيّفي، و64 اتصالًا متزامنًا أكثر مما يفتحه متصفح لصفحة واحدة (30 في ملف القسم 4).
-كلفته: تغيير حدَّين في `docs/protocol.md` القسم 5 بدل واحد.
+**The cheaper alternative if adaptation is rejected:** pin the window at 4 MiB and lower the concurrency limit from 256
+to 64. It covers every case with a 256 MiB memory ceiling and no adaptive logic at all, and 64 concurrent connections
+is more than a browser opens for one page (30 in section 4's file). Its cost: changing two limits in section 5 of
+`docs/protocol.md` instead of one.
 
-**ما لا نوصي به:** ترك 1 MiB والاعتماد على أن المستخدمين لن يلاحظوا. الفارق 3.5× على وصلة عابرة للقارات مرئي
-لأي أحد ينزّل ملفًا واحدًا.
+**What we do not recommend:** leaving it at 1 MiB and relying on users not noticing. A difference of 3.5× on an
+intercontinental link is visible to anyone downloading a single file.
 
-**التبعات العقدية:** الرقم 1 MiB مكتوب في `docs/protocol.md` القسم 5 وفي ADR-0006، وكلاهما يحتاج تعديلًا مقصودًا
-لا تغييرًا صامتًا في الكود. لذلك لم يُغيَّر الافتراضي في هذا الأسبوع: القياس هنا، والقرار لمالكي العقد.
+**The contractual consequences:** the number 1 MiB is written in section 5 of `docs/protocol.md` and in ADR-0006, and
+both need a deliberate amendment rather than a silent change in the code. So the default was not changed this week: the
+measurement is here, and the decision is the contract owners'.
 
 ---
 
-## 8. بعد التعديل: النافذة مشتقة من الـ RTT (مقيس)
+## 8. After the amendment: the window is derived from the RTT (measured)
 
-العقد عُدِّل (`docs/protocol.md` القسم 5) والكود تبعه: `MuxWindow.ForRoundTrip` في `Josour.Tunnel.Mux` تختار النافذة
-من `connect_ms`، و`TunnelSession` تستدعيها بعد `SymmetricConnector` وتمرر الحد المتزامن المرافق إلى `StreamLimiter`
-عبر `TunnelEgressContext.MaxConcurrentStreams`. حد الـ 50 فتحة/ثانية لم يتغير.
+The contract was amended (`docs/protocol.md` section 5) and the code followed: `MuxWindow.ForRoundTrip` in
+`Josour.Tunnel.Mux` chooses the window from `connect_ms`, and `TunnelSession` calls it after `SymmetricConnector` and
+passes the accompanying concurrency limit to `StreamLimiter` through `TunnelEgressContext.MaxConcurrentStreams`. The
+50 opens/second limit is unchanged.
 
-المعيار الجديد `WanBenchmarks.PerStreamThroughput_WithRttDerivedWindow_ClearsTheSingleDownloadCeiling` يشغّل نفس
-تنزيل القسم 3 لكن بالنافذة التي تختارها الدالة نفسها (لا برقم مكتوب في الاختبار):
+The new benchmark `WanBenchmarks.PerStreamThroughput_WithRttDerivedWindow_ClearsTheSingleDownloadCeiling` runs the same
+download as section 3 but with the window the function itself chooses (not a number written into the test):
 
 ```bash
 dotnet test client/tests/Josour.Tunnel.Tests -c Release \
   --filter 'FullyQualifiedName~PerStreamThroughput_WithRttDerivedWindow' --logger "console;verbosity=detailed"
 ```
 
-| RTT اسمي | RTT مقيس | النافذة المشتقة | الحد المتزامن | الحجم | الزمن | **المقيس** | الكفاءة | قبل التعديل (1 MiB) | الزيادة |
+| Nominal RTT | Measured RTT | The derived window | Concurrency limit | Size | Time | **Measured** | Efficiency | Before the amendment (1 MiB) | The gain |
 |---|---|---|---|---|---|---|---|---|---|
 | 50 ms | 52.0 ms | 1 MiB | 256 | 81 MB | 3975 ms | **20.29 MB/s (162.3 Mbit/s)** | 101% | 161.3 Mbit/s | ×1.0 |
 | 150 ms | 150.6 ms | 2 MiB | 128 | 56 MB | 3947 ms | **14.11 MB/s (112.9 Mbit/s)** | 101% | 55.7 Mbit/s | **×2.0** |
 | 300 ms | 301.0 ms | 4 MiB | 64 | 56 MB | 3929 ms | **14.19 MB/s (113.5 Mbit/s)** | 102% | 27.9 Mbit/s | **×4.1** |
 
-أرقام تشغيل كامل بتاريخ 2026-09-05 على نفس بيئة القسم 2.2 (M5، .NET 8.0.424، Release، TLS 1.2). تشغيل ثانٍ في اليوم
-نفسه أعطى 162.9 و**110.9** و112.9 Mbit/s: أي أن الصف الأوسط يقع على **111 ± 1 Mbit/s** لأن الـ RTT المقيس يزيد على
-الاسمي بـ 1–3 ms فينزل السقف بقدرها. لذلك يؤكّد المعيار «فوق 100 Mbit/s» ونسبة الزيادة (×2 و×4)، لا رقمًا حرفيًا.
+The numbers are from a complete run on 2026-09-05 in the same environment as section 2.2 (M5, .NET 8.0.424, Release,
+TLS 1.2). A second run the same day gave 162.9, **110.9** and 112.9 Mbit/s: that is, the middle row sits at **111 ± 1
+Mbit/s**, because the measured RTT exceeds the nominal one by 1–3 ms and the ceiling drops by that much. So the
+benchmark confirms "above 100 Mbit/s" and the ratio of the gain (×2 and ×4), not a literal number.
 
-**القراءة:** الحالة الوحيدة التي كانت تفشل (تنزيل ملف عمل واحد عبر RTT عابر للقارات) لم تعد تفشل: 56 → 113 Mbit/s
-عند 150 ms، و28 → 113 عند 300 ms. الكفاءة بقيت 101–102% كما في القسم 3، أي أن النافذة الأكبر تتحول إنتاجية فعلًا
-ولا يظهر عنق زجاجة آخر مكانها. الشريحة الدنيا (≤ 60 ms) لم تتغير عمّا كان: نفس 1 MiB ونفس 256 stream.
+**The reading:** the one case that used to fail (downloading a single work file across an intercontinental RTT) no
+longer fails: 56 → 113 Mbit/s at 150 ms, and 28 → 113 at 300 ms. The efficiency stayed at 101–102% as in section 3,
+which means the larger window really does turn into throughput and no other bottleneck appears in its place. The lowest
+band (≤ 60 ms) did not change from what it was: the same 1 MiB and the same 256 streams.
 
-**ما اشترينا به ذلك — سقف الذاكرة:** النافذة × الحد المتزامن = **256 MiB في كل الشرائح الثلاث** (256×1، 128×2، 64×4)،
-أي أن السقف النظري الأسوأ لم يتحرك عن القسم 6. الثمن الحقيقي في مكان آخر:
+**What we bought that with — the memory ceiling:** the window × the concurrency limit = **256 MiB in all three bands**
+(256×1, 128×2, 64×4), so the theoretical worst case has not moved from section 6. The real price is elsewhere:
 
-- **ذاكرة أكثر في الحالة الشائعة لا في السقف:** الجلسة على RTT عالٍ تحمل نوافذ 2 أو 4 MiB لكل stream نشط بدل 1 MiB.
-  القياس المستمر (القسم 5، 21 stream نشطة) بلغ 17.0 MiB مُدارة بنافذة 1 MiB؛ الحمل نفسه بنافذة 4 MiB يصل إلى
-  أضعاف ذلك إن امتلأت النوافذ فعلًا.
-- **تزامن أقل حيث الـ RTT أعلى:** 64 stream بدل 256 عند 4 MiB. صفحة القسم 4 تستعمل 30 مسارًا، فالهامش قائم، لكن
-  متصفحًا يفتح أكثر من 64 اتصالًا متزامنًا سيصطدم بـ `OPEN_FAIL(limit)` على وصلة عابرة للقارات ولم يكن ليصطدم قبل التعديل.
+- **More memory in the common case rather than at the ceiling:** a session at a high RTT carries windows of 2 or 4 MiB
+  per active stream instead of 1 MiB. The sustained measurement (section 5, 21 active streams) reached 17.0 MiB managed
+  with a 1 MiB window; the same load with a 4 MiB window reaches several times that if the windows actually fill.
+- **Less concurrency where the RTT is higher:** 64 streams instead of 256 at 4 MiB. Section 4's page uses 30 paths, so
+  there is margin, but a browser opening more than 64 concurrent connections will hit `OPEN_FAIL(limit)` on an
+  intercontinental link where it would not have before the amendment.
 
-**تنبيه لمالكي العقد — `connect_ms` ليس RTT:** العقد يسمّيه «زمن الذهاب والإياب المقيس عند إنشاء الاتصال» والكود
-ينفّذ ذلك حرفيًا، لكن `TunnelConnectResult.ConnectMs` يقيس **الاتصال كله**: مصافحة TCP (RTT) + مصافحة TLS
-(RTT أو اثنان) + `AUTH1`/`AUTH2` (RTT)، فوق سباق المرشحين والفارق الزمني بين لحظة بدء كل طرف. أي أنه يقارب
-**ثلاثة إلى أربعة أضعاف** الـ RTT الحقيقي. النتيجة العملية: جلسات كثيرة سترتفع شريحةً أو شريحتين فوق ما يبرره
-الـ RTT وحده — تكلفتها ذاكرة وتزامن لا إنتاجية. إن أُريد الرقم الدقيق فالمصدر الصحيح `IMuxEndpoint.PingAsync`
-(القسم 3 يقيسه بدقة ≤ 4 ms)، لكنه لا يتاح إلا **بعد** إنشاء الـ Mux والنافذة تُثبَّت عند الإنشاء؛ فاستعماله يقتضي
-تعديلًا في العقد لا في الكود.
+**A warning for the contract owners — `connect_ms` is not the RTT:** the contract calls it "the round-trip time
+measured when the connection is established" and the code implements that literally, but
+`TunnelConnectResult.ConnectMs` measures **the whole connection**: the TCP handshake (an RTT) + the TLS handshake (one
+RTT or two) + `AUTH1`/`AUTH2` (an RTT), on top of the candidate race and the time difference between when each side
+started. That is, it approximates **three to four times** the real RTT. The practical result: many sessions will rise a
+band or two above what the RTT alone justifies — at a cost in memory and concurrency rather than throughput. If the
+exact number is wanted, the correct source is `IMuxEndpoint.PingAsync` (section 3 measures it to within ≤ 4 ms), but it
+is only available **after** the mux is created and the window is fixed at creation; so using it requires an amendment
+to the contract rather than to the code.
 
-**قياس فاسد:** `connect_ms` صفر أو سالب أو أكبر من 5 ثوانٍ (مهلة، ساعة قفزت، حقل مفقود) لا يختار نافذة من قمامة:
-الشريحة الوسطى (2 MiB / 128) مع سبب مكتوب في تشخيص الجلسة (`mux_window_reason`).
+**A corrupt measurement:** a `connect_ms` that is zero, negative or greater than 5 seconds (a timeout, a clock that
+jumped, a missing field) does not choose a window from rubbish: it takes the middle band (2 MiB / 128) with a reason
+written into the session's diagnostics (`mux_window_reason`).
 
-**كل طرف يشتق نافذته وحده:** الطرفان يقيسان `connect_ms` كلٌّ بساعته، فقد يختلفان قليلًا وقد يقعان — قرب الحد —
-في شريحتين مختلفتين. هذا قانوني وغير محتاج إلى تفاوض: نافذة الاستقبال في بروتوكول Nerdbank 3 خاصية **المستقبل**
-وتُعلَن لكل قناة في إطار العرض/القبول، فكل اتجاه محكوم بنافذة مستقبله.
-`NerdbankMuxTests.Windows_AreAdvertisedPerReceiver_SoTheTwoSidesMayDiffer` يثبت ذلك بالقياس: بضيف 1 MiB ومضيف 4 MiB
-توقف اتجاه Guest→Host عند نافذة المضيف واتجاه Host→Guest عند نافذة الضيف، والقناة المزروعة (PING/PONG) عملت في الاتجاهين.
+**Each side derives its own window:** both sides measure `connect_ms` each by its own clock, so they may differ
+slightly and may — near a boundary — land in different bands. That is legal and needs no negotiation: the receiving
+window in Nerdbank protocol 3 is a property of the **receiver** and is announced per channel in the offer/accept frame,
+so each direction is governed by its receiver's window.
+`NerdbankMuxTests.Windows_AreAdvertisedPerReceiver_SoTheTwoSidesMayDiffer` proves it by measurement: with a guest at
+1 MiB and a host at 4 MiB, the Guest→Host direction stopped at the host's window and the Host→Guest direction at the
+guest's, and the seeded channel (PING/PONG) worked in both directions.
 
-لكن اختلاف الشريحتين يفتح ثغرة في **حد الذاكرة**: المضيف يفرض حده على السلك (`StreamLimiter`)، فلو كان في الشريحة
-الدنيا (256 stream) والضيف في العليا (4 MiB) لبلغ سقف الضيف النظري 1 GiB — وهو بالضبط ما أراد التعديل منعه. لذلك
-يحجز الضيف مكان كل stream في `NerdbankMux.OpenStreamAsync` قبل العرض ويرد `OPEN_FAIL(limit)` محليًا عند تجاوز حد
-شريحته هو، فيبقى سقف كل جهاز 256 MiB مهما اختلفت الشريحتان. هذا الحد المحلي لا يزيد على ما يسمح به العقد للمضيف
-في الشريحة نفسها، والمتصفح يراه كأي `OPEN_FAIL(limit)`.
+But the two bands differing opens a hole in **the memory limit**: the host enforces its limit on the wire
+(`StreamLimiter`), so if it were in the lowest band (256 streams) and the guest in the highest (4 MiB), the guest's
+theoretical ceiling would reach 1 GiB — which is exactly what the amendment meant to prevent. So the guest reserves
+each stream's slot in `NerdbankMux.OpenStreamAsync` before offering, and answers `OPEN_FAIL(limit)` locally when its
+own band's limit is exceeded, so each machine's ceiling stays 256 MiB however the two bands differ. This local limit is
+no tighter than what the contract allows the host in the same band, and the browser sees it as any other
+`OPEN_FAIL(limit)`.
 
-## 9. ما يبقى بحاجة إلى شبكة حقيقية أو Windows
+## 9. What still needs a real network or Windows
 
-| البند | لماذا لا يكفي القياس هنا |
+| Item | Why the measurement here is not enough |
 |---|---|
-| Schannel على Windows 10 (TLS 1.2) و11 (TLS 1.3) | كل الأرقام على مكدس TLS الخاص بـ .NET على macOS. حمل التشفير وحجم السجل يختلفان |
-| ازدحام حقيقي وبدء TCP البطيء | المحاكي لا ينمذج نافذة الازدحام؛ الأرقام متفائلة بأول بضع RTT لكل اتصال |
-| فقد حقيقي على مسار دولي | نُمذج حجب رأس الطابور فقط؛ سلوك RTO الحقيقي لمكدس النظام قد يختلف |
-| نافذة استقبال TCP للنظام نفسه | قد تصير عنق الزجاجة قبل نافذتنا على RTT عالٍ إن لم يكن تحجيمها مفعّلًا |
-| Wi-Fi وشبكات الهاتف | ارتجاف وفقد بأنماط لا يمثلها ملف ثابت |
+| Schannel on Windows 10 (TLS 1.2) and 11 (TLS 1.3) | All the numbers are on .NET's own TLS stack on macOS. The encryption overhead and the record size differ |
+| Real congestion and TCP slow start | The simulator does not model the congestion window; the numbers are optimistic by the first few RTTs of every connection |
+| Real loss on an international path | Only head-of-line blocking was modelled; the real RTO behaviour of the system's stack may differ |
+| The system's own TCP receive window | It may become the bottleneck before ours at a high RTT if window scaling is not enabled |
+| Wi-Fi and mobile networks | Jitter and loss in patterns a fixed file does not represent |
 
-وكلها تحتاج البند نفسه المعلَّق منذ الأسبوع الأول: **جهازان حقيقيان على Windows** وفق `docs/spike-runbook.md`.
+And all of them need the same item pending since week one: **two real Windows machines** per `docs/spike-runbook.md`.
