@@ -622,17 +622,21 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
 
         public IReadOnlyList<BrowserKind> Preference() => new[] { _kind };
 
-        public IBrowserSession Create(BrowserKind kind) => new EventBrowserSession(new BrowserLauncher(), kind, _log);
+        public IBrowserSession Create(BrowserKind kind) => new EventBrowserSession(BrowserSessions.ForCurrentPlatform(), kind, _log);
     }
 
-    /// <summary><see cref="BrowserLauncher"/> emits a <c>browser.launch</c> event with every launch's result.</summary>
+    /// <summary>
+    /// The platform's own <see cref="IBrowserSession"/>, emitting a <c>browser.launch</c> event with every launch's
+    /// result. It used to construct <see cref="BrowserLauncher"/> by name, which is the Windows implementation, so
+    /// the tool that verifies the stack could not launch a browser on macOS at all.
+    /// </summary>
     private sealed class EventBrowserSession : IBrowserSession
     {
-        private readonly BrowserLauncher _inner;
+        private readonly IBrowserSession _inner;
         private readonly BrowserKind _kind;
         private readonly EventLog _log;
 
-        public EventBrowserSession(BrowserLauncher inner, BrowserKind kind, EventLog log)
+        public EventBrowserSession(IBrowserSession inner, BrowserKind kind, EventLog log)
         {
             _inner = inner;
             _kind = kind;
@@ -648,10 +652,22 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
             var result = await _inner.LaunchAsync(options, ct).ConfigureAwait(false);
             _log.Emit("browser.launch", EventLog.Fields(
                 ("browser", _kind.ToString().ToLowerInvariant()), ("success", result.Success), ("failure", result.Failure?.ToString()),
-                ("detail", result.Detail), ("handoff", _inner.InstanceHandoff), ("pid", _inner.ProcessId)),
+                ("detail", result.Detail), ("handoff", (_inner as BrowserLauncher)?.InstanceHandoff), ("pid", ProcessId())),
                 result.Success ? $"launched {_kind} on the check page" : $"could not launch {_kind}: {result.Failure} — {result.Detail}");
             return result;
         }
+
+        /// <summary>
+        /// Instance handoff is a Windows notion — a second copy of Chrome handing the URL to the first — and is left
+        /// null elsewhere rather than invented. A process id is not: every platform has one, so it is read from
+        /// whichever session ran.
+        /// </summary>
+        private int? ProcessId() => _inner switch
+        {
+            BrowserLauncher windows => windows.ProcessId,
+            MacBrowserSession mac => mac.ProcessId,
+            _ => null,
+        };
 
         public Task CloseAsync(TimeSpan graceful, CancellationToken ct) => _inner.CloseAsync(graceful, ct);
 

@@ -28,7 +28,7 @@ everything the host does with the bytes — needs nothing.
 |---|---|---|---|---|
 | 1 | Secret storage | DPAPI (`DpapiSecretStore`) | A file with `0600` permissions (`FileSecretStore`) — the Keychain was tried first and fell, see [ADR-0013](decisions/0013-avalonia-and-macos.md) | ✅ (`FileSecretStore`, `SecretStores`) |
 | 2 | Device information | Registry keys | `sw_vers` | ✅ (`DeviceInfoProvider.ReadMacVersion`) |
-| 3 | Locating the browser's path | The registry | `/Applications` and `~/Applications` (`MacBrowserLocator`) | ✅ |
+| 3 | Locating the browser's path | The registry | `/Applications` and `~/Applications` (`MacBrowserLocator`, reached through `BrowserSessions.IsInstalled`) | ✅ |
 | 4 | Launching the work browser | `--proxy-server` + an isolated profile | The same arguments; executing directly inside the bundle rather than `open` (`MacBrowserSession`) | ✅ |
 | 5 | Containing the browser | A Job Object | The process tree: SIGTERM to the tree then SIGKILL (`MacProcessTree`) | ✅ |
 | 6 | **The connection-owner check** | `iphlpapi!GetExtendedTcpTable` | `lsof` (`MacOwnerPidChecker`) + the process tree | ✅ **implemented and tested both ways** |
@@ -98,6 +98,21 @@ own.
 | That the refusal is a decision, not an inability | A test proving the checker **names the test's own process** — a refusal caused by failing to identify anything would have looked identical, and would mean the control does not work |
 
 **Not exercised:** a real mac ↔ Windows session in both roles. It needs two machines.
+
+**And what the `Spike` tool could not exercise, discovered on 2026-09-23.** The positive case above ran through the
+tool's `browser` command, which does ask for this platform's session. Two paths around it did not, and both were blind
+to macOS:
+
+- `WorkBrowserProvider.Preference()` — the app's own gate — asked `BrowserLocator`, which knows `chrome.exe`, the
+  registry and the Windows default paths. On macOS it answered "not installed" however many browsers were there, so a
+  guest session that had connected, relayed and gone active ended with `browser_not_proxied` in the same instant. The
+  tool never reached this code: its provider answers the browser named on the command line without asking whether it is
+  installed.
+- `SessionDriver`'s provider constructed `BrowserLauncher` — the Windows implementation — by name, so the tool's own
+  `session` command could not launch a browser on macOS either.
+
+Both now go through `BrowserSessions.IsInstalled` / `ForCurrentPlatform`, and the regression is pinned in
+`BrowserSessionsTests`. The lesson is the one this table exists for: what the tool exercised was not what the app ran.
 
 ## The interface: what actually changed
 

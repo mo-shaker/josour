@@ -10,7 +10,8 @@ namespace Josour.App.Services;
 /// <summary>
 /// Picks the work browser on this machine: the user's preferred one first (week 6 — the <c>preferredBrowser</c> setting
 /// existed since week 1 and nothing read it), then the other, keeping only the ones that are actually installed
-/// (<see cref="BrowserLocator"/>) and putting the ones NOT managed by enterprise policy (<see cref="PolicyDetector"/>) ahead
+/// (<see cref="BrowserSessions.IsInstalled"/>, which asks each platform its own way) and putting the ones NOT managed
+/// by enterprise policy (<see cref="PolicyDetector"/>) ahead
 /// of the managed ones — a managed browser ignores <c>--proxy-server</c>, which is exactly the case the probe page catches.
 /// A managed browser is still offered last so the user gets the real reason from the launch result instead of "not found".
 /// <para>
@@ -68,7 +69,7 @@ public sealed class WorkBrowserProvider : IWorkBrowserProvider
         var managed = new List<BrowserKind>();
         foreach (var kind in Order())
         {
-            if (_locator.Locate(kind) is null)
+            if (!BrowserSessions.IsInstalled(kind, _locator))
             {
                 continue;
             }

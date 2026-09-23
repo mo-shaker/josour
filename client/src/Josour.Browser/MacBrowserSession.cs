@@ -42,6 +42,18 @@ public sealed class MacBrowserSession : IBrowserSession
     /// <summary>The executable that was launched, for diagnostics.</summary>
     public string? ExecutablePath { get; private set; }
 
+    /// <summary>The launched browser's process id, for the diagnostics; null before a launch and after a close.</summary>
+    public int? ProcessId
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _process?.Id;
+            }
+        }
+    }
+
     /// <summary>The arguments it was launched with, for diagnostics.</summary>
     public IReadOnlyList<string> Arguments { get; private set; } = Array.Empty<string>();
 

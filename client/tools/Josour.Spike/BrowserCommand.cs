@@ -32,6 +32,9 @@ public static class BrowserCommand
         IRegistryReader registry = OperatingSystem.IsWindows() ? WindowsRegistryReader.Instance : NullRegistryReader.Instance;
         var locator = new BrowserLocator(registry);
         var location = locator.Locate(kind);
+        // The Windows locator answers the publisher and the registry source; the path itself has to come from
+        // whichever platform this is, or every macOS report says "(not found)" beside a browser that is installed.
+        var executable = BrowserSessions.ExecutablePath(kind, locator);
         var policy = PolicyDetector.Detect(kind, registry);
         var launcher = BrowserSessions.ForCurrentPlatform(registry, locator);
 
@@ -39,7 +42,7 @@ public static class BrowserCommand
         {
             ["os"] = RuntimeInformation.OSDescription,
             ["browser"] = kind == BrowserKind.Chrome ? "chrome" : "edge",
-            ["path"] = location?.Path,
+            ["path"] = executable,
             ["path_source"] = location?.Source,
             ["publisher"] = location?.Publisher,
             ["publisher_verified"] = location?.PublisherVerified,
@@ -52,7 +55,7 @@ public static class BrowserCommand
             ["profile"] = profile,
             ["self_hosted"] = selfHosted,
         };
-        Console.Error.WriteLine($"[browser] {report["browser"]}: path={location?.Path ?? "(not found)"} publisher_verified={location?.PublisherVerified?.ToString() ?? "n/a"} proxy_managed={policy.ProxyManaged} user_data_dir_managed={policy.UserDataDirManaged}");
+        Console.Error.WriteLine($"[browser] {report["browser"]}: path={executable ?? "(not found)"} publisher_verified={location?.PublisherVerified?.ToString() ?? "n/a"} proxy_managed={policy.ProxyManaged} user_data_dir_managed={policy.UserDataDirManaged}");
 
         ConnectProxyServer? proxy = null;
         var probeHit = new TaskCompletionSource<DateTimeOffset>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -75,7 +78,7 @@ public static class BrowserCommand
         report["proxy_port"] = proxyPort;
 
         var options = new BrowserLaunchOptions(kind, proxyPort, profile, "http://check.josour/");
-        report["command_line"] = BrowserCommandLine.Render(location?.Path ?? BrowserLocator.ExeName(kind), BrowserCommandLine.Arguments(options));
+        report["command_line"] = BrowserCommandLine.Render(executable ?? BrowserLocator.ExeName(kind), BrowserCommandLine.Arguments(options));
 
         var exit = 2;
         try
@@ -88,10 +91,16 @@ public static class BrowserCommand
                 ["failure"] = result.Failure?.ToString(),
                 ["detail"] = result.Detail,
                 ["launch_ms"] = launchClock.ElapsedMilliseconds,
+                // A process id is what every platform has, so it is read from whichever session ran.
+                ["pid"] = launcher switch
+                {
+                    BrowserLauncher windows => windows.ProcessId,
+                    MacBrowserSession mac => mac.ProcessId,
+                    _ => null,
+                },
                 // Instance handoff and the profile's exit type are Windows notions — a second copy of Chrome
                 // handing the URL to the first, and the prefs key that stops the "restore tabs?" bubble. They are
                 // reported when the Windows launcher is what ran, and left null otherwise rather than invented.
-                ["pid"] = (launcher as BrowserLauncher)?.ProcessId,
                 ["handoff"] = (launcher as BrowserLauncher)?.InstanceHandoff,
                 ["exit_type_set"] = (launcher as BrowserLauncher)?.ExitTypeSet,
             };
