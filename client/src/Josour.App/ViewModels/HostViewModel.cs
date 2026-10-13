@@ -7,17 +7,17 @@ using Josour.App.Services;
 using Josour.Core.Control;
 using Josour.Core.Session;
 using Josour.Infrastructure.Api;
+using Josour.Infrastructure.Contacts;
 using Josour.Infrastructure.Control.Mock;
 using Josour.Infrastructure.Diagnostics;
 using Josour.Infrastructure.Session;
-using Josour.Infrastructure.Settings;
 using Josour.App.Services.Notifications;
 
 namespace Josour.App.ViewModels;
 
 /// <summary>
 /// Host page: the "Available for requests" state (single source of truth, mirrored by the tray) published as <c>host.available</c>
-/// and only reported as available once the server echoes this device in <c>hosts.snapshot</c>/<c>hosts.update</c>;
+/// and only reported as available once the server confirms it with <c>host.state</c> (a host never appears in its own host list);
 /// and incoming-request handling (<c>request.incoming</c> → prompt → <c>request.accept</c>/<c>request.reject</c>, <c>request.expired</c> closes it).
 /// </summary>
 public sealed partial class HostViewModel : ObservableObject
@@ -28,11 +28,12 @@ public sealed partial class HostViewModel : ObservableObject
     private readonly IAllowlistDisclosure _allowlist;
     private readonly HostReadinessMonitor _readiness;
     private readonly IAuthSession _auth;
-    private readonly IAutoAcceptStore _autoAccept;
+    private readonly IContactsStore _contacts;
+    private readonly IApiClient _api;
     private readonly INotifier _toasts;
-    private readonly TimeProvider _time;
     private readonly ILogger<HostViewModel> _logger;
     private bool _suppressPublish;
+    private RequestIncomingMessage? _autoAccepted;
 
     [ObservableProperty]
     private bool _isAvailable;
@@ -70,10 +71,10 @@ public sealed partial class HostViewModel : ObservableObject
         IAllowlistDisclosure allowlist,
         HostReadinessMonitor readiness,
         IAuthSession auth,
-        IAutoAcceptStore autoAccept,
+        IContactsStore contacts,
+        IApiClient api,
         INotifier toasts,
-        ILogger<HostViewModel> logger,
-        TimeProvider? time = null)
+        ILogger<HostViewModel> logger)
     {
         _controlChannel = controlChannel;
         _sessions = sessions;
@@ -81,9 +82,9 @@ public sealed partial class HostViewModel : ObservableObject
         _allowlist = allowlist;
         _readiness = readiness;
         _auth = auth;
-        _autoAccept = autoAccept;
+        _contacts = contacts;
+        _api = api;
         _toasts = toasts;
-        _time = time ?? TimeProvider.System;
         _logger = logger;
 
         _controlChannel.StateChanged += OnChannelStateChanged;
@@ -243,23 +244,21 @@ public sealed partial class HostViewModel : ObservableObject
     {
         switch (message)
         {
-            case HostsMessage hosts:
-                var self = _auth.DeviceId;
-                var listed = self is not null && hosts.Hosts.Any(h => h.DeviceId == self.Value);
+            case HostStateMessage state:
+                // The server's own record of this device: the only way a host can know its availability was taken,
+                // because the host list it receives never contains itself.
+                UiThread.Post(() => IsAnnounced = IsAvailable && state.Available);
+                break;
 
-                // A host with a session in progress is deliberately not listed (docs/ws-protocol.md section 5),
-                // so only an idle device may conclude "the server did not take my host.available".
-                UiThread.Post(() =>
-                {
-                    if (listed)
-                    {
-                        IsAnnounced = IsAvailable;
-                    }
-                    else if (_sessions.Phase == SessionPhase.Idle)
-                    {
-                        IsAnnounced = false;
-                    }
-                });
+            case HostsMessage hosts when hosts.Hosts.Any(h => h.DeviceId == _auth.DeviceId):
+                // A server older than host.state still lists the host to itself.
+                UiThread.Post(() => IsAnnounced = IsAvailable);
+                break;
+
+            case ErrorMessage { Code: ControlErrorCodes.TrustRevoked } when _autoAccepted is { } withdrawn:
+                // The grant was withdrawn (from another device) while this one answered on its strength: ask after all.
+                _autoAccepted = null;
+                UiThread.Post(() => _ = ReceiveIncomingRequestAsync(withdrawn, CancellationToken.None, allowAuto: false));
                 break;
 
             case RequestIncomingMessage incoming:
@@ -287,7 +286,7 @@ public sealed partial class HostViewModel : ObservableObject
     /// a decision that had already been taken. The version number the policy needs is in the frame itself.
     /// </para>
     /// </summary>
-    public async Task ReceiveIncomingRequestAsync(RequestIncomingMessage incoming, CancellationToken ct)
+    public async Task ReceiveIncomingRequestAsync(RequestIncomingMessage incoming, CancellationToken ct, bool allowAuto = true)
     {
         ArgumentNullException.ThrowIfNull(incoming);
         if (!TryBeginRequest(incoming.RequestId))
@@ -297,17 +296,14 @@ public sealed partial class HostViewModel : ObservableObject
 
         try
         {
-            if (await TryAutoAcceptAsync(
-                    incoming.RequestId,
-                    incoming.GuestUserId,
-                    incoming.GuestDeviceId,
-                    incoming.GuestName,
-                    incoming.GuestDevice,
-                    incoming.DurationMin,
-                    incoming.AllowlistVersion,
-                    ct).ConfigureAwait(true))
+            if (allowAuto && await TryAutoAcceptAsync(incoming, ct).ConfigureAwait(true))
             {
                 return;
+            }
+
+            if (!allowAuto)
+            {
+                _toasts.ShowInfo(Strings.AutoAcceptToastTitle, Strings.ErrorTrustRevoked);
             }
 
             // ADR-0010: with the list unenforced there is no bounded set of sites, and showing one would
@@ -345,19 +341,6 @@ public sealed partial class HostViewModel : ObservableObject
 
         try
         {
-            if (await TryAutoAcceptAsync(
-                    request.RequestId,
-                    request.GuestUserId,
-                    request.GuestDeviceId,
-                    request.GuestName,
-                    request.GuestDevice,
-                    request.DurationMinutes,
-                    request.Allowlist.Version,
-                    ct).ConfigureAwait(true))
-            {
-                return;
-            }
-
             await PresentAndAnswerAsync(request, ct).ConfigureAwait(true);
         }
         finally
@@ -391,9 +374,9 @@ public sealed partial class HostViewModel : ObservableObject
                 await AnswerAsync(() => _sessions.AcceptRequestAsync(request.RequestId, ct), "request.accept");
                 // After the acceptance, never before it: a rule stored for a request that then failed to send would be
                 // a standing consent the host gave for a session it never actually granted.
-                if (answer.Trust is { } trust)
+                if (answer.AlwaysAllow)
                 {
-                    await GrantTrustAsync(request, trust, ct).ConfigureAwait(true);
+                    await GrantTrustAsync(request, ct).ConfigureAwait(true);
                 }
 
                 break;
@@ -407,59 +390,41 @@ public sealed partial class HostViewModel : ObservableObject
     }
 
     /// <summary>
-    /// docs/ws-protocol.md section 5a. Answers <c>request.accept {auto: true}</c> and returns true when the host had
-    /// already decided about this guest; returns false — every other time — so the prompt is shown as usual.
+    /// ADR-0014. Answers <c>request.accept {auto: true}</c> and returns true when this contact may use the connection
+    /// without asking; returns false - every other time - so the prompt is shown as usual.
     /// <para>
-    /// The whole decision is <see cref="AutoAcceptPolicy"/>, which is pure and lives in <c>Josour.Core</c> where it can
-    /// be tested exhaustively. Nothing here may add a reason to accept; this method only carries the answer out.
+    /// Two independent sources must agree: the server marked the request <c>trusted</c>, <b>and</b> this app's own copy of
+    /// the contact list (read from <c>GET /contacts</c>) says the host allowed it. The server checks the grant once more
+    /// when the answer arrives, and answers <c>trust_revoked</c> if it was withdrawn meanwhile - which brings the prompt
+    /// back. Nothing here may add a reason to accept; this method only carries out a decision the host already took.
     /// </para>
     /// </summary>
-    private async Task<bool> TryAutoAcceptAsync(
-        Guid requestId,
-        Guid guestUserId,
-        Guid guestDeviceId,
-        string guestName,
-        string guestDevice,
-        int durationMinutes,
-        int allowlistVersion,
-        CancellationToken ct)
+    private async Task<bool> TryAutoAcceptAsync(RequestIncomingMessage incoming, CancellationToken ct)
     {
-        var settings = _autoAccept.Current;
-        var verdict = AutoAcceptPolicy.Evaluate(
-            settings,
-            guestUserId,
-            guestDeviceId,
-            durationMinutes,
-            allowlistVersion,
-            _sessions.EnforceAllowlist,
-            _time.GetUtcNow());
-
-        if (!verdict.ShouldAccept)
+        if (!incoming.Trusted || incoming.GuestUserId == Guid.Empty || !_contacts.Trusts(incoming.GuestUserId))
         {
-            // Only worth a line once the host has actually switched the feature on: otherwise it is every request on
-            // every device saying "disabled".
-            if (settings.Enabled)
+            if (incoming.Trusted)
             {
                 _logger.LogInformation(
-                    "Request {RequestId} from {GuestName} was not auto-accepted ({Outcome}); asking the host",
-                    requestId,
-                    guestName,
-                    verdict.Outcome);
+                    "Request {RequestId} from {GuestName} is marked trusted but this app's contact list disagrees; asking the host",
+                    incoming.RequestId,
+                    incoming.GuestName);
             }
 
             return false;
         }
 
         _logger.LogInformation(
-            "Request {RequestId} from {GuestName} matched a trusted-guest rule; accepting without a prompt",
-            requestId,
-            guestName);
+            "Request {RequestId} from {GuestName}: the host lets this contact connect without asking; accepting",
+            incoming.RequestId,
+            incoming.GuestName);
 
         var sent = false;
+        _autoAccepted = incoming;
         await AnswerAsync(
             async () =>
             {
-                await _sessions.AcceptRequestAsync(requestId, auto: true, ct).ConfigureAwait(false);
+                await _sessions.AcceptRequestAsync(incoming.RequestId, auto: true, ct).ConfigureAwait(false);
                 sent = true;
             },
             "request.accept (auto)");
@@ -467,63 +432,43 @@ public sealed partial class HostViewModel : ObservableObject
         if (!sent)
         {
             // The accept never left the machine. Falling through to the prompt gives the host the request back
-            // rather than letting it expire silently on a rule that was supposed to make things easier.
+            // rather than letting it expire silently on a grant that was supposed to make things easier.
+            _autoAccepted = null;
             return false;
         }
 
-        // Inform, do not ask (section 5a). A host who only ever learns about these from a bill or from a slow
-        // connection was not told, and being told is the part of consent that auto-accept must not spend.
+        // Inform, do not ask. A host who only ever learns about these from a bill or from a slow connection was not
+        // told, and being told is the part of consent that an automatic acceptance must not spend.
         _toasts.ShowInfo(
             Strings.AutoAcceptToastTitle,
-            string.Format(UiFlow.Culture, Strings.AutoAcceptToastBodyFormat, guestName, guestDevice));
+            string.Format(UiFlow.Culture, Strings.AutoAcceptToastBodyFormat, incoming.GuestName, incoming.GuestDevice));
         return true;
     }
 
     /// <summary>
-    /// Writes the standing rule the host ticked in the request window (docs/ws-protocol.md section 5a) and turns the
-    /// master switch on, since a host that has just said "accept from this guest from now on" has said what the switch
-    /// says. Turning it on here is why the settings page shows the switch beside the list: the host must be able to
-    /// find and undo in one place what it agreed to in another.
+    /// The host ticked "always let this contact use my connection" while accepting. Stored on the server
+    /// (<c>PUT /contacts/{id}/trust</c>) after the acceptance went out, never before: a grant stored for a request that
+    /// then failed to send would be a standing consent for a session the host never actually granted.
     /// </summary>
-    private async Task GrantTrustAsync(IncomingRequest request, TrustGrant trust, CancellationToken ct)
+    private async Task GrantTrustAsync(IncomingRequest request, CancellationToken ct)
     {
-        if (request.GuestUserId == Guid.Empty || request.GuestDeviceId == Guid.Empty)
+        if (request.GuestUserId == Guid.Empty)
         {
-            // A server older than section 5a: there is no identity to write a rule against, and writing one against
-            // Guid.Empty would make it match every guest on that deployment.
-            _logger.LogWarning(
-                "Cannot trust {GuestName}: this server does not identify guests in request.incoming",
-                request.GuestName);
+            _logger.LogWarning("Cannot trust {GuestName}: this server does not identify guests", request.GuestName);
             return;
         }
 
-        var now = _time.GetUtcNow();
-        var guest = new TrustedGuest(
-            request.GuestUserId,
-            request.GuestDeviceId,
-            request.GuestName,
-            request.GuestDevice,
-            trust.MaxDurationMinutes,
-            trust.For is { } window ? now + window : null,
-            request.Allowlist.Version,
-            now);
-
         try
         {
-            var settings = _autoAccept.Current.WithoutExpired(now).With(guest) with { Enabled = true };
-            await _autoAccept.SaveAsync(settings, ct).ConfigureAwait(false);
-            _logger.LogInformation(
-                "{GuestName} on {GuestDevice} is now trusted until {Expiry} for sessions up to {MaxMinutes} minutes",
-                guest.GuestName,
-                guest.GuestDevice,
-                guest.ExpiresAt,
-                guest.MaxDurationMinutes);
+            await _api.SetTrustAsync(request.GuestUserId, autoAccept: true, ct).ConfigureAwait(false);
+            await _contacts.RefreshAsync(ct).ConfigureAwait(false);
+            _logger.LogInformation("{GuestName} may now use this connection without asking", request.GuestName);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is ApiException or ApiUnavailableException)
         {
-            // The session is already granted; only the standing rule is lost. Say so rather than letting the host
-            // believe it will not be asked again.
-            _logger.LogError(ex, "Could not save the trusted-guest rule for {GuestName}", guest.GuestName);
+            // The session is already granted; only the standing consent is lost. Say so in the log rather than letting
+            // the host believe it will not be asked again.
+            _logger.LogError(ex, "Could not store the trust for {GuestName}", request.GuestName);
         }
     }
 

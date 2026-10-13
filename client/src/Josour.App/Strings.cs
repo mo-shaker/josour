@@ -339,4 +339,118 @@ public static class Strings
     public static string AdminDisableWarning => LocalizedStrings.Current[UiStringKeys.AdminDisableWarning];
     public static string TrayAdmin => LocalizedStrings.Current[UiStringKeys.TrayAdmin];
     public static string MainAdminTooltip => LocalizedStrings.Current[UiStringKeys.MainAdminTooltip];
+
+    public static string ContactsPageTitle => LocalizedStrings.Current[UiStringKeys.ContactsPageTitle];
+
+    public static string ContactsPageDescription => LocalizedStrings.Current[UiStringKeys.ContactsPageDescription];
+
+    public static string ContactsEmptyTitle => LocalizedStrings.Current[UiStringKeys.ContactsEmptyTitle];
+
+    public static string ContactsEmptyText => LocalizedStrings.Current[UiStringKeys.ContactsEmptyText];
+
+    public static string ContactsInvitePlaceholder => LocalizedStrings.Current[UiStringKeys.ContactsInvitePlaceholder];
+
+    public static string ContactsInviteButton => LocalizedStrings.Current[UiStringKeys.ContactsInviteButton];
+
+    public static string ContactsInviteSentFormat => LocalizedStrings.Current[UiStringKeys.ContactsInviteSentFormat];
+
+    public static string ContactsInviteFailedFormat => LocalizedStrings.Current[UiStringKeys.ContactsInviteFailedFormat];
+
+    public static string ContactsIncomingTitle => LocalizedStrings.Current[UiStringKeys.ContactsIncomingTitle];
+
+    public static string ContactsIncomingFormat => LocalizedStrings.Current[UiStringKeys.ContactsIncomingFormat];
+
+    public static string ContactsAccept => LocalizedStrings.Current[UiStringKeys.ContactsAccept];
+
+    public static string ContactsDecline => LocalizedStrings.Current[UiStringKeys.ContactsDecline];
+
+    public static string ContactsOutgoingTitle => LocalizedStrings.Current[UiStringKeys.ContactsOutgoingTitle];
+
+    public static string ContactsOutgoingPending => LocalizedStrings.Current[UiStringKeys.ContactsOutgoingPending];
+
+    public static string ContactsOutgoingExpired => LocalizedStrings.Current[UiStringKeys.ContactsOutgoingExpired];
+
+    public static string ContactsWithdraw => LocalizedStrings.Current[UiStringKeys.ContactsWithdraw];
+
+    public static string ContactOnline => LocalizedStrings.Current[UiStringKeys.ContactOnline];
+
+    public static string ContactOffline => LocalizedStrings.Current[UiStringKeys.ContactOffline];
+
+    public static string ContactSharing => LocalizedStrings.Current[UiStringKeys.ContactSharing];
+
+    public static string ContactUseConnection => LocalizedStrings.Current[UiStringKeys.ContactUseConnection];
+
+    public static string ContactOfferConnection => LocalizedStrings.Current[UiStringKeys.ContactOfferConnection];
+
+    public static string ContactAllowAlways => LocalizedStrings.Current[UiStringKeys.ContactAllowAlways];
+
+    public static string ContactTrustsMe => LocalizedStrings.Current[UiStringKeys.ContactTrustsMe];
+
+    public static string ContactRemove => LocalizedStrings.Current[UiStringKeys.ContactRemove];
+
+    public static string ContactRemoveConfirm => LocalizedStrings.Current[UiStringKeys.ContactRemoveConfirm];
+
+    public static string ContactActionFailedFormat => LocalizedStrings.Current[UiStringKeys.ContactActionFailedFormat];
+
+    public static string ContactsOfferWaitingFormat => LocalizedStrings.Current[UiStringKeys.ContactsOfferWaitingFormat];
+
+    public static string ContactsCancelOffer => LocalizedStrings.Current[UiStringKeys.ContactsCancelOffer];
+
+    public static string OfferIncomingTitle => LocalizedStrings.Current[UiStringKeys.OfferIncomingTitle];
+
+    public static string OfferIncomingFormat => LocalizedStrings.Current[UiStringKeys.OfferIncomingFormat];
+
+    public static string OfferToastTitle => LocalizedStrings.Current[UiStringKeys.OfferToastTitle];
+
+    public static string OfferToastBodyFormat => LocalizedStrings.Current[UiStringKeys.OfferToastBodyFormat];
+
+    public static string OfferResultRejected => LocalizedStrings.Current[UiStringKeys.OfferResultRejected];
+
+    public static string OfferResultExpired => LocalizedStrings.Current[UiStringKeys.OfferResultExpired];
+
+    public static string OfferResultCancelled => LocalizedStrings.Current[UiStringKeys.OfferResultCancelled];
+
+    public static string OfferErrorGuestUnavailable => LocalizedStrings.Current[UiStringKeys.OfferErrorGuestUnavailable];
+
+    public static string ErrorNotContact => LocalizedStrings.Current[UiStringKeys.ErrorNotContact];
+
+    public static string ErrorTrustRevoked => LocalizedStrings.Current[UiStringKeys.ErrorTrustRevoked];
+
+    public static string SettingsTrustMovedHint => LocalizedStrings.Current[UiStringKeys.SettingsTrustMovedHint];
+
+    public static string LoginCreateAccount => LocalizedStrings.Current[UiStringKeys.LoginCreateAccount];
+
+    public static string LoginHaveAccount => LocalizedStrings.Current[UiStringKeys.LoginHaveAccount];
+
+    public static string RegisterTitle => LocalizedStrings.Current[UiStringKeys.RegisterTitle];
+
+    public static string RegisterDisplayName => LocalizedStrings.Current[UiStringKeys.RegisterDisplayName];
+
+    public static string RegisterPasswordHint => LocalizedStrings.Current[UiStringKeys.RegisterPasswordHint];
+
+    public static string RegisterSubmit => LocalizedStrings.Current[UiStringKeys.RegisterSubmit];
+
+    public static string RegisterPendingTitle => LocalizedStrings.Current[UiStringKeys.RegisterPendingTitle];
+
+    public static string RegisterPendingText => LocalizedStrings.Current[UiStringKeys.RegisterPendingText];
+
+    public static string RegisterClosed => LocalizedStrings.Current[UiStringKeys.RegisterClosed];
+
+    public static string RegisterUnavailable => LocalizedStrings.Current[UiStringKeys.RegisterUnavailable];
+
+    public static string RegisterEmailTaken => LocalizedStrings.Current[UiStringKeys.RegisterEmailTaken];
+
+    public static string RegisterNameRequired => LocalizedStrings.Current[UiStringKeys.RegisterNameRequired];
+
+    public static string LoginErrorAccountPending => LocalizedStrings.Current[UiStringKeys.LoginErrorAccountPending];
+
+    public static string LoginErrorAccountRejected => LocalizedStrings.Current[UiStringKeys.LoginErrorAccountRejected];
+
+    public static string ErrorUpgradeRequired => LocalizedStrings.Current[UiStringKeys.ErrorUpgradeRequired];
+
+    public static string SessionEndedContactRemoved => LocalizedStrings.Current[UiStringKeys.SessionEndedContactRemoved];
+
+    public static string SessionEndedSystemProxyFailed => LocalizedStrings.Current[UiStringKeys.SessionEndedSystemProxyFailed];
+
+    public static string AdminOpenWebDashboard => LocalizedStrings.Current[UiStringKeys.AdminOpenWebDashboard];
 }

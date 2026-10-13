@@ -64,6 +64,53 @@ public sealed class FakeApiClient : IApiClient
         return Task.FromResult(DomainsResult.From(new DomainsDto(DomainsVersion, DomainEntries.ToList()), $"\"{DomainsVersion}\""));
     }
 
+    /// <summary>What <c>GET /contacts</c> answers.</summary>
+    public List<ContactDto> Contacts { get; } = new();
+
+    /// <summary>What <c>GET /contacts/invites</c> answers.</summary>
+    public InvitesDto Invites { get; set; } = InvitesDto.Empty;
+
+    /// <summary>Every contacts read, so a test can count refreshes.</summary>
+    public int ContactsCalls { get; private set; }
+
+    /// <summary>Every <c>PUT /contacts/{id}/trust</c>: (user, auto_accept).</summary>
+    public List<(Guid UserId, bool AutoAccept)> TrustCalls { get; } = new();
+
+    public Task<IReadOnlyList<ContactDto>> GetContactsAsync(CancellationToken ct)
+    {
+        ContactsCalls++;
+        return Task.FromResult<IReadOnlyList<ContactDto>>(Contacts.ToList());
+    }
+
+    public Task<InvitesDto> GetInvitesAsync(CancellationToken ct) => Task.FromResult(Invites);
+
+    public Task<ContactDto> SetTrustAsync(Guid userId, bool autoAccept, CancellationToken ct)
+    {
+        TrustCalls.Add((userId, autoAccept));
+        var index = Contacts.FindIndex(c => c.UserId == userId);
+        if (index < 0)
+        {
+            throw new ApiException(System.Net.HttpStatusCode.NotFound, ApiErrorCodes.NotFound, "Contact not found");
+        }
+
+        Contacts[index] = Contacts[index] with { ITrust = autoAccept };
+        return Task.FromResult(Contacts[index]);
+    }
+
+    public Task<RegistrationInfoDto> GetRegistrationAsync(CancellationToken ct) => throw new NotSupportedException();
+
+    public Task<RegisterResponse> RegisterAsync(string email, string password, string displayName, CancellationToken ct) => throw new NotSupportedException();
+
+    public Task RemoveContactAsync(Guid userId, CancellationToken ct) => throw new NotSupportedException();
+
+    public Task InviteAsync(string email, CancellationToken ct) => throw new NotSupportedException();
+
+    public Task<ContactDto> AcceptInviteAsync(Guid inviteId, CancellationToken ct) => throw new NotSupportedException();
+
+    public Task DeclineInviteAsync(Guid inviteId, CancellationToken ct) => throw new NotSupportedException();
+
+    public Task CancelInviteAsync(Guid inviteId, CancellationToken ct) => throw new NotSupportedException();
+
     public Task<AuthResponse> LoginAsync(string email, string password, DeviceLoginInfo device, CancellationToken ct) => throw new NotSupportedException();
 
     public Task<AuthResponse> RefreshAsync(string refreshToken, CancellationToken ct) => throw new NotSupportedException();

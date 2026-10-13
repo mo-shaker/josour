@@ -39,19 +39,12 @@ public sealed record IncomingRequest(
     }
 }
 
-/// <summary>
-/// The host asked, while accepting, that this guest be accepted unasked from now on
-/// (docs/ws-protocol.md section 5a). Carried back with the decision rather than written by the window, so that the
-/// rule is only ever stored on the path that also sends <c>request.accept</c>.
-/// </summary>
-/// <param name="For">How long the rule lasts; <c>null</c> means until the host removes it.</param>
-/// <param name="MaxDurationMinutes">The longest session the rule will accept unasked — the duration of the request the
-/// host is looking at. Agreeing to half an hour is not agreeing to a working day, and the window says so.</param>
-public sealed record TrustGrant(TimeSpan? For, int MaxDurationMinutes);
-
-/// <summary>The host's answer: what it decided, and whether it also wrote a standing rule while deciding.</summary>
-/// <param name="Trust">Non-null only alongside <see cref="IncomingRequestDecision.Accepted"/>.</param>
-public sealed record IncomingRequestAnswer(IncomingRequestDecision Decision, TrustGrant? Trust = null)
+/// <summary>The host's answer: what it decided, and whether it also let this contact in unasked from now on.</summary>
+/// <param name="AlwaysAllow">
+/// "Always let this contact use my connection without asking" (ADR-0014). Only ever true alongside
+/// <see cref="IncomingRequestDecision.Accepted"/>, and stored on the server only after the acceptance was sent.
+/// </param>
+public sealed record IncomingRequestAnswer(IncomingRequestDecision Decision, bool AlwaysAllow = false)
 {
     public static IncomingRequestAnswer Of(IncomingRequestDecision decision) => new(decision);
 }

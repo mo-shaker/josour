@@ -189,3 +189,77 @@ public sealed record AdminUserPatch
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Unlock { get; init; }
 }
+
+
+// ---------------------------------------------------------------- registration (ADR-0017)
+
+/// <summary><c>GET /auth/registration</c>: <c>closed</c>, <c>approval</c> or <c>open</c>.</summary>
+public sealed record RegistrationInfoDto([property: JsonPropertyName("mode")] string Mode)
+{
+    public const string Closed = "closed";
+    public const string Approval = "approval";
+    public const string Open = "open";
+
+    public bool IsOpen => !string.Equals(Mode, Closed, StringComparison.Ordinal);
+}
+
+public sealed record RegisterRequest(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("password")] string Password,
+    [property: JsonPropertyName("display_name")] string DisplayName)
+{
+    public override string ToString() => $"RegisterRequest {{ Email = {Email}, Password = [redacted], DisplayName = {DisplayName} }}";
+}
+
+/// <summary><c>POST /auth/register</c>: <c>pending</c> (an administrator must approve) or <c>active</c> (sign in now).</summary>
+public sealed record RegisterResponse([property: JsonPropertyName("status")] string Status)
+{
+    public bool IsActive => string.Equals(Status, "active", StringComparison.Ordinal);
+}
+
+// ---------------------------------------------------------------- contacts (ADR-0014)
+
+/// <summary>
+/// One contact. <see cref="ITrust"/>: I let them use my connection without asking me. <see cref="TrustsMe"/>: they let me
+/// use theirs without asking them.
+/// </summary>
+public sealed record ContactDto(
+    [property: JsonPropertyName("user_id")] Guid UserId,
+    [property: JsonPropertyName("display_name")] string DisplayName,
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("online")] bool Online,
+    [property: JsonPropertyName("i_trust")] bool ITrust,
+    [property: JsonPropertyName("trusts_me")] bool TrustsMe,
+    [property: JsonPropertyName("since")] DateTimeOffset Since);
+
+public sealed record IncomingInviteDto(
+    [property: JsonPropertyName("id")] Guid Id,
+    [property: JsonPropertyName("from_user_id")] Guid FromUserId,
+    [property: JsonPropertyName("from_display_name")] string FromDisplayName,
+    [property: JsonPropertyName("from_email")] string FromEmail,
+    [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
+    [property: JsonPropertyName("expires_at")] DateTimeOffset ExpiresAt);
+
+/// <summary>An invitation I sent. <see cref="Status"/> is <c>pending</c> or <c>expired</c>: a decline is never shown.</summary>
+public sealed record OutgoingInviteDto(
+    [property: JsonPropertyName("id")] Guid Id,
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
+    [property: JsonPropertyName("expires_at")] DateTimeOffset ExpiresAt)
+{
+    public bool IsExpired => string.Equals(Status, "expired", StringComparison.Ordinal);
+}
+
+public sealed record InvitesDto(
+    [property: JsonPropertyName("incoming")] IReadOnlyList<IncomingInviteDto> Incoming,
+    [property: JsonPropertyName("outgoing")] IReadOnlyList<OutgoingInviteDto> Outgoing)
+{
+    public static InvitesDto Empty { get; } = new([], []);
+}
+
+public sealed record InviteRequest([property: JsonPropertyName("email")] string Email);
+
+public sealed record TrustRequest([property: JsonPropertyName("auto_accept")] bool AutoAccept);
+
+public sealed record AcceptedInviteDto([property: JsonPropertyName("contact")] ContactDto Contact);

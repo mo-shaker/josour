@@ -27,6 +27,16 @@ public abstract class StubApiClient : IApiClient
     public virtual Task<IReadOnlyList<AdminUserDto>> GetUsersAsync(string? query, CancellationToken ct) => NotUsed<Task<IReadOnlyList<AdminUserDto>>>();
     public virtual Task<AdminUserDto> CreateUserAsync(AdminUserCreate request, CancellationToken ct) => NotUsed<Task<AdminUserDto>>();
     public virtual Task<AdminUserDto> PatchUserAsync(Guid userId, AdminUserPatch patch, CancellationToken ct) => NotUsed<Task<AdminUserDto>>();
+    public virtual Task<RegistrationInfoDto> GetRegistrationAsync(CancellationToken ct) => NotUsed<Task<RegistrationInfoDto>>();
+    public virtual Task<RegisterResponse> RegisterAsync(string email, string password, string displayName, CancellationToken ct) => NotUsed<Task<RegisterResponse>>();
+    public virtual Task<IReadOnlyList<ContactDto>> GetContactsAsync(CancellationToken ct) => NotUsed<Task<IReadOnlyList<ContactDto>>>();
+    public virtual Task RemoveContactAsync(Guid userId, CancellationToken ct) => NotUsed<Task>();
+    public virtual Task<ContactDto> SetTrustAsync(Guid userId, bool autoAccept, CancellationToken ct) => NotUsed<Task<ContactDto>>();
+    public virtual Task<InvitesDto> GetInvitesAsync(CancellationToken ct) => NotUsed<Task<InvitesDto>>();
+    public virtual Task InviteAsync(string email, CancellationToken ct) => NotUsed<Task>();
+    public virtual Task<ContactDto> AcceptInviteAsync(Guid inviteId, CancellationToken ct) => NotUsed<Task<ContactDto>>();
+    public virtual Task DeclineInviteAsync(Guid inviteId, CancellationToken ct) => NotUsed<Task>();
+    public virtual Task CancelInviteAsync(Guid inviteId, CancellationToken ct) => NotUsed<Task>();
 }
 
 /// <summary>A signed-in session with a fixed user; enough for anything that only reads the role or the id.</summary>

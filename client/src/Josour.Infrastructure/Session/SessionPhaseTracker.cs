@@ -17,6 +17,8 @@ public sealed class SessionPhaseTracker
     private SessionInfo? _session;
     private Guid? _pendingRequestId;
     private string? _pendingRequestRef;
+    private bool _pendingIsOffer;
+    private bool _agreed;
     private string? _lastEndReason;
 
     public SessionPhase Phase
@@ -53,6 +55,18 @@ public sealed class SessionPhaseTracker
         }
     }
 
+    /// <summary>True while the pending question is an offer (<c>offer.*</c>) rather than a request (<c>request.*</c>).</summary>
+    public bool PendingIsOffer
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _pendingIsOffer;
+            }
+        }
+    }
+
     /// <summary>Why the last request or session ended: a <c>request.result.reason</c>, an error code, or a <c>session.terminate.reason</c>.</summary>
     public string? LastEndReason
     {
@@ -73,7 +87,15 @@ public sealed class SessionPhaseTracker
     /// await <c>request.result</c>") and remembers the <c>ref</c> so an <c>error</c> with that <c>ref</c> returns the tracker to Idle.
     /// Returns false (and does nothing) unless the tracker is Idle.
     /// </summary>
-    public bool TrackRequest(string requestRef)
+    public bool TrackRequest(string requestRef) => TrackOwn(requestRef, isOffer: false);
+
+    /// <summary>
+    /// Host: call right before sending <c>offer.create</c> (ADR-0014). Like <see cref="TrackRequest"/>, for an offer: an
+    /// <c>offer.result</c> that was not accepted, or an <c>error</c> with this <c>ref</c>, returns the tracker to Idle.
+    /// </summary>
+    public bool TrackOffer(string offerRef) => TrackOwn(offerRef, isOffer: true);
+
+    private bool TrackOwn(string requestRef, bool isOffer)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(requestRef);
         lock (_gate)
@@ -85,12 +107,32 @@ public sealed class SessionPhaseTracker
 
             _pendingRequestRef = requestRef;
             _pendingRequestId = null;
+            _pendingIsOffer = isOffer;
+            _agreed = true; // this side asked (or offered): a session it asked for is one it agreed to
             _lastEndReason = null;
             _phase = SessionPhase.RequestPending;
         }
 
         PhaseChanged?.Invoke(SessionPhase.RequestPending);
         return true;
+    }
+
+    /// <summary>
+    /// This side said yes to the pending question: a host accepted <c>request.incoming</c>, or a guest accepted
+    /// <c>offer.incoming</c>. Only after that is a <c>session.created</c> for it honoured.
+    /// </summary>
+    public bool MarkAgreed(Guid requestId)
+    {
+        lock (_gate)
+        {
+            if (_phase != SessionPhase.RequestPending || _pendingRequestId != requestId)
+            {
+                return false;
+            }
+
+            _agreed = true;
+            return true;
+        }
     }
 
     /// <summary>Applies one inbound frame. Returns true when the phase changed.</summary>
@@ -111,6 +153,8 @@ public sealed class SessionPhaseTracker
                     // request.create was sent without TrackRequest: still track the pending request.
                     _pendingRequestId = m.RequestId;
                     _pendingRequestRef = m.Ref;
+                    _pendingIsOffer = false;
+                    _agreed = true;
                     _lastEndReason = null;
                     next = SessionPhase.RequestPending;
                     break;
@@ -118,8 +162,39 @@ public sealed class SessionPhaseTracker
                 case RequestIncomingMessage m when _phase == SessionPhase.Idle:
                     _pendingRequestId = m.RequestId;
                     _pendingRequestRef = null;
+                    _pendingIsOffer = false;
+                    _agreed = false;
                     _lastEndReason = null;
                     next = SessionPhase.RequestPending;
+                    break;
+
+                case OfferCreatedMessage m when _phase == SessionPhase.RequestPending && _pendingIsOffer && _pendingRequestRef == m.Ref:
+                    _pendingRequestId = m.OfferId; // server acknowledged; phase unchanged
+                    break;
+
+                case OfferIncomingMessage m when _phase == SessionPhase.Idle:
+                    _pendingRequestId = m.OfferId;
+                    _pendingRequestRef = null;
+                    _pendingIsOffer = true;
+                    _agreed = false;
+                    _lastEndReason = null;
+                    next = SessionPhase.RequestPending;
+                    break;
+
+                case OfferResultMessage m when _phase == SessionPhase.RequestPending && _pendingIsOffer && MatchesPending(m.OfferId):
+                    if (!m.Accepted)
+                    {
+                        _lastEndReason = m.Reason ?? "rejected";
+                        ClearPending();
+                        next = SessionPhase.Idle;
+                    }
+
+                    break;
+
+                case OfferClosedMessage m when _phase == SessionPhase.RequestPending && _pendingIsOffer && MatchesPending(m.OfferId):
+                    _lastEndReason = m.Reason;
+                    ClearPending();
+                    next = SessionPhase.Idle;
                     break;
 
                 case RequestResultMessage m when _phase == SessionPhase.RequestPending && MatchesPending(m.RequestId):
@@ -145,7 +220,10 @@ public sealed class SessionPhaseTracker
                     next = SessionPhase.Idle;
                     break;
 
-                case SessionCreatedMessage m when _phase is SessionPhase.Idle or SessionPhase.RequestPending:
+                // Only a session this side agreed to: one it asked for or offered, or a question it answered yes to.
+                // A session.created out of nowhere - from Idle, or for a request still unanswered here - would start a
+                // tunnel nobody on this machine consented to, so it is ignored (the server's connect deadline ends it).
+                case SessionCreatedMessage m when _phase == SessionPhase.RequestPending && _agreed:
                     _session = SessionInfo.From(m);
                     ClearPending();
                     _lastEndReason = null;
@@ -245,5 +323,7 @@ public sealed class SessionPhaseTracker
     {
         _pendingRequestId = null;
         _pendingRequestRef = null;
+        _pendingIsOffer = false;
+        _agreed = false;
     }
 }

@@ -37,7 +37,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     public MainViewModel(
         HostViewModel host,
-        GuestViewModel guest,
+        ContactsViewModel contacts,
         SessionCoordinator sessions,
         SessionPanelViewModel session,
         IStartupRegistration startup,
@@ -51,7 +51,7 @@ public sealed partial class MainViewModel : ObservableObject
         ILogger<MainViewModel> logger)
     {
         Host = host;
-        Guest = guest;
+        Contacts = contacts;
         Sessions = sessions;
         Session = session;
         _startup = startup;
@@ -75,7 +75,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     public HostViewModel Host { get; }
 
-    public GuestViewModel Guest { get; }
+    /// <summary>The Contacts tab: people, invitations, requests and offers (ADR-0014).</summary>
+    public ContactsViewModel Contacts { get; }
 
     /// <summary>The session lifecycle itself (phase, tunnel, work browser); the tray and the pages ask it for state.</summary>
     public SessionCoordinator Sessions { get; }

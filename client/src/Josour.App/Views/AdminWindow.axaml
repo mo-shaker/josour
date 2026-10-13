@@ -16,8 +16,15 @@
 
         <StackPanel Grid.Row="0">
             <TextBlock Classes="title" Text="{x:Static app:Strings.AdminHeading}" />
-            <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,4,0,12"
+            <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,4,0,4"
                        Text="{x:Static app:Strings.AdminDescription}" />
+            <Button Classes="transparent" HorizontalAlignment="Left" Padding="0,2" Margin="0,0,0,12"
+                    Command="{Binding OpenWebDashboardCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <c:Icon Symbol="Globe" />
+                    <TextBlock VerticalAlignment="Center" Text="{x:Static app:Strings.AdminOpenWebDashboard}" />
+                </StackPanel>
+            </Button>
 
             <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
                 <TextBox Grid.Column="0"

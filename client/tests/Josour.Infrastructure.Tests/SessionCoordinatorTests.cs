@@ -849,6 +849,93 @@ public sealed class SessionCoordinatorTests
 
     // ---------- the rig ----------
 
+    // ---------------------------------------------------------------- offers (ADR-0014)
+
+    private static SessionCreatedMessage Created(Rig rig, string role) => new(
+        Guid.NewGuid(),
+        role,
+        Convert.ToBase64String(new byte[32]),
+        rig.ServerNow.AddMinutes(30),
+        7,
+        "198.51.100.9",
+        SamePublicIp: false,
+        new PeerDto(Guid.NewGuid(), Guid.NewGuid(), "Sara Ahmed", "SARA-LAPTOP"),
+        Initiator: "host");
+
+    [Fact]
+    public async Task Host_OffersItsConnection_AndTheSessionFollowsTheGuestsAcceptance()
+    {
+        await using var rig = await Rig.StartAsync();
+        var guestUserId = Guid.NewGuid();
+
+        var offering = rig.Coordinator.OfferSessionAsync(guestUserId, 45, None);
+        var create = await rig.Connection.NextAsync<OfferCreateMessage>();
+        Assert.Equal((guestUserId, 45), (create.GuestUserId, create.DurationMin));
+        await rig.Connection.SendAsync(new OfferCreatedMessage(create.Ref, Guid.NewGuid(), rig.ServerNow.AddSeconds(60)));
+
+        Assert.Null(await offering);
+        Assert.Equal(SessionPhase.RequestPending, rig.Coordinator.Phase);
+        Assert.True(rig.Coordinator.PendingIsOffer);
+
+        var created = Created(rig, SessionInfo.HostRole);
+        await rig.Connection.SendAsync(created);
+        await rig.WaitAsync(() => rig.Coordinator.CurrentSession?.SessionId == created.SessionId);
+        await rig.Connection.NextAsync<SessionEndpointMessage>();
+    }
+
+    [Fact]
+    public async Task Host_AnOfferTheServerRefuses_ReturnsTheCode_AndIdle()
+    {
+        await using var rig = await Rig.StartAsync();
+
+        var offering = rig.Coordinator.OfferSessionAsync(Guid.NewGuid(), 30, None);
+        var create = await rig.Connection.NextAsync<OfferCreateMessage>();
+        await rig.Connection.SendAsync(new ErrorMessage(create.Ref, ControlErrorCodes.GuestUnavailable, "nobody home"));
+
+        Assert.Equal(ControlErrorCodes.GuestUnavailable, await offering);
+        await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Idle);
+    }
+
+    [Fact]
+    public async Task Guest_AnOfferStartsNothingUntilThisDeviceAcceptsIt()
+    {
+        await using var rig = await Rig.StartAsync();
+        var offerId = Guid.NewGuid();
+        await rig.Connection.SendAsync(new OfferIncomingMessage(
+            offerId, Guid.NewGuid(), Guid.NewGuid(), "Sara Ahmed", "SARA-LAPTOP", 30, 7, rig.ServerNow.AddSeconds(60)));
+        await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.RequestPending);
+
+        // A session.created before this device said yes is not one it agreed to.
+        await rig.Connection.SendAsync(Created(rig, SessionInfo.GuestRole));
+        await Task.Delay(100);
+        Assert.Equal(SessionPhase.RequestPending, rig.Coordinator.Phase);
+        Assert.Null(rig.Coordinator.CurrentSession);
+
+        await rig.Coordinator.AcceptOfferAsync(offerId, None);
+        var accept = await rig.Connection.NextAsync<OfferAcceptMessage>();
+        Assert.Equal(offerId, accept.OfferId);
+
+        var created = Created(rig, SessionInfo.GuestRole);
+        await rig.Connection.SendAsync(created);
+        await rig.WaitAsync(() => rig.Coordinator.CurrentSession?.SessionId == created.SessionId);
+    }
+
+    [Fact]
+    public async Task Guest_AnAcceptanceTheServerRefuses_ReturnsToIdle()
+    {
+        await using var rig = await Rig.StartAsync();
+        var offerId = Guid.NewGuid();
+        await rig.Connection.SendAsync(new OfferIncomingMessage(
+            offerId, Guid.NewGuid(), Guid.NewGuid(), "Sara Ahmed", "SARA-LAPTOP", 30, 7, rig.ServerNow.AddSeconds(60)));
+        await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.RequestPending);
+
+        await rig.Coordinator.AcceptOfferAsync(offerId, None);
+        var accept = await rig.Connection.NextAsync<OfferAcceptMessage>();
+        await rig.Connection.SendAsync(new ErrorMessage(accept.Ref, ControlErrorCodes.NotFound, "taken on another device"));
+
+        await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Idle);
+    }
+
     private sealed class Rig : IAsyncDisposable
     {
         private readonly List<SessionPhase> _phases = new();
@@ -961,9 +1048,14 @@ public sealed class SessionCoordinatorTests
             return rig;
         }
 
-        /// <summary>Sends <c>session.created</c> with a fresh 32-byte secret and returns the session id.</summary>
+        /// <summary>
+        /// Puts the coordinator where a real session starts - the guest asked, or the host accepted an incoming request -
+        /// then sends <c>session.created</c> with a fresh 32-byte secret and returns the session id. A session.created
+        /// without that agreement is ignored by design (<see cref="SessionPhaseTracker"/>).
+        /// </summary>
         public async Task<Guid> CreateSessionAsync(string role, int allowlistVersion = 7)
         {
+            await AgreeAsync(role);
             var sessionId = Guid.NewGuid();
             var secret = new byte[32];
             Random.Shared.NextBytes(secret);
@@ -981,6 +1073,26 @@ public sealed class SessionCoordinatorTests
 
             await WaitAsync(() => Coordinator.CurrentSession?.SessionId == sessionId);
             return sessionId;
+        }
+
+        /// <summary>The guest's request (answered with <c>request.created</c>) or the host's acceptance of one.</summary>
+        public async Task AgreeAsync(string role)
+        {
+            if (role == SessionInfo.GuestRole)
+            {
+                var asking = Coordinator.RequestSessionAsync(Guid.NewGuid(), 30, None);
+                var create = await Connection.NextAsync<RequestCreateMessage>();
+                await Connection.SendAsync(new RequestCreatedMessage(create.Ref, Guid.NewGuid(), ServerNow.AddSeconds(60)));
+                Assert.Null(await asking);
+                return;
+            }
+
+            var requestId = Guid.NewGuid();
+            await Connection.SendAsync(new RequestIncomingMessage(
+                requestId, Guid.NewGuid(), Guid.NewGuid(), "Sara Ahmed", "SARA-LAPTOP", 30, 7, ServerNow.AddSeconds(60)));
+            await WaitAsync(() => Coordinator.Phase == SessionPhase.RequestPending);
+            await Coordinator.AcceptRequestAsync(requestId, None);
+            await Connection.NextAsync<RequestAcceptMessage>();
         }
 
         public Task SendPeerEndpointAsync(Guid sessionId) => Connection.SendAsync(new SessionPeerEndpointMessage(

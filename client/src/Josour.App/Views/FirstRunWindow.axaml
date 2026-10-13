@@ -48,6 +48,10 @@
 
             <!-- step 2: sign in -->
             <StackPanel IsVisible="{Binding IsSignInStep}">
+                <StackPanel IsVisible="{Binding IsRegistering}">
+                    <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.RegisterDisplayName}" />
+                    <TextBox Margin="0,4,0,12" MaxLength="100" Text="{Binding DisplayName, Mode=TwoWay}" />
+                </StackPanel>
                 <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.LoginEmailLabel}" />
                 <TextBox Margin="0,4,0,12"
                             FlowDirection="{x:Static app:UiFlow.Technical}"
@@ -104,10 +108,16 @@
                            Content="{x:Static app:Strings.FirstRunNext}"
                            Command="{Binding ContinueFromServerCommand}"
                            IsVisible="{Binding IsServerStep}" />
-                <Button Grid.Column="2" MinWidth="140" Classes="accent" IsDefault="True"
-                           Content="{x:Static app:Strings.LoginSignIn}"
-                           Command="{Binding SignInCommand}"
-                           IsVisible="{Binding IsSignInStep}" />
+                <Panel Grid.Column="2" IsVisible="{Binding IsSignInStep}">
+                    <Button MinWidth="140" Classes="accent" IsDefault="True"
+                               Content="{x:Static app:Strings.LoginSignIn}"
+                               Command="{Binding SignInCommand}"
+                               IsVisible="{Binding IsSigningIn}" />
+                    <Button MinWidth="140" Classes="accent"
+                               Content="{x:Static app:Strings.RegisterSubmit}"
+                               Command="{Binding RegisterCommand}"
+                               IsVisible="{Binding IsRegistering}" />
+                </Panel>
                 <Button Grid.Column="2" MinWidth="140" Classes="accent" IsDefault="True"
                            Content="{x:Static app:Strings.FirstRunFinish}"
                            Command="{Binding FinishCommand}"

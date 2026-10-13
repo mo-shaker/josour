@@ -323,7 +323,7 @@ public sealed class ControlChannel : IControlChannel, IReconnectNow
                     }
                 }
 
-                await SendFrameAsync(socket, new HelloMessage(token, _deviceId, _device.AppVersion, _diagnostics), ct).ConfigureAwait(false);
+                await SendFrameAsync(socket, new HelloMessage(token, _deviceId, _device.AppVersion, _diagnostics, ClientCapabilities.Current), ct).ConfigureAwait(false);
                 var ack = await AwaitHelloAckAsync(socket, ct).ConfigureAwait(false);
 
                 var opened = socket;
@@ -414,6 +414,10 @@ public sealed class ControlChannel : IControlChannel, IReconnectNow
         ControlCloseCodes.Replaced => new ControlChannelClosedException(
             ControlCloseReason.ReplacedByAnotherConnection,
             $"Another connection of this device took over ({ControlCloseCodes.Replaced} {description}).",
+            closeCode),
+        ControlCloseCodes.UpgradeRequired => new ControlChannelClosedException(
+            ControlCloseReason.UpgradeRequired,
+            $"This version of Josour is older than the server accepts ({ControlCloseCodes.UpgradeRequired} {description}).",
             closeCode),
         _ => new WebSocketException(
             WebSocketError.ConnectionClosedPrematurely,
@@ -796,6 +800,7 @@ public sealed class ControlChannel : IControlChannel, IReconnectNow
         // 4401 is not terminal here: the next OpenAsync refreshes the token once and only then gives up.
         ControlCloseCodes.DeviceRevoked => ControlCloseReason.DeviceRevoked,
         ControlCloseCodes.Replaced => ControlCloseReason.ReplacedByAnotherConnection,
+        ControlCloseCodes.UpgradeRequired => ControlCloseReason.UpgradeRequired,
         _ => null,
     };
 

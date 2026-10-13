@@ -31,6 +31,9 @@ public interface IShellService
     /// <summary>The admin panel. Only offered to an administrator; the server enforces it regardless.</summary>
     void ShowAdminWindow();
 
+    /// <summary>Opens a web address in the user's default browser. False (with the reason) when nothing could open it.</summary>
+    bool TryOpenUrl(Uri url, out string? error);
+
     /// <summary>
     /// Opens a folder in the file manager (the About window's "open the log folder"). False with a reason rather than an
     /// exception: a failure here is a message in the window, never a crash.

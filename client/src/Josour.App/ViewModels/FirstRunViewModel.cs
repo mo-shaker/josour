@@ -39,6 +39,7 @@ public sealed partial class FirstRunViewModel : ObservableObject
     public const int StepCount = 3;
 
     private readonly IAppSettingsStore _settings;
+    private readonly IApiClient _api;
     private readonly IServerCheck _serverCheck;
     private readonly IAuthSession _auth;
     private readonly IAuthFlow _flow;
@@ -74,6 +75,16 @@ public sealed partial class FirstRunViewModel : ObservableObject
     [ObservableProperty]
     private bool _isMessageAnError;
 
+    /// <summary>The sign-in step is creating an account (ADR-0017).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSigningIn))]
+    [NotifyCanExecuteChangedFor(nameof(RegisterCommand))]
+    private bool _isRegistering;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RegisterCommand))]
+    private string _displayName = string.Empty;
+
     [ObservableProperty]
     private bool _isReadinessChecking = true;
 
@@ -91,6 +102,7 @@ public sealed partial class FirstRunViewModel : ObservableObject
 
     public FirstRunViewModel(
         IAppSettingsStore settings,
+        IApiClient api,
         IServerCheck serverCheck,
         IAuthSession auth,
         IAuthFlow flow,
@@ -98,6 +110,7 @@ public sealed partial class FirstRunViewModel : ObservableObject
         ILogger<FirstRunViewModel> logger)
     {
         _settings = settings;
+        _api = api;
         _serverCheck = serverCheck;
         _auth = auth;
         _flow = flow;
@@ -107,6 +120,8 @@ public sealed partial class FirstRunViewModel : ObservableObject
     }
 
     public bool IsServerStep => Step == FirstRunStep.Server;
+
+    public bool IsSigningIn => !IsRegistering;
 
     public bool IsSignInStep => Step == FirstRunStep.SignIn;
 
@@ -220,6 +235,54 @@ public sealed partial class FirstRunViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    private bool CanRegister() => CanSignIn() && IsRegistering && !string.IsNullOrWhiteSpace(DisplayName);
+
+    [RelayCommand]
+    private void ToggleRegistering()
+    {
+        IsRegistering = !IsRegistering;
+        Message = null;
+    }
+
+    /// <summary>Creates the account; an active one signs in at once, a pending one waits for an administrator.</summary>
+    [RelayCommand(CanExecute = nameof(CanRegister))]
+    private async Task RegisterAsync(CancellationToken ct)
+    {
+        IsBusy = true;
+        Message = null;
+        (RegistrationResult result, string? message) outcome;
+        try
+        {
+            outcome = await AccountRegistration.RegisterAsync(_api, Email, Password, DisplayName, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+
+        _logger.LogInformation("First run: registration {Result}", outcome.result);
+        switch (outcome.result)
+        {
+            case RegistrationResult.SignInNow:
+                IsRegistering = false;
+                await SignInAsync(ct);
+                break;
+            case RegistrationResult.Pending:
+                IsRegistering = false;
+                Password = string.Empty;
+                Message = outcome.message;
+                IsMessageAnError = false;
+                break;
+            default:
+                ShowError(outcome.message ?? string.Empty);
+                break;
         }
     }
 

@@ -90,56 +90,9 @@
                           Content="{x:Static app:Strings.SettingsStartMinimized}"
                           IsChecked="{Binding StartMinimized, Mode=TwoWay}" />
 
-                <!--
-                    Auto-accept (docs/ws-protocol.md section 5a). The switch and the list are applied as they are
-                    changed, not on Save: they are a standing consent, and one that survived closing the window
-                    unsaved would be a consent the host thought it had withdrawn.
-                -->
-                <TextBlock Classes="bodyStrong" Margin="0,20,0,0" Text="{x:Static app:Strings.SettingsAutoAcceptSection}" />
-                <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Margin="0,4,0,0"
-                              Text="{x:Static app:Strings.SettingsAutoAcceptHint}" />
-                <CheckBox Margin="0,8,0,0"
-                          Content="{x:Static app:Strings.SettingsAutoAcceptEnable}"
-                          IsChecked="{Binding IsAutoAcceptEnabled, Mode=TwoWay}" />
-                <c:InfoBar Margin="0,8,0,0" IsClosable="False" Severity="Warning"
-                            IsOpen="{Binding IsAutoAcceptEnabled, Mode=OneWay}"
-                            Message="{x:Static app:Strings.SettingsAutoAcceptWarning}" />
-
-                <TextBlock Classes="caption secondary" Margin="0,12,0,0"
-                              Text="{x:Static app:Strings.SettingsAutoAcceptEmpty}"
-                              IsVisible="{Binding !HasTrustedGuests}" />
-
-                <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding TrustedGuests}"
-                              IsVisible="{Binding HasTrustedGuests}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <c:Card Margin="0,0,0,6" Padding="12,8">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <TextBlock Classes="bodyStrong" TextWrapping="Wrap" Text="{Binding GuestName}" />
-                                        <TextBlock Classes="caption secondary" TextWrapping="Wrap" Text="{Binding GuestDevice}" />
-                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                            <TextBlock Classes="caption tertiary" Margin="0,0,4,0"
-                                                          Text="{x:Static app:Strings.SettingsAutoAcceptColumnLimit}" />
-                                            <TextBlock Classes="caption tertiary" Margin="0,0,12,0" Text="{Binding LimitText}" />
-                                            <TextBlock Classes="caption tertiary" Margin="0,0,4,0"
-                                                          Text="{x:Static app:Strings.SettingsAutoAcceptColumnExpiry}" />
-                                            <TextBlock Classes="caption tertiary" Text="{Binding ExpiryText}" />
-                                        </StackPanel>
-                                    </StackPanel>
-                                    <Button Grid.Column="1" VerticalAlignment="Center" Margin="8,0,0,0"
-                                               Content="{x:Static app:Strings.SettingsAutoAcceptRemove}"
-                                               Command="{Binding DataContext.RemoveTrustedGuestCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                               CommandParameter="{Binding}" />
-                                </Grid>
-                            </c:Card>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <!-- Who may use this connection without asking is set per contact now (ADR-0014). -->
+                <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Margin="0,20,0,0"
+                              Text="{x:Static app:Strings.SettingsTrustMovedHint}" />
 
                 <c:InfoBar Margin="0,16,0,0" IsClosable="False" Severity="Error"
                             IsOpen="{Binding HasSaveMessage, Mode=OneWay}"

@@ -113,6 +113,7 @@ public sealed class SessionPhaseTrackerTests
         Assert.Equal(SessionPhase.RequestPending, rig.Tracker.Phase);
         Assert.Equal(requestId, rig.Tracker.PendingRequestId);
 
+        Assert.True(rig.Tracker.MarkAgreed(requestId)); // what SessionCoordinator.AcceptRequestAsync does before sending
         await rig.Channel.SendAsync(new RequestAcceptMessage("c7", requestId), None);
         var session = await rig.Messages.NextAsync<SessionCreatedMessage>();
         Assert.Equal(SessionPhase.Preparing, rig.Tracker.Phase);
@@ -196,6 +197,7 @@ public sealed class SessionPhaseTrackerTests
 
         Assert.False(tracker.Apply(new HostsMessage("hosts.snapshot", Array.Empty<HostInfoDto>())));
         Assert.False(tracker.Apply(new PingMessage()));
+        Assert.True(tracker.TrackRequest("r1"));
         Assert.True(tracker.Apply(created));
         Assert.False(tracker.Apply(new SessionPeerEndpointMessage(Guid.NewGuid(), Fp, Array.Empty<CandidateDto>())));
         Assert.False(tracker.Apply(new SessionTerminateMessage(Guid.NewGuid(), "expired")));
@@ -211,6 +213,68 @@ public sealed class SessionPhaseTrackerTests
         Assert.False(tracker.Apply(new SessionTerminateMessage(created.SessionId, "admin_terminated"))); // duplicate: no change
         Assert.True(tracker.MarkEnded());
         Assert.Equal("admin_terminated", tracker.LastEndReason);
+    }
+
+    [Fact]
+    public void ASessionNobodyHereAgreedTo_IsIgnored()
+    {
+        // The client used to accept session.created from Idle, i.e. a session the server started on its own. That is the
+        // one thing a host's consent exists to prevent, so the frame is ignored unless this side asked, offered, or
+        // answered yes.
+        var tracker = new SessionPhaseTracker();
+        var created = new SessionCreatedMessage(Guid.NewGuid(), "host", Convert.ToBase64String(new byte[32]), DateTimeOffset.UtcNow.AddMinutes(30), 1, "203.0.113.10", false, new PeerDto(Guid.NewGuid(), Guid.NewGuid(), "Omar", "OMAR-DESKTOP"));
+
+        Assert.False(tracker.Apply(created));
+        Assert.Equal(SessionPhase.Idle, tracker.Phase);
+
+        var requestId = Guid.NewGuid();
+        Assert.True(tracker.Apply(new RequestIncomingMessage(requestId, Guid.NewGuid(), Guid.NewGuid(), "Omar", "OMAR-DESKTOP", 30, 1, DateTimeOffset.UtcNow.AddSeconds(60))));
+        Assert.False(tracker.Apply(created)); // still unanswered
+        Assert.Equal(SessionPhase.RequestPending, tracker.Phase);
+
+        Assert.False(tracker.MarkAgreed(Guid.NewGuid())); // not the pending one
+        Assert.True(tracker.MarkAgreed(requestId));
+        Assert.True(tracker.Apply(created));
+        Assert.Equal(SessionPhase.Preparing, tracker.Phase);
+    }
+
+    [Fact]
+    public void HostOffer_Created_Rejected_ReturnsToIdle()
+    {
+        var tracker = new SessionPhaseTracker();
+        var offerId = Guid.NewGuid();
+
+        Assert.True(tracker.TrackOffer("o1"));
+        Assert.True(tracker.PendingIsOffer);
+        Assert.False(tracker.Apply(new OfferCreatedMessage("o1", offerId, DateTimeOffset.UtcNow.AddSeconds(60))));
+        Assert.Equal(offerId, tracker.PendingRequestId);
+
+        Assert.False(tracker.Apply(new OfferResultMessage(Guid.NewGuid(), false, "rejected", null))); // someone else's
+        Assert.True(tracker.Apply(new OfferResultMessage(offerId, false, "rejected", null)));
+        Assert.Equal(SessionPhase.Idle, tracker.Phase);
+        Assert.Equal("rejected", tracker.LastEndReason);
+    }
+
+    [Fact]
+    public void GuestOffer_Incoming_Accepted_StartsTheSession_ClosedElsewhere_ReturnsToIdle()
+    {
+        var created = new SessionCreatedMessage(Guid.NewGuid(), "guest", Convert.ToBase64String(new byte[32]), DateTimeOffset.UtcNow.AddMinutes(30), 1, "203.0.113.10", false, new PeerDto(Guid.NewGuid(), Guid.NewGuid(), "Omar", "OMAR-DESKTOP"), Initiator: "host");
+        OfferIncomingMessage Offer(Guid id) => new(id, Guid.NewGuid(), Guid.NewGuid(), "Omar", "OMAR-DESKTOP", 30, 1, DateTimeOffset.UtcNow.AddSeconds(60));
+
+        var accepted = new SessionPhaseTracker();
+        var offerId = Guid.NewGuid();
+        Assert.True(accepted.Apply(Offer(offerId)));
+        Assert.True(accepted.PendingIsOffer);
+        Assert.True(accepted.MarkAgreed(offerId));
+        Assert.True(accepted.Apply(created));
+        Assert.Equal(SessionPhase.Preparing, accepted.Phase);
+
+        var elsewhere = new SessionPhaseTracker();
+        var other = Guid.NewGuid();
+        Assert.True(elsewhere.Apply(Offer(other)));
+        Assert.True(elsewhere.Apply(new OfferClosedMessage(other, "accepted_elsewhere")));
+        Assert.Equal(SessionPhase.Idle, elsewhere.Phase);
+        Assert.Equal("accepted_elsewhere", elsewhere.LastEndReason);
     }
 
     [Fact]

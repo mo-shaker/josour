@@ -10,7 +10,28 @@ public sealed record HelloMessage(
     [property: JsonPropertyName("token")] string Token,
     [property: JsonPropertyName("device_id")] Guid DeviceId,
     [property: JsonPropertyName("app_version")] string AppVersion,
-    [property: JsonPropertyName("diagnostics")] Dictionary<string, object?>? Diagnostics) : ControlMessage("hello");
+    [property: JsonPropertyName("diagnostics")] Dictionary<string, object?>? Diagnostics,
+    /// <summary>What this build understands (docs/ws-protocol.md section 10); see <see cref="ClientCapabilities"/>.</summary>
+    [property: JsonPropertyName("capabilities")] IReadOnlyList<string>? Capabilities = null) : ControlMessage("hello");
+
+/// <summary>The <c>hello.capabilities</c> names this build declares (docs/ws-protocol.md section 10).</summary>
+public static class ClientCapabilities
+{
+    /// <summary>Understands <c>contacts.changed</c>, <c>contacts.presence</c> and <c>host.state</c>.</summary>
+    public const string Contacts = "contacts";
+
+    /// <summary>Can be rung by <c>offer.incoming</c>.</summary>
+    public const string Offers = "offers";
+
+    /// <summary>Bases an automatic acceptance on the trust the server holds (<c>request.incoming.trusted</c>).</summary>
+    public const string TrustV2 = "trust_v2";
+
+    /// <summary>Routes the guest's traffic through the system proxy rather than a work browser (ADR-0015).</summary>
+    public const string SystemProxy = "system_proxy";
+
+    /// <summary>What this build sends.</summary>
+    public static IReadOnlyList<string> Current { get; } = [Contacts, Offers, TrustV2];
+}
 
 public sealed record HostAvailableMessage(
     [property: JsonPropertyName("available")] bool Available,
@@ -33,6 +54,16 @@ public sealed record RequestAcceptMessage(
     [property: JsonPropertyName("request_id")] Guid RequestId,
     [property: JsonPropertyName("auto")] bool Auto = false) : ControlMessage("request.accept");
 public sealed record RequestRejectMessage([property: JsonPropertyName("ref")] string Ref, [property: JsonPropertyName("request_id")] Guid RequestId) : ControlMessage("request.reject");
+
+/// <summary><c>offer.create</c>: this device offers its connection to a contact (docs/ws-protocol.md section 10).</summary>
+public sealed record OfferCreateMessage(
+    [property: JsonPropertyName("ref")] string Ref,
+    [property: JsonPropertyName("guest_user_id")] Guid GuestUserId,
+    [property: JsonPropertyName("duration_min")] int DurationMin) : ControlMessage("offer.create");
+
+public sealed record OfferCancelMessage([property: JsonPropertyName("ref")] string Ref, [property: JsonPropertyName("offer_id")] Guid OfferId) : ControlMessage("offer.cancel");
+public sealed record OfferAcceptMessage([property: JsonPropertyName("ref")] string Ref, [property: JsonPropertyName("offer_id")] Guid OfferId) : ControlMessage("offer.accept");
+public sealed record OfferRejectMessage([property: JsonPropertyName("ref")] string Ref, [property: JsonPropertyName("offer_id")] Guid OfferId) : ControlMessage("offer.reject");
 
 public sealed record CandidateDto(
     [property: JsonPropertyName("type")] string Type,
@@ -86,13 +117,62 @@ public sealed record HelloAckMessage(
     [property: JsonPropertyName("server_time")] DateTimeOffset ServerTime,
     [property: JsonPropertyName("public_ip")] string PublicIp,
     [property: JsonPropertyName("settings")] ServerSettings Settings,
-    [property: JsonPropertyName("allowlist_version")] int AllowlistVersion) : ControlMessage("hello.ack");
+    [property: JsonPropertyName("allowlist_version")] int AllowlistVersion,
+    /// <summary>What the server implements (docs/ws-protocol.md section 10); null from a server that predates contacts.</summary>
+    [property: JsonPropertyName("features")] IReadOnlyList<string>? Features = null) : ControlMessage("hello.ack");
 
 public sealed record HostInfoDto(
     [property: JsonPropertyName("device_id")] Guid DeviceId,
     [property: JsonPropertyName("user_display_name")] string UserDisplayName,
     [property: JsonPropertyName("device_name")] string DeviceName,
-    [property: JsonPropertyName("reachable")] bool? Reachable);
+    [property: JsonPropertyName("reachable")] bool? Reachable,
+    /// <summary>The contact the device belongs to; <see cref="Guid.Empty"/> from a server that predates contacts.</summary>
+    [property: JsonPropertyName("user_id")] Guid UserId = default);
+
+/// <summary><c>host.state</c>: what the server recorded about this device's availability (a host never sees itself in the host list).</summary>
+public sealed record HostStateMessage(
+    [property: JsonPropertyName("available")] bool Available,
+    [property: JsonPropertyName("reachable")] bool? Reachable) : ControlMessage("host.state");
+
+/// <summary><c>contacts.changed</c>: re-read the contacts and invitations over REST.</summary>
+public sealed record ContactsChangedMessage() : ControlMessage("contacts.changed");
+
+public sealed record ContactPresenceDto(
+    [property: JsonPropertyName("user_id")] Guid UserId,
+    [property: JsonPropertyName("online")] bool Online);
+
+/// <summary><c>contacts.presence</c>: every contact when <see cref="Full"/> (after hello), otherwise only those that changed.</summary>
+public sealed record ContactsPresenceMessage(
+    [property: JsonPropertyName("full")] bool Full,
+    [property: JsonPropertyName("contacts")] IReadOnlyList<ContactPresenceDto> Contacts) : ControlMessage("contacts.presence");
+
+public sealed record OfferCreatedMessage(
+    [property: JsonPropertyName("ref")] string Ref,
+    [property: JsonPropertyName("offer_id")] Guid OfferId,
+    [property: JsonPropertyName("expires_at")] DateTimeOffset ExpiresAt) : ControlMessage("offer.created");
+
+/// <summary><c>offer.incoming</c>: a contact offers this user their connection.</summary>
+public sealed record OfferIncomingMessage(
+    [property: JsonPropertyName("offer_id")] Guid OfferId,
+    [property: JsonPropertyName("host_user_id")] Guid HostUserId,
+    [property: JsonPropertyName("host_device_id")] Guid HostDeviceId,
+    [property: JsonPropertyName("host_name")] string HostName,
+    [property: JsonPropertyName("host_device")] string HostDevice,
+    [property: JsonPropertyName("duration_min")] int DurationMin,
+    [property: JsonPropertyName("allowlist_version")] int AllowlistVersion,
+    [property: JsonPropertyName("expires_at")] DateTimeOffset ExpiresAt) : ControlMessage("offer.incoming");
+
+/// <summary><c>offer.result</c>: to the offering device, how its offer ended.</summary>
+public sealed record OfferResultMessage(
+    [property: JsonPropertyName("offer_id")] Guid OfferId,
+    [property: JsonPropertyName("accepted")] bool Accepted,
+    [property: JsonPropertyName("reason")] string? Reason,
+    [property: JsonPropertyName("session_id")] Guid? SessionId) : ControlMessage("offer.result");
+
+/// <summary><c>offer.closed</c>: to the guest's devices, stop showing this offer.</summary>
+public sealed record OfferClosedMessage(
+    [property: JsonPropertyName("offer_id")] Guid OfferId,
+    [property: JsonPropertyName("reason")] string Reason) : ControlMessage("offer.closed");
 
 public sealed record HostsMessage(string Type, [property: JsonPropertyName("hosts")] IReadOnlyList<HostInfoDto> Hosts) : ControlMessage(Type); // hosts.snapshot | hosts.update
 
@@ -114,7 +194,12 @@ public sealed record RequestIncomingMessage(
     [property: JsonPropertyName("guest_device")] string GuestDevice,
     [property: JsonPropertyName("duration_min")] int DurationMin,
     [property: JsonPropertyName("allowlist_version")] int AllowlistVersion,
-    [property: JsonPropertyName("expires_at")] DateTimeOffset ExpiresAt) : ControlMessage("request.incoming");
+    [property: JsonPropertyName("expires_at")] DateTimeOffset ExpiresAt,
+    /// <summary>
+    /// The host told the server this contact may use the connection without asking (ADR-0014). The app answers without a
+    /// window only when this is true <em>and</em> its own copy of the contact list agrees.
+    /// </summary>
+    [property: JsonPropertyName("trusted")] bool Trusted = false) : ControlMessage("request.incoming");
 
 public sealed record RequestResultMessage(
     [property: JsonPropertyName("request_id")] Guid RequestId,
@@ -143,7 +228,9 @@ public sealed record SessionCreatedMessage(
     [property: JsonPropertyName("peer_public_ip")] string PeerPublicIp,
     [property: JsonPropertyName("same_public_ip")] bool SamePublicIp,
     [property: JsonPropertyName("peer")] PeerDto Peer,
-    [property: JsonPropertyName("relay")] RelayDto? Relay = null) : ControlMessage("session.created");
+    [property: JsonPropertyName("relay")] RelayDto? Relay = null,
+    /// <summary>Who started it: <c>guest</c> (a request) or <c>host</c> (an offer).</summary>
+    [property: JsonPropertyName("initiator")] string Initiator = "guest") : ControlMessage("session.created");
 
 /// <summary>
 /// The relay's address and this side's token (ADR-0009). null in a deployment with no relay, which is supported: direct only.

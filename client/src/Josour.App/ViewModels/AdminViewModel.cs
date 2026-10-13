@@ -2,7 +2,9 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using Josour.App.Services;
 using Josour.Infrastructure.Api;
+using Josour.Infrastructure.Settings;
 
 namespace Josour.App.ViewModels;
 
@@ -26,6 +28,8 @@ public sealed partial class AdminViewModel : ObservableObject
     private readonly IAuthSession _auth;
     private readonly TimeProvider _time;
     private readonly ILogger<AdminViewModel> _logger;
+    private readonly IShellService? _shell;
+    private readonly IAppSettingsStore? _settings;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RefreshCommand))]
@@ -64,12 +68,35 @@ public sealed partial class AdminViewModel : ObservableObject
         IApiClient api,
         IAuthSession auth,
         ILogger<AdminViewModel> logger,
-        TimeProvider? time = null)
+        TimeProvider? time = null,
+        IShellService? shell = null,
+        IAppSettingsStore? settings = null)
     {
         _api = api;
         _auth = auth;
         _logger = logger;
         _time = time ?? TimeProvider.System;
+        _shell = shell;
+        _settings = settings;
+    }
+
+    /// <summary>
+    /// The full administration - approving registrations, deleting accounts, contacts, sessions, server settings - is the
+    /// web dashboard on the server itself (ADR-0016); this window keeps the everyday account actions.
+    /// </summary>
+    [RelayCommand]
+    private void OpenWebDashboard()
+    {
+        if (_shell is null || _settings is null
+            || !Infrastructure.Api.ServerUrl.TryNormalize(_settings.Current.ServerUrl, out var baseUri))
+        {
+            return;
+        }
+
+        if (!_shell.TryOpenUrl(new Uri(baseUri, "admin"), out var error))
+        {
+            _logger.LogWarning("Could not open the web dashboard: {Error}", error);
+        }
     }
 
     /// <summary>The accounts, as listed.</summary>

@@ -11,7 +11,7 @@
                  Title="{x:Static app:Strings.AppName}"
                  FlowDirection="{x:Static app:UiFlow.Direction}"
                  Icon="/Assets/josour.ico"
-                 Width="460" Height="560" MinWidth="420" MinHeight="480"
+                 Width="480" Height="640" MinWidth="420" MinHeight="520"
                  WindowStartupLocation="CenterScreen">
     <Grid>
         <Grid.RowDefinitions>
@@ -20,14 +20,17 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- The session takes over the window while it lasts (and until its summary is dismissed); otherwise the two tabs. -->
+        <!--
+            The session takes over the window while it lasts (and until its summary is dismissed); otherwise the contacts
+            (everything between people, ADR-0014) and this device's own "share my connection" switch.
+        -->
         <Grid Grid.Row="1" Margin="12,4,12,0">
             <TabControl IsVisible="{Binding !Session.IsVisible}">
+                <TabItem Header="{x:Static app:Strings.GuestTab}">
+                    <views:ContactsPage DataContext="{Binding Contacts}" />
+                </TabItem>
                 <TabItem Header="{x:Static app:Strings.HostTab}">
                     <views:HostPage DataContext="{Binding Host}" />
-                </TabItem>
-                <TabItem Header="{x:Static app:Strings.GuestTab}">
-                    <views:GuestPage DataContext="{Binding Guest}" />
                 </TabItem>
             </TabControl>
 

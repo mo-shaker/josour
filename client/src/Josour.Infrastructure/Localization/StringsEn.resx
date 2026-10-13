@@ -101,10 +101,10 @@
   </data>
   <!-- main window -->
   <data name="HostTab" xml:space="preserve">
-    <value>Host</value>
+    <value>Share my connection</value>
   </data>
   <data name="GuestTab" xml:space="preserve">
-    <value>Guest</value>
+    <value>Contacts</value>
   </data>
   <data name="StatusNotSignedIn" xml:space="preserve">
     <value>Not signed in</value>
@@ -762,7 +762,7 @@
     <value>Connected automatically</value>
   </data>
   <data name="AutoAcceptToastBodyFormat" xml:space="preserve">
-    <value>{0} ({1}) connected automatically: they are on your trusted-guest list. You can end the session now from the app window.</value>
+    <value>{0} ({1}) is using your connection: you allowed them to without asking. You can end the session from the app window.</value>
   </data>
   <data name="SettingsAutoAcceptSection" xml:space="preserve">
     <value>Automatic acceptance</value>
@@ -798,10 +798,10 @@
     <value>{0} min</value>
   </data>
   <data name="IncomingRequestTrustThisGuest" xml:space="preserve">
-    <value>Accept from this guest automatically from now on</value>
+    <value>Always let this contact use my connection without asking</value>
   </data>
   <data name="IncomingRequestTrustHint" xml:space="preserve">
-    <value>Applies to this device only, and to sessions no longer than this one. You can withdraw the trust from Settings whenever you like.</value>
+    <value>Applies on every device you sign in from. You are still told each time, and you can withdraw it from the Contacts tab whenever you like.</value>
   </data>
   <data name="AutoAcceptTrustWeek" xml:space="preserve">
     <value>a week</value>
@@ -916,5 +916,176 @@
   </data>
   <data name="LicenseSummary" xml:space="preserve">
     <value>Published for the community under Apache-2.0. Copying, modification and commercial use are permitted subject to the licence. Provided as is, without warranty or support. Liability is limited to the extent permitted by law. Third-party components retain their own licences.</value>
+  </data>
+  <data name="ContactsPageTitle" xml:space="preserve">
+    <value>Contacts</value>
+  </data>
+  <data name="ContactsPageDescription" xml:space="preserve">
+    <value>Share a connection with the people you added: use theirs, or offer them yours.</value>
+  </data>
+  <data name="ContactsEmptyTitle" xml:space="preserve">
+    <value>No contacts yet</value>
+  </data>
+  <data name="ContactsEmptyText" xml:space="preserve">
+    <value>Invite someone by their email address. Once they accept, the two of you can share a connection.</value>
+  </data>
+  <data name="ContactsInvitePlaceholder" xml:space="preserve">
+    <value>Email address</value>
+  </data>
+  <data name="ContactsInviteButton" xml:space="preserve">
+    <value>Invite</value>
+  </data>
+  <data name="ContactsInviteSentFormat" xml:space="preserve">
+    <value>If {0} uses Josour, they will see your invitation.</value>
+  </data>
+  <data name="ContactsInviteFailedFormat" xml:space="preserve">
+    <value>The invitation was not sent: {0}</value>
+  </data>
+  <data name="ContactsIncomingTitle" xml:space="preserve">
+    <value>Invitations to you</value>
+  </data>
+  <data name="ContactsIncomingFormat" xml:space="preserve">
+    <value>{0} wants to add you as a contact</value>
+  </data>
+  <data name="ContactsAccept" xml:space="preserve">
+    <value>Accept</value>
+  </data>
+  <data name="ContactsDecline" xml:space="preserve">
+    <value>Decline</value>
+  </data>
+  <data name="ContactsOutgoingTitle" xml:space="preserve">
+    <value>Invitations you sent</value>
+  </data>
+  <data name="ContactsOutgoingPending" xml:space="preserve">
+    <value>Waiting</value>
+  </data>
+  <data name="ContactsOutgoingExpired" xml:space="preserve">
+    <value>Expired</value>
+  </data>
+  <data name="ContactsWithdraw" xml:space="preserve">
+    <value>Withdraw</value>
+  </data>
+  <data name="ContactOnline" xml:space="preserve">
+    <value>Online</value>
+  </data>
+  <data name="ContactOffline" xml:space="preserve">
+    <value>Offline</value>
+  </data>
+  <data name="ContactSharing" xml:space="preserve">
+    <value>Sharing their connection</value>
+  </data>
+  <data name="ContactUseConnection" xml:space="preserve">
+    <value>Use their connection</value>
+  </data>
+  <data name="ContactOfferConnection" xml:space="preserve">
+    <value>Offer my connection</value>
+  </data>
+  <data name="ContactAllowAlways" xml:space="preserve">
+    <value>Can use my connection without asking</value>
+  </data>
+  <data name="ContactTrustsMe" xml:space="preserve">
+    <value>Lets me use their connection without asking</value>
+  </data>
+  <data name="ContactRemove" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="ContactRemoveConfirm" xml:space="preserve">
+    <value>Remove for good?</value>
+  </data>
+  <data name="ContactActionFailedFormat" xml:space="preserve">
+    <value>That did not work: {0}</value>
+  </data>
+  <data name="ContactsOfferWaitingFormat" xml:space="preserve">
+    <value>Offering your connection to {0}…</value>
+  </data>
+  <data name="ContactsCancelOffer" xml:space="preserve">
+    <value>Withdraw the offer</value>
+  </data>
+  <data name="OfferIncomingTitle" xml:space="preserve">
+    <value>A connection is offered to you</value>
+  </data>
+  <data name="OfferIncomingFormat" xml:space="preserve">
+    <value>{0} offers you their connection for {1} minutes. While you are connected, sites will see {0}'s address.</value>
+  </data>
+  <data name="OfferToastTitle" xml:space="preserve">
+    <value>Connection offered</value>
+  </data>
+  <data name="OfferToastBodyFormat" xml:space="preserve">
+    <value>{0} offers you their connection. Open Josour to accept or decline.</value>
+  </data>
+  <data name="OfferResultRejected" xml:space="preserve">
+    <value>Your offer was declined.</value>
+  </data>
+  <data name="OfferResultExpired" xml:space="preserve">
+    <value>Nobody answered your offer.</value>
+  </data>
+  <data name="OfferResultCancelled" xml:space="preserve">
+    <value>You withdrew the offer.</value>
+  </data>
+  <data name="OfferErrorGuestUnavailable" xml:space="preserve">
+    <value>That contact cannot take an offer right now: they are offline, busy, or on an older version.</value>
+  </data>
+  <data name="ErrorNotContact" xml:space="preserve">
+    <value>You are no longer contacts.</value>
+  </data>
+  <data name="ErrorTrustRevoked" xml:space="preserve">
+    <value>Automatic acceptance was withdrawn; asking you instead.</value>
+  </data>
+  <data name="SettingsTrustMovedHint" xml:space="preserve">
+    <value>Who may use your connection without asking is now set for each contact, on the Contacts tab.</value>
+  </data>
+  <data name="LoginCreateAccount" xml:space="preserve">
+    <value>Create an account</value>
+  </data>
+  <data name="LoginHaveAccount" xml:space="preserve">
+    <value>I already have an account</value>
+  </data>
+  <data name="RegisterTitle" xml:space="preserve">
+    <value>Create an account</value>
+  </data>
+  <data name="RegisterDisplayName" xml:space="preserve">
+    <value>Your name</value>
+  </data>
+  <data name="RegisterPasswordHint" xml:space="preserve">
+    <value>At least 8 characters</value>
+  </data>
+  <data name="RegisterSubmit" xml:space="preserve">
+    <value>Create account</value>
+  </data>
+  <data name="RegisterPendingTitle" xml:space="preserve">
+    <value>Waiting for approval</value>
+  </data>
+  <data name="RegisterPendingText" xml:space="preserve">
+    <value>Your account was created. An administrator has to approve it before you can sign in.</value>
+  </data>
+  <data name="RegisterClosed" xml:space="preserve">
+    <value>This server does not take new accounts. Ask its administrator.</value>
+  </data>
+  <data name="RegisterUnavailable" xml:space="preserve">
+    <value>Too many accounts are waiting for approval. Try again later.</value>
+  </data>
+  <data name="RegisterEmailTaken" xml:space="preserve">
+    <value>That email already has an account.</value>
+  </data>
+  <data name="RegisterNameRequired" xml:space="preserve">
+    <value>Enter your name.</value>
+  </data>
+  <data name="LoginErrorAccountPending" xml:space="preserve">
+    <value>Your account is waiting for an administrator's approval.</value>
+  </data>
+  <data name="LoginErrorAccountRejected" xml:space="preserve">
+    <value>Your registration was not approved.</value>
+  </data>
+  <data name="ErrorUpgradeRequired" xml:space="preserve">
+    <value>This version of Josour is older than the server accepts. Update the app.</value>
+  </data>
+  <data name="SessionEndedContactRemoved" xml:space="preserve">
+    <value>The contact was removed, so the session ended.</value>
+  </data>
+  <data name="SessionEndedSystemProxyFailed" xml:space="preserve">
+    <value>The system proxy could not be set, so the session ended.</value>
+  </data>
+  <data name="AdminOpenWebDashboard" xml:space="preserve">
+    <value>Open the full web dashboard (registrations, contacts, sessions, settings)</value>
   </data>
 </root>

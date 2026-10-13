@@ -71,6 +71,31 @@ public sealed class ShellService : IShellService
 
     public void ShowAdminWindow() => OnUiThread(() => _admin = ShowSingle(_admin));
 
+    /// <summary>The default browser, the platform's own way (as for folders below). Only http(s) is ever opened.</summary>
+    public bool TryOpenUrl(Uri url, out string? error)
+    {
+        error = null;
+        if (url is null || url.Scheme is not ("https" or "http"))
+        {
+            error = "not a web address";
+            return false;
+        }
+
+        try
+        {
+            using var process = OperatingSystem.IsMacOS()
+                ? Process.Start(new ProcessStartInfo("/usr/bin/open") { ArgumentList = { url.AbsoluteUri }, UseShellExecute = false })
+                : Process.Start(new ProcessStartInfo(url.AbsoluteUri) { UseShellExecute = true });
+            return true;
+        }
+        catch (Exception ex) when (ex is Win32Exception or IOException or InvalidOperationException or PlatformNotSupportedException)
+        {
+            _logger.LogWarning(ex, "{Url} could not be opened", url);
+            error = ex.Message;
+            return false;
+        }
+    }
+
     /// <summary>
     /// Opens a folder with the shell's own handler (<c>UseShellExecute</c>), creating it first: the log folder does not
     /// exist until something has been written, and "the folder is missing" is a worse answer than an empty folder.

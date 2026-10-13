@@ -19,6 +19,9 @@ public enum ControlCloseReason
 
     /// <summary>The channel cannot run at all (no server configured, no token).</summary>
     Failed,
+
+    /// <summary>Close <c>4426</c>: this build is older than the server accepts; only an update helps.</summary>
+    UpgradeRequired,
 }
 
 /// <summary>One terminal close of the channel: the reason, the raw close code and the server's description.</summary>

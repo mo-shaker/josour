@@ -92,8 +92,8 @@
                           Text="{x:Static app:Strings.IncomingRequestDisconnectHint}" />
 
             <!--
-                docs/ws-protocol.md section 5a: the one place a standing consent can be given, because it is the only
-                screen where the host is looking at who is asking. Unticked every time the window opens, and below the
+                ADR-0014: a standing consent can be given here, where the host is looking at who is asking, or from the
+                contact's row on the Contacts tab. Unticked every time the window opens, and below the
                 warnings rather than beside the buttons, so it is read as part of the decision and not as part of
                 pressing Accept.
             -->
@@ -101,14 +101,6 @@
                 <StackPanel>
                     <CheckBox Content="{x:Static app:Strings.IncomingRequestTrustThisGuest}"
                               IsChecked="{Binding TrustThisGuest, Mode=TwoWay}" />
-                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0"
-                                IsEnabled="{Binding TrustThisGuest, Mode=OneWay}">
-                        <TextBlock Classes="secondary" VerticalAlignment="Center" Margin="0,0,8,0"
-                                      Text="{x:Static app:Strings.SettingsAutoAcceptColumnExpiry}" />
-                        <ComboBox MinWidth="140"
-                                  ItemsSource="{Binding TrustDurations}"
-                                  SelectedItem="{Binding SelectedTrustDuration, Mode=TwoWay}" />
-                    </StackPanel>
                     <TextBlock Classes="caption tertiary" Margin="0,8,0,0" TextWrapping="Wrap"
                                   Text="{x:Static app:Strings.IncomingRequestTrustHint}" />
                 </StackPanel>

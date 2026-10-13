@@ -35,6 +35,12 @@
                             </TextBox.InnerLeftContent>
                         </TextBox>
 
+            <!-- Creating an account (ADR-0017): the one extra field. -->
+            <StackPanel IsVisible="{Binding IsRegistering}">
+                <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.RegisterDisplayName}" />
+                <TextBox Margin="0,4,0,12" MaxLength="100" Text="{Binding DisplayName, Mode=TwoWay}" />
+            </StackPanel>
+
             <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.LoginEmailLabel}" />
             <TextBox Margin="0,4,0,12"
                         FlowDirection="{x:Static app:UiFlow.Technical}"
@@ -53,9 +59,16 @@
                                 </TextBox.InnerLeftContent>
                             </TextBox>
 
+            <TextBlock Classes="caption tertiary" Margin="0,2,0,0" IsVisible="{Binding IsRegistering}"
+                       Text="{x:Static app:Strings.RegisterPasswordHint}" />
+
             <c:InfoBar Margin="0,12,0,0" IsClosable="False" Severity="Error"
                         IsOpen="{Binding HasError, Mode=OneWay}"
                         Message="{Binding ErrorText}" />
+            <c:InfoBar Margin="0,12,0,0" IsClosable="False" Severity="Informational"
+                        IsOpen="{Binding HasInfo, Mode=OneWay}"
+                        Title="{x:Static app:Strings.RegisterPendingTitle}"
+                        Message="{Binding InfoText}" />
 
             <Grid Margin="0,16,0,0">
                 <Grid.ColumnDefinitions>
@@ -65,9 +78,22 @@
                 <ProgressBar IsIndeterminate="True" Grid.Column="0" Width="80" Height="4" HorizontalAlignment="Left" VerticalAlignment="Center"
                                  IsVisible="{Binding IsBusy}" />
                 <Button Grid.Column="1" MinWidth="140" Classes="accent" IsDefault="True"
+                           IsVisible="{Binding IsSigningIn}"
                            Content="{Binding SignInButtonText}"
                            Command="{Binding SignInCommand}" />
+                <Button Grid.Column="1" MinWidth="140" Classes="accent"
+                           IsVisible="{Binding IsRegistering}"
+                           Content="{x:Static app:Strings.RegisterSubmit}"
+                           Command="{Binding RegisterCommand}" />
             </Grid>
+
+            <Button Classes="transparent" HorizontalAlignment="Center" Margin="0,12,0,0"
+                    Command="{Binding ToggleRegisteringCommand}">
+                <Panel>
+                    <TextBlock IsVisible="{Binding IsSigningIn}" Text="{x:Static app:Strings.LoginCreateAccount}" />
+                    <TextBlock IsVisible="{Binding IsRegistering}" Text="{x:Static app:Strings.LoginHaveAccount}" />
+                </Panel>
+            </Button>
         </StackPanel>
     </Grid>
 </Window>

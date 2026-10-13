@@ -17,6 +17,21 @@ public static class ApiErrorCodes
     public const string Conflict = "conflict";
     public const string Internal = "internal";
 
+    /// <summary>The password was right, but the self-registered account is waiting for an administrator (ADR-0017).</summary>
+    public const string AccountPending = "account_pending";
+
+    /// <summary>The password was right, but an administrator turned the registration down.</summary>
+    public const string AccountRejected = "account_rejected";
+
+    /// <summary><c>POST /auth/register</c> on a server that does not take registrations.</summary>
+    public const string RegistrationClosed = "registration_closed";
+
+    /// <summary>Too many registrations are waiting for approval; try later.</summary>
+    public const string RegistrationUnavailable = "registration_unavailable";
+
+    /// <summary>This build is older than the server's <c>min_client_version</c>.</summary>
+    public const string UpgradeRequired = "upgrade_required";
+
     /// <summary>Client-side: the server answered 2xx but the body was not the expected JSON.</summary>
     public const string InvalidResponse = "invalid_response";
 

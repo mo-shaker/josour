@@ -47,6 +47,8 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
     public const string BusyCode = "busy";
     public const string TimeoutCode = "timeout";
 
+    private volatile string? _offerAnswerRef;
+
     private static readonly IReadOnlyList<int> DefaultAllowedPorts = new[] { 80, 443 };
 
     private readonly IControlChannel _channel;
@@ -208,11 +210,85 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
     /// trusted-guest rule it had set up beforehand (docs/ws-protocol.md section 5a); it only travels to the server's
     /// audit trail and changes nothing about the session that follows.
     /// </summary>
-    public Task AcceptRequestAsync(Guid requestId, bool auto, CancellationToken ct) =>
-        _channel.SendAsync(new RequestAcceptMessage(ControlRef.Next(), requestId, auto), ct);
+    public Task AcceptRequestAsync(Guid requestId, bool auto, CancellationToken ct)
+    {
+        _tracker.MarkAgreed(requestId);
+        return _channel.SendAsync(new RequestAcceptMessage(ControlRef.Next(), requestId, auto), ct);
+    }
 
     public Task RejectRequestAsync(Guid requestId, CancellationToken ct) =>
         _channel.SendAsync(new RequestRejectMessage(ControlRef.Next(), requestId), ct);
+
+    // ---------- offers (ADR-0014): the host starts ----------
+
+    /// <summary>True while the pending question is an offer rather than a request.</summary>
+    public bool PendingIsOffer => _tracker.PendingIsOffer;
+
+    /// <summary>
+    /// Host: <c>offer.create</c> to a contact and wait for <c>offer.created</c>. Returns null when the offer is ringing the
+    /// guest's devices, otherwise the error code to show (as <see cref="RequestSessionAsync"/>).
+    /// </summary>
+    public async Task<string?> OfferSessionAsync(Guid guestUserId, int durationMin, CancellationToken ct)
+    {
+        var offerRef = ControlRef.Next();
+        if (!_tracker.TrackOffer(offerRef))
+        {
+            _logger.LogWarning("offer.create ignored: phase is {Phase}", _tracker.Phase);
+            return BusyCode;
+        }
+
+        try
+        {
+            var reply = await _channel.RequestAsync(new OfferCreateMessage(offerRef, guestUserId, durationMin), _options.RequestReplyTimeout, ct).ConfigureAwait(false);
+            if (reply is ErrorMessage error)
+            {
+                _logger.LogWarning("offer.create rejected: {Code} {Message}", error.Code, error.Message);
+                return error.Code;
+            }
+
+            _logger.LogInformation("offer.create accepted by the server: offer {OfferId} for {DurationMin} min", (reply as OfferCreatedMessage)?.OfferId, durationMin);
+            return null;
+        }
+        catch (ControlErrorException ex)
+        {
+            _logger.LogWarning("offer.create rejected: {Code} {Message}", ex.Code, ex.Message);
+            _tracker.Reset();
+            return ex.Code;
+        }
+        catch (Exception ex) when (ex is TimeoutException or InvalidOperationException or ControlChannelClosedException)
+        {
+            _logger.LogWarning(ex, "offer.create failed");
+            _tracker.Reset();
+            return ex is TimeoutException ? TimeoutCode : NotConnectedCode;
+        }
+    }
+
+    /// <summary>Host: withdraw the pending offer.</summary>
+    public Task CancelOfferAsync(CancellationToken ct)
+    {
+        if (!_tracker.PendingIsOffer || _tracker.PendingRequestId is not Guid offerId)
+        {
+            return Task.CompletedTask;
+        }
+
+        return _channel.SendAsync(new OfferCancelMessage(ControlRef.Next(), offerId), ct);
+    }
+
+    /// <summary>
+    /// Guest: take the offer on this device. The session follows as <c>session.created</c>; if the offer is gone (another
+    /// device took it, the host withdrew) the server's <c>error</c> returns this side to Idle.
+    /// </summary>
+    public Task AcceptOfferAsync(Guid offerId, CancellationToken ct)
+    {
+        _tracker.MarkAgreed(offerId);
+        var answerRef = ControlRef.Next();
+        _offerAnswerRef = answerRef;
+        return _channel.SendAsync(new OfferAcceptMessage(answerRef, offerId), ct);
+    }
+
+    /// <summary>Guest: decline the offer (for every device of this user).</summary>
+    public Task RejectOfferAsync(Guid offerId, CancellationToken ct) =>
+        _channel.SendAsync(new OfferRejectMessage(ControlRef.Next(), offerId), ct);
 
     // ---------- both: ending ----------
 
@@ -372,6 +448,25 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
 
             case RequestExpiredMessage m:
                 _logger.LogInformation("request.expired {RequestId}", m.RequestId);
+                break;
+
+            case OfferResultMessage m:
+                _logger.LogInformation("offer.result {OfferId}: accepted={Accepted} ({Reason})", m.OfferId, m.Accepted, m.Reason);
+                break;
+
+            case OfferClosedMessage m:
+                _logger.LogInformation("offer.closed {OfferId}: {Reason}", m.OfferId, m.Reason);
+                break;
+
+            case ErrorMessage m when m.Ref is not null && m.Ref == _offerAnswerRef:
+                // offer.accept was refused (taken on another device, withdrawn, no longer contacts): nothing will follow.
+                _logger.LogInformation("offer.accept refused: {Code} {Message}", m.Code, m.Message);
+                _offerAnswerRef = null;
+                if (_tracker.Phase == SessionPhase.RequestPending && _tracker.PendingIsOffer)
+                {
+                    _tracker.Reset();
+                }
+
                 break;
 
             case ErrorMessage m when m.Ref is null:

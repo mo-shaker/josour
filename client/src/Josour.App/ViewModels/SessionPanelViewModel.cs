@@ -172,6 +172,8 @@ public sealed partial class SessionPanelViewModel : ObservableObject, IDisposabl
         SessionEndReasonNames.AdminTerminated => Strings.SessionEndedAdminTerminated,
         SessionEndReasonNames.BrowserNotProxied => Strings.SessionEndedBrowserNotProxied,
         SessionEndReasonNames.ProtocolError => Strings.SessionEndedProtocolError,
+        SessionEndReasonNames.ContactRemoved => Strings.SessionEndedContactRemoved,
+        SessionEndReasonNames.SystemProxyFailed => Strings.SessionEndedSystemProxyFailed,
         _ => string.Format(UiFlow.Culture, Strings.SessionEndedUnknownFormat, reason),
     };
 

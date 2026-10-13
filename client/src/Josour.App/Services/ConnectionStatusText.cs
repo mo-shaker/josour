@@ -23,6 +23,7 @@ public static class ConnectionStatusText
             ControlCloseReason.ReplacedByAnotherConnection => Strings.StatusReplacedElsewhere,
             ControlCloseReason.Unauthorized => Strings.StatusSignInExpired,
             ControlCloseReason.DeviceRevoked => Strings.SignedOutDeviceRevoked,
+            ControlCloseReason.UpgradeRequired => Strings.ErrorUpgradeRequired,
             ControlCloseReason.Failed when !canConnect => Strings.StatusNoServer,
             _ => Strings.StatusOffline,
         },

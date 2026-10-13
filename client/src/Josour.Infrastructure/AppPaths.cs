@@ -24,9 +24,8 @@ public static class AppPaths
     public static string SettingsFile => Path.Combine(LocalAppDataRoot, "settings.json");
 
     /// <summary>
-    /// <c>%LOCALAPPDATA%\Josour\auto-accept.json</c>: the host's auto-accept switch and its trusted-guest rules
-    /// (docs/ws-protocol.md section 5a). Kept apart from <see cref="SettingsFile"/> so that saving an unrelated
-    /// preference can never race with, or half-write, a standing consent decision.
+    /// <c>%LOCALAPPDATA%\Josour\auto-accept.json</c>: where a 1.x app kept its trusted-guest rules (ADR-0012). Retired by
+    /// ADR-0014 - trust is held per contact on the server - and only named so the app can delete what was left behind.
     /// </summary>
     public static string AutoAcceptFile => Path.Combine(LocalAppDataRoot, "auto-accept.json");
 

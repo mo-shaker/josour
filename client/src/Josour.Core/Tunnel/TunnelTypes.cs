@@ -9,7 +9,13 @@ public enum TunnelState { Idle, Listening, Connecting, Authenticating, Connected
 public enum TunnelEndReason
 {
     GuestEnded, HostEnded, Expired, GuestDisconnected, HostDisconnected,
-    ConnectFailed, AdminTerminated, BrowserNotProxied, ProtocolError
+    ConnectFailed, AdminTerminated, BrowserNotProxied, ProtocolError,
+
+    /// <summary>One of the two removed the other from their contacts (a server verdict, ADR-0014).</summary>
+    ContactRemoved,
+
+    /// <summary>The guest could not point its system proxy at the tunnel (ADR-0015).</summary>
+    SystemProxyFailed,
 }
 
 /// <summary>The candidate's type as in docs/protocol.md section 2.</summary>

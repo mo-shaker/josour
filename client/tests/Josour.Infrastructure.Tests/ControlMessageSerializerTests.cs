@@ -91,6 +91,10 @@ public sealed class ControlMessageSerializerTests
             "session.endpoint", "session.connected", "session.connect_failed", "session.stats", "session.end", "ping", "pong",
             "hello.ack", "hosts.snapshot", "hosts.update", "request.created", "request.incoming", "request.result", "request.expired",
             "session.created", "session.peer_endpoint", "session.active", "session.terminate", "allowlist.updated", "error",
+            // ADR-0014 (docs/ws-protocol.md section 10)
+            "offer.create", "offer.cancel", "offer.accept", "offer.reject",
+            "host.state", "contacts.changed", "contacts.presence",
+            "offer.created", "offer.incoming", "offer.result", "offer.closed",
         };
 
         Assert.Equal(expected.OrderBy(x => x), ControlMessageSerializer.KnownTypes.OrderBy(x => x));
@@ -236,5 +240,52 @@ public sealed class ControlMessageSerializerTests
         Assert.Equal("22631", ((JsonElement)parsed.Diagnostics["os_build"]!).GetString());
         Assert.Equal("jwt", parsed.Token);
         Assert.Equal(DeviceId, parsed.DeviceId);
+    }
+
+    [Fact]
+    public void Hello_CarriesTheCapabilities_AndAnOlderAckStillReads()
+    {
+        var hello = ControlMessageSerializer.Serialize(new HelloMessage("t", Guid.Empty, "2.0.0", null, ClientCapabilities.Current));
+        Assert.Contains("\"capabilities\":[\"contacts\",\"offers\",\"trust_v2\"]", hello);
+
+        var oldAck = Assert.IsType<HelloAckMessage>(ControlMessageSerializer.Deserialize("""
+            {"type":"hello.ack","server_time":"2026-09-04T10:15:30.123Z","public_ip":"203.0.113.10",
+             "settings":{"max_session_minutes":120,"request_timeout_seconds":60,"allowed_ports":[80,443],"log_domains":false},
+             "allowlist_version":3}
+            """));
+        Assert.Null(oldAck.Features);
+    }
+
+    [Fact]
+    public void ContactsAndOfferFrames_ReadTheirContractLiterals()
+    {
+        var offer = Assert.IsType<OfferIncomingMessage>(ControlMessageSerializer.Deserialize("""
+            {"type":"offer.incoming","offer_id":"00000000-0000-0000-0000-000000000001",
+             "host_user_id":"00000000-0000-0000-0000-000000000002","host_device_id":"00000000-0000-0000-0000-000000000003",
+             "host_name":"Sara","host_device":"SARA-PC","duration_min":45,"allowlist_version":0,
+             "expires_at":"2026-09-04T10:15:30.123Z"}
+            """));
+        Assert.Equal(("Sara", 45), (offer.HostName, offer.DurationMin));
+
+        var presence = Assert.IsType<ContactsPresenceMessage>(ControlMessageSerializer.Deserialize("""
+            {"type":"contacts.presence","full":false,"contacts":[{"user_id":"00000000-0000-0000-0000-000000000002","online":true}]}
+            """));
+        Assert.True(presence.Contacts.Single().Online);
+
+        var state = Assert.IsType<HostStateMessage>(ControlMessageSerializer.Deserialize("""{"type":"host.state","available":true,"reachable":null}"""));
+        Assert.True(state.Available);
+        Assert.IsType<ContactsChangedMessage>(ControlMessageSerializer.Deserialize("""{"type":"contacts.changed"}"""));
+
+        var incoming = Assert.IsType<RequestIncomingMessage>(ControlMessageSerializer.Deserialize("""
+            {"type":"request.incoming","request_id":"00000000-0000-0000-0000-000000000001",
+             "guest_user_id":"00000000-0000-0000-0000-000000000002","guest_device_id":"00000000-0000-0000-0000-000000000003",
+             "guest_name":"Omar","guest_device":"OMAR-PC","duration_min":30,"allowlist_version":0,
+             "expires_at":"2026-09-04T10:15:30.123Z","trusted":true}
+            """));
+        Assert.True(incoming.Trusted);
+
+        var create = ControlMessageSerializer.Serialize(new OfferCreateMessage("o1", Guid.Empty, 30));
+        Assert.StartsWith("{\"type\":\"offer.create\"", create);
+        Assert.Equal("o1", ControlMessageSerializer.GetRef(ControlMessageSerializer.Deserialize(create)));
     }
 }

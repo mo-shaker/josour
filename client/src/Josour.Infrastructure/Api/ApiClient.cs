@@ -92,6 +92,68 @@ public sealed class ApiClient : IApiClient
         await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
     }
 
+    public Task<RegistrationInfoDto> GetRegistrationAsync(CancellationToken ct) =>
+        GetAsync<RegistrationInfoDto>("auth/registration", ct, anonymous: true);
+
+    public Task<RegisterResponse> RegisterAsync(string email, string password, string displayName, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(email);
+        ArgumentNullException.ThrowIfNull(password);
+        ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+        return PostAsync<RegisterResponse>(
+            "auth/register", new RegisterRequest(email.Trim(), password, displayName.Trim()), anonymous: true, ct);
+    }
+
+    // ---------- contacts (ADR-0014) ----------
+
+    public Task<IReadOnlyList<ContactDto>> GetContactsAsync(CancellationToken ct) => GetAsync<IReadOnlyList<ContactDto>>("contacts", ct);
+
+    public async Task RemoveContactAsync(Guid userId, CancellationToken ct)
+    {
+        using var response = await SendAsync(HttpMethod.Delete, $"contacts/{userId:D}", body: null, anonymous: false, configure: null, ct).ConfigureAwait(false);
+        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+    }
+
+    public async Task<ContactDto> SetTrustAsync(Guid userId, bool autoAccept, CancellationToken ct)
+    {
+        using var response = await SendAsync(
+            HttpMethod.Put, $"contacts/{userId:D}/trust", new TrustRequest(autoAccept), anonymous: false, configure: null, ct).ConfigureAwait(false);
+        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+        return await ReadJsonAsync<ContactDto>(response, ct).ConfigureAwait(false);
+    }
+
+    public Task<InvitesDto> GetInvitesAsync(CancellationToken ct) => GetAsync<InvitesDto>("contacts/invites", ct);
+
+    public async Task InviteAsync(string email, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(email);
+        using var response = await SendAsync(
+            HttpMethod.Post, "contacts/invites", new InviteRequest(email.Trim()), anonymous: false, configure: null, ct).ConfigureAwait(false);
+        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+    }
+
+    public async Task<ContactDto> AcceptInviteAsync(Guid inviteId, CancellationToken ct)
+    {
+        using var response = await SendAsync(
+            HttpMethod.Post, $"contacts/invites/{inviteId:D}/accept", body: null, anonymous: false, configure: null, ct).ConfigureAwait(false);
+        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+        return (await ReadJsonAsync<AcceptedInviteDto>(response, ct).ConfigureAwait(false)).Contact;
+    }
+
+    public async Task DeclineInviteAsync(Guid inviteId, CancellationToken ct)
+    {
+        using var response = await SendAsync(
+            HttpMethod.Post, $"contacts/invites/{inviteId:D}/decline", body: null, anonymous: false, configure: null, ct).ConfigureAwait(false);
+        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+    }
+
+    public async Task CancelInviteAsync(Guid inviteId, CancellationToken ct)
+    {
+        using var response = await SendAsync(
+            HttpMethod.Delete, $"contacts/invites/{inviteId:D}", body: null, anonymous: false, configure: null, ct).ConfigureAwait(false);
+        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+    }
+
     // ---------- current user ----------
 
     public Task<UserDto> GetMeAsync(CancellationToken ct) => GetAsync<UserDto>("me", ct);
@@ -189,9 +251,9 @@ public sealed class ApiClient : IApiClient
         return await ReadJsonAsync<AdminUserDto>(response, ct).ConfigureAwait(false);
     }
 
-    private async Task<T> GetAsync<T>(string path, CancellationToken ct)
+    private async Task<T> GetAsync<T>(string path, CancellationToken ct, bool anonymous = false)
     {
-        using var response = await SendAsync(HttpMethod.Get, path, body: null, anonymous: false, configure: null, ct).ConfigureAwait(false);
+        using var response = await SendAsync(HttpMethod.Get, path, body: null, anonymous, configure: null, ct).ConfigureAwait(false);
         await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
         return await ReadJsonAsync<T>(response, ct).ConfigureAwait(false);
     }

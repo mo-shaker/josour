@@ -339,4 +339,118 @@ public static class UiStringKeys
     public const string AdminDisableWarning = "AdminDisableWarning";
     public const string TrayAdmin = "TrayAdmin";
     public const string MainAdminTooltip = "MainAdminTooltip";
+
+    public const string ContactsPageTitle = "ContactsPageTitle";
+
+    public const string ContactsPageDescription = "ContactsPageDescription";
+
+    public const string ContactsEmptyTitle = "ContactsEmptyTitle";
+
+    public const string ContactsEmptyText = "ContactsEmptyText";
+
+    public const string ContactsInvitePlaceholder = "ContactsInvitePlaceholder";
+
+    public const string ContactsInviteButton = "ContactsInviteButton";
+
+    public const string ContactsInviteSentFormat = "ContactsInviteSentFormat";
+
+    public const string ContactsInviteFailedFormat = "ContactsInviteFailedFormat";
+
+    public const string ContactsIncomingTitle = "ContactsIncomingTitle";
+
+    public const string ContactsIncomingFormat = "ContactsIncomingFormat";
+
+    public const string ContactsAccept = "ContactsAccept";
+
+    public const string ContactsDecline = "ContactsDecline";
+
+    public const string ContactsOutgoingTitle = "ContactsOutgoingTitle";
+
+    public const string ContactsOutgoingPending = "ContactsOutgoingPending";
+
+    public const string ContactsOutgoingExpired = "ContactsOutgoingExpired";
+
+    public const string ContactsWithdraw = "ContactsWithdraw";
+
+    public const string ContactOnline = "ContactOnline";
+
+    public const string ContactOffline = "ContactOffline";
+
+    public const string ContactSharing = "ContactSharing";
+
+    public const string ContactUseConnection = "ContactUseConnection";
+
+    public const string ContactOfferConnection = "ContactOfferConnection";
+
+    public const string ContactAllowAlways = "ContactAllowAlways";
+
+    public const string ContactTrustsMe = "ContactTrustsMe";
+
+    public const string ContactRemove = "ContactRemove";
+
+    public const string ContactRemoveConfirm = "ContactRemoveConfirm";
+
+    public const string ContactActionFailedFormat = "ContactActionFailedFormat";
+
+    public const string ContactsOfferWaitingFormat = "ContactsOfferWaitingFormat";
+
+    public const string ContactsCancelOffer = "ContactsCancelOffer";
+
+    public const string OfferIncomingTitle = "OfferIncomingTitle";
+
+    public const string OfferIncomingFormat = "OfferIncomingFormat";
+
+    public const string OfferToastTitle = "OfferToastTitle";
+
+    public const string OfferToastBodyFormat = "OfferToastBodyFormat";
+
+    public const string OfferResultRejected = "OfferResultRejected";
+
+    public const string OfferResultExpired = "OfferResultExpired";
+
+    public const string OfferResultCancelled = "OfferResultCancelled";
+
+    public const string OfferErrorGuestUnavailable = "OfferErrorGuestUnavailable";
+
+    public const string ErrorNotContact = "ErrorNotContact";
+
+    public const string ErrorTrustRevoked = "ErrorTrustRevoked";
+
+    public const string SettingsTrustMovedHint = "SettingsTrustMovedHint";
+
+    public const string LoginCreateAccount = "LoginCreateAccount";
+
+    public const string LoginHaveAccount = "LoginHaveAccount";
+
+    public const string RegisterTitle = "RegisterTitle";
+
+    public const string RegisterDisplayName = "RegisterDisplayName";
+
+    public const string RegisterPasswordHint = "RegisterPasswordHint";
+
+    public const string RegisterSubmit = "RegisterSubmit";
+
+    public const string RegisterPendingTitle = "RegisterPendingTitle";
+
+    public const string RegisterPendingText = "RegisterPendingText";
+
+    public const string RegisterClosed = "RegisterClosed";
+
+    public const string RegisterUnavailable = "RegisterUnavailable";
+
+    public const string RegisterEmailTaken = "RegisterEmailTaken";
+
+    public const string RegisterNameRequired = "RegisterNameRequired";
+
+    public const string LoginErrorAccountPending = "LoginErrorAccountPending";
+
+    public const string LoginErrorAccountRejected = "LoginErrorAccountRejected";
+
+    public const string ErrorUpgradeRequired = "ErrorUpgradeRequired";
+
+    public const string SessionEndedContactRemoved = "SessionEndedContactRemoved";
+
+    public const string SessionEndedSystemProxyFailed = "SessionEndedSystemProxyFailed";
+
+    public const string AdminOpenWebDashboard = "AdminOpenWebDashboard";
 }

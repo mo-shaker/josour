@@ -41,7 +41,7 @@ public class ViewsLoadTests
 
     [AvaloniaTheory]
     [InlineData(typeof(HostPage))]
-    [InlineData(typeof(GuestPage))]
+    [InlineData(typeof(ContactsPage))]
     [InlineData(typeof(SessionPanel))]
     public void A_page_loads_its_xaml_and_applies_its_templates(Type pageType)
     {
@@ -80,36 +80,25 @@ public class ViewsLoadTests
 
         Assert.False(checkBox.IsChecked);
         Assert.False(viewModel.TrustThisGuest);
-        Assert.Null(viewModel.Trust);
     }
 
     [AvaloniaFact]
-    public void Ticking_the_box_offers_a_rule_capped_at_this_request_and_expiring_by_default()
+    public async Task Ticking_the_box_lets_this_contact_in_unasked_only_with_an_acceptance()
     {
-        using var viewModel = SampleViewModel(durationMinutes: 45);
-        using var rendered = new Rendered(new IncomingRequestWindow(viewModel));
-        var window = rendered.Window;
+        // ADR-0014: the grant rides along with an Accept and nothing else.
+        using var accepted = SampleViewModel();
+        using (var rendered = new Rendered(new IncomingRequestWindow(accepted)))
+        {
+            rendered.Window.GetVisualDescendants().OfType<CheckBox>().Single().IsChecked = true;
+            accepted.AcceptCommand.Execute(null);
+        }
 
-        window.GetVisualDescendants().OfType<CheckBox>().Single().IsChecked = true;
+        Assert.True((await accepted.Completion).AlwaysAllow);
 
-        var trust = viewModel.Trust;
-        Assert.NotNull(trust);
-        Assert.Equal(45, trust!.MaxDurationMinutes);
-        Assert.Equal(TimeSpan.FromDays(7), trust.For); // a week, not "always"
-    }
-
-    [AvaloniaFact]
-    public void The_duration_box_is_disabled_until_the_box_is_ticked()
-    {
-        using var viewModel = SampleViewModel();
-        using var rendered = new Rendered(new IncomingRequestWindow(viewModel));
-        var window = rendered.Window;
-
-        var combo = window.GetVisualDescendants().OfType<ComboBox>().Single();
-        Assert.False(combo.IsEffectivelyEnabled);
-
-        window.GetVisualDescendants().OfType<CheckBox>().Single().IsChecked = true;
-        Assert.True(combo.IsEffectivelyEnabled);
+        using var rejected = SampleViewModel();
+        rejected.TrustThisGuest = true;
+        rejected.RejectCommand.Execute(null);
+        Assert.False((await rejected.Completion).AlwaysAllow);
     }
 
     [AvaloniaFact]
@@ -140,12 +129,12 @@ public class ViewsLoadTests
     }
 
     [AvaloniaFact]
-    public void The_guest_page_offers_the_role_only_where_the_platform_can_police_it()
+    public void The_contacts_page_offers_the_guest_role_only_where_the_platform_can_police_it()
     {
         // The proxy listens on loopback; without an owner check every program on the machine could leave
         // through the host's address. So the page either offers the role or says why it cannot — never both,
         // and never neither.
-        var page = new GuestPage();
+        var page = new ContactsPage();
 
         using var rendered = Render(page);
 
@@ -154,7 +143,7 @@ public class ViewsLoadTests
 
         Assert.NotNull(warning);
         Assert.Equal(!OwnerPidCheckers.SupportedOnThisPlatform, warning!.IsVisible);
-        Assert.Equal(OwnerPidCheckers.SupportedOnThisPlatform, GuestViewModel.IsGuestRoleSupported);
+        Assert.Equal(OwnerPidCheckers.SupportedOnThisPlatform, ContactsViewModel.IsGuestRoleSupported);
     }
 
     [AvaloniaFact]

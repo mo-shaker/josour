@@ -173,10 +173,10 @@ public sealed class LocalizationTests
             Assert.Equal(UiLanguage.Arabic, LocalizedStrings.Current.Language); // the default, before anyone chooses
 
             LocalizedStrings.UseLanguage(UiLanguage.English);
-            Assert.Equal("Host", LocalizedStrings.Current[UiStringKeys.HostTab]);
+            Assert.Equal("Share my connection", LocalizedStrings.Current[UiStringKeys.HostTab]);
 
             LocalizedStrings.UseLanguage(UiLanguage.Arabic);
-            Assert.Equal("المضيف", LocalizedStrings.Current[UiStringKeys.HostTab]);
+            Assert.Equal("مشاركة اتصالي", LocalizedStrings.Current[UiStringKeys.HostTab]);
         }
         finally
         {

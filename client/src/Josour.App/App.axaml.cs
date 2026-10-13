@@ -14,7 +14,9 @@ using Josour.App.Views;
 using Josour.Core.Control;
 using Josour.Core.Diagnostics;
 using Josour.Core.Security;
+using Josour.Infrastructure;
 using Josour.Infrastructure.Api;
+using Josour.Infrastructure.Contacts;
 using Josour.Infrastructure.Control;
 using Josour.Infrastructure.Control.Mock;
 using Josour.Infrastructure.Device;
@@ -69,9 +71,13 @@ public partial class App : Application
             // Closing the last window must not end the process: Josour lives in the tray.
             desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnExplicitShutdown;
             desktop.Exit += (_, e) => OnExit(e.ApplicationExitCode);
+
+            // Only a real desktop run starts the app. The headless UI tests build this same class, and starting there
+            // meant every test run signed in to the developer's real server with the developer's real stored session -
+            // dozens of parallel refreshes of one rotating token, which the server rightly treats as theft.
+            Start();
         }
 
-        Start();
         base.OnFrameworkInitializationCompleted();
     }
 
@@ -188,6 +194,8 @@ public partial class App : Application
 
     private static async Task RunStartupFlowAsync(StaleWorkBrowserGuard guard, IAuthFlow flow, ILogger<App> logger)
     {
+        RetireLocalTrustRules(logger);
+
         try
         {
             // Before anything can start a session: close a work browser a previous, unclean run left behind (plan 8.5).
@@ -205,6 +213,27 @@ public partial class App : Application
         catch (Exception ex)
         {
             logger.LogError(ex, "Start-up flow failed");
+        }
+    }
+
+    /// <summary>
+    /// Trusted guests used to live in a local file (ADR-0012). They are held per contact on the server now (ADR-0014), so
+    /// the file is removed rather than left to look as though it still meant something. The trust is granted again from
+    /// the Contacts tab.
+    /// </summary>
+    private static void RetireLocalTrustRules(ILogger<App> logger)
+    {
+        try
+        {
+            if (File.Exists(AppPaths.AutoAcceptFile))
+            {
+                File.Delete(AppPaths.AutoAcceptFile);
+                logger.LogInformation("Removed the old local trusted-guest file; trust is now set per contact");
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning("Could not remove the old trusted-guest file: {Message}", ex.Message);
         }
     }
 
@@ -236,7 +265,6 @@ public partial class App : Application
         // Infrastructure: settings, secrets, device. The settings store is the instance OnStartup already read the
         // language from, so the file is parsed once.
         services.AddSingleton<IAppSettingsStore>(_settings ?? new AppSettingsStore());
-        services.AddSingleton<IAutoAcceptStore>(sp => new AutoAcceptStore(sp.GetRequiredService<ILogger<AutoAcceptStore>>()));
         services.AddSingleton<ISecretStore>(sp => SecretStores.ForCurrentPlatform(sp.GetRequiredService<ILoggerFactory>()));
         services.AddSingleton<IDeviceInfoProvider>(_ => new DeviceInfoProvider(typeof(App).Assembly));
 
@@ -297,6 +325,12 @@ public partial class App : Application
                 ControlChannelOptions.Default,
                 sp.GetRequiredService<ILogger<ControlChannel>>()));
         services.AddSingleton<ControlChannelConnector>();
+
+        // Contacts (ADR-0014): the lists over REST, kept current by the control channel.
+        services.AddSingleton<IContactsStore>(sp => new ContactsStore(
+            sp.GetRequiredService<IApiClient>(),
+            sp.GetRequiredService<IControlChannel>(),
+            sp.GetRequiredService<ILogger<ContactsStore>>()));
 
         // Sleep/resume and network changes (plan 8.5): the Windows event source, and the watcher that turns a signal into
         // "look at the connection now" instead of waiting out the backoff.
@@ -362,7 +396,7 @@ public partial class App : Application
         // unresolvable optional parameter is a failure mode worth not depending on.
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<HostViewModel>();
-        services.AddSingleton<GuestViewModel>();
+        services.AddSingleton<ContactsViewModel>();
         services.AddSingleton<SessionPanelViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();

@@ -18,6 +18,8 @@ public static class SessionEndReasonNames
     public const string AdminTerminated = "admin_terminated";
     public const string BrowserNotProxied = "browser_not_proxied";
     public const string ProtocolError = "protocol_error";
+    public const string ContactRemoved = "contact_removed";
+    public const string SystemProxyFailed = "system_proxy_failed";
 
     public static string ToWire(TunnelEndReason reason) => reason switch
     {
@@ -30,6 +32,8 @@ public static class SessionEndReasonNames
         TunnelEndReason.AdminTerminated => AdminTerminated,
         TunnelEndReason.BrowserNotProxied => BrowserNotProxied,
         TunnelEndReason.ProtocolError => ProtocolError,
+        TunnelEndReason.ContactRemoved => ContactRemoved,
+        TunnelEndReason.SystemProxyFailed => SystemProxyFailed,
         _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, "unknown end reason"),
     };
 
@@ -47,6 +51,8 @@ public static class SessionEndReasonNames
             case AdminTerminated: reason = TunnelEndReason.AdminTerminated; return true;
             case BrowserNotProxied: reason = TunnelEndReason.BrowserNotProxied; return true;
             case ProtocolError: reason = TunnelEndReason.ProtocolError; return true;
+            case ContactRemoved: reason = TunnelEndReason.ContactRemoved; return true;
+            case SystemProxyFailed: reason = TunnelEndReason.SystemProxyFailed; return true;
             default: reason = TunnelEndReason.ProtocolError; return false;
         }
     }

@@ -12,6 +12,18 @@ public static class ControlErrorCodes
     public const string Forbidden = "forbidden";
     public const string RateLimited = "rate_limited";
     public const string Internal = "internal";
+
+    /// <summary>The two users are not contacts (ADR-0014).</summary>
+    public const string NotContact = "not_contact";
+
+    /// <summary>An offer's guest has no device that can take it now.</summary>
+    public const string GuestUnavailable = "guest_unavailable";
+
+    /// <summary>An automatic acceptance arrived after the host withdrew the trust it relied on; the request is still open.</summary>
+    public const string TrustRevoked = "trust_revoked";
+
+    /// <summary>This build is older than the server accepts.</summary>
+    public const string UpgradeRequired = "upgrade_required";
 }
 
 /// <summary>The WebSocket close codes of docs/ws-protocol.md section 7.</summary>
@@ -28,6 +40,9 @@ public static class ControlCloseCodes
 
     /// <summary>Server restart; reconnect with exponential backoff.</summary>
     public const int ServerRestarting = 1012;
+
+    /// <summary>This build is older than the server's <c>min_client_version</c>: retrying cannot help.</summary>
+    public const int UpgradeRequired = 4426;
 }
 
 /// <summary>

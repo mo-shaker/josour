@@ -18,6 +18,41 @@ public interface IApiClient
     /// <summary><c>POST /auth/logout</c> → 204. Anonymous.</summary>
     Task LogoutAsync(string refreshToken, CancellationToken ct);
 
+    /// <summary><c>GET /auth/registration</c>. Anonymous. Whether this server lets people create their own account.</summary>
+    Task<RegistrationInfoDto> GetRegistrationAsync(CancellationToken ct);
+
+    /// <summary>
+    /// <c>POST /auth/register</c>. Anonymous. Never signs in: on <c>active</c> call <see cref="LoginAsync"/>; on
+    /// <c>pending</c> an administrator must approve the account first (and a sign-in answers <c>account_pending</c>).
+    /// </summary>
+    Task<RegisterResponse> RegisterAsync(string email, string password, string displayName, CancellationToken ct);
+
+    // ---------------------------------------------------------------- contacts (ADR-0014)
+
+    /// <summary><c>GET /contacts</c>.</summary>
+    Task<IReadOnlyList<ContactDto>> GetContactsAsync(CancellationToken ct);
+
+    /// <summary><c>DELETE /contacts/{id}</c> → 204. Ends a session between the two, if one is running.</summary>
+    Task RemoveContactAsync(Guid userId, CancellationToken ct);
+
+    /// <summary><c>PUT /contacts/{id}/trust</c>: let this contact use my connection without asking me (or stop).</summary>
+    Task<ContactDto> SetTrustAsync(Guid userId, bool autoAccept, CancellationToken ct);
+
+    /// <summary><c>GET /contacts/invites</c>.</summary>
+    Task<InvitesDto> GetInvitesAsync(CancellationToken ct);
+
+    /// <summary><c>POST /contacts/invites</c> → 202, whatever the address (the answer never says who has an account).</summary>
+    Task InviteAsync(string email, CancellationToken ct);
+
+    /// <summary><c>POST /contacts/invites/{id}/accept</c>: the contact that now exists.</summary>
+    Task<ContactDto> AcceptInviteAsync(Guid inviteId, CancellationToken ct);
+
+    /// <summary><c>POST /contacts/invites/{id}/decline</c> → 204. The inviter is not told.</summary>
+    Task DeclineInviteAsync(Guid inviteId, CancellationToken ct);
+
+    /// <summary><c>DELETE /contacts/invites/{id}</c> → 204: withdraw an invitation I sent.</summary>
+    Task CancelInviteAsync(Guid inviteId, CancellationToken ct);
+
     /// <summary><c>GET /me</c>.</summary>
     Task<UserDto> GetMeAsync(CancellationToken ct);
 

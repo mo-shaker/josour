@@ -36,14 +36,11 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
     private bool _isCompleted;
 
     /// <summary>
-    /// "Accept from this guest automatically from now on" (docs/ws-protocol.md section 5a). Off every time the window
-    /// opens: a standing consent is not something a host should be able to give by not noticing a pre-ticked box.
+    /// "Always let this contact use my connection without asking" (ADR-0014). Off every time the window opens: a
+    /// standing consent is not something a host should be able to give by not noticing a pre-ticked box.
     /// </summary>
     [ObservableProperty]
     private bool _trustThisGuest;
-
-    [ObservableProperty]
-    private TrustDurationOption _selectedTrustDuration = TrustDurationOption.Options[0];
 
     /// <param name="serverNow">
     /// The server's clock as the app knows it. Defaults to the local clock only so that the debug
@@ -129,17 +126,6 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
 
     public IncomingRequestDecision? Decision { get; private set; }
 
-    /// <summary>The options behind the "for how long" box next to the trust checkbox.</summary>
-    public IReadOnlyList<TrustDurationOption> TrustDurations => TrustDurationOption.Options;
-
-    /// <summary>
-    /// The rule the host is offering to write, or null when the box is unticked. The ceiling is this request's own
-    /// duration, which is the one number the host has actually looked at and agreed to.
-    /// </summary>
-    public TrustGrant? Trust => TrustThisGuest
-        ? new TrustGrant(SelectedTrustDuration.For, DurationMinutes)
-        : null;
-
     /// <summary>Completes with the decision (Accept/Reject/TimedOut/Dismissed) and any trust granted with it.</summary>
     public Task<IncomingRequestAnswer> Completion => _completion.Task;
 
@@ -200,13 +186,13 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
 
         // A rule only ever rides along with an acceptance: "trust from now on" on top of a refusal is not a thing
         // the host can have meant, and a timeout or a dismissal is not an answer at all.
-        var trust = decision == IncomingRequestDecision.Accepted ? Trust : null;
+        var alwaysAllow = decision == IncomingRequestDecision.Accepted && TrustThisGuest;
         _logger.LogInformation(
             "Incoming request {RequestId} completed: {Decision} (trusted from now on: {Trusted})",
             RequestId,
             decision,
-            trust is not null);
-        _completion.TrySetResult(new IncomingRequestAnswer(decision, trust));
+            alwaysAllow);
+        _completion.TrySetResult(new IncomingRequestAnswer(decision, alwaysAllow));
         Completed?.Invoke(this, EventArgs.Empty);
     }
 
