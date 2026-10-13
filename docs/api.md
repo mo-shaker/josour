@@ -10,7 +10,8 @@ administrators in production). This file pins the shapes track C depends on.
   days and it is replaced on every refresh (rotation; reusing an old refresh token revokes the whole chain).
 - Errors: `{ "error": { "code": "…", "message": "…" } }` with an appropriate HTTP status. Common codes:
   `invalid_credentials`, `account_locked`, `account_disabled`, `device_revoked`, `unauthorized`, `forbidden`,
-  `not_found`, `validation_error`, `rate_limited`, `conflict`.
+  `not_found`, `validation_error`, `rate_limited`, `conflict`. Added on 2026-10-13: `account_pending`,
+  `account_rejected`, `registration_closed`, `registration_unavailable`, `upgrade_required`.
 - **Rate limiting** (recalibrated in week 6, [ADR-0008](decisions/0008-rate-limit-policy.md)); exceeding it returns
   `429` with the `rate_limited` envelope and a `Retry-After` header:
 
@@ -20,6 +21,8 @@ administrators in production). This file pins the shapes track C depends on.
 | `POST /auth/login` | **the submitted email** (hashed) | 5 per 15 minutes, **returned on a successful sign-in** |
 | `POST /auth/refresh` | IP address | 60/minute |
 | `POST /probe` | `user_id` | 10/minute |
+| `POST /auth/register` | IP address | 5/hour (added 2026-10-13, [ADR-0017](decisions/0017-self-registration-with-approval.md)) |
+| `POST /contacts/invites` | `user_id` | 20/day (added 2026-10-13, [ADR-0014](decisions/0014-contacts-and-server-held-trust.md)) |
 
   The email-keyed limit is what protects the account: the IP limit alone is got past by twenty different addresses,
   and in return it punishes a whole team behind one NAT. Its capacity (5) is deliberately **below the account-lockout
@@ -45,17 +48,57 @@ The `200` response:
   "device": { "id": "…", "name": "…", "secret": "…|null" } }
 ```
 
+- **Added on 2026-10-13** ([ADR-0017](decisions/0017-self-registration-with-approval.md)): after a **correct**
+  password only, `403 account_pending` while a self-registration waits for approval and `403 account_rejected` when it
+  was turned down. A wrong password always answers `401 invalid_credentials`, so neither code reveals that an address
+  registered.
+- `426 upgrade_required` when the `Josour/<version>` User-Agent is older than the `min_client_version` setting.
+  A request without a Josour User-Agent is not steered.
+
 ### `POST /auth/refresh`  `{ "refresh_token": "…" }` → the same response shape as above, without `device.secret`.
 ### `POST /auth/logout`  `{ "refresh_token": "…" }` → `204`.
+
+### Self-registration (added on 2026-10-13, [ADR-0017](decisions/0017-self-registration-with-approval.md))
+
+- `GET /auth/registration` (unauthenticated) → `{ "mode": "closed" | "approval" | "open" }`. The app shows
+  "Create account" unless it is `closed`.
+- `POST /auth/register` `{ email, password (≥ 8), display_name }` — never signs in; the app calls `POST /auth/login`
+  once the account may be used, and registers its device then.
+  - `approval` (the default): `202 { "status": "pending" }` — **identical whether or not the address already had an
+    account**, so registering cannot be used to learn who uses the server (the attempt on a taken address is written
+    as `registration_duplicate`). Above `MAX_PENDING_REGISTRATIONS` (200) waiting accounts:
+    `429 registration_unavailable`.
+  - `open`: `201 { "status": "active" }`; a taken address is `409 conflict` — that mode cannot hide it.
+  - `closed`: `403 registration_closed`.
+
+## Contacts (added on 2026-10-13, [ADR-0014](decisions/0014-contacts-and-server-held-trust.md))
+
+Only contacts can see each other's hosts and ask for or offer a connection.
+
+- `GET /contacts` → `[{ user_id, display_name, email, online, i_trust, trusts_me, since }]`. `i_trust`: I let this
+  contact use **my** connection without asking me; `trusts_me`: they let me use theirs.
+- `PUT /contacts/{user_id}/trust` `{ "auto_accept": bool }` → the contact. About the caller's own connection only;
+  withdrawing it never ends a session already running.
+- `DELETE /contacts/{user_id}` → `204`. Removes both directions; pending questions between the two are settled and a
+  live session between them ends with `contact_removed`.
+- `GET /contacts/invites` → `{ incoming: [{ id, from_user_id, from_display_name, from_email, created_at, expires_at }],
+  outgoing: [{ id, email, status: "pending"|"expired", created_at, expires_at }] }`. A **decline is never shown** to
+  the inviter: it looks exactly like an address with no account.
+- `POST /contacts/invites` `{ email }` → always `202 {}`, whether or not the address has an account. Inviting someone
+  who already invited you makes you contacts at once. An address without an account receives the invitation if it
+  registers and is approved before `invite_ttl_days` pass.
+- `POST /contacts/invites/{id}/accept` → `{ contact }`; `POST /contacts/invites/{id}/decline` → `204`;
+  `DELETE /contacts/invites/{id}` (the inviter withdrawing) → `204`.
 
 ## The current user
 
 - `GET /me` → `{ id, email, display_name, role }`
 - `GET /me/devices` → `[{ id, name, os_version, status, last_seen_at, created_at }]`
 - `DELETE /me/devices/{id}` → `204` (deregistration; revokes the device's refresh tokens)
-- `GET /hosts` → `[{ device_id, user_display_name, device_name, reachable }]` — the same shape as `hosts.snapshot` and
-  exactly the same filtering (connected, "available" enabled, with no unfinished session, **and excluding the user's
-  own devices**; pinned in week 3)
+- `GET /hosts` → `[{ device_id, user_id, user_display_name, device_name, reachable }]` — the same shape as
+  `hosts.snapshot` and exactly the same filtering (connected, "available" enabled, with no unfinished session, **and
+  excluding the user's own devices**; pinned in week 3). Since 2026-10-13 only the hosts of the caller's **contacts**
+  are listed, and each entry carries `user_id`.
 - `GET /sessions/me?limit=50` → `[{ id, role, peer_display_name, peer_device_name, status, created_at, started_at, ended_at, end_reason, bytes_up, bytes_down }]`
 - `GET /domains` → `{ "version": 3, "entries": ["example.com", "=exact.com", "portal.corp:8443"] }` with `ETag: "3"`;
   supports `If-None-Match` → `304`, and `?version=N` returns a specific version or `404`.
@@ -102,8 +145,11 @@ The `200` response:
 
 ## Administration (role = admin)
 
-- `POST /admin/users` `{ email, password, display_name, role }` → `201` the user.
-- `GET /admin/users` → a list. `PATCH /admin/users/{id}` `{ is_active?, password?, display_name?, unlock?: true }`.
+- `POST /admin/users` `{ email, password, display_name, role }` → `201` the user (approved and active).
+- `GET /admin/users?q=&state=&role=&limit=&offset=` → a list; `state` is `active`, `disabled`, `pending`, `rejected`
+  or `deleted`, and each row carries `state`, `approval_status`, `registered_via`, `approved_at`, `deleted_at` and
+  `last_login_at` (added 2026-10-13). `PATCH /admin/users/{id}`
+  `{ is_active?, password?, display_name?, email?, role?, unlock?: true }` (`email` and `role` added 2026-10-13).
   - `password` and `is_active: false` both revoke the refresh tokens.
   - **`is_active: false` takes effect at once**: it clears the user's presence and closes every live control channel of
     theirs with code `4403`, as revoking a device does. Without that, revoking the tokens alone left a disabled account
@@ -111,8 +157,18 @@ The `200` response:
     the administrator who did it.
   - The devices themselves are **not revoked**: it is the account that is disabled, not the hardware, so reactivation
     does not leave the user registering their devices again.
-  - There is no deleting a user: `sessions.guest_user_id` and `host_user_id` are both `ON DELETE CASCADE`, so deleting
-    a user erases the record of every session they were a party to — **including the other host's share of it**.
+  - A pending or rejected account cannot be activated this way (`409`) — approve it instead. Nobody may disable or
+    demote themselves, nor the last active administrator (`409`).
+- `POST /admin/users/{id}/approve`, `POST /admin/users/{id}/reject` → the user (added 2026-10-13). Approving delivers
+  the contact invitations that were waiting for the address.
+- `DELETE /admin/users/{id}` → `204` (added 2026-10-13). A **soft** delete: email, name and password are replaced,
+  every device is revoked and disconnected, contacts and invitations go, and a live session ends `admin_terminated`.
+  The row stays, because `sessions.*_user_id` are `ON DELETE CASCADE` and a hard delete would erase the other party's
+  history too.
+- `GET /admin/users/{id}/contacts` → `[{ user_id, contact_user_id, contact_display_name, contact_email, auto_accept,
+  trusted_by_contact, created_at }]`; `DELETE /admin/contacts/{user_id}/{contact_user_id}` → `204`;
+  `POST /admin/contacts/{user_id}/{contact_user_id}/revoke-trust` → `204` — an administrator can withdraw a trust
+  grant, never give one. `GET /admin/invites?status=&limit=` → the invitations (added 2026-10-13).
 - `GET /admin/devices?user_id=`, `POST /admin/devices/{id}/revoke` → `204`.
 - `GET /admin/domains` → `{ version, entries, updated_at }`.
 - `PUT /admin/domains` `{ "entries": [...] }` → a new version; validates every entry; broadcasts `allowlist.updated`.
@@ -120,7 +176,8 @@ The `200` response:
 - `GET /admin/security-events?limit=`, `GET /admin/diagnostics` → a summary: the number of sessions, the
   `connect_result=ok` rate (with `timeout` counted as a failure), the distribution of `winner_type`, of `tls_version`,
   and of `end_reason` (added in week 4).
-- `GET /admin/settings`, `PATCH /admin/settings` `{ max_session_minutes?, request_timeout_seconds?, log_domains?, enforce_allowlist?, allowed_ports? }`.
+- `GET /admin/settings`, `PATCH /admin/settings` `{ max_session_minutes?, request_timeout_seconds?, log_domains?, enforce_allowlist?, allowed_ports?, registration_mode?, min_client_version?, invite_ttl_days? }`.
+  Every change is written as a `settings_changed` security event.
 
 ## The settings' default values
 
@@ -132,3 +189,6 @@ The `200` response:
 | `log_domains` | false |
 | `enforce_allowlist` | false — **[ADR-0010](decisions/0010-route-all-through-host.md)**: everything the work browser asks for goes through the host. The list restricts only when an administrator turns this key on |
 | `allowed_ports` | `[80, 443]` |
+| `registration_mode` | `approval` — [ADR-0017](decisions/0017-self-registration-with-approval.md) |
+| `min_client_version` | `""` (no floor) |
+| `invite_ttl_days` | 30 |

@@ -13,5 +13,9 @@
 | [0009](0009-relay-default.md) | The relay as the default transport, direct as an opportunistic upgrade | Accepted 2026-09-07 (closes the 0003 gate) |
 | [0010](0010-route-all-through-host.md) | Everything the work browser asks for goes through the host | Accepted 2026-09-07 (supersedes 0004) |
 | [0011](0011-no-code-signing-certificate.md) | No code-signing certificate; one file, distributed by hash | Accepted 2026-09-10 (amends 0005) |
-| [0012](0012-auto-accept-trusted-guests.md) | Accepting guests the host has already decided about | Proposed 2026-09-18 |
+| [0012](0012-auto-accept-trusted-guests.md) | Accepting guests the host has already decided about | Proposed 2026-09-18; storage and keying **superseded by 0014** |
 | [0013](0013-avalonia-and-macos.md) | One Avalonia interface, and macOS as a supported system | Proposed 2026-09-18 (supersedes 0001) |
+| [0014](0014-contacts-and-server-held-trust.md) | Contacts, offers in both directions, and trust held by the server | Accepted 2026-10-13 |
+| [0015](0015-system-proxy-instead-of-work-browser.md) | The guest's system proxy instead of a dedicated work browser | Proposed 2026-10-13 |
+| [0016](0016-web-admin-dashboard.md) | An administration dashboard on the web, served by the API | Accepted 2026-10-13 |
+| [0017](0017-self-registration-with-approval.md) | Self-registration from the app, with administrator approval by default | Accepted 2026-10-13 |

@@ -27,7 +27,8 @@ with an `error` carrying the same `ref`.
 ```
 
 The `error` codes: `unauthorized`, `bad_request`, `not_found`, `host_unavailable`, `session_exists`,
-`request_pending`, `forbidden`, `rate_limited`, `internal`.
+`request_pending`, `forbidden`, `rate_limited`, `internal`, and since 2026-10-13 `not_contact`, `guest_unavailable`,
+`trust_revoked`, `upgrade_required` ([section 10](#10-contacts-offers-and-server-held-trust-added-2026-10-13)).
 
 `rate_limited` is also used on the channel itself (pinned in week 5): every connection has a frame budget (100 frames
 in 10 seconds); exceeding it returns `rate_limited` **without dropping the connection**, protecting the single worker
@@ -124,6 +125,11 @@ Rules:
 
 ## 5a. Auto-accepting a trusted guest
 
+> **Superseded for clients that declare `trust_v2`** (2026-10-13,
+> [ADR-0014](decisions/0014-contacts-and-server-held-trust.md)): the trust now lives on the server, per contact, and
+> the server re-checks it — see [section 10](#10-contacts-offers-and-server-held-trust-added-2026-10-13). This section
+> still describes what the server accepts from an older client.
+
 The host can answer `request.incoming` **without a window being shown**, if the request matches a trusted-guest rule
 the host had set themselves in advance. The consent here is real, not abolished: it was given once before the request
 rather than at it. What changes is the moment it was given, not its existence.
@@ -176,6 +182,7 @@ same method through `POST /api/v1/probe`.
 | `1012` | The server is restarting; reconnect with exponential backoff (1, 2, 4… up to 30 seconds) |
 | `1001` | The heartbeat timed out (no `pong` within 40 seconds); transient, reconnect |
 | `1011` | An unexpected failure during the handshake; transient, reconnect |
+| `4426` | The client is older than `min_client_version`; an `error(upgrade_required)` precedes it (added 2026-10-13) |
 
 ## 8. Details pinned in week 3
 
@@ -273,3 +280,74 @@ spaces or control characters, or exceed 255 characters are ignored, with a maxim
 
 **`connect_result`** takes `ok`, `failed` or `timeout`, and the last is counted among the failures in the
 `GET /admin/diagnostics` summary.
+
+## 10. Contacts, offers and server-held trust (added 2026-10-13)
+
+[ADR-0014](decisions/0014-contacts-and-server-held-trust.md). Everything here is additive: a client that declares no
+capabilities keeps exactly the behaviour of sections 1–9, except that it sees only its contacts' hosts.
+
+**Capabilities.** `hello` gains `capabilities` (an array of strings, at most 32 of at most 32 characters; unknown names
+are ignored), and `hello.ack` gains `features` (what the server implements: `contacts`, `offers`, `trust_v2`,
+`registration`). The server sends a client only what it declared it understands:
+
+| Capability | What it changes |
+|---|---|
+| `contacts` | The client receives `contacts.presence`, `contacts.changed` and `host.state` |
+| `offers` | The device can be rung by `offer.incoming`; a device without it is never offered a connection |
+| `trust_v2` | The host's `request.accept {auto: true}` is checked against the trust the server holds |
+| `system_proxy` | The guest routes through the system proxy rather than a work browser ([ADR-0015](decisions/0015-system-proxy-instead-of-work-browser.md)) |
+
+**Contacts only.** `hosts.snapshot`, `hosts.update` and `GET /hosts` list only the hosts of the recipient's contacts,
+and each entry gains `user_id`. `request.create` to a non-contact answers `not_contact`. Each connection is sent
+`hosts.update` only when **its own** list changes; a host's availability therefore sends the host itself nothing — it
+gets `host.state` instead.
+
+**New server messages:**
+
+| Type | Fields | To whom |
+|---|---|---|
+| `contacts.presence` | `full` (bool), `contacts`: `[{user_id, online}]` | `full: true` with every contact right after `hosts.snapshot`; afterwards a delta when a contact's first device connects or last device leaves |
+| `contacts.changed` | — | Contacts, invitations or trust changed for this user: re-read `GET /contacts` and `GET /contacts/invites` |
+| `host.state` | `available`, `reachable` | The device itself, after `host.available` and after each reachability probe |
+| `offer.created` | `ref`, `offer_id`, `expires_at` | The offering host device |
+| `offer.incoming` | `offer_id`, `host_user_id`, `host_device_id`, `host_name`, `host_device`, `duration_min`, `allowlist_version`, `expires_at` | Every connected `offers` device of the guest |
+| `offer.result` | `offer_id`, `accepted`, `reason` (`rejected`/`cancelled`/`expired`/`host_unavailable`/`contact_removed`), `session_id` (when accepted) | The offering host device |
+| `offer.closed` | `offer_id`, `reason` (`accepted_elsewhere`/`rejected`/`cancelled`/`expired`/`host_unavailable`/`contact_removed`) | The guest's devices: stop showing it |
+
+`request.incoming` gains `trusted` (bool) and `session.created` gains `initiator` (`guest`/`host`).
+`request.result.reason` gains `contact_removed`.
+
+**Offers** (section 5b of the lifecycle). The other direction of a request: a host offers its connection.
+
+| Client message | Fields | From |
+|---|---|---|
+| `offer.create` | `ref`, `guest_user_id`, `duration_min` | A host device |
+| `offer.cancel` | `ref`, `offer_id` | The offering device |
+| `offer.accept` | `ref`, `offer_id` | Any `offers` device of the guest; it becomes the session's guest device |
+| `offer.reject` | `ref`, `offer_id` | Any device of the guest |
+
+```
+offer(pending, request_timeout_seconds) — addressed to the guest *user*, rings each capable device
+  ├─ reject / cancel / timeout / host disconnects ──▶ offer.result(false) to the host + offer.closed to the guest
+  └─ accept from one device ──▶ session(connecting) exactly as in section 5, initiator=host;
+                                offer.closed(accepted_elsewhere) to the guest's other devices
+```
+
+`offer.create` errors: `bad_request` (yourself, or a bad duration), `not_contact`, `session_exists` (the host is in a
+session), `request_pending` (the host device already has a question open), `guest_unavailable` (the guest is in a
+session or has no free `offers` device). The guest always answers an offer: accepting one points their own machine at
+somebody else's connection, so there is no automatic acceptance of offers.
+
+**Server-held trust.** `(A → B).auto_accept` means A lets B use A's connection without asking (`PUT
+/contacts/{id}/trust`). The server puts it in `request.incoming.trusted`. A `trust_v2` host answers a trusted request
+with `request.accept {auto: true}` and **no window**, and informs its user with a non-blocking notification that can
+end the session or withdraw the trust. The server checks the grant again in the transaction that creates the session:
+if it was withdrawn meanwhile it answers `error(trust_revoked)` with the `ref` and leaves the request pending, so the
+host can still ask. The audit row `request_auto_accepted` gains `grant`: `server` (checked) or `client_legacy` (an
+older client's own rules, which the server cannot see).
+
+**New end reasons:** `contact_removed` (the server's verdict when either side removes the other mid-session) and
+`system_proxy_failed` (from the **guest** only: it could not point its system proxy at the tunnel).
+
+**Version floor.** When `min_client_version` is set and `hello.app_version` is older, the server sends
+`error(upgrade_required)` and closes with `4426`.

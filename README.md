@@ -22,15 +22,18 @@ and nothing else on either machine is affected.
 > What does **not** happen: your other applications are unaffected, your local network and `localhost` services
 > stay out of reach, and the guest goes through an isolated work browser and nothing else.
 
-A host can spare themselves the question every time by putting particular guests on a trusted list, after which
-their requests are accepted at once with no window shown
-([ADR-0012](docs/decisions/0012-auto-accept-trusted-guests.md)). The consent is still the host's — given in
-advance rather than at each request — capped by duration, expiring on its own, and withdrawable at any moment.
+User management happens in a **web dashboard on your own server**, at `https://<your domain>/admin`
+([ADR-0016](docs/decisions/0016-web-admin-dashboard.md)): approving the people who register from the app
+([ADR-0017](docs/decisions/0017-self-registration-with-approval.md)), disabling, deleting or unlocking accounts,
+revoking devices, removing contacts, ending sessions, and the server's settings. An administrative panel on the
+internet is a high-value target, so it is plain server-rendered pages with no JavaScript, its own short-lived
+sessions with CSRF protection, an optional authenticator-app second factor and an optional network allowlist — and
+`ADMIN_WEB_ENABLED=false` removes it.
 
-User management — creating accounts, disabling them, unlocking them, setting passwords — happens **inside the
-application** for anyone whose role is `admin`, not only from the command line. There is no web panel: an
-administrative panel on the internet would be the highest-value target in the system, and this one exposes
-nothing.
+People share a connection only with their **contacts**: you add someone by email, and once they accept, either of
+you can ask for the other's connection or offer your own
+([ADR-0014](docs/decisions/0014-contacts-and-server-held-trust.md)). You can let a contact use your connection without
+asking you each time; you are still told when they connect, and can cut them off at any moment.
 
 Browsing data is encrypted end to end between the two machines: **the server cannot read it**. When a direct
 connection is impossible — which is the normal case between two mobile networks — the opaque bytes travel through
