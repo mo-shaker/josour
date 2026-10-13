@@ -29,7 +29,7 @@ from app.core.config import Settings, get_settings  # noqa: E402
 from app.core.security import AccessClaims, create_access_token  # noqa: E402
 from app.db import session as db_session  # noqa: E402
 from app.db.session import get_db, make_engine, make_sessionmaker  # noqa: E402
-from app.models import Base, ConnectionRequest, Device, Session, User  # noqa: E402
+from app.models import Base, ConnectionRequest, Contact, Device, Session, User  # noqa: E402
 from app.models.enums import RequestStatus, SessionStatus, UserRole  # noqa: E402
 from app.services.app_settings import settings_service  # noqa: E402
 from app.services.session_timer import scheduler  # noqa: E402
@@ -277,9 +277,47 @@ def access_token() -> Callable[[User, Device], str]:
     return build
 
 
+ContactsFactory = Callable[..., Awaitable[None]]
+
+
 @pytest.fixture
-def make_actor(db: AsyncSession, access_token: Callable[[User, Device], str]) -> ActorFactory:
-    """Create (and commit) a user + device pair the WebSocket layer can authenticate."""
+def make_contacts(db: AsyncSession) -> ContactsFactory:
+    """Make two users contacts (both rows), optionally with each side's trust switch on."""
+
+    async def build(
+        a: User | uuid.UUID,
+        b: User | uuid.UUID,
+        *,
+        a_trusts_b: bool = False,
+        b_trusts_a: bool = False,
+    ) -> None:
+        a_id = a if isinstance(a, uuid.UUID) else a.id
+        b_id = b if isinstance(b, uuid.UUID) else b.id
+        for owner, other, trust in ((a_id, b_id, a_trusts_b), (b_id, a_id, b_trusts_a)):
+            link = await db.get(Contact, (owner, other))
+            if link is None:
+                db.add(Contact(user_id=owner, contact_user_id=other, auto_accept=trust))
+            else:
+                link.auto_accept = trust
+        await db.commit()
+
+    return build
+
+
+@pytest.fixture
+def make_actor(
+    db: AsyncSession,
+    access_token: Callable[[User, Device], str],
+    make_contacts: ContactsFactory,
+) -> ActorFactory:
+    """Create (and commit) a user + device pair the WebSocket layer can authenticate.
+
+    By default every actor of a test is made a contact of every earlier one - the world the
+    tests written before ADR-0014 assume, and the one ``manage.py seed-contacts`` recreates on
+    upgrade. Pass ``contacts=False`` for a stranger."""
+    # Ids, not rows: a test may expire the session between actors, and touching an expired
+    # row's attribute would be a lazy load outside the async context.
+    created: list[uuid.UUID] = []
 
     async def build(
         email: str = "guest@example.com",
@@ -287,6 +325,7 @@ def make_actor(db: AsyncSession, access_token: Callable[[User, Device], str]) ->
         display_name: str = "Guest",
         device_name: str = "GUEST-PC",
         role: UserRole = UserRole.USER,
+        contacts: bool = True,
     ) -> Actor:
         user = await create_user(
             db, email=email, password=PASSWORD, display_name=display_name, role=role
@@ -296,7 +335,12 @@ def make_actor(db: AsyncSession, access_token: Callable[[User, Device], str]) ->
         )
         db.add(device)
         await db.commit()
-        return Actor(user=user, device=device, token=access_token(user, device))
+        actor = Actor(user=user, device=device, token=access_token(user, device))
+        if contacts:
+            for other in created:
+                await make_contacts(user.id, other)
+            created.append(user.id)
+        return actor
 
     return build
 
@@ -320,7 +364,10 @@ async def ws_connect(app: FastAPI) -> AsyncIterator[WsFactory]:
         diagnostics: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         client: tuple[str, int] = ("203.0.113.10", 51000),
+        capabilities: list[str] | None = None,
     ) -> ASGIWebSocket:
+        """``capabilities`` is sent in ``hello`` when given; with ``contacts`` among them the
+        full ``contacts.presence`` that follows the snapshot is read into ``ws.presence``."""
         ws = ASGIWebSocket(app, headers=headers, client=client)
         opened.append(ws)
         await ws.open()
@@ -335,10 +382,14 @@ async def ws_connect(app: FastAPI) -> AsyncIterator[WsFactory]:
             }
             if diagnostics is not None:
                 payload["diagnostics"] = diagnostics
+            if capabilities is not None:
+                payload["capabilities"] = capabilities
             await ws.send(payload)
             try:
                 ws.hello_ack = await ws.expect("hello.ack", skip=frozenset({"error"}))
                 ws.snapshot = await ws.expect("hosts.snapshot")
+                if capabilities and "contacts" in capabilities:
+                    ws.presence = await ws.expect("contacts.presence")
             except WebSocketClosed:
                 # A rejected hello: the caller asserts on ``wait_closed()``.
                 pass

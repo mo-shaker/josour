@@ -11,10 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.errors import ApiError
 from app.db.session import make_engine, make_sessionmaker
-from app.models.enums import SessionStatus, UserRole
+from app.models import User
+from app.models.enums import RegisteredVia, SessionStatus, UserRole
 from app.schemas.sessions import AdminSessionOut
 from app.services import allowlist
+from app.services import contacts as contact_service
 from app.services import sessions as session_service
+from app.services import users as user_service
 from app.services.users import create_user
 
 cli = typer.Typer(help="Josour management commands.", no_args_is_help=True)
@@ -72,7 +75,14 @@ def _create(email: str, password: str, display_name: str | None, role: UserRole)
     name = display_name or email.split("@", 1)[0]
 
     async def op(db: AsyncSession) -> tuple[str, str]:
-        user = await create_user(db, email=email, password=password, display_name=name, role=role)
+        user = await create_user(
+            db,
+            email=email,
+            password=password,
+            display_name=name,
+            role=role,
+            registered_via=RegisteredVia.CLI,
+        )
         return str(user.id), user.email
 
     user_id, user_email = _run(op)
@@ -158,6 +168,90 @@ def end_session(
         fg=typer.colors.YELLOW,
         err=True,
     )
+
+
+async def _by_email(db: AsyncSession, email: str) -> User:
+    user = await user_service.get_user_by_email(db, email)
+    if user is None:
+        raise ApiError(404, "not_found", f"no account with email {email}")
+    return user
+
+
+@cli.command("list-pending")
+def list_pending() -> None:
+    """List registrations waiting for approval, oldest first."""
+
+    async def op(db: AsyncSession) -> list[tuple[str, str, str]]:
+        rows = await user_service.list_users(db, state=user_service.UserState.PENDING, limit=500)
+        return [(u.email, u.display_name, u.created_at.isoformat()) for u in reversed(rows)]
+
+    rows = _run(op)
+    if not rows:
+        typer.echo("no pending registrations")
+    for email, name, created in rows:
+        typer.echo(f"{email:40}  {name:30}  {created}")
+
+
+@cli.command("approve-user")
+def approve_user(email: Annotated[str, typer.Argument(help="The registration's email")]) -> None:
+    """Approve a self-registered account so it can sign in."""
+
+    async def op(db: AsyncSession) -> None:
+        user = await _by_email(db, email)
+        await user_service.approve_user(db, user, actor_user_id=None, ip=None)
+
+    _run(op)
+    typer.echo(f"approved {email}")
+
+
+@cli.command("reject-user")
+def reject_user(email: Annotated[str, typer.Argument(help="The registration's email")]) -> None:
+    """Reject a pending registration."""
+
+    async def op(db: AsyncSession) -> None:
+        user = await _by_email(db, email)
+        await user_service.reject_user(db, user, actor_user_id=None, ip=None)
+
+    _run(op)
+    typer.echo(f"rejected {email}")
+
+
+@cli.command("delete-user")
+def delete_user(
+    email: Annotated[str, typer.Argument(help="The account's email")],
+    yes: Annotated[bool, typer.Option("--yes", help="Do not ask for confirmation")] = False,
+) -> None:
+    """Delete an account (anonymised; the history of the people it shared with is kept).
+
+    Runs outside the API process: connected clients are not notified from here, and a device
+    that is online keeps its control channel until it reconnects. Prefer the dashboard while the
+    server is running."""
+    if not yes:
+        typer.confirm(f"delete {email}? this cannot be undone", abort=True)
+
+    async def op(db: AsyncSession) -> None:
+        user = await _by_email(db, email)
+        await user_service.delete_user(db, user, actor_user_id=None, ip=None)
+
+    _run(op)
+    typer.echo(f"deleted {email}")
+
+
+@cli.command("seed-contacts")
+def seed_contacts(
+    all_active: Annotated[
+        bool, typer.Option("--all-active", help="Link every pair of active accounts")
+    ] = False,
+) -> None:
+    """Make every active account a contact of every other (the upgrade path from the global
+    host list, ADR-0014): nobody loses a host they could use before, and each person prunes
+    their own list from there. Safe to run twice."""
+    if not all_active:
+        typer.secho("pass --all-active to confirm", fg=typer.colors.YELLOW, err=True)
+        raise typer.Exit(code=2)
+
+    pairs = _run(contact_service.seed_all_active)
+    typer.echo(f"linked {pairs} new pair(s) of contacts")
 
 
 def main() -> None:

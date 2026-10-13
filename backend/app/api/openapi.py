@@ -25,8 +25,10 @@ whole device chain).
 
 ### Errors
 Every failure is `{"error": {"code": "...", "message": "..."}}` with a matching HTTP status. The
-codes are stable: `invalid_credentials`, `account_locked`, `account_disabled`, `device_revoked`,
-`unauthorized`, `forbidden`, `not_found`, `validation_error`, `rate_limited`, `conflict`.
+codes are stable: `invalid_credentials`, `account_locked`, `account_disabled`, `account_pending`,
+`account_rejected`, `device_revoked`, `unauthorized`, `forbidden`, `not_found`,
+`validation_error`, `rate_limited`, `conflict`, `registration_closed`, `registration_unavailable`,
+`upgrade_required`.
 
 ### Rate limits
 `POST /auth/login` is limited per client IP *and* per submitted email, `POST /auth/refresh` per
@@ -43,14 +45,22 @@ TAGS_METADATA: list[dict[str, Any]] = [
     {
         "name": "auth",
         "description": (
-            "Sign in, rotate a refresh token, sign out. `POST /auth/login` both authenticates "
-            "the user and registers or verifies the calling device; the device secret is "
-            "returned exactly once, at registration."
+            "Create an account, sign in, rotate a refresh token, sign out. `POST /auth/login` "
+            "both authenticates the user and registers or verifies the calling device; the "
+            "device secret is returned exactly once, at registration."
         ),
     },
     {
         "name": "me",
         "description": "The calling user and the devices they have registered.",
+    },
+    {
+        "name": "contacts",
+        "description": (
+            "The people a user can share a connection with (ADR-0014): invitations by email, "
+            "the contact list, and each side's switch for letting a contact use their "
+            "connection without being asked."
+        ),
     },
     {
         "name": "hosts",

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf_field with context %}
+{% block content %}
+<h1>{{ t("confirm.title") }}</h1>
+<p>{{ message }}</p>
+<form method="post" action="{{ action }}" class="row">
+  {{ csrf_field() }}
+  <button type="submit" class="danger">{{ t("confirm.go") }}</button>
+  <a class="button" href="{{ back }}">{{ t("confirm.cancel") }}</a>
+</form>
+{% endblock %}

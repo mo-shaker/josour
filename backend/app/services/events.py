@@ -50,6 +50,16 @@ class SessionEnded(Event):
     ended_at: datetime
 
 
+@dataclass(frozen=True, slots=True)
+class ContactsChanged(Event):
+    """Contacts, invitations or trust changed for these users (ADR-0014).
+
+    Each of them is sent ``contacts.changed`` - a hint to re-read ``GET /contacts`` - and the
+    host list is re-broadcast, because who can see which host may have changed."""
+
+    user_ids: tuple[uuid.UUID, ...]
+
+
 type Handler[E: Event] = Callable[[E], Awaitable[None] | None]
 type Unsubscribe = Callable[[], None]
 

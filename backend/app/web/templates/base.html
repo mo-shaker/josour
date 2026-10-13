@@ -1,0 +1,44 @@
+{% from "_macros.html" import csrf_field with context %}
+<!doctype html>
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  {% block refresh %}{% endblock %}
+  <title>{% block title %}{{ t("app.title") }}{% endblock %}</title>
+  <link rel="stylesheet" href="/admin/static/admin.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">{{ t("app.title") }}</div>
+  <a class="lang" href="/admin/lang/{{ 'en' if lang == 'ar' else 'ar' }}?next={{ path | urlencode }}">{{ t("nav.language") }}</a>
+  {% if ctx %}
+  <span class="who">{{ ctx.user.display_name }}</span>
+  <form method="post" action="/admin/logout" class="inline">
+    {{ csrf_field() }}
+    <button type="submit" class="link">{{ t("nav.logout") }}</button>
+  </form>
+  {% endif %}
+</header>
+{% if ctx %}
+<nav class="side">
+  <a href="/admin" {% if path == '/admin' %}aria-current="page"{% endif %}>{{ t("nav.overview") }}</a>
+  <a href="/admin/users" {% if path.startswith('/admin/users') %}aria-current="page"{% endif %}>{{ t("nav.users") }}</a>
+  <a href="/admin/registrations" {% if path == '/admin/registrations' %}aria-current="page"{% endif %}>{{ t("nav.registrations") }}{% if pending_count %} <span class="count">{{ pending_count }}</span>{% endif %}</a>
+  <a href="/admin/sessions?live=1" {% if path.startswith('/admin/sessions') %}aria-current="page"{% endif %}>{{ t("nav.sessions") }}</a>
+  <a href="/admin/invites" {% if path == '/admin/invites' %}aria-current="page"{% endif %}>{{ t("nav.invites") }}</a>
+  <a href="/admin/events" {% if path == '/admin/events' %}aria-current="page"{% endif %}>{{ t("nav.events") }}</a>
+  <a href="/admin/settings" {% if path == '/admin/settings' %}aria-current="page"{% endif %}>{{ t("nav.settings") }}</a>
+  <a href="/admin/domains" {% if path == '/admin/domains' %}aria-current="page"{% endif %}>{{ t("nav.domains") }}</a>
+  <a href="/admin/diagnostics" {% if path == '/admin/diagnostics' %}aria-current="page"{% endif %}>{{ t("nav.diagnostics") }}</a>
+  <a href="/admin/account" {% if path == '/admin/account' %}aria-current="page"{% endif %}>{{ t("nav.account") }}</a>
+</nav>
+{% endif %}
+<main class="{{ 'with-nav' if ctx else 'narrow' }}">
+  {% if done %}<p class="flash ok" role="status">{{ t(done) }}</p>{% endif %}
+  {% if error %}<p class="flash bad" role="alert">{{ t("error.action_failed") }} <code>{{ error }}</code></p>{% endif %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

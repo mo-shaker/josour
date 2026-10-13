@@ -3,15 +3,28 @@
 }
 
 {$DOMAIN} {
-  encode zstd gzip
+  # The dashboard's pages carry a per-session CSRF token and echo what was typed into them, so
+  # they are not compressed (BREACH). Everything else is.
+  @compressible not path /admin /admin/*
+  encode @compressible zstd gzip
 
   header {
     Strict-Transport-Security "max-age=31536000; includeSubDomains"
     X-Content-Type-Options nosniff
-    X-Frame-Options DENY
-    Referrer-Policy no-referrer
+    # "?": only where the application did not set its own (the dashboard sends a stricter
+    # Content-Security-Policy and its own Referrer-Policy, ADR-0016).
+    ?X-Frame-Options DENY
+    ?Referrer-Policy no-referrer
     -Server
   }
+
+  # Optional: let only your own network reach the dashboard at the edge, in addition to (or
+  # instead of) ADMIN_WEB_ALLOWED_CIDRS in .env. Replace the range and uncomment.
+  # @admin_outside {
+  #   path /admin /admin/*
+  #   not remote_ip 203.0.113.0/24
+  # }
+  # respond @admin_outside 404
 
   # WebSocket and REST together; Caddy passes the Upgrade through automatically
   reverse_proxy api:8000 {

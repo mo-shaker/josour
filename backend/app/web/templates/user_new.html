@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf_field with context %}
+{% block content %}
+<h1>{{ t("new.title") }}</h1>
+<form method="post" action="/admin/users/new" class="stack">
+  {{ csrf_field() }}
+  <label>{{ t("col.email") }} <input type="email" name="email" required dir="ltr"></label>
+  <label>{{ t("user.display_name") }} <input type="text" name="display_name" maxlength="100" required></label>
+  <label>{{ t("login.password") }} <input type="password" name="password" minlength="8" autocomplete="new-password" required dir="ltr"></label>
+  <label>{{ t("col.role") }}
+    <select name="role"><option value="user">{{ t("role.user") }}</option><option value="admin">{{ t("role.admin") }}</option></select>
+  </label>
+  <button type="submit" class="primary">{{ t("new.submit") }}</button>
+</form>
+{% endblock %}

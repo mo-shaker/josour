@@ -13,6 +13,7 @@ from app.core.config import Settings, get_settings
 from app.core.errors import ApiError, Forbidden, RateLimited, Unauthorized
 from app.core.rate_limit import RateLimiters, TokenBucketLimiter, opaque_key
 from app.core.security import AccessClaims, InvalidAccessToken, decode_access_token
+from app.core.versions import is_below, version_from_user_agent
 from app.db.session import get_db
 from app.models import Device, User
 from app.models.enums import DeviceStatus, UserRole
@@ -67,6 +68,19 @@ async def require_admin(auth: AuthDep) -> AuthContext:
 AdminDep = Annotated[AuthContext, Depends(require_admin)]
 
 
+async def client_version_floor(request: Request, db: DbDep) -> None:
+    """``426 upgrade_required`` for an app older than the ``min_client_version`` setting, read
+    from its ``Josour/<version>`` User-Agent. Anything that is not the app passes: the floor is
+    there to steer installed apps, not to keep an operator's curl out."""
+    from app.services.app_settings import settings_service
+
+    floor = (await settings_service.get(db)).min_client_version
+    if not floor:
+        return
+    if is_below(version_from_user_agent(request.headers.get("user-agent")), floor):
+        raise ApiError(426, "upgrade_required", f"This server needs Josour {floor} or later")
+
+
 def client_ip(request: Request) -> str | None:
     """Peer address as seen by uvicorn (X-Forwarded-For is applied by uvicorn's proxy-headers
     middleware when the proxy is trusted; see the Dockerfile CMD)."""
@@ -85,6 +99,9 @@ def build_rate_limiters(settings: Settings) -> RateLimiters | None:
         ),
         refresh_ip=TokenBucketLimiter(settings.refresh_rate_limit_per_minute, 60.0),
         probe_user=TokenBucketLimiter(settings.probe_rate_limit_per_minute, 60.0),
+        register_ip=TokenBucketLimiter(settings.register_rate_limit_per_hour, 3600.0),
+        invite_user=TokenBucketLimiter(settings.invite_rate_limit_per_day, 86400.0),
+        admin_login_ip=TokenBucketLimiter(settings.admin_login_rate_limit_per_minute, 60.0),
     )
 
 
@@ -158,6 +175,23 @@ async def refresh_rate_limit(request: Request) -> None:
     if limiters is None:
         return
     _spend(limiters.refresh_ip, client_ip(request) or "unknown")
+
+
+async def register_rate_limit(request: Request) -> None:
+    """``POST /auth/register``: per client IP, answered before the body is validated or a
+    password is hashed, so a flood is refused at the cost of a dictionary lookup."""
+    limiters = get_rate_limiters(request)
+    if limiters is None:
+        return
+    _spend(limiters.register_ip, client_ip(request) or "unknown")
+
+
+async def invite_rate_limit(request: Request, auth: AuthDep) -> None:
+    """``POST /contacts/invites``: per authenticated user."""
+    limiters = get_rate_limiters(request)
+    if limiters is None:
+        return
+    _spend(limiters.invite_user, str(auth.user.id))
 
 
 async def probe_rate_limit(request: Request, auth: AuthDep) -> None:

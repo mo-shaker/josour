@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ t("diagnostics.title") }}</h1>
+<div class="tiles">
+  <div class="tile"><span class="n">{{ summary.total_sessions }}</span><span>{{ t("diagnostics.total") }}</span></div>
+  <div class="tile"><span class="n" dir="ltr">{{ "%.0f" | format(summary.connect_ok_ratio * 100) }}%</span><span>{{ t("diagnostics.ok_ratio") }}</span></div>
+</div>
+<h2>{{ t("diagnostics.winner") }}</h2>
+<table><tbody>{% for k, v in summary.winner_type_distribution.items() %}<tr><td><code>{{ k }}</code></td><td>{{ v }}</td></tr>{% endfor %}</tbody></table>
+<h2>{{ t("diagnostics.end_reasons") }}</h2>
+<table><tbody>{% for k, v in summary.end_reason_distribution.items() %}<tr><td><code>{{ k }}</code></td><td>{{ v }}</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf_field with context %}
+{% block content %}
+<h1>{{ t("domains.title") }}</h1>
+<p class="muted">{{ t("domains.help") }}</p>
+<p>{{ t("domains.version") }}: <strong>{{ latest.version if latest else 0 }}</strong>{% if latest %} · <span dir="ltr">{{ latest.created_at | dt }}</span>{% endif %}</p>
+<form method="post" action="/admin/domains" class="stack">
+  {{ csrf_field() }}
+  <textarea name="entries" rows="16" dir="ltr" spellcheck="false">{% if latest %}{{ latest.entries | join('\n') }}{% endif %}</textarea>
+  <button type="submit" class="primary">{{ t("domains.publish") }}</button>
+</form>
+{% endblock %}

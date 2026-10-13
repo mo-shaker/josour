@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block refresh %}{% if live_only %}<meta http-equiv="refresh" content="15">{% endif %}{% endblock %}
+{% block content %}
+<h1>{{ t("sessions.title") }}</h1>
+<p class="row">
+  {% if live_only %}<a href="/admin/sessions">{{ t("state.all") }}</a>{% else %}<a href="/admin/sessions?live=1">{{ t("sessions.live_only") }}</a>{% endif %}
+</p>
+{% if sessions %}
+<table>
+  <thead><tr><th>{{ t("col.guest") }}</th><th>{{ t("col.host") }}</th><th>{{ t("col.status") }}</th><th>{{ t("col.started") }}</th><th>{{ t("col.ended") }}</th><th>{{ t("col.reason") }}</th><th>{{ t("col.traffic") }}</th><th></th></tr></thead>
+  <tbody>
+  {% for s in sessions %}
+    <tr>
+      <td><a href="/admin/users/{{ s.guest_user_id }}">{{ s.guest_display_name }}</a> / {{ s.guest_device_name }}</td>
+      <td><a href="/admin/users/{{ s.host_user_id }}">{{ s.host_display_name }}</a> / {{ s.host_device_name }}</td>
+      <td><code>{{ s.status }}</code></td>
+      <td dir="ltr">{{ s.started_at | dt }}</td>
+      <td dir="ltr">{{ s.ended_at | dt }}</td>
+      <td><code>{{ s.end_reason or "—" }}</code></td>
+      <td dir="ltr">↑{{ s.bytes_up | bytes }} ↓{{ s.bytes_down | bytes }}</td>
+      <td>{% if s.status != 'ended' %}<a class="button danger small" href="/admin/sessions/{{ s.id }}/terminate">{{ t("sessions.terminate") }}</a>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">{{ t("sessions.none") }}</p>
+{% endif %}
+{% endblock %}

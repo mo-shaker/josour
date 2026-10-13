@@ -2,6 +2,10 @@
 
 One query serves all three consumers - ``GET /hosts``, ``hosts.snapshot`` and ``hosts.update``
 (docs/ws-protocol.md section 4) - so the filter can never drift between REST and WebSocket.
+
+**Who may see a host is part of that query** (ADR-0014): a viewer sees only the hosts of their
+contacts. ``visible_to`` is the single place that rule is written; ``hosts.update`` applies the
+same rule in memory for a whole fan-out with ``app.services.contacts.adjacency``.
 """
 
 import uuid
@@ -11,7 +15,7 @@ from typing import Any
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Device, Presence, Session, User
+from app.models import Contact, Device, Presence, Session, User
 from app.models.enums import NON_ENDED_SESSION_STATUSES, DeviceStatus
 from app.schemas.hosts import HostOut
 
@@ -29,14 +33,17 @@ class AvailableHost:
     def to_out(self) -> HostOut:
         return HostOut(
             device_id=self.device_id,
+            user_id=self.user_id,
             user_display_name=self.user_display_name,
             device_name=self.device_name,
             reachable=self.reachable,
         )
 
 
-def _available_query(exclude_user_id: uuid.UUID | None) -> Any:
-    """The single definition of "this host can be asked for a session right now"."""
+def _available_query(visible_to: uuid.UUID | None) -> Any:
+    """The single definition of "this host can be asked for a session right now" - and, given a
+    viewer, "by this viewer". ``None`` lists every available host (the broadcast filters it per
+    recipient afterwards)."""
     live_session = (
         select(Session.id)
         .where(
@@ -58,30 +65,35 @@ def _available_query(exclude_user_id: uuid.UUID | None) -> Any:
             ~live_session,
         )
     )
-    if exclude_user_id is not None:
-        # You never see your own devices in the host list.
-        stmt = stmt.where(Device.user_id != exclude_user_id)
+    if visible_to is not None:
+        # You never see your own devices, and you only see your contacts' (ADR-0014).
+        is_contact = (
+            select(Contact.user_id)
+            .where(Contact.user_id == Device.user_id, Contact.contact_user_id == visible_to)
+            .exists()
+        )
+        stmt = stmt.where(Device.user_id != visible_to, is_contact)
     return stmt
 
 
 async def list_available(
-    db: AsyncSession, *, exclude_user_id: uuid.UUID | None = None
+    db: AsyncSession, *, visible_to: uuid.UUID | None = None
 ) -> list[AvailableHost]:
-    stmt = _available_query(exclude_user_id).order_by(User.display_name, Device.name)
+    stmt = _available_query(visible_to).order_by(User.display_name, Device.name)
     return [AvailableHost(*row) for row in await db.execute(stmt)]
 
 
 async def list_available_hosts(
-    db: AsyncSession, *, exclude_user_id: uuid.UUID | None = None
+    db: AsyncSession, *, visible_to: uuid.UUID | None = None
 ) -> list[HostOut]:
     """``GET /hosts``, ``hosts.snapshot`` and ``hosts.update`` all render this list."""
-    return [host.to_out() for host in await list_available(db, exclude_user_id=exclude_user_id)]
+    return [host.to_out() for host in await list_available(db, visible_to=visible_to)]
 
 
 async def get_available_host(
-    db: AsyncSession, device_id: uuid.UUID, *, exclude_user_id: uuid.UUID | None = None
+    db: AsyncSession, device_id: uuid.UUID, *, visible_to: uuid.UUID | None = None
 ) -> AvailableHost | None:
     """``request.create`` target check - the same filter, narrowed to one device."""
-    stmt = _available_query(exclude_user_id).where(Device.id == device_id)
+    stmt = _available_query(visible_to).where(Device.id == device_id)
     row = (await db.execute(stmt)).first()
     return AvailableHost(*row) if row is not None else None

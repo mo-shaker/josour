@@ -148,5 +148,10 @@ async def probe_and_store(device_id: uuid.UUID, ip: str | None, port: int) -> bo
     async with session_scope() as db:
         await set_reachable(db, device_id, reachable)
         await db.commit()
+        row = await get(db, device_id)
+        if row is not None:
+            await notify.send_host_state(
+                device_id, available=row.is_available_host, reachable=reachable
+            )
         await notify.broadcast_hosts_update(db)
     return reachable

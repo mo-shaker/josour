@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "_macros.html" import state_badge with context %}
+{% block content %}
+<h1>{{ t("users.title") }}</h1>
+<form method="get" action="/admin/users" class="row">
+  <input type="search" name="q" value="{{ q }}" placeholder="{{ t('users.search') }}">
+  <select name="state">
+    <option value="">{{ t("state.all") }}</option>
+    {% for s in states %}<option value="{{ s }}" {% if s == state %}selected{% endif %}>{{ t("state." ~ s) }}</option>{% endfor %}
+  </select>
+  <button type="submit">{{ t("users.filter") }}</button>
+  <a class="button primary" href="/admin/users/new">{{ t("users.new") }}</a>
+</form>
+{% if users %}
+<table>
+  <thead><tr><th>{{ t("col.name") }}</th><th>{{ t("col.email") }}</th><th>{{ t("col.role") }}</th><th>{{ t("col.state") }}</th><th>{{ t("col.created") }}</th><th>{{ t("col.last_login") }}</th></tr></thead>
+  <tbody>
+  {% for u in users %}
+    <tr>
+      <td><a href="/admin/users/{{ u.id }}">{{ u.display_name }}</a></td>
+      <td dir="ltr">{{ u.email }}</td>
+      <td>{{ t("role." ~ u.role) }}</td>
+      <td>{{ state_badge(u.state) }}</td>
+      <td dir="ltr">{{ u.created_at | dt }}</td>
+      <td dir="ltr">{{ u.last_login_at | dt }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="row">
+  {% if page > 0 %}<a href="/admin/users?q={{ q | urlencode }}&state={{ state }}&page={{ page - 1 }}">{{ t("users.prev") }}</a>{% endif %}
+  {% if has_next %}<a href="/admin/users?q={{ q | urlencode }}&state={{ state }}&page={{ page + 1 }}">{{ t("users.next") }}</a>{% endif %}
+</p>
+{% else %}
+<p class="muted">{{ t("users.none") }}</p>
+{% endif %}
+{% endblock %}

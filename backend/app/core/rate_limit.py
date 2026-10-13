@@ -108,7 +108,7 @@ def opaque_key(value: str) -> str:
 
 @dataclass(frozen=True, slots=True)
 class RateLimiters:
-    """The four buckets of ADR-0008, built once per application.
+    """The buckets of ADR-0008 (plus registration and invitations), built once per application.
 
     ``None`` in ``app.state`` (``RATE_LIMIT_ENABLED=false``) disables all of them together; there
     is deliberately no way to disable one and not the others, so the load harness and the
@@ -123,7 +123,21 @@ class RateLimiters:
     """``POST /auth/refresh`` per client IP."""
     probe_user: TokenBucketLimiter
     """``POST /probe`` per authenticated user."""
+    register_ip: TokenBucketLimiter
+    """``POST /auth/register`` per client IP (ADR-0017)."""
+    invite_user: TokenBucketLimiter
+    """``POST /contacts/invites`` per authenticated user (ADR-0014)."""
+    admin_login_ip: TokenBucketLimiter
+    """``POST /admin/login`` (the web dashboard) per client IP (ADR-0016)."""
 
     def reset(self) -> None:
-        for limiter in (self.login_ip, self.login_email, self.refresh_ip, self.probe_user):
+        for limiter in (
+            self.login_ip,
+            self.login_email,
+            self.refresh_ip,
+            self.probe_user,
+            self.register_ip,
+            self.invite_user,
+            self.admin_login_ip,
+        ):
             limiter.reset()

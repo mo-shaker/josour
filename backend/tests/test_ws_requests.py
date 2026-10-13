@@ -473,6 +473,9 @@ async def test_auto_accept_is_written_to_the_audit_trail(
         "guest_display_name": "Guest",
         "guest_device_name": "GUEST-PC",
         "duration_min": 20,
+        # An older host keeps its trust rules on its own disk, where the server cannot check
+        # them (ADR-0014); the row says so.
+        "grant": "client_legacy",
     }
 
 

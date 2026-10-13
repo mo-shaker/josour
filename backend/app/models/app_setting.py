@@ -17,6 +17,12 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # page pulls from dozens of subdomains. Switching this on restricts a deployment to the list.
     "enforce_allowlist": False,
     "allowed_ports": [80, 443],
+    # ADR-0017: may people create their own account from the app? "approval" lets them, but the
+    # account cannot sign in until an administrator approves it.
+    "registration_mode": "approval",
+    # Below this version a client is told to update instead of being served (empty = no floor).
+    "min_client_version": "",
+    "invite_ttl_days": 30,
 }
 
 

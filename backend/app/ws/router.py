@@ -17,16 +17,18 @@ from starlette.websockets import WebSocketDisconnect
 from app.core.clock import utcnow
 from app.core.config import Settings, get_settings
 from app.core.security import InvalidAccessToken, decode_access_token
+from app.core.versions import is_below
 from app.db.session import session_scope
 from app.models import Device, User
 from app.models.enums import DeviceStatus
-from app.services import allowlist, presence, requests, session_flow
+from app.services import allowlist, offers, presence, requests, session_flow
 from app.services import sessions as session_service
 from app.services.app_settings import settings_service
 from app.services.events import event_bus
 from app.ws import notify
 from app.ws.connection_manager import Connection, connection_manager
 from app.ws.protocol import (
+    Capability,
     ClientMessage,
     ClientPing,
     ClientPong,
@@ -36,6 +38,10 @@ from app.ws.protocol import (
     Hello,
     HelloAck,
     HostAvailable,
+    OfferAccept,
+    OfferCancel,
+    OfferCreate,
+    OfferReject,
     Ping,
     Pong,
     RequestAccept,
@@ -159,6 +165,20 @@ async def _authenticate(db: AsyncSession, settings: Settings, hello: Hello) -> t
     return user, device
 
 
+async def _assert_supported(websocket: WebSocket, db: AsyncSession, hello: Hello) -> None:
+    """The ``min_client_version`` floor: an older app is told, then closed with 4426."""
+    floor = (await settings_service.get(db)).min_client_version
+    if is_below(hello.app_version, floor):
+        await _send_raw(
+            websocket,
+            ErrorFrame(
+                code=ErrorCode.UPGRADE_REQUIRED,
+                message=f"This server needs Josour {floor} or later",
+            ),
+        )
+        raise _HandshakeRejected(CloseCode.UPGRADE_REQUIRED, "client below min_client_version")
+
+
 async def _handshake(websocket: WebSocket) -> Connection | None:
     """Returns the registered connection, or ``None`` after closing with 4401/4403."""
     connection: Connection | None = None
@@ -168,8 +188,15 @@ async def _handshake(websocket: WebSocket) -> Connection | None:
         public_ip = ws_client_ip(websocket)
         async with session_scope() as db:
             user, device = await _authenticate(db, settings, hello)
+            await _assert_supported(websocket, db, hello)
+            first_device = not connection_manager.is_user_online(user.id)
             connection = Connection(
-                websocket, device_id=device.id, user_id=user.id, public_ip=public_ip
+                websocket,
+                device_id=device.id,
+                user_id=user.id,
+                public_ip=public_ip,
+                capabilities=frozenset(hello.capabilities),
+                app_version=hello.app_version,
             )
             await connection_manager.register(connection)
             await presence.mark_connected(
@@ -193,6 +220,10 @@ async def _handshake(websocket: WebSocket) -> Connection | None:
                 )
             )
             await notify.send_hosts_snapshot(db, connection)
+            if connection.can(Capability.CONTACTS):
+                await notify.send_contacts_presence(db, connection)
+            if first_device:
+                await notify.announce_presence(db, user.id, online=True)
             await notify.broadcast_hosts_update(db)
     except _HandshakeRejected as exc:
         log.info("ws handshake rejected", extra={"code": int(exc.code), "reason": exc.reason})
@@ -246,10 +277,38 @@ async def _handle(connection: Connection, message: ClientMessage) -> None:
                 ref=message.ref,
                 runtime=_runtime(connection),
                 auto=message.auto,
+                verify_trust=connection.can(Capability.TRUST_V2),
             )
         case RequestReject():
             await requests.reject(
                 request_id=message.request_id, device_id=connection.device_id, ref=message.ref
+            )
+        case OfferCreate():
+            await offers.create(
+                host_user_id=connection.user_id,
+                host_device_id=connection.device_id,
+                guest_user_id=message.guest_user_id,
+                duration_min=message.duration_min,
+                ref=message.ref,
+            )
+        case OfferCancel():
+            await offers.cancel(
+                offer_id=message.offer_id, device_id=connection.device_id, ref=message.ref
+            )
+        case OfferAccept():
+            await offers.accept(
+                offer_id=message.offer_id,
+                user_id=connection.user_id,
+                device_id=connection.device_id,
+                ref=message.ref,
+                runtime=_runtime(connection),
+            )
+        case OfferReject():
+            await offers.reject(
+                offer_id=message.offer_id,
+                user_id=connection.user_id,
+                device_id=connection.device_id,
+                ref=message.ref,
             )
         case SessionEndpoint():
             await session_flow.endpoint(device_id=connection.device_id, message=message)
@@ -271,13 +330,16 @@ async def _handle(connection: Connection, message: ClientMessage) -> None:
 
 async def _handle_host_available(connection: Connection, message: HostAvailable) -> None:
     async with session_scope() as db:
-        await presence.set_host_available(
+        row = await presence.set_host_available(
             db,
             connection.device_id,
             available=message.available,
             listen_port=message.listen_port,
         )
         await db.commit()
+        await notify.send_host_state(
+            connection.device_id, available=row.is_available_host, reachable=row.reachable
+        )
         await notify.broadcast_hosts_update(db)
     if message.available and message.listen_port is not None:
         # Section 6: a background TCP probe; the handler never waits for its 3 s timeout.
@@ -378,6 +440,8 @@ async def _teardown(connection: Connection) -> None:
             await db.commit()
             for event in events:
                 await event_bus.publish(event)
+            if not connection_manager.is_user_online(connection.user_id):
+                await notify.announce_presence(db, connection.user_id, online=False)
             await notify.broadcast_hosts_update(db)
     except Exception:  # pragma: no cover - cleanup must never escape
         log.exception("ws teardown failed", extra={"device_id": str(connection.device_id)})

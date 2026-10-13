@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "_macros.html" import state_badge with context %}
+{% block content %}
+<h1>{{ t("overview.title") }}</h1>
+<div class="tiles">
+  <a class="tile" href="/admin/registrations"><span class="n">{{ counts['pending'] }}</span><span>{{ t("overview.pending") }}</span></a>
+  <a class="tile" href="/admin/sessions?live=1"><span class="n">{{ live_sessions }}</span><span>{{ t("overview.live_sessions") }}</span></a>
+  <div class="tile"><span class="n">{{ online_devices }}</span><span>{{ t("overview.online_devices") }}</span></div>
+  {% for state in ['active', 'disabled', 'rejected', 'deleted'] %}
+  <a class="tile" href="/admin/users?state={{ state }}"><span class="n">{{ counts[state] }}</span><span>{{ t("state." ~ state) }}</span></a>
+  {% endfor %}
+</div>
+<h2>{{ t("overview.recent_events") }}</h2>
+{% include "_events_table.html" %}
+{% endblock %}

@@ -38,6 +38,9 @@ async def on_startup(settings: Settings | None = None) -> None:
     # Suspicious-device detection rides the same scheduler as the session deadlines (ADR-0008),
     # so it is armed after the reset above and torn down by the same ``cancel_all``.
     armed = device_risk.start(settings)
+    from app.web import start_housekeeping
+
+    start_housekeeping(settings)
     log.info(
         "ws state reset",
         extra={

@@ -707,10 +707,14 @@ async def test_startup_leaves_no_live_session_and_no_session_timer(
             )
             == 0
         )
-        # No *session* timer survives. The one timer a running process always holds is the
-        # periodic suspicious-device sweep (ADR-0008), armed by the same startup path.
+        # No *session* timer survives. The timers a running process always holds are the
+        # periodic housekeeping ones armed by the same startup path: the suspicious-device sweep
+        # (ADR-0008) and the purge of old dashboard sessions (ADR-0016).
+        from app.web import PURGE_KEY
+
         assert scheduler.is_scheduled(device_risk.SWEEP_KEY)
-        assert len(scheduler) == 1
+        assert scheduler.is_scheduled(PURGE_KEY)
+        assert len(scheduler) == 2
 
 
 # ---------------------------------------------------------------- every ending path

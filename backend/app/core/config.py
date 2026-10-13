@@ -1,5 +1,6 @@
 """Runtime configuration loaded from environment variables (and an optional .env file)."""
 
+import ipaddress
 from functools import lru_cache
 from typing import Literal
 
@@ -34,6 +35,35 @@ class Settings(BaseSettings):
     probe_rate_limit_per_minute: int = Field(default=10, ge=1)
     """``POST /probe`` per user: the server opens a TCP socket to a caller-named public address,
     so this is what stops the endpoint being used as a slow port scanner wearing our identity."""
+    register_rate_limit_per_hour: int = Field(default=5, ge=1)
+    """``POST /auth/register`` per client IP. Every registration costs an argon2 hash and, in
+    approval mode, a row an administrator has to read, so this is deliberately tight."""
+    invite_rate_limit_per_day: int = Field(default=20, ge=1)
+    """``POST /contacts/invites`` per user: an invitation lands in somebody else's app."""
+
+    admin_login_rate_limit_per_minute: int = Field(default=10, ge=1)
+    """``POST /admin/login`` (the web dashboard) per client IP. The per-email bucket and the
+    account lockout are shared with the app's sign-in."""
+
+    # --- Web dashboard (ADR-0016).
+    admin_web_enabled: bool = True
+    """Serve the dashboard at ``/admin``. Off removes the routes altogether."""
+    admin_web_allowed_cidrs: str = ""
+    """Comma-separated networks allowed to reach the dashboard (``203.0.113.0/24,2001:db8::/32``);
+    anyone else gets a 404. Empty allows every address."""
+    admin_web_idle_minutes: int = Field(default=30, ge=1, le=24 * 60)
+    admin_web_absolute_hours: int = Field(default=12, ge=1, le=24 * 7)
+    admin_web_require_totp: bool = False
+    """Every administrator must use a second factor in the dashboard; one without it is sent to
+    enrol before anything else."""
+    public_origin: str = ""
+    """``https://josour.example.com`` - the origin the dashboard's forms must come from. Empty
+    derives it from the request (scheme and ``Host`` as the proxy forwards them)."""
+
+    # --- Self-registration (ADR-0017).
+    max_pending_registrations: int = Field(default=200, ge=1)
+    """Above this many accounts waiting for approval, new registrations are refused until an
+    administrator works through the queue - a bound on what a registration flood can leave."""
 
     # --- Relay (ADR-0009). The relay is the guaranteed transport; direct is the optimisation.
     relay_host: str = ""
@@ -68,6 +98,14 @@ class Settings(BaseSettings):
     def relay_enabled(self) -> bool:
         return bool(self.relay_host and self.relay_secret)
 
+    @property
+    def admin_web_networks(self) -> list[ipaddress.IPv4Network | ipaddress.IPv6Network]:
+        return [
+            ipaddress.ip_network(item.strip(), strict=False)
+            for item in self.admin_web_allowed_cidrs.split(",")
+            if item.strip()
+        ]
+
     @model_validator(mode="after")
     def _relay_is_configured_completely(self) -> "Settings":
         """Half a relay configuration is the dangerous state: an address with no secret mints
@@ -80,6 +118,10 @@ class Settings(BaseSettings):
             raise ValueError("RELAY_SECRET is set but RELAY_HOST is not")
         if self.relay_secret and len(self.relay_secret) < 32:
             raise ValueError("RELAY_SECRET must be at least 32 characters")
+        try:
+            self.admin_web_networks  # noqa: B018 - validated at boot, not at first request
+        except ValueError as exc:
+            raise ValueError(f"ADMIN_WEB_ALLOWED_CIDRS is not a list of networks: {exc}") from exc
         return self
 
 

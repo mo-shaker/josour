@@ -1,0 +1,17 @@
+{% if events %}
+<table>
+  <thead><tr><th>{{ t("col.when") }}</th><th>{{ t("col.type") }}</th><th>{{ t("col.ip") }}</th><th>{{ t("col.details") }}</th></tr></thead>
+  <tbody>
+  {% for e in events %}
+    <tr>
+      <td dir="ltr">{{ e.created_at | dt }}</td>
+      <td><code>{{ e.type }}</code>{% if e.user_id %} · <a href="/admin/users/{{ e.user_id }}">{{ t("events.account") }}</a>{% endif %}</td>
+      <td dir="ltr">{{ e.ip or "—" }}</td>
+      <td dir="ltr" class="details">{% if e.details %}{% for k, v in e.details.items() %}<span>{{ k }}={{ v }}</span> {% endfor %}{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">{{ t("events.none") }}</p>
+{% endif %}

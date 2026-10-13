@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf_field with context %}
+{% block content %}
+<h1>{{ t("settings.title") }}</h1>
+<form method="post" action="/admin/settings" class="stack">
+  {{ csrf_field() }}
+  <fieldset>
+    <legend>{{ t("settings.registration_mode") }}</legend>
+    {% for mode in ['closed', 'approval', 'open'] %}
+    <label class="choice"><input type="radio" name="registration_mode" value="{{ mode }}" {% if settings.registration_mode == mode %}checked{% endif %}> {{ t("mode." ~ mode) }}</label>
+    {% endfor %}
+  </fieldset>
+  <label>{{ t("settings.max_session_minutes") }} <input type="number" name="max_session_minutes" min="1" max="1440" value="{{ settings.max_session_minutes }}" required></label>
+  <label>{{ t("settings.request_timeout_seconds") }} <input type="number" name="request_timeout_seconds" min="10" max="300" value="{{ settings.request_timeout_seconds }}" required></label>
+  <label>{{ t("settings.connect_timeout_seconds") }} <input type="number" name="connect_timeout_seconds" min="10" max="300" value="{{ settings.connect_timeout_seconds }}" required></label>
+  <label>{{ t("settings.allowed_ports") }} <input type="text" name="allowed_ports" value="{{ settings.allowed_ports | join(', ') }}" required dir="ltr"></label>
+  <label>{{ t("settings.invite_ttl_days") }} <input type="number" name="invite_ttl_days" min="1" max="365" value="{{ settings.invite_ttl_days }}" required></label>
+  <label>{{ t("settings.min_client_version") }} <input type="text" name="min_client_version" value="{{ settings.min_client_version }}" placeholder="2.0.0" dir="ltr"></label>
+  <label class="choice"><input type="checkbox" name="log_domains" {% if settings.log_domains %}checked{% endif %}> {{ t("settings.log_domains") }}</label>
+  <label class="choice"><input type="checkbox" name="enforce_allowlist" {% if settings.enforce_allowlist %}checked{% endif %}> {{ t("settings.enforce_allowlist") }}</label>
+  <button type="submit" class="primary">{{ t("settings.save") }}</button>
+</form>
+{% endblock %}

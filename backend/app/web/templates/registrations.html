@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf_field with context %}
+{% block content %}
+<h1>{{ t("registrations.title") }}</h1>
+{% if users %}
+<table>
+  <thead><tr><th>{{ t("col.name") }}</th><th>{{ t("col.email") }}</th><th>{{ t("col.created") }}</th><th>{{ t("col.actions") }}</th></tr></thead>
+  <tbody>
+  {% for u in users %}
+    <tr>
+      <td><a href="/admin/users/{{ u.id }}">{{ u.display_name }}</a></td>
+      <td dir="ltr">{{ u.email }}</td>
+      <td dir="ltr">{{ u.created_at | dt }}</td>
+      <td>
+        <form method="post" action="/admin/users/{{ u.id }}/approve" class="inline">{{ csrf_field() }}<input type="hidden" name="next" value="/admin/registrations"><button type="submit" class="primary small">{{ t("user.approve") }}</button></form>
+        <a class="button danger small" href="/admin/users/{{ u.id }}/reject">{{ t("user.reject") }}</a>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">{{ t("registrations.none") }}</p>
+{% endif %}
+{% endblock %}

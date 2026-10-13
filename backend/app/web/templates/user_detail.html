@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf_field, post_button, state_badge with context %}
+{% block content %}
+<h1>{{ user.display_name }} {{ state_badge(user.state) }}</h1>
+<dl class="kv">
+  <dt>{{ t("col.email") }}</dt><dd dir="ltr">{{ user.email }}</dd>
+  <dt>{{ t("col.role") }}</dt><dd>{{ t("role." ~ user.role) }}</dd>
+  <dt>{{ t("user.registered_via") }}</dt><dd>{{ t("via." ~ user.registered_via) }}</dd>
+  <dt>{{ t("col.created") }}</dt><dd dir="ltr">{{ user.created_at | dt }}</dd>
+  <dt>{{ t("col.last_login") }}</dt><dd dir="ltr">{{ user.last_login_at | dt }}</dd>
+  {% if user.locked_until %}<dt>{{ t("user.locked_until") }}</dt><dd dir="ltr">{{ user.locked_until | dt }}</dd>{% endif %}
+</dl>
+
+{% if user.state != 'deleted' %}
+<div class="actions">
+  {% if user.state == 'pending' %}
+    <form method="post" action="/admin/users/{{ user.id }}/approve" class="inline">{{ csrf_field() }}<input type="hidden" name="next" value="/admin/users/{{ user.id }}"><button type="submit" class="primary">{{ t("user.approve") }}</button></form>
+    <a class="button danger" href="/admin/users/{{ user.id }}/reject">{{ t("user.reject") }}</a>
+  {% elif user.state == 'rejected' %}
+    <form method="post" action="/admin/users/{{ user.id }}/approve" class="inline">{{ csrf_field() }}<input type="hidden" name="next" value="/admin/users/{{ user.id }}"><button type="submit">{{ t("user.approve") }}</button></form>
+  {% elif user.state == 'active' and not is_self %}
+    {{ post_button("/admin/users/" ~ user.id ~ "/deactivate", t("user.deactivate"), "danger") }}
+  {% elif user.state == 'disabled' %}
+    {{ post_button("/admin/users/" ~ user.id ~ "/activate", t("user.activate")) }}
+  {% endif %}
+  {% if user.locked_until or user.failed_logins %}{{ post_button("/admin/users/" ~ user.id ~ "/unlock", t("user.unlock")) }}{% endif %}
+  {% if not is_self %}<a class="button danger" href="/admin/users/{{ user.id }}/delete">{{ t("user.delete") }}</a>{% endif %}
+</div>
+
+<section>
+  <h2>{{ t("user.profile") }}</h2>
+  <form method="post" action="/admin/users/{{ user.id }}/profile" class="stack">
+    {{ csrf_field() }}
+    <label>{{ t("user.display_name") }} <input type="text" name="display_name" value="{{ user.display_name }}" maxlength="100" required></label>
+    <label>{{ t("col.email") }} <input type="email" name="email" value="{{ user.email }}" required dir="ltr"></label>
+    <label>{{ t("col.role") }}
+      <select name="role">
+        <option value="user" {% if user.role == 'user' %}selected{% endif %}>{{ t("role.user") }}</option>
+        <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>{{ t("role.admin") }}</option>
+      </select>
+    </label>
+    <button type="submit">{{ t("user.save") }}</button>
+  </form>
+  <form method="post" action="/admin/users/{{ user.id }}/password" class="row">
+    {{ csrf_field() }}
+    <input type="password" name="password" minlength="8" autocomplete="new-password" placeholder="{{ t('user.new_password') }}" required dir="ltr">
+    <button type="submit">{{ t("user.set_password") }}</button>
+  </form>
+</section>
+{% endif %}
+
+<section>
+  <h2>{{ t("user.devices") }}</h2>
+  {% if devices %}
+  <table>
+    <thead><tr><th>{{ t("col.device") }}</th><th>{{ t("col.os") }}</th><th>{{ t("col.status") }}</th><th>{{ t("col.online") }}</th><th>{{ t("col.last_seen") }}</th><th></th></tr></thead>
+    <tbody>
+    {% for d in devices %}
+      <tr>
+        <td>{{ d.name }}</td>
+        <td dir="ltr">{{ d.os_version }}{% if d.os_build %} ({{ d.os_build }}){% endif %}</td>
+        <td><code>{{ d.status }}</code></td>
+        <td>{{ t("yes") if d.id in online else t("no") }}</td>
+        <td dir="ltr">{{ d.last_seen_at | dt }}</td>
+        <td>{% if d.status == 'active' %}<a class="button danger small" href="/admin/devices/{{ d.id }}/revoke">{{ t("user.revoke") }}</a>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">{{ t("user.none_devices") }}</p>{% endif %}
+</section>
+
+<section>
+  <h2>{{ t("user.contacts") }}</h2>
+  {% if contacts %}
+  <table>
+    <thead><tr><th>{{ t("col.contact") }}</th><th>{{ t("user.trusts") }}</th><th>{{ t("user.trusted_by") }}</th><th>{{ t("col.created") }}</th><th></th></tr></thead>
+    <tbody>
+    {% for c in contacts %}
+      <tr>
+        <td><a href="/admin/users/{{ c.contact_user_id }}">{{ c.contact_display_name }}</a> <span dir="ltr" class="muted">{{ c.contact_email }}</span></td>
+        <td>{{ t("yes") if c.auto_accept else t("no") }}
+          {% if c.auto_accept %}{{ post_button("/admin/contacts/" ~ user.id ~ "/" ~ c.contact_user_id ~ "/revoke-trust", t("user.revoke_trust"), "small") }}{% endif %}</td>
+        <td>{{ t("yes") if c.trusted_by_contact else t("no") }}</td>
+        <td dir="ltr">{{ c.created_at | dt }}</td>
+        <td><a class="button danger small" href="/admin/contacts/{{ user.id }}/{{ c.contact_user_id }}/remove">{{ t("user.remove_contact") }}</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">{{ t("user.none_contacts") }}</p>{% endif %}
+</section>
+
+<section>
+  <h2>{{ t("user.sessions") }}</h2>
+  {% if sessions %}
+  <table>
+    <thead><tr><th>{{ t("col.role") }}</th><th>{{ t("col.contact") }}</th><th>{{ t("col.status") }}</th><th>{{ t("col.started") }}</th><th>{{ t("col.ended") }}</th><th>{{ t("col.reason") }}</th><th>{{ t("col.traffic") }}</th></tr></thead>
+    <tbody>
+    {% for s in sessions %}
+      <tr>
+        <td><code>{{ s.role }}</code></td>
+        <td>{{ s.peer_display_name }} / {{ s.peer_device_name }}</td>
+        <td><code>{{ s.status }}</code></td>
+        <td dir="ltr">{{ s.started_at | dt }}</td>
+        <td dir="ltr">{{ s.ended_at | dt }}</td>
+        <td><code>{{ s.end_reason or "—" }}</code></td>
+        <td dir="ltr">↑{{ s.bytes_up | bytes }} ↓{{ s.bytes_down | bytes }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">{{ t("user.none_sessions") }}</p>{% endif %}
+</section>
+
+<section>
+  <h2>{{ t("user.events") }}</h2>
+  {% include "_events_table.html" %}
+</section>
+{% endblock %}

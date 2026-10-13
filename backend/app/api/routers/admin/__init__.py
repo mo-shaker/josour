@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 
 from app.api.deps import require_admin
 from app.api.routers.admin import (
+    contacts,
     devices,
     diagnostics,
     domains,
@@ -15,5 +16,5 @@ from app.api.routers.admin import (
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
-for module in (users, devices, domains, sessions, security_events, diagnostics, settings):
+for module in (users, contacts, devices, domains, sessions, security_events, diagnostics, settings):
     router.include_router(module.router)

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf_field with context %}
+{% block content %}
+<h1>{{ t("account.title") }}</h1>
+{% if error == 'wrong_password' %}<p class="flash bad" role="alert">{{ t("account.wrong_password") }}</p>{% endif %}
+{% if error == 'totp' %}<p class="flash bad" role="alert">{{ t("totp.wrong") }}</p>{% endif %}
+<section>
+  <h2>{{ t("account.change_password") }}</h2>
+  <form method="post" action="/admin/account/password" class="stack">
+    {{ csrf_field() }}
+    <label>{{ t("account.current_password") }} <input type="password" name="current" autocomplete="current-password" required dir="ltr"></label>
+    <label>{{ t("user.new_password") }} <input type="password" name="password" minlength="8" autocomplete="new-password" required dir="ltr"></label>
+    <button type="submit">{{ t("account.change_password") }}</button>
+  </form>
+</section>
+<section>
+  <h2>{{ t("totp.title") }}</h2>
+  {% if ctx.user.totp_enabled_at %}
+    <p>{{ t("totp.enabled") }}</p>
+    <form method="post" action="/admin/account/totp/disable" class="row">
+      {{ csrf_field() }}
+      <input type="password" name="current" placeholder="{{ t('account.current_password') }}" autocomplete="current-password" required dir="ltr">
+      <button type="submit" class="danger">{{ t("totp.turn_off") }}</button>
+    </form>
+  {% elif enrolling %}
+    <p>{{ t("totp.enrol_help") }}</p>
+    <dl class="kv">
+      <dt>{{ t("totp.secret") }}</dt><dd><code dir="ltr">{{ ctx.user.totp_secret }}</code></dd>
+      <dt>{{ t("totp.uri") }}</dt><dd><code dir="ltr" class="wrap">{{ uri }}</code></dd>
+    </dl>
+    <form method="post" action="/admin/account/totp/confirm" class="row">
+      {{ csrf_field() }}
+      <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" placeholder="000000" required dir="ltr">
+      <button type="submit" class="primary">{{ t("totp.confirm") }}</button>
+    </form>
+  {% else %}
+    <p>{{ t("totp.disabled") }}</p>
+    <form method="post" action="/admin/account/totp/start" class="inline">
+      {{ csrf_field() }}
+      <button type="submit">{{ t("totp.start") }}</button>
+    </form>
+  {% endif %}
+</section>
+{% endblock %}

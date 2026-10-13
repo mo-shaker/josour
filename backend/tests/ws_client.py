@@ -59,6 +59,7 @@ class ASGIWebSocket:
         self.close_code: int | None = None
         self.hello_ack: dict[str, Any] | None = None
         self.snapshot: dict[str, Any] | None = None
+        self.presence: dict[str, Any] | None = None
 
     # -- lifecycle --------------------------------------------------------------------------
 

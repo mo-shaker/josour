@@ -1,0 +1,14 @@
+{% macro csrf_field() -%}
+<input type="hidden" name="csrf" value="{{ csrf }}">
+{%- endmacro %}
+
+{% macro post_button(action, label, kind="") -%}
+<form method="post" action="{{ action }}" class="inline">
+  {{ csrf_field() }}
+  <button type="submit" class="{{ kind }}">{{ label }}</button>
+</form>
+{%- endmacro %}
+
+{% macro state_badge(state) -%}
+<span class="badge state-{{ state }}">{{ t("state." ~ state) }}</span>
+{%- endmacro %}

@@ -1,8 +1,9 @@
 import uuid
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models.enums import UserRole
+from app.models.enums import RegistrationMode, UserRole
 from app.schemas.common import ApiModel, normalise_email_address
 
 _DEVICE_EXAMPLE = {
@@ -133,3 +134,51 @@ class LogoutRequest(BaseModel):
     )
 
     refresh_token: str = Field(min_length=1, max_length=128)
+
+
+class RegisterRequest(BaseModel):
+    """``POST /auth/register``. No device: the app signs in with ``POST /auth/login`` once the
+    account may be used, and registers its device then, exactly as for any other account."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "email": "bob@example.com",
+                    "password": "correct-horse-battery",
+                    "display_name": "Bob",
+                }
+            ]
+        }
+    )
+
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=8, max_length=1024)
+    display_name: str = Field(min_length=1, max_length=100)
+
+    @field_validator("email")
+    @classmethod
+    def _normalise_email(cls, value: str) -> str:
+        return normalise_email_address(value)
+
+    @field_validator("display_name")
+    @classmethod
+    def _name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("must not be empty")
+        return value
+
+
+class RegisterOut(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"examples": [{"status": "pending"}]})
+
+    status: Literal["pending", "active"]
+    """``pending``: an administrator must approve the account before it can sign in.
+    ``active``: sign in now."""
+
+
+class RegistrationInfo(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"examples": [{"mode": "approval"}]})
+
+    mode: RegistrationMode

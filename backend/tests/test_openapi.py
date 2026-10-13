@@ -10,7 +10,12 @@ from fastapi.routing import APIRoute
 MIN_DESCRIPTION_CHARS = 40
 
 # Operations that answer without authentication and therefore have nothing to say about 401.
-PUBLIC_OPERATIONS = {("/api/v1/auth/login", "post"), ("/api/v1/auth/logout", "post")}
+PUBLIC_OPERATIONS = {
+    ("/api/v1/auth/login", "post"),
+    ("/api/v1/auth/logout", "post"),
+    ("/api/v1/auth/register", "post"),
+    ("/api/v1/auth/registration", "get"),
+}
 
 
 def documented_routes(app: FastAPI) -> list[APIRoute]:

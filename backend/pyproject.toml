@@ -20,6 +20,8 @@ dependencies = [
     "argon2-cffi>=23.1",
     "PyJWT>=2.8",
     "typer>=0.12",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
@@ -36,6 +38,11 @@ josour = "app.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["app*"]
+
+[tool.setuptools.package-data]
+# The web dashboard (ADR-0016): without this a regular (non-editable) install - which is what
+# the Docker image does - ships the Python code and silently leaves the pages behind.
+"app.web" = ["templates/*.html", "static/*"]
 
 [tool.ruff]
 line-length = 100

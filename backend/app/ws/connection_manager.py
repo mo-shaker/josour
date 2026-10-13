@@ -49,11 +49,19 @@ class Connection:
         device_id: uuid.UUID,
         user_id: uuid.UUID,
         public_ip: str | None,
+        capabilities: frozenset[str] = frozenset(),
+        app_version: str | None = None,
     ) -> None:
         self.websocket = websocket
         self.device_id = device_id
         self.user_id = user_id
         self.public_ip = public_ip
+        self.capabilities = capabilities
+        """``hello.capabilities``: what this client said it understands."""
+        self.app_version = app_version
+        self.last_hosts_signature: object | None = None
+        """What this connection was last told the host list is, so an unchanged list is not
+        sent again (``app.ws.notify.broadcast_hosts_update``)."""
         self.closed = asyncio.Event()
         self.close_code: int | None = None
         self._lock = asyncio.Lock()
@@ -66,6 +74,9 @@ class Connection:
         self.connected_at = now
         self.last_pong_at = now
         self.last_ping_at = now
+
+    def can(self, capability: str) -> bool:
+        return capability in self.capabilities
 
     def mark_pong(self) -> None:
         self.last_pong_at = time.monotonic()
@@ -158,6 +169,18 @@ class ConnectionManager:
     def is_connected(self, device_id: uuid.UUID) -> bool:
         connection = self._connections.get(device_id)
         return connection is not None and not connection.closed.is_set()
+
+    def for_user(self, user_id: uuid.UUID) -> list[Connection]:
+        """Every live connection of one user (one per device). A scan: the registry holds one
+        entry per connected device, and the callers are rare, user-scoped events."""
+        return [
+            c for c in self._connections.values() if c.user_id == user_id and not c.closed.is_set()
+        ]
+
+    def is_user_online(self, user_id: uuid.UUID) -> bool:
+        return any(
+            c.user_id == user_id and not c.closed.is_set() for c in self._connections.values()
+        )
 
     def connections(self) -> list[Connection]:
         """Snapshot for presence fan-out; safe to iterate while connections come and go."""

@@ -40,7 +40,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title="Josour API",
         version="1",
-        summary="Control plane for peer-to-peer browsing sessions between two Windows devices.",
+        summary="Control plane for peer-to-peer browsing sessions between contacts.",
         description=API_DESCRIPTION,
         openapi_tags=TAGS_METADATA,
         # Open in dev; otherwise served by admin-gated routes (register_guarded_docs).
@@ -57,6 +57,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health_router)
     app.include_router(api_router)
     app.include_router(ws_router)  # /ws (docs/ws-protocol.md)
+    if settings.admin_web_enabled:
+        from app.web import mount
+
+        mount(app)  # /admin (ADR-0016)
     register_subscribers(event_bus)
     return app
 

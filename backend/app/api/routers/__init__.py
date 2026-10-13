@@ -2,11 +2,22 @@
 
 from fastapi import APIRouter
 
-from app.api.routers import admin, auth, diagnostics, domains, hosts, me, probe, sessions
+from app.api.routers import (
+    admin,
+    auth,
+    contacts,
+    diagnostics,
+    domains,
+    hosts,
+    me,
+    probe,
+    sessions,
+)
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router)
 api_router.include_router(me.router)
+api_router.include_router(contacts.router)
 api_router.include_router(hosts.router)
 api_router.include_router(sessions.router)
 api_router.include_router(domains.router)

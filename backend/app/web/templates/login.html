@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ t("login.title") }}{% endblock %}
+{% block content %}
+<h1>{{ t("login.title") }}</h1>
+{% if message %}<p class="flash bad" role="alert">{{ t(message) }}</p>{% endif %}
+<form method="post" action="/admin/login" class="stack">
+  <input type="hidden" name="next" value="{{ next }}">
+  <label>{{ t("login.email") }}
+    <input type="email" name="email" value="{{ email or '' }}" autocomplete="username" required dir="ltr">
+  </label>
+  <label>{{ t("login.password") }}
+    <input type="password" name="password" autocomplete="current-password" required dir="ltr">
+  </label>
+  <button type="submit" class="primary">{{ t("login.submit") }}</button>
+</form>
+{% endblock %}

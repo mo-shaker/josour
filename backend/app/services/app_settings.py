@@ -7,6 +7,7 @@ is dropped by ``update()``; with a single uvicorn worker that is sufficient.
 """
 
 import logging
+import uuid
 from typing import Any
 
 from pydantic import ValidationError
@@ -15,7 +16,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AppSetting
 from app.models.app_setting import DEFAULT_SETTINGS
+from app.models.enums import SecurityEventType
 from app.schemas.settings import AppSettings, SettingsPatch
+from app.services.security_events import record_event
 
 log = logging.getLogger(__name__)
 
@@ -30,9 +33,16 @@ class SettingsService:
             self._cached = await self._load(db)
         return self._cached
 
-    async def update(self, db: AsyncSession, patch: SettingsPatch) -> AppSettings:
+    async def update(
+        self,
+        db: AsyncSession,
+        patch: SettingsPatch,
+        *,
+        actor_user_id: uuid.UUID | None = None,
+        ip: str | None = None,
+    ) -> AppSettings:
         """Upsert the keys present in ``patch``. Commits and invalidates the cache."""
-        changes = patch.model_dump(exclude_unset=True, exclude_none=True)
+        changes = patch.model_dump(mode="json", exclude_unset=True, exclude_none=True)
         current = await self.get(db)
         merged = AppSettings.model_validate({**current.model_dump(), **changes})
         for key, value in changes.items():
@@ -41,6 +51,14 @@ class SettingsService:
                 db.add(AppSetting(key=key, value=value))
             else:
                 row.value = value
+        if changes:
+            record_event(
+                db,
+                SecurityEventType.SETTINGS_CHANGED,
+                user_id=actor_user_id,
+                ip=ip,
+                details={"changes": changes},
+            )
         await db.commit()
         self.invalidate()
         self._cached = merged

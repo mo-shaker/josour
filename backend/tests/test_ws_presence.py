@@ -35,6 +35,7 @@ async def test_host_available_broadcasts_hosts_update_and_rest_agrees(
         "hosts": [
             {
                 "device_id": host.device_id,
+                "user_id": host.user_id,
                 "user_display_name": "Hosty",
                 "device_name": "OFFICE-PC",
                 "reachable": None,
@@ -45,9 +46,10 @@ async def test_host_available_broadcasts_hosts_update_and_rest_agrees(
     rest = await client.get(HOSTS, headers=_headers(guest))
     assert rest.json() == update["hosts"]
 
-    # ... and the host never sees its own device.
-    own = await host_ws.receive()
-    assert own == {"type": "hosts.update", "hosts": []}
+    # ... and the host never sees its own device: its list did not change, so it is not sent
+    # one (each connection is told only when its own list changes).
+    await host_ws.send({"type": "ping"})
+    assert (await host_ws.receive())["type"] == "pong"
     assert (await client.get(HOSTS, headers=_headers(host))).json() == []
 
 

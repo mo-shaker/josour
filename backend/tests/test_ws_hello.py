@@ -220,7 +220,10 @@ async def test_disconnect_clears_presence(
     actor = await make_actor("bye@example.com")
     ws = await ws_connect(actor)
     await ws.send({"type": "host.available", "available": True})
-    await ws.receive()  # hosts.update
+    # A host's own list never contains itself, so its availability sends it nothing; a ping is
+    # the barrier that proves the frame was processed.
+    await ws.send({"type": "ping"})
+    await ws.expect("pong")
     await ws.disconnect()
 
     await db.rollback()

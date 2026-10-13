@@ -300,8 +300,11 @@ def _end_reason(role: SessionRole, reason: str) -> SessionEndReason:
 
     ``guest_disconnected`` / ``host_disconnected`` name the *peer*: a client reports them when its
     tunnel died, so the rule is mirrored. ``browser_not_proxied`` and ``protocol_error`` are
-    observations either party can make."""
+    observations either party can make; ``system_proxy_failed`` is the guest's alone, since only
+    the guest points its system proxy at the tunnel (ADR-0015)."""
     value = SessionEndReason(reason)
+    if value is SessionEndReason.SYSTEM_PROXY_FAILED and role is not SessionRole.GUEST:
+        raise WsError(ErrorCode.BAD_REQUEST, "only the guest can report system_proxy_failed")
     mine = {
         SessionRole.GUEST: SessionEndReason.GUEST_ENDED,
         SessionRole.HOST: SessionEndReason.HOST_ENDED,

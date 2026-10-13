@@ -48,3 +48,11 @@ jobs:
         run: pytest -q
       - name: Docker image builds
         run: docker build -t josour-api:ci .
+      - name: The image carries the dashboard's pages
+        # A regular install only ships non-Python files listed in package-data; an editable
+        # install (what the tests above use) would hide the omission.
+        run: >-
+          docker run --rm josour-api:ci python -c
+          "import importlib.resources as r; w = r.files('app.web');
+          assert w.joinpath('templates/base.html').is_file();
+          assert w.joinpath('static/admin.css').is_file()"

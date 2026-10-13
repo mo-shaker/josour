@@ -6,7 +6,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clock import utcnow
-from app.models import ConnectionRequest, Device, Presence, Session, User
+from app.models import ConnectionRequest, Contact, Device, Presence, Session, User
 from app.models.enums import RequestStatus, SessionStatus
 from app.services.users import create_user
 
@@ -30,6 +30,11 @@ async def _make_device(db: AsyncSession, user: User, name: str) -> Device:
     return device
 
 
+async def _befriend(db: AsyncSession, a: uuid.UUID, b: uuid.UUID) -> None:
+    db.add_all([Contact(user_id=a, contact_user_id=b), Contact(user_id=b, contact_user_id=a)])
+    await db.flush()
+
+
 async def test_hosts_lists_available_and_excludes_busy(
     client: AsyncClient, auth_headers: dict, logged_in: dict[str, Any], db: AsyncSession
 ) -> None:
@@ -37,6 +42,7 @@ async def test_hosts_lists_available_and_excludes_busy(
         db, email="host@example.com", password="pw-12345678", display_name="Hosty"
     )
     host_device = await _make_device(db, host_user, "OFFICE-PC")
+    await _befriend(db, uuid.UUID(logged_in["user"]["id"]), host_user.id)
     db.add(
         Presence(device_id=host_device.id, connected=True, is_available_host=True, reachable=True)
     )
@@ -44,6 +50,7 @@ async def test_hosts_lists_available_and_excludes_busy(
         db, email="idle@example.com", password="pw-12345678", display_name="Idle"
     )
     idle_device = await _make_device(db, idle_user, "IDLE-PC")
+    await _befriend(db, uuid.UUID(logged_in["user"]["id"]), idle_user.id)
     db.add(Presence(device_id=idle_device.id, connected=True, is_available_host=False))
     await db.commit()
 
@@ -51,6 +58,7 @@ async def test_hosts_lists_available_and_excludes_busy(
     assert response.json() == [
         {
             "device_id": str(host_device.id),
+            "user_id": str(host_user.id),
             "user_display_name": "Hosty",
             "device_name": "OFFICE-PC",
             "reachable": True,
@@ -88,3 +96,21 @@ async def test_hosts_lists_available_and_excludes_busy(
     session.end_reason = "guest_ended"
     await db.commit()
     assert len((await client.get(HOSTS, headers=auth_headers)).json()) == 1
+
+
+async def test_hosts_only_lists_contacts(
+    client: AsyncClient, auth_headers: dict, logged_in: dict[str, Any], db: AsyncSession
+) -> None:
+    """ADR-0014: an available host is invisible to anyone who is not its contact."""
+    stranger = await create_user(
+        db, email="stranger@example.com", password="pw-12345678", display_name="Stranger"
+    )
+    device = await _make_device(db, stranger, "STRANGER-PC")
+    db.add(Presence(device_id=device.id, connected=True, is_available_host=True))
+    await db.commit()
+    assert (await client.get(HOSTS, headers=auth_headers)).json() == []
+
+    await _befriend(db, uuid.UUID(logged_in["user"]["id"]), stranger.id)
+    await db.commit()
+    listed = (await client.get(HOSTS, headers=auth_headers)).json()
+    assert [h["device_id"] for h in listed] == [str(device.id)]

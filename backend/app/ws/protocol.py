@@ -49,6 +49,10 @@ class CloseCode(enum.IntEnum):
     code for it, so the standard "going away" is used."""
     INTERNAL_ERROR = 1011
     """The handshake itself failed unexpectedly; also not named by the contract."""
+    UPGRADE_REQUIRED = 4426
+    """The client is older than the ``min_client_version`` setting. Sent after an ``error``
+    frame with code ``upgrade_required``; an old client that does not know the code reconnects
+    with backoff and is refused the same way, which is noisy but never wrong."""
 
 
 class ErrorCode(enum.StrEnum):
@@ -63,6 +67,14 @@ class ErrorCode(enum.StrEnum):
     FORBIDDEN = "forbidden"
     RATE_LIMITED = "rate_limited"
     INTERNAL = "internal"
+    NOT_CONTACT = "not_contact"
+    """The two users are not contacts (ADR-0014): only contacts can request or offer."""
+    GUEST_UNAVAILABLE = "guest_unavailable"
+    """An offer's guest has no connected device that can take it right now."""
+    TRUST_REVOKED = "trust_revoked"
+    """``request.accept {auto: true}`` arrived after the host withdrew the trust it relied on.
+    The request stays pending, so the host can still answer it by hand."""
+    UPGRADE_REQUIRED = "upgrade_required"
 
 
 class WsError(Exception):
@@ -168,12 +180,43 @@ class _ClientFrame(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
+class Capability(enum.StrEnum):
+    """What a client declares it understands in ``hello.capabilities``.
+
+    The server only sends a client what it said it can handle, and an old client that declares
+    nothing keeps today's behaviour - which is what lets one server serve both during an
+    upgrade."""
+
+    CONTACTS = "contacts"
+    """Understands ``contacts.changed`` / ``contacts.presence`` / ``host.state``."""
+    OFFERS = "offers"
+    """Can be rung by ``offer.incoming``; a device without it is never offered a connection."""
+    TRUST_V2 = "trust_v2"
+    """Bases ``request.accept {auto: true}`` on the server-held trust (``request.incoming
+    .trusted``), so the server re-checks the grant instead of taking the host's word for it."""
+    SYSTEM_PROXY = "system_proxy"
+    """Routes the guest's traffic through the system proxy rather than a work browser."""
+
+
+SERVER_FEATURES: tuple[str, ...] = ("contacts", "offers", "trust_v2", "registration")
+"""``hello.ack.features``: what this server implements, so a newer client can tell an older
+server apart without guessing from errors."""
+
+
+def _capabilities(value: list[str]) -> list[str]:
+    if len(value) > 32 or any(len(item) > 32 for item in value):
+        raise ValueError("at most 32 capabilities of at most 32 characters each")
+    return value
+
+
 class Hello(_ClientFrame):
     type: Literal["hello"]
     token: str
     device_id: uuid.UUID
     app_version: str | None = None
     diagnostics: dict[str, Any] | None = None
+    capabilities: Annotated[list[str], AfterValidator(_capabilities)] = Field(default_factory=list)
+    """Unknown names are kept and ignored, so a newer client never breaks an older server."""
 
 
 class HostAvailable(_ClientFrame):
@@ -211,6 +254,35 @@ class RequestReject(_ClientFrame):
     type: Literal["request.reject"]
     ref: str
     request_id: uuid.UUID
+
+
+class OfferCreate(_ClientFrame):
+    """From a host's device: "do you want to use my connection?" to a contact (ADR-0014)."""
+
+    type: Literal["offer.create"]
+    ref: str
+    guest_user_id: uuid.UUID
+    duration_min: int
+
+
+class OfferCancel(_ClientFrame):
+    type: Literal["offer.cancel"]
+    ref: str
+    offer_id: uuid.UUID
+
+
+class OfferAccept(_ClientFrame):
+    """From one of the guest's devices; that device becomes the session's guest device."""
+
+    type: Literal["offer.accept"]
+    ref: str
+    offer_id: uuid.UUID
+
+
+class OfferReject(_ClientFrame):
+    type: Literal["offer.reject"]
+    ref: str
+    offer_id: uuid.UUID
 
 
 class SessionEndpoint(_ClientFrame):
@@ -255,6 +327,7 @@ type ClientEndReason = Literal[
     "protocol_error",
     "guest_disconnected",
     "host_disconnected",
+    "system_proxy_failed",
 ]
 """The subset of the section 5 end reasons a client may ask for.
 
@@ -289,6 +362,10 @@ type ClientMessage = Annotated[
     | RequestCancel
     | RequestAccept
     | RequestReject
+    | OfferCreate
+    | OfferCancel
+    | OfferAccept
+    | OfferReject
     | SessionEndpoint
     | SessionConnected
     | SessionConnectFailed
@@ -330,13 +407,47 @@ class HelloAck(ServerMessage):
     public_ip: str
     settings: ServerSettings
     allowlist_version: int
+    features: list[str] = Field(default_factory=lambda: list(SERVER_FEATURES))
 
 
 class HostEntry(BaseModel):
     device_id: uuid.UUID
+    user_id: uuid.UUID
+    """The contact the device belongs to, so a client can group a contact's devices."""
     user_display_name: str
     device_name: str
     reachable: bool | None
+
+
+class HostState(ServerMessage):
+    """To a device itself, after ``host.available`` and after each reachability probe: what the
+    server has recorded about it. A host never appears in its own host list, so without this it
+    could not tell that its availability was taken."""
+
+    type: Literal["host.state"] = "host.state"
+    available: bool
+    reachable: bool | None
+
+
+class ContactsChanged(ServerMessage):
+    """Contacts, invitations or trust changed for this user: re-read ``GET /contacts`` and
+    ``GET /contacts/invites``. Carries nothing itself, so it can never disagree with REST."""
+
+    type: Literal["contacts.changed"] = "contacts.changed"
+
+
+class ContactPresenceEntry(BaseModel):
+    user_id: uuid.UUID
+    online: bool
+
+
+class ContactsPresence(ServerMessage):
+    """Which contacts have at least one device connected. ``full`` after ``hello`` (every
+    contact), otherwise a delta naming only the contacts whose state changed."""
+
+    type: Literal["contacts.presence"] = "contacts.presence"
+    full: bool
+    contacts: list[ContactPresenceEntry]
 
 
 class HostsSnapshot(ServerMessage):
@@ -369,6 +480,10 @@ class RequestIncoming(ServerMessage):
     duration_min: int
     allowlist_version: int
     expires_at: UtcTime
+    trusted: bool = False
+    """The host has told the server this contact may use the connection without asking
+    (ADR-0014). A ``trust_v2`` host answers ``request.accept {auto: true}`` without a prompt,
+    and the server checks the grant again when that answer arrives."""
 
 
 class RequestResult(ServerMessage):
@@ -377,6 +492,49 @@ class RequestResult(ServerMessage):
     accepted: bool
     reason: str | None = None
     session_id: uuid.UUID | None = None
+
+
+class OfferCreated(ServerMessage):
+    """To the offering host device: the offer is ringing the guest's devices."""
+
+    type: Literal["offer.created"] = "offer.created"
+    ref: str
+    offer_id: uuid.UUID
+    expires_at: UtcTime
+
+
+class OfferIncoming(ServerMessage):
+    """To every connected ``offers``-capable device of the guest."""
+
+    type: Literal["offer.incoming"] = "offer.incoming"
+    offer_id: uuid.UUID
+    host_user_id: uuid.UUID
+    host_device_id: uuid.UUID
+    host_name: str
+    host_device: str
+    duration_min: int
+    allowlist_version: int
+    expires_at: UtcTime
+
+
+class OfferResult(ServerMessage):
+    """To the offering host device: how the offer ended."""
+
+    type: Literal["offer.result"] = "offer.result"
+    offer_id: uuid.UUID
+    accepted: bool
+    reason: str | None = None
+    """``rejected``, ``cancelled``, ``expired``, ``guest_unavailable`` or ``contact_removed``."""
+    session_id: uuid.UUID | None = None
+
+
+class OfferClosed(ServerMessage):
+    """To the guest's devices: stop showing this offer. ``accepted_elsewhere`` when another of
+    the guest's devices took it."""
+
+    type: Literal["offer.closed"] = "offer.closed"
+    offer_id: uuid.UUID
+    reason: str
 
 
 class RequestExpired(ServerMessage):
@@ -417,6 +575,9 @@ class SessionCreated(ServerMessage):
     same_public_ip: bool
     peer: Peer
     relay: Relay | None = None
+    initiator: Literal["guest", "host"] = "guest"
+    """Who started it: the guest asking (``request.create``) or the host offering
+    (``offer.create``)."""
 
 
 class SessionPeerEndpoint(ServerMessage):

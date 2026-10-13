@@ -48,22 +48,30 @@ class AdminUserCreate(BaseModel):
 
 
 class AdminUserPatch(BaseModel):
-    """``{ is_active?, password?, display_name?, unlock?: true }``; unknown keys rejected."""
+    """``{ is_active?, password?, display_name?, email?, role?, unlock?: true }``; unknown keys
+    rejected."""
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={"examples": [{"unlock": True}, {"is_active": False}]},
+        json_schema_extra={"examples": [{"unlock": True}, {"is_active": False}, {"role": "admin"}]},
     )
 
     is_active: bool | None = None
     password: str | None = Field(None, min_length=8, max_length=1024)
     display_name: str | None = Field(None, min_length=1, max_length=100)
+    email: str | None = Field(None, min_length=3, max_length=320)
+    role: UserRole | None = None
     unlock: bool | None = None
 
     @field_validator("display_name")
     @classmethod
     def _name(cls, value: str | None) -> str | None:
         return None if value is None else _strip_non_empty(value)
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, value: str | None) -> str | None:
+        return None if value is None else normalise_email_address(value)
 
 
 class AdminUserOut(UserOut):
@@ -81,6 +89,12 @@ class AdminUserOut(UserOut):
                     "failed_logins": 0,
                     "locked_until": None,
                     "created_at": "2026-08-30T07:02:10.000Z",
+                    "state": "active",
+                    "approval_status": "approved",
+                    "registered_via": "admin",
+                    "approved_at": "2026-08-30T07:02:10.000Z",
+                    "deleted_at": None,
+                    "last_login_at": "2026-09-05T09:14:22.000Z",
                 }
             ]
         }
@@ -90,6 +104,13 @@ class AdminUserOut(UserOut):
     failed_logins: int
     locked_until: UtcDatetime | None
     created_at: UtcDatetime
+    state: str
+    """``active``, ``disabled``, ``pending``, ``rejected`` or ``deleted``."""
+    approval_status: str
+    registered_via: str
+    approved_at: UtcDatetime | None
+    deleted_at: UtcDatetime | None
+    last_login_at: UtcDatetime | None
 
 
 class AdminDeviceOut(ApiModel):

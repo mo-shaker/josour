@@ -16,6 +16,10 @@ DEFAULTS = {
     # asks it to, because the product exists to reach sites nobody listed in advance.
     "enforce_allowlist": False,
     "allowed_ports": [80, 443],
+    # ADR-0017: anyone may register, an administrator lets them in.
+    "registration_mode": "approval",
+    "min_client_version": "",
+    "invite_ttl_days": 30,
 }
 
 

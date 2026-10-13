@@ -69,7 +69,7 @@ async def list_for_user(db: AsyncSession, user_id: uuid.UUID, *, limit: int) -> 
         .where((Session.guest_user_id == user_id) | (Session.host_user_id == user_id))
         .limit(limit)
     )
-    rows: Sequence[SessionRow] = (await db.execute(stmt)).tuples().all()  # type: ignore[assignment]
+    rows: Sequence[SessionRow] = (await db.execute(stmt)).all()  # type: ignore[assignment]
     out: list[MySessionOut] = []
     for session, guest_name, guest_device, host_name, host_device in rows:
         is_guest = session.guest_user_id == user_id
@@ -97,7 +97,7 @@ async def list_all(
     stmt = _rows_query().limit(limit)
     if status is not None:
         stmt = stmt.where(Session.status == status)
-    rows: Sequence[SessionRow] = (await db.execute(stmt)).tuples().all()  # type: ignore[assignment]
+    rows: Sequence[SessionRow] = (await db.execute(stmt)).all()  # type: ignore[assignment]
     return [
         AdminSessionOut(
             id=s.id,
@@ -232,6 +232,7 @@ async def admin_terminate(
     admin_user_id: uuid.UUID | None,
     admin_device_id: uuid.UUID | None,
     ip: str | None,
+    via: str | None = None,
 ) -> SessionEnded:
     """Central session termination: ``POST /admin/sessions/{id}/terminate`` and the
     ``end-session`` CLI command. 404 unknown, 409 already ended.
@@ -251,7 +252,7 @@ async def admin_terminate(
         device_id=admin_device_id,
         ip=ip,
         details={
-            "via": "api" if admin_user_id is not None else "cli",
+            "via": via or ("api" if admin_user_id is not None else "cli"),
             "session_id": str(session.id),
             "guest_user_id": str(session.guest_user_id),
             "host_user_id": str(session.host_user_id),
@@ -261,9 +262,15 @@ async def admin_terminate(
 
 
 async def list_security_events(
-    db: AsyncSession, *, event_type: str | None = None, limit: int = 100
+    db: AsyncSession,
+    *,
+    event_type: str | None = None,
+    user_id: uuid.UUID | None = None,
+    limit: int = 100,
 ) -> list[SecurityEvent]:
     stmt = select(SecurityEvent).order_by(SecurityEvent.created_at.desc(), SecurityEvent.id)
     if event_type:
         stmt = stmt.where(SecurityEvent.type == event_type)
+    if user_id is not None:
+        stmt = stmt.where(SecurityEvent.user_id == user_id)
     return list(await db.scalars(stmt.limit(limit)))

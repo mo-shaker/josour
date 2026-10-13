@@ -22,6 +22,12 @@ USER_KEYS = {
     "failed_logins",
     "locked_until",
     "created_at",
+    "state",
+    "approval_status",
+    "registered_via",
+    "approved_at",
+    "deleted_at",
+    "last_login_at",
 }
 
 
@@ -161,7 +167,7 @@ async def test_patch_display_name_and_unknown_user(
     )
     assert unknown.status_code == 404 and unknown.json()["error"]["code"] == "not_found"
 
-    extra = await client.patch(f"{USERS}/{user.id}", json={"role": "admin"}, headers=admin_headers)
+    extra = await client.patch(f"{USERS}/{user.id}", json={"owner": "x"}, headers=admin_headers)
     assert extra.status_code == 422
     short = await client.patch(
         f"{USERS}/{user.id}", json={"password": "short"}, headers=admin_headers

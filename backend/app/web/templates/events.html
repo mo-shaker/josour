@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ t("events.title") }}</h1>
+<form method="get" action="/admin/events" class="row">
+  <select name="type">
+    <option value="">{{ t("state.all") }}</option>
+    {% for ty in types %}<option value="{{ ty }}" {% if ty == event_type %}selected{% endif %}>{{ ty }}</option>{% endfor %}
+  </select>
+  <button type="submit">{{ t("users.filter") }}</button>
+</form>
+{% include "_events_table.html" %}
+{% endblock %}

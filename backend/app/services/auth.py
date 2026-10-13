@@ -18,7 +18,7 @@ from app.core.security import (
     verify_password_async,
 )
 from app.models import Device, User
-from app.models.enums import DeviceStatus, SecurityEventType
+from app.models.enums import ApprovalStatus, DeviceStatus, SecurityEventType
 from app.schemas.auth import DeviceAuthOut, DeviceLogin, LoginRequest, TokenResponse, UserOut
 from app.services.security_events import record_event
 from app.services.tokens import issue_refresh_token
@@ -116,20 +116,27 @@ async def _resolve_device(
     return device, None
 
 
-async def login(
-    db: AsyncSession, settings: Settings, payload: LoginRequest, ip: str | None
-) -> TokenResponse:
+async def authenticate_password(
+    db: AsyncSession, email: str, password: str, ip: str | None, *, channel: str = "app"
+) -> User:
+    """Check an email and password: lockout, failure counting and the audit trail.
+
+    Shared by the desktop sign-in and the web dashboard, so the two cannot drift apart and the
+    lockout counts failures from both. Raises the documented error, after committing its audit
+    row; returns the user only for a correct password on an account that may sign in.
+
+    The approval states are checked **after** the password: ``account_pending`` and
+    ``account_rejected`` are only ever said to somebody who already knows the password, so they
+    cannot be used to find out which addresses have registered."""
     now = utcnow()
-    user = await get_user_by_email(db, payload.email)
+    user = await get_user_by_email(db, email)
     if user is None:
         # Equalise timing with a real verify, and off the loop like the real one.
-        await verify_password_async(None, payload.password)
-        record_event(
-            db,
-            SecurityEventType.LOGIN_FAILED,
-            ip=ip,
-            details={"reason": "unknown_user", "email": payload.email},
-        )
+        await verify_password_async(None, password)
+        details = {"reason": "unknown_user", "email": email}
+        if channel != "app":
+            details["channel"] = channel
+        record_event(db, SecurityEventType.LOGIN_FAILED, ip=ip, details=details)
         await db.commit()
         raise ApiError(401, "invalid_credentials", "Invalid email or password")
 
@@ -148,7 +155,7 @@ async def login(
         user.locked_until = None
         user.failed_logins = 0
 
-    if not await verify_password_async(user.password_hash, payload.password):
+    if not await verify_password_async(user.password_hash, password):
         user.failed_logins += 1
         if user.failed_logins >= MAX_FAILED_LOGINS:
             user.locked_until = now + LOCKOUT_DURATION
@@ -171,6 +178,26 @@ async def login(
             error=ApiError(401, "invalid_credentials", "Invalid email or password"),
         )
 
+    if user.approval_status == ApprovalStatus.PENDING:
+        raise await _fail(
+            db,
+            SecurityEventType.LOGIN_FAILED,
+            user=user,
+            device=None,
+            ip=ip,
+            reason="account_pending",
+            error=ApiError(403, "account_pending", "Account is waiting for approval"),
+        )
+    if user.approval_status == ApprovalStatus.REJECTED:
+        raise await _fail(
+            db,
+            SecurityEventType.LOGIN_FAILED,
+            user=user,
+            device=None,
+            ip=ip,
+            reason="account_rejected",
+            error=ApiError(403, "account_rejected", "Account registration was not approved"),
+        )
     if not user.is_active:
         raise await _fail(
             db,
@@ -181,17 +208,32 @@ async def login(
             reason="account_disabled",
             error=ApiError(403, "account_disabled", "Account is disabled"),
         )
+    return user
 
-    device, device_secret = await _resolve_device(db, user, payload.device, ip)
 
+async def mark_signed_in(user: User, password: str) -> None:
+    """After every other check of a sign-in has passed: clear the failure counter, record the
+    time and upgrade the password hash if its parameters are outdated. Separate from
+    :func:`authenticate_password` so a sign-in that fails later (a wrong device secret) does not
+    reset the lockout counter."""
     user.failed_logins = 0
     user.locked_until = None
+    user.last_login_at = utcnow()
     if password_needs_rehash(user.password_hash):
-        user.password_hash = await hash_password_async(payload.password)
+        user.password_hash = await hash_password_async(password)
+
+
+async def login(
+    db: AsyncSession, settings: Settings, payload: LoginRequest, ip: str | None
+) -> TokenResponse:
+    user = await authenticate_password(db, payload.email, payload.password, ip)
+    device, device_secret = await _resolve_device(db, user, payload.device, ip)
+    await mark_signed_in(user, payload.password)
+
     device.name = payload.device.name
     device.os_version = payload.device.os_version
     device.os_build = payload.device.os_build
-    device.last_seen_at = now
+    device.last_seen_at = utcnow()
 
     refresh_token = await issue_refresh_token(db, settings, user.id, device.id)
     record_event(
