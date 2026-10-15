@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using Josour.Core.Browser;
@@ -125,10 +126,19 @@ public class MacOwnerCheckIntegrationTests
 {
     private sealed class OwnsNothing : IBrowserSession
     {
+        private readonly ConcurrentQueue<int> _asked = new();
+
         public bool IsRunning => true;
 
+        /// <summary>Every pid the proxy asked about: one means the checker identified the owner of that connection.</summary>
+        public IReadOnlyList<int> Asked => _asked.ToArray();
+
         /// <summary>The shape of the real question: this pid is not in the browser's process tree.</summary>
-        public bool OwnsProcess(int pid) => false;
+        public bool OwnsProcess(int pid)
+        {
+            _asked.Enqueue(pid);
+            return false;
+        }
 
         public Task<BrowserLaunchResult> LaunchAsync(BrowserLaunchOptions options, CancellationToken ct)
             => Task.FromResult(new BrowserLaunchResult(true, null, null));
@@ -150,17 +160,8 @@ public class MacOwnerCheckIntegrationTests
         await client.ConnectAsync(new IPEndPoint(IPAddress.Loopback, proxy.Port));
 
         // The proxy identifies the owner (this test), asks the browser whether it is one of its own, is told no,
-        // and drops it. Whether that arrives as an orderly close or a reset is the kernel's business and varies;
-        // what must be true is that nothing was served.
-        try
-        {
-            var read = await client.ReceiveAsync(new byte[1], SocketFlags.None);
-            Assert.Equal(0, read);
-        }
-        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.ConnectionReset)
-        {
-            // Also a refusal.
-        }
+        // and drops it.
+        await AssertRefusedAsync(client);
 
         Assert.Equal(1, proxy.Counters.RejectedByOwner);
         Assert.Equal(0, proxy.Counters.Tunneled);
@@ -170,16 +171,34 @@ public class MacOwnerCheckIntegrationTests
     public async Task The_owner_is_identified_at_all_which_is_what_makes_the_refusal_a_decision()
     {
         // A refusal that happened because nothing could be identified would be indistinguishable from this one,
-        // and would mean the control was not working rather than working. So: the checker names this process.
+        // and would mean the control was not working rather than working. So: the proxy's own lookup named this
+        // process, and the browser was asked about it. (A second lookup from here would race the refusal: once the
+        // proxy has reset the connection it is no longer ESTABLISHED, and lsof rightly finds nothing.)
+        var browser = new OwnsNothing();
         await using var proxy = Proxies.Start(
-            browser: new OwnsNothing(), checker: MacOwnerPidChecker.Instance, rejectUnknown: true);
+            browser: browser, checker: MacOwnerPidChecker.Instance, rejectUnknown: true);
 
         using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         await client.ConnectAsync(new IPEndPoint(IPAddress.Loopback, proxy.Port));
+        await AssertRefusedAsync(client);
 
-        var owner = MacOwnerPidChecker.Instance.GetOwnerPid(
-            (IPEndPoint)client.LocalEndPoint!, new IPEndPoint(IPAddress.Loopback, proxy.Port));
+        Assert.Equal(Environment.ProcessId, Assert.Single(browser.Asked));
+    }
 
-        Assert.Equal(Environment.ProcessId, owner);
+    /// <summary>
+    /// Waits for the proxy to drop the connection. Whether that arrives as an orderly close or a reset is the
+    /// kernel's business and varies; what must be true is that nothing was served.
+    /// </summary>
+    private static async Task AssertRefusedAsync(Socket client)
+    {
+        try
+        {
+            var read = await client.ReceiveAsync(new byte[1], SocketFlags.None);
+            Assert.Equal(0, read);
+        }
+        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.ConnectionReset)
+        {
+            // Also a refusal.
+        }
     }
 }

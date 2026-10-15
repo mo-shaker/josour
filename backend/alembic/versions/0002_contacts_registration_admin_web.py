@@ -153,9 +153,7 @@ def upgrade() -> None:
     op.add_column("users", sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True))
     op.add_column("users", sa.Column("last_login_at", sa.DateTime(timezone=True), nullable=True))
     op.add_column("users", sa.Column("totp_secret", sa.String(length=64), nullable=True))
-    op.add_column(
-        "users", sa.Column("totp_enabled_at", sa.DateTime(timezone=True), nullable=True)
-    )
+    op.add_column("users", sa.Column("totp_enabled_at", sa.DateTime(timezone=True), nullable=True))
     op.add_column("users", sa.Column("totp_last_step", sa.Integer(), nullable=True))
     op.create_index(
         "ix_users_approval_status_created_at",

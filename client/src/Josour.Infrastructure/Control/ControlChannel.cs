@@ -67,6 +67,9 @@ public sealed class ControlChannel : IControlChannel, IReconnectNow
     private CancellationTokenSource _wake = new();
     private CancellationTokenSource? _lifetime;
     private ClientWebSocket? _socket;
+
+    /// <summary>The wake token that was current when <see cref="_socket"/> began opening: a wake since then pings it at once.</summary>
+    private CancellationToken _socketWake;
     private Task? _supervisor;
     private Task? _dispatchLoop;
     private Channel<ControlMessage>? _dispatch;
@@ -188,8 +191,7 @@ public sealed class ControlChannel : IControlChannel, IReconnectNow
                 }
             }
 
-            LastHelloAck = ack;
-            SetState(ControlChannelState.Connected);
+            // OpenAsync has already stored the ack and reported Connected.
             _supervisor = Task.Run(() => SuperviseAsync(lifetime.Token), CancellationToken.None);
             return ack;
         }
@@ -306,6 +308,7 @@ public sealed class ControlChannel : IControlChannel, IReconnectNow
         while (true)
         {
             ct.ThrowIfCancellationRequested();
+            var wake = CurrentWakeToken();
             ClientWebSocket? socket = null;
             try
             {
@@ -331,6 +334,7 @@ public sealed class ControlChannel : IControlChannel, IReconnectNow
                 lock (_gate)
                 {
                     _socket = opened;
+                    _socketWake = wake;
                     _token = token;
                 }
 
@@ -344,6 +348,10 @@ public sealed class ControlChannel : IControlChannel, IReconnectNow
                     ack.Settings.MaxSessionMinutes,
                     ack.Settings.RequestTimeoutSeconds,
                     ack.AllowlistVersion);
+
+                // Connected before hello.ack is raised, on the first connect and on every reconnect: a handler that reacts
+                // to the ack by sending (SendAsync needs Connected) must not find the channel still Connecting/Reconnecting.
+                SetState(ControlChannelState.Connected);
                 Publish(ack);
                 return ack;
             }
@@ -511,7 +519,7 @@ public sealed class ControlChannel : IControlChannel, IReconnectNow
                     return;
                 }
 
-                SetState(ControlChannelState.Connected);
+                // OpenAsync reported Connected before raising the new hello.ack.
                 await ReannounceAsync(ct).ConfigureAwait(false);
             }
         }
@@ -533,7 +541,13 @@ public sealed class ControlChannel : IControlChannel, IReconnectNow
     {
         using var connection = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var dead = new StrongBox<bool>(false);
-        var heartbeat = Task.Run(() => HeartbeatAsync(socket, connection, dead), CancellationToken.None);
+        CancellationToken wake;
+        lock (_gate)
+        {
+            wake = _socketWake;
+        }
+
+        var heartbeat = Task.Run(() => HeartbeatAsync(socket, wake, connection, dead), CancellationToken.None);
         try
         {
             while (true)
@@ -589,7 +603,8 @@ public sealed class ControlChannel : IControlChannel, IReconnectNow
         }
     }
 
-    private async Task HeartbeatAsync(ClientWebSocket socket, CancellationTokenSource connection, StrongBox<bool> dead)
+    /// <param name="wake">The wake token current when <paramref name="socket"/> began opening (see <see cref="_socketWake"/>).</param>
+    private async Task HeartbeatAsync(ClientWebSocket socket, CancellationToken wake, CancellationTokenSource connection, StrongBox<bool> dead)
     {
         var ct = connection.Token;
         try
@@ -597,8 +612,10 @@ public sealed class ControlChannel : IControlChannel, IReconnectNow
             while (!ct.IsCancellationRequested)
             {
                 // A wake (resume / network change) ends the wait early: ping now, so a socket that did not survive the
-                // sleep fails here instead of at the end of the interval.
-                using (var wait = CancellationTokenSource.CreateLinkedTokenSource(ct, CurrentWakeToken()))
+                // sleep fails here instead of at the end of the interval. Each wait links to the token taken when the
+                // previous one ended (the first, to the one taken when the socket began opening), so a wake that lands
+                // before the wait starts still cuts it short instead of going to a token nobody listens to any more.
+                using (var wait = CancellationTokenSource.CreateLinkedTokenSource(ct, wake))
                 {
                     try
                     {
@@ -609,6 +626,8 @@ public sealed class ControlChannel : IControlChannel, IReconnectNow
                         _logger.LogDebug("Heart-beat woken early: sending ping now");
                     }
                 }
+
+                wake = CurrentWakeToken();
 
                 if (ct.IsCancellationRequested)
                 {

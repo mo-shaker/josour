@@ -25,7 +25,10 @@ jobs:
       - name: Test
         run: dotnet test Josour.sln --no-build -c Release --filter "Category!=Benchmark" --logger "trx;LogFileName=results.trx"
 
+      # Throughput and timing on a shared runner: the numbers are for reading, so a missed criterion warns rather than
+      # failing the job (and skipping the QA artifact below).
       - name: Mux benchmarks (informational, ADR-0006 criteria)
+        continue-on-error: true
         run: dotnet test tests/Josour.Tunnel.Tests --no-build -c Release --filter "Category=Benchmark" --logger "console;verbosity=detailed"
       # The app multi-targets (ADR-0013), so publish names the framework: the Windows one, which is the build
       # that carries the toast notifications.

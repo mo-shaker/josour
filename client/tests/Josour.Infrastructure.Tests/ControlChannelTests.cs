@@ -306,6 +306,29 @@ public sealed class ControlChannelTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => pending);
     }
 
+    [Fact]
+    public async Task HelloAck_ReachesItsHandlersWithTheChannelAlreadyConnected()
+    {
+        // A handler that answers hello.ack on the channel (SendAsync needs Connected) must not find it still Connecting or
+        // Reconnecting, on the first connect or after a reconnect: the state changes before the ack is raised, not after.
+        await using var h = await Harness.StartAsync(connect: false);
+        var seen = System.Threading.Channels.Channel.CreateUnbounded<ControlChannelState>();
+        h.Channel.MessageReceived += message =>
+        {
+            if (message is HelloAckMessage)
+            {
+                seen.Writer.TryWrite(h.Channel.State);
+            }
+        };
+
+        await h.Channel.ConnectAsync("at-1", DeviceId, null, None);
+        var first = await h.Server.NextConnectionAsync();
+        Assert.Equal(ControlChannelState.Connected, await seen.Reader.ReadAsync().AsTask().WaitAsync(Timeout));
+
+        first.Drop();
+        Assert.Equal(ControlChannelState.Connected, await seen.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+    }
+
     // ---------- close codes ----------
 
     [Fact]
