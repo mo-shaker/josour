@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S3: WebRTC STUN</title>
+<style>
+  body { margin: 0; font: 16px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif; color: #1d1d1f; background: #fff; }
+  main { padding: 16px 24px 24px; max-width: 760px; }
+  pre { font: 12px ui-monospace, Menlo, Consolas, monospace; background: #f5f5f7; padding: 8px; white-space: pre-wrap; }
+  #verdict { font-weight: 600; }
+  .leak { color: #b42318; }
+  .clean { color: #1a7f37; }
+</style>
+</head>
+<body>
+<main>
+  <h1>S3 &middot; WebRTC / STUN</h1>
+  <p>STUN runs over UDP, which the system proxy does not carry. Run this once with the proxy off (a baseline, where a
+  <b>srflx</b> candidate is normal) and once while the spike holds the proxy on. A srflx candidate while the proxy is
+  on means the browser reached the STUN server directly and the page learned this computer's own public address:
+  the leak ADR-0015 lists as not covered.</p>
+  <p>STUN server: <input id="stun" value="stun:stun.l.google.com:19302" size="34"> <button id="go">Run</button></p>
+  <p id="verdict"></p>
+  <pre id="out"></pre>
+  <p><a href="/">Back to the poller</a></p>
+</main>
+<script>
+document.getElementById('go').onclick = function () {
+  var out = document.getElementById('out');
+  var verdict = document.getElementById('verdict');
+  out.textContent = '';
+  verdict.className = '';
+  verdict.textContent = 'Gathering candidates...';
+  var types = {}, publicAddresses = {}, done = false, pc;
+  try {
+    pc = new RTCPeerConnection({ iceServers: [{ urls: document.getElementById('stun').value }] });
+  } catch (e) {
+    verdict.textContent = 'RTCPeerConnection is not available here: ' + e;
+    return;
+  }
+  function finish() {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
+    pc.close();
+    var found = Object.keys(publicAddresses);
+    if (found.length) {
+      verdict.className = 'leak';
+      verdict.textContent = 'srflx candidate: STUN went out directly. Public address the page saw: ' + found.join(', ');
+    } else {
+      verdict.className = 'clean';
+      verdict.textContent = 'No srflx candidate: STUN did not get out. Candidate types seen: ' + JSON.stringify(types);
+    }
+  }
+  var timer = setTimeout(finish, 8000);
+  pc.onicecandidate = function (e) {
+    if (!e.candidate) { finish(); return; }
+    var line = e.candidate.candidate;
+    if (!line) return;
+    out.textContent += line + '\n';
+    var m = / typ (\w+)/.exec(line);
+    var type = m ? m[1] : '?';
+    types[type] = (types[type] || 0) + 1;
+    if (type === 'srflx') publicAddresses[line.split(' ')[4]] = true;
+  };
+  pc.createDataChannel('josour-spike');
+  pc.createOffer()
+    .then(function (offer) { return pc.setLocalDescription(offer); })
+    .catch(function (e) { verdict.textContent = 'createOffer failed: ' + e; });
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Josour proxy poller</title>
+<style>
+  body { margin: 0; font: 16px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif; color: #1d1d1f; background: #fff; }
+  #banner { padding: 28px 24px; color: #fff; background: #6e6e73; }
+  #banner.on { background: #1a7f37; }
+  #banner.off { background: #b42318; }
+  #state { font-size: 28px; font-weight: 600; }
+  main { padding: 8px 24px 24px; max-width: 760px; }
+  code { background: #f2f2f2; padding: 1px 4px; border-radius: 3px; }
+  #log { font: 13px ui-monospace, Menlo, Consolas, monospace; }
+</style>
+</head>
+<body>
+<div id="banner"><div id="state">Starting&hellip;</div><div id="who"></div></div>
+<main>
+  <p>Keep this tab open and <b>visible</b>, side by side with the other browsers, while the spike runs. Twice a second
+  it asks for <code>http://check.josour/ping</code>. That name does not exist, so the request only succeeds when this
+  browser hands it to the system proxy, which during the spike is the dummy listener. Green means "going through the
+  system proxy"; red means "not".</p>
+  <p>The spike script times when each browser turns green after the apply and red after the restore. To give this
+  browser another name in the results, add <code>?b=name</code> to the address of this page.</p>
+  <p>Leak checks (S3): <a href="/webrtc">WebRTC / STUN</a> &middot; <a href="/dns">DNS prefetch</a></p>
+  <ol id="log"></ol>
+</main>
+<script>
+(function () {
+  var ua = navigator.userAgent;
+  var name = /Edg\//.test(ua) ? 'edge' : /Firefox\//.test(ua) ? 'firefox' : /Chrome\//.test(ua) ? 'chrome'
+    : /Safari\//.test(ua) ? 'safari' : 'other';
+  var m = /[?&]b=([A-Za-z0-9_.-]{1,40})/.exec(location.search);
+  if (m) name = m[1];
+  var banner = document.getElementById('banner');
+  var state = document.getElementById('state');
+  var log = document.getElementById('log');
+  document.getElementById('who').textContent = 'reporting as "' + name + '"';
+  var n = 0, last = null;
+  function show(ok) {
+    if (ok === last) return;
+    last = ok;
+    banner.className = ok ? 'on' : 'off';
+    state.textContent = ok ? 'Through the system proxy' : 'Not through the proxy';
+    var li = document.createElement('li');
+    li.textContent = new Date().toLocaleTimeString() + '  ' + (ok ? 'proxied' : 'direct or failed');
+    log.appendChild(li);
+  }
+  function tick() {
+    var img = new Image();
+    img.onload = function () { show(true); };
+    img.onerror = function () { show(false); };
+    img.src = 'http://check.josour/ping?b=' + encodeURIComponent(name) + '&n=' + (n++);
+  }
+  tick();
+  setInterval(tick, 500);
+})();
+</script>
+</body>
+</html>

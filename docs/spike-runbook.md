@@ -308,3 +308,259 @@ Added to the list in section 5 above:
 14. `--listen-port N` on the host: `reachable=true` appearing in `hosts` at the user.
 15. The device secret under DPAPI in `<state-dir>/secrets/` on Windows, and `--reset-device` re-registering after the
     device is revoked.
+
+---
+
+# The system proxy spikes S1–S3 (ADR-0015, phase 0 of the restructure)
+
+The goal: to settle how the guest app changes the operating system's proxy ([ADR-0015](decisions/0015-system-proxy-instead-of-work-browser.md))
+before any of it is built. S1 decides the macOS path (`networksetup` called directly, or a small root-installed
+helper); S2 confirms the WinINet per-user path on Windows and its Group Policy and VPN edges; S3 lists what still
+leaks around a system proxy. The tools, all in `scripts/spikes/`:
+
+| File | What it is |
+|---|---|
+| `system-proxy-macos.sh` | S1: saves, applies, reads back and restores the proxy of every enabled network service with `networksetup`, timing each call |
+| `system-proxy-windows.ps1` | S2: the same through `InternetSetOptionW` per-connection options (LAN and every dial-up/VPN connection) |
+| `dummy-listener.pl`, `pages/` | The local listener the macOS script starts (the Windows script carries the same thing in PowerShell) and the pages it serves |
+| `proxy-probe/` | A .NET 8 console that shows whether a running .NET process notices the change |
+
+## 0. Before running anything
+
+- **What changes.** Only the proxy settings: on macOS the web proxy, secure web proxy, bypass domains, auto-proxy
+  (PAC) state and auto-discovery state of each enabled network service; on Windows the connection flags, proxy server
+  and bypass list of the LAN settings and of each dial-up/VPN connection. Both scripts save the current values to a
+  snapshot file **before** the first change, restore from it at the end (also on Ctrl+C), read everything back and say
+  whether it is exactly as before. Exit code `0` means restored exactly; `2` means the restore did not match (the
+  summary says which field).
+- **While the proxy is applied, the internet is off** for every app that honours the system proxy: the dummy
+  listener on `127.0.0.1:18923` answers 502 to everything and forwards nothing anywhere. Pick a moment when a few
+  minutes offline do not matter (not during a call). Anything that keeps working during that window is going around
+  the proxy, which is exactly what S3 looks for.
+- **If a run is killed** (terminal or window closed, machine crashed), the snapshot path is printed before the apply:
+  - macOS: `scripts/spikes/system-proxy-macos.sh --restore ~/josour-spike-results/s1-macos-<stamp>/snapshot.tsv`
+  - Windows: `powershell -ExecutionPolicy Bypass -File scripts\spikes\system-proxy-windows.ps1 -RestoreFrom %USERPROFILE%\josour-spike-results\s2-windows-<stamp>\snapshot.json`
+  - By hand: macOS System Settings > Network > (service) > Details > Proxies; Windows Settings > Network & internet >
+    Proxy, and Internet Options > Connections for a VPN connection's own settings.
+- **Copy the whole `scripts/spikes` folder** to the test machine: the scripts refuse to apply when `pages/` (and on
+  macOS `dummy-listener.pl`) is not next to them.
+- **The poller.** After the script starts its listener it prints `http://127.0.0.1:18923/`. Open that in every
+  browser under test **before** pressing Enter to apply, and keep the windows visible side by side (browsers slow down
+  timers in background tabs). Each page asks twice a second for `http://check.josour/ping`, a name that does not exist:
+  red until the browser hands it to the system proxy, green while it does. The script prints
+  `+ chrome reached the listener +0.4 s after the apply finished` live, and the summary has the first and last request
+  of each browser. Add `?b=name` to the page's address to give a browser another name (two Chrome profiles, say).
+- **Firefox** must be in Settings > Network Settings > *Use system proxy settings* (the default). Turn HTTPS-Only Mode
+  off for the test, or allow `check.josour`: otherwise the poller stays red while the listener logs `firefox-https`.
+- **The .NET probe** needs the .NET 8 SDK. Start it in a second terminal before the apply and stop it after the
+  restore (section 4).
+- **Never run either script with `sudo` or from an elevated window.** The question is what the app, running as the
+  user, may do. The macOS script refuses root; the Windows script warns and records `elevated: True`.
+
+## 1. S1: macOS (`networksetup` authorisation)
+
+The matrix: macOS 14 and macOS 15 (whatever machines exist), each with an **administrator** account and a
+**standard** account.
+
+1. **Dry run** (reads only; shows the services it would touch, their current settings, and whether the port is free):
+   ```
+   scripts/spikes/system-proxy-macos.sh --dry-run
+   ```
+2. **Run 1, administrator account.** Start the probe in a second terminal (section 4), then:
+   ```
+   scripts/spikes/system-proxy-macos.sh --bypass <the Josour server host> --bypass <the relay host>
+   ```
+   (`--bypass` is optional; the default list already covers `*.local`, loopback and the private ranges.) Open the
+   poller in Safari, Chrome, Firefox and Edge, press Enter to apply, and **watch the screen**: the terminal prints
+   each `networksetup` call as it finishes, so a dialog can be tied to the call that raised it. If a dialog appears,
+   write down its exact wording and whose password it asks for (yours, or "an administrator's"). Enter the password
+   (or Cancel: that is a finding too). When asked, type how many dialogs appeared. Look at the browsers (section 3),
+   then press Enter to restore and answer the second count.
+3. **Run 2, administrator account, a long hold:**
+   ```
+   scripts/spikes/system-proxy-macos.sh --hold 400
+   ```
+   If run 1 asked only once, this shows whether the restore asks again after the authorisation has timed out. The
+   app's restore can come hours after the apply, from a guardian process or at the next login, with nobody there to
+   type a password.
+4. **Run 3, standard account.** Log in to a standard account with Fast User Switching (a dialog belongs to the
+   graphical session, so `su` in Terminal is not the same test). Copy the folder somewhere readable first, for
+   instance `cp -R scripts/spikes /Users/Shared/josour-spikes`, then repeat run 1 from there. If a dialog asks for an
+   administrator, Cancel once (to record the failure) and, on a second run, enter the administrator's credentials
+   once (to record whether it then stays silent).
+
+What each call is marked as in the summary: `silent` (under 1.5 s, no error), `slow` (1.5 s or more: in practice a
+dialog was on screen) or `failed` (a non-zero exit or an error message, quoted in full in `commands.tsv`). The files in
+`~/josour-spike-results/s1-macos-<stamp>/`: `summary.txt`, `commands.tsv`, `snapshot.tsv`, `readback-applied.txt`,
+`readback-restored.txt`, `scutil-before/applied/after.txt`, `listener.log`, `listener-hosts.txt`.
+
+Two things to note by hand if they happen: a service whose settings come back slightly different from what was set
+(the summary prints the difference, for instance how `networksetup` writes `::1` or `10.0.0.0/8`), and a restore
+that leaves `127.0.0.1` in the server field of a proxy that was empty before (`networksetup` may not accept `""` to
+clear it).
+
+## 2. S2: Windows (WinINet per-user)
+
+The matrix: Windows 10 and Windows 11, each with a **standard** account and a non-elevated **administrator**
+account, plus the Group Policy and VPN cases on one test machine. Use Windows PowerShell 5.1 (`powershell`), which
+every Windows has.
+
+1. **Dry run** (reads the settings of every connection and the proxy policies; changes nothing):
+   ```
+   powershell -ExecutionPolicy Bypass -File scripts\spikes\system-proxy-windows.ps1 -DryRun
+   ```
+2. **Run 1, from a normal (non-elevated) window.** Start the probe first (section 4), then:
+   ```
+   powershell -ExecutionPolicy Bypass -File scripts\spikes\system-proxy-windows.ps1 -Bypass <server host>,<relay host>
+   ```
+   Open the poller in Edge, Chrome and Firefox, press Enter to apply, look at the browsers, press Enter to restore.
+3. **Run 2, standard account.** The same.
+4. **The Group Policy lock (test machine only).** As administrator:
+   ```
+   reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxySettingsPerUser /t REG_DWORD /d 0 /f
+   ```
+   Rerun as the standard user and as the non-elevated administrator. The script reports the lock and asks whether to
+   apply anyway: answer `y`, to record what WinINet does under it (fails, or succeeds without effect). Afterwards:
+   ```
+   reg delete "HKLM\SOFTWARE\Policies\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxySettingsPerUser /f
+   ```
+5. **VPN.** With a Windows built-in VPN connection (Settings > Network & internet > VPN) **connected**, the dry run
+   must list `RAS '<its name>'` next to `LAN`; run once while connected. With a third-party VPN client (the kind that
+   adds a network adapter), run once while connected and note whether the browsers still reach the listener.
+   `-LanOnly` touches the LAN settings alone, to see what breaks when the dial-up/VPN connections are left out.
+
+The files in `%USERPROFILE%\josour-spike-results\s2-windows-<stamp>\`: `summary.txt`, `commands.tsv`,
+`snapshot.json`, `listener.log`, `listener-hosts.txt`. The summary also shows the legacy registry values
+(`ProxyEnable`, `ProxyServer`, `ProxyOverride`, `AutoConfigURL`) before, during and after, and every proxy policy it
+found for Internet Explorer settings, Chrome, Edge and Firefox.
+
+## 3. Do the browsers pick it up, and how quickly?
+
+Read it off the poller and section 3 of the summary:
+
+- **Picked up without a restart:** the page went green without being reloaded and without restarting the browser.
+- **How quickly:** `first +N s after the apply`.
+- **Let go after the restore:** `last +N s after the restore`. Around zero or negative is immediate; a large positive
+  number means the browser kept using a proxy that was no longer set (and would have had no internet once the
+  listener stopped).
+- Also try once: a browser **started** while the proxy is applied, and `chrome://net-internals/#proxy` /
+  `edge://net-internals/#proxy` to see the effective settings the browser itself reports.
+
+## 4. Does .NET re-read the system proxy?
+
+From the repository root, in a second terminal, before the apply:
+```
+dotnet run --project scripts/spikes/proxy-probe -- 900
+```
+It prints one line per change, for instance
+`10:15:03.120 DefaultProxy says http://127.0.0.1:18923/; kept client went through the proxy; fresh client went through the proxy`.
+The *kept* client is created once at start-up, like the app's `ApiClient`; the *fresh* one is created each second.
+Record whether `DefaultProxy`, the kept client and the fresh client follow the apply, and whether they come back to
+`direct` after the restore. Its requests also show up in the summary as `dotnet-kept` and `dotnet-fresh`. A note that
+`HTTP_PROXY` (or a sibling) is set means .NET uses that variable instead of the system proxy: unset it and start
+again.
+
+## 5. S3: the leak survey (by hand, during a hold)
+
+The rule: while the proxy points at the dummy listener nothing can load *through* it, so anything that loads, or any
+packet that leaves for a public address, is going *around* it. Run these during a long hold (`--hold 600` /
+`-HoldSeconds 600`), with a capture running:
+
+- macOS: `sudo tcpdump -n -l -i any 'port 53 or udp port 443 or udp port 3478 or udp port 19302'` (if `-i any` is
+  refused, use the Wi-Fi interface, usually `-i en0`).
+- Windows: Wireshark if it is installed, with the capture filter `port 53 or udp port 443 or udp port 3478 or udp port 19302`.
+  Otherwise, in an elevated window: `pktmon filter remove`, then `pktmon filter add DNS -p 53`,
+  `pktmon filter add QUIC -t UDP -p 443`, `pktmon filter add STUN -t UDP -p 3478`,
+  `pktmon filter add STUN2 -t UDP -p 19302`, `pktmon start --capture --pkt-size 0 --file-name %TEMP%\josour-s3.etl`;
+  after the tests `pktmon stop` and `pktmon etl2pcap %TEMP%\josour-s3.etl --out %TEMP%\josour-s3.pcapng` to open in
+  Wireshark. Run `ipconfig /flushdns` before the DNS check.
+
+| # | Check | How | Leak if |
+|---|---|---|---|
+| 1 | QUIC (HTTP/3 over UDP) | Before the run, open https://www.google.com, https://www.youtube.com and https://www.cloudflare.com in each browser so it learns they speak HTTP/3. During the hold, reload them | The page loads, or UDP 443 to a public address appears in the capture |
+| 2 | WebRTC STUN | Open `http://127.0.0.1:18923/webrtc` and press Run once **before** the apply (a baseline: a srflx candidate is normal) and once during the hold | A `srflx` candidate during the hold: the page learned this computer's own public address |
+| 3 | DNS prefetch | Open `http://127.0.0.1:18923/dns` during the hold and search the capture for the token it shows (`... \| grep --line-buffered <token>` on macOS) | A query for `dp-`, `pc-`, `a-` or `img-<token>.example.com` |
+| 4 | Apps that ignore the proxy | Use the computer normally for a minute during the hold: mail, chat, updates, the music app | An app that keeps working ignores the system proxy; `listener-hosts.txt` lists the ones that honoured it |
+
+Write down, next to the results, whether encrypted DNS is on (Chrome and Edge *Use secure DNS*, Firefox *DNS over
+HTTPS*, a DNS profile on macOS): with it, lookups do not appear on port 53 at all. Also note whether iCloud Private
+Relay is on (macOS).
+
+## 6. The results tables
+
+**S1, one column per macOS version and account.** In each cell: `silent`, `slow + dialog` (with its wording) or
+`failed` (with the message).
+
+| | macOS 14 admin | macOS 14 standard | macOS 15 admin | macOS 15 standard |
+|---|---|---|---|---|
+| `-setwebproxy` | | | | |
+| `-setwebproxystate` | | | | |
+| `-setsecurewebproxy` | | | | |
+| `-setsecurewebproxystate` | | | | |
+| `-setproxybypassdomains` | | | | |
+| `-setautoproxystate` | | | | |
+| `-setproxyautodiscovery` | | | | |
+| Dialogs counted: apply / restore | | | | |
+| Restore after `--hold 400` asked again? | | | | |
+| Read-back after the apply (`as set`?) | | | | |
+| Restore (`exactly as before`?) | | | | |
+| `scutil --proxy` followed the apply / the restore (ms) | | | | |
+
+**S2, one row per machine and case.**
+
+| Windows (build) | Account | Elevated | Case (plain / GP lock / built-in VPN / VPN client) | `set per-connection` | Notifications | Read-back | Restore exact | Notes |
+|---|---|---|---|---|---|---|---|---|
+| | | | | | | | | |
+
+**Browsers (sections 3 and 4), one row per OS and browser.**
+
+| OS | Browser (version) | Proxy mode | Picked up without a restart? | First request after the apply (s) | Last request after the restore (s) | Notes |
+|---|---|---|---|---|---|---|
+| macOS | Safari | system | | | | |
+| macOS | Chrome | system | | | | |
+| macOS | Firefox | Use system proxy settings | | | | |
+| macOS | Edge | system | | | | |
+| Windows 10 | Edge | system | | | | |
+| Windows 10 | Chrome | system | | | | |
+| Windows 10 | Firefox | Use system proxy settings | | | | |
+| Windows 11 | Edge | system | | | | |
+| Windows 11 | Chrome | system | | | | |
+| Windows 11 | Firefox | Use system proxy settings | | | | |
+
+| OS | `DefaultProxy` followed the apply? | Kept client went through the proxy? | Fresh client? | All back to direct after the restore? (s) |
+|---|---|---|---|---|
+| macOS | | | | |
+| Windows | | | | |
+
+**S3, one column per browser.** In each cell: `no leak`, or what was seen.
+
+| Check | macOS Safari | macOS Chrome | macOS Firefox | Windows Edge | Windows Chrome | Windows Firefox |
+|---|---|---|---|---|---|---|
+| 1. QUIC | | | | | | |
+| 2. WebRTC srflx during the hold | | | | | | |
+| 3. DNS prefetch (which of dp/pc/a/img) | | | | | | |
+| 4. Apps that kept working (per machine) | | | | | | |
+
+## 7. What to send back
+
+- Every `summary.txt`: one per macOS version and account, one per Windows machine and case. Each says at the top
+  which run it was. They name the network services, the previous proxy settings and the proxy policies, and
+  `listener-hosts.txt` lists the hosts other apps tried to reach, so read them before sharing.
+- The probe's output lines (copy them from the terminal).
+- The tables in section 6, filled in, and the wording of any dialog.
+
+## 8. How the results decide phase 4
+
+- **S1.** Every call `silent` on both accounts, including the restore after `--hold 400`: `MacSystemProxyController`
+  calls `networksetup` directly. Any dialog or failure on either account: the small C helper, installed once as root
+  and accepting two commands only. A dialog on the first call alone still counts, because the guardian and the
+  restore at login cannot answer one.
+- **S2.** `set per-connection` succeeding and an exact restore on a standard account confirm the plan. Under
+  `ProxySettingsPerUser=0` the app turns the guest role off with a clear message, whatever WinINet did. If browsers
+  ignore the LAN settings while a dial-up/VPN connection is up, the controller sets every such connection too.
+- **Browsers.** A browser that needs a restart gets told so at session start (the check page catches it). A browser
+  that keeps a stale proxy after the restore shapes the cleanup order and the "repair internet settings" command.
+- **.NET.** If `DefaultProxy` follows the change, `LoopSafeWebProxy` has to wrap every client the app owns and keep the
+  proxy as it was before the session. If it does not, it is still needed, and the stale value is written down.
+- **S3.** Whatever leaks goes into ADR-0015's consequences and into the host's disclosure. Fixing a leak through
+  browser policy (Chrome and Edge `QuicAllowed`, WebRTC handling) is a separate decision, not part of phase 4.

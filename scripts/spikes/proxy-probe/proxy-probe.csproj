@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Spike tool for ADR-0015 (docs/spike-runbook.md). Not part of the product or of client/Josour.sln. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>proxy-probe</AssemblyName>
+    <RootNamespace>ProxyProbe</RootNamespace>
+  </PropertyGroup>
+
+</Project>

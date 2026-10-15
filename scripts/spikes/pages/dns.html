@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S3: DNS prefetch</title>
+<link rel="dns-prefetch" href="//dp-{{TOKEN}}.example.com">
+<link rel="preconnect" href="http://pc-{{TOKEN}}.example.com">
+<style>
+  body { margin: 0; font: 16px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif; color: #1d1d1f; background: #fff; }
+  main { padding: 16px 24px 24px; max-width: 760px; }
+  code { background: #f2f2f2; padding: 1px 4px; border-radius: 3px; }
+  .token { font-size: 22px; font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>S3 &middot; DNS prefetch</h1>
+  <p class="token">Token: <code>{{TOKEN}}</code></p>
+  <p>Start a DNS capture first (the runbook has the command), then load this page while the spike holds the proxy on.
+  The page makes the browser want four names that exist nowhere else. A DNS query for any of them in the capture
+  means the browser resolved a name itself instead of leaving it to the proxy, so the guest's own resolver saw it.
+  Reload for a new token.</p>
+  <ul>
+    <li><code>dp-{{TOKEN}}.example.com</code>: a <code>&lt;link rel="dns-prefetch"&gt;</code></li>
+    <li><code>pc-{{TOKEN}}.example.com</code>: a <code>&lt;link rel="preconnect"&gt;</code></li>
+    <li><a href="http://a-{{TOKEN}}.example.com/"><code>a-{{TOKEN}}.example.com</code></a>: a plain link, never clicked
+      (Firefox prefetches the hosts of links on http pages)</li>
+    <li><code>img-{{TOKEN}}.example.com</code>: an image, which is requested through the proxy; a lookup for it would
+      mean the browser resolves names even for requests it proxies</li>
+  </ul>
+  <img src="http://img-{{TOKEN}}.example.com/x.gif" width="1" height="1" alt="">
+  <p><a href="/">Back to the poller</a></p>
+</main>
+</body>
+</html>
