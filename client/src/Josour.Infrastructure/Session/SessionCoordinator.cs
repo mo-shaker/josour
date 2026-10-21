@@ -4,20 +4,21 @@ using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Josour.Core.Allowlist;
-using Josour.Core.Browser;
 using Josour.Core.Control;
+using Josour.Core.Net;
 using Josour.Core.Session;
 using Josour.Core.Tunnel;
 using Josour.Infrastructure.Api;
 using Josour.Infrastructure.Control;
 using Josour.Infrastructure.Diagnostics;
+using Josour.Infrastructure.SystemProxy;
 
 namespace Josour.Infrastructure.Session;
 
 /// <summary>
 /// Owns the whole client-side session: it listens to <see cref="IControlChannel.MessageReceived"/>, drives
-/// <see cref="SessionPhaseTracker"/> (Idle → RequestPending → Preparing → Connecting → Active → Ending → Ended) and — from
-/// week 4 on — the real tunnel and the work browser behind it.
+/// <see cref="SessionPhaseTracker"/> (Idle → RequestPending → Preparing → Connecting → Active → Ending → Ended), the real
+/// tunnel, and — on the guest — the system proxy that sends every browser through it (ADR-0015).
 ///
 /// <para>End to end, per role (docs/ws-protocol.md sections 3-5, docs/protocol.md sections 2 and 7):</para>
 /// <list type="number">
@@ -26,11 +27,11 @@ namespace Josour.Infrastructure.Session;
 ///     through <see cref="ITunnelSessionFactory"/>, <c>PrepareAsync</c>, send <c>session.endpoint</c>.</item>
 ///   <item><c>session.peer_endpoint</c> → <c>ConnectAsync</c>; the host reports <c>session.connected</c>, either side reports
 ///     <c>session.connect_failed</c> with the tunnel's diagnostics and tears down.</item>
-///   <item><c>session.active</c> → guest: launch the work browser on <c>Proxy.ProbeUrl</c> and wait for the probe (skipped
-///     when there is no browser to launch — see <see cref="NoWorkBrowser"/>); host: report <c>session.stats</c> every 30 s.
-///     Both: a monotonic countdown to <c>expires_at</c>.</item>
+///   <item><c>session.active</c> → guest: point the system proxy at the local proxy (<c>system_proxy_failed</c> when that
+///     fails), optionally open <c>Proxy.ProbeUrl</c> in the default browser and note whether it came through — a warning,
+///     never an ending; host: report <c>session.stats</c> every 30 s. Both: a monotonic countdown to <c>expires_at</c>.</item>
 ///   <item>Any ending funnels through the single idempotent <see cref="EndSessionAsync(TunnelEndReason)"/>:
-///     cleanup in the order of docs/protocol.md section 7 (the browser is closed by the tunnel's own step 2), then
+///     cleanup in the order of docs/protocol.md section 7 (the system proxy is put back in the tunnel's own step 2), then
 ///     <c>session.end</c> — except when the server already ended it (<c>session.terminate</c>) or we answered
 ///     <c>session.connect_failed</c>.</item>
 /// </list>
@@ -54,7 +55,8 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
     private readonly IControlChannel _channel;
     private readonly IApiClient _api;
     private readonly ITunnelSessionFactory _tunnels;
-    private readonly IWorkBrowser _browser;
+    private readonly ISystemProxyGuard _systemProxy;
+    private readonly ICheckPageOpener? _checkPage;
     private readonly TimeProvider _time;
     private readonly ILogger _logger;
     private readonly SessionCoordinatorOptions _options;
@@ -78,15 +80,16 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
     private long _bytesUp;
     private long _bytesDown;
     private string? _probeUrl;
-    private bool _canReopenBrowser;
-    private BrowserLaunchFailure? _browserFailure;
-    private string? _browserFailureDetail;
+    private bool _canOpenCheckPage;
+    private bool? _checkPageConfirmed;
+    private string? _systemProxyFailure;
 
     public SessionCoordinator(
         IControlChannel channel,
         IApiClient api,
         ITunnelSessionFactory tunnels,
-        IWorkBrowser browser,
+        ISystemProxyGuard systemProxy,
+        ICheckPageOpener? checkPage = null,
         ILogger<SessionCoordinator>? logger = null,
         TimeProvider? time = null,
         SessionCoordinatorOptions? options = null)
@@ -94,7 +97,8 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
         _channel = channel ?? throw new ArgumentNullException(nameof(channel));
         _api = api ?? throw new ArgumentNullException(nameof(api));
         _tunnels = tunnels ?? throw new ArgumentNullException(nameof(tunnels));
-        _browser = browser ?? throw new ArgumentNullException(nameof(browser));
+        _systemProxy = systemProxy ?? throw new ArgumentNullException(nameof(systemProxy));
+        _checkPage = checkPage;
         _logger = (ILogger?)logger ?? NullLogger.Instance;
         _time = time ?? TimeProvider.System;
         _options = options ?? SessionCoordinatorOptions.Default;
@@ -121,17 +125,24 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
 
     public long BytesDown { get => _bytesDown; private set => SetField(ref _bytesDown, value); }
 
-    /// <summary>The guest's probe page (also the page the work browser opens); null on the host or before the tunnel is up.</summary>
+    /// <summary>The guest's check page (http://check.josour/); null on the host or before the system proxy points at us.</summary>
     public string? ProbeUrl { get => _probeUrl; private set => SetField(ref _probeUrl, value); }
 
-    /// <summary>The guest may reopen the work browser (it is up, and the user may have closed the window).</summary>
-    public bool CanReopenBrowser { get => _canReopenBrowser; private set => SetField(ref _canReopenBrowser, value); }
+    /// <summary>The guest may open the check page (the session is active and the system proxy points at us).</summary>
+    public bool CanOpenCheckPage { get => _canOpenCheckPage; private set => SetField(ref _canOpenCheckPage, value); }
 
-    /// <summary>Why the work browser could not be used (managed policy / handoff / not found / probe timeout); null when it is fine.</summary>
-    public BrowserLaunchFailure? BrowserFailure { get => _browserFailure; private set => SetField(ref _browserFailure, value); }
+    /// <summary>
+    /// Did a browser reach the check page through us? null = not asked (the page was not opened); true = it did;
+    /// false = it was opened and nothing came through within <see cref="SessionCoordinatorOptions.ProbeTimeout"/> — the
+    /// browser may ignore the system proxy (a warning: the session runs on).
+    /// </summary>
+    public bool? CheckPageConfirmed { get => _checkPageConfirmed; private set => SetField(ref _checkPageConfirmed, value); }
 
-    /// <summary>Technical detail behind <see cref="BrowserFailure"/> for the log and the details line; never user-facing prose.</summary>
-    public string? BrowserFailureDetail { get => _browserFailureDetail; private set => SetField(ref _browserFailureDetail, value); }
+    /// <summary>Why the system proxy could not be set (<see cref="SystemProxyException.Reason"/>) when a session ended with <c>system_proxy_failed</c>.</summary>
+    public string? SystemProxyFailure { get => _systemProxyFailure; private set => SetField(ref _systemProxyFailure, value); }
+
+    /// <summary>Can this machine be a guest at all (its system proxy can be pointed at us)?</summary>
+    public bool IsGuestRoleSupported => _systemProxy.IsSupported;
 
     /// <summary>The pending request id while <see cref="SessionPhase.RequestPending"/>.</summary>
     public Guid? PendingRequestId => _tracker.PendingRequestId;
@@ -294,7 +305,7 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
 
     /// <summary>
     /// The single, idempotent ending. Runs the cleanup order of docs/protocol.md section 7 through
-    /// <see cref="ITunnelSession.EndAsync"/> (which closes the work browser in its step 2) and then reports
+    /// <see cref="ITunnelSession.EndAsync"/> (which puts the system proxy back in its step 2) and then reports
     /// <c>session.end</c>. Two triggers at the same time produce exactly one <c>session.end</c>.
     /// </summary>
     public Task EndSessionAsync(TunnelEndReason reason) => EndCoreAsync(reason, notifyServer: true);
@@ -313,7 +324,7 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
         var run = CurrentRun;
         if (run is null)
         {
-            await SafeAsync("browser close", () => CloseBrowserAsync(CancellationToken.None)).ConfigureAwait(false);
+            await SafeAsync("system proxy restore", () => RestoreSystemProxyAsync(CancellationToken.None)).ConfigureAwait(false);
             return;
         }
 
@@ -339,32 +350,28 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
             BytesUp = 0;
             BytesDown = 0;
             ProbeUrl = null;
-            CanReopenBrowser = false;
-            BrowserFailure = null;
-            BrowserFailureDetail = null;
+            CanOpenCheckPage = false;
+            CheckPageConfirmed = null;
+            SystemProxyFailure = null;
         });
     }
 
     /// <summary>
-    /// Guest: reopen the work browser on the probe page (the user closed the window but the session is still up).
-    /// Returns null when there is nothing to reopen.
+    /// Guest: open the check page in the default browser (the user asked), and note whether it comes through.
+    /// False when there is no active guest session or the page could not be opened.
     /// </summary>
-    public async Task<BrowserLaunchResult?> ReopenBrowserAsync(CancellationToken ct)
+    public async Task<bool> OpenCheckPageAsync()
     {
         var run = CurrentRun;
-        if (run is null || run.IsHost || !_browser.CanLaunch || run.Tunnel?.Proxy is not { } proxy || _tracker.Phase != SessionPhase.Active)
+        if (run is null || run.IsHost || run.Tunnel?.Proxy is not { } proxy || _tracker.Phase != SessionPhase.Active || _checkPage is null)
         {
-            return null;
+            return false;
         }
 
-        _logger.LogInformation("Reopening the work browser for session {SessionId}", run.SessionId);
-        var result = await _browser.OpenAsync(proxy.Port, proxy.ProbeUrl, ct).ConfigureAwait(false);
-        Publish(() =>
-        {
-            BrowserFailure = result.Success ? null : result.Failure;
-            BrowserFailureDetail = result.Success ? null : result.Detail;
-        });
-        return result;
+        if (!_checkPage.TryOpen(proxy.ProbeUrl)) return false;
+        if (!run.ProbeSeen.Task.IsCompletedSuccessfully) Publish(() => CheckPageConfirmed = null);
+        await AwaitCheckPageAsync(run, proxy).ConfigureAwait(false);
+        return true;
     }
 
     // ---------- inbound ----------
@@ -523,9 +530,9 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
             BytesDown = 0;
             TimeRemaining = null;
             ProbeUrl = null;
-            CanReopenBrowser = false;
-            BrowserFailure = null;
-            BrowserFailureDetail = null;
+            CanOpenCheckPage = false;
+            CheckPageConfirmed = null;
+            SystemProxyFailure = null;
         });
 
         // docs/ws-protocol.md section 5: the server ends a session that is not active 30 s after session.created. Without a
@@ -605,8 +612,7 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
                     allowlist,
                     _hello?.Settings.AllowedPorts ?? DefaultAllowedPorts,
                     _hello?.PublicIp,
-                    _browser,
-                    CloseBrowserAsync,
+                    run.IsHost ? null : RestoreSystemProxyAsync,
                     ToRelay(message.Relay)));
             }
             catch
@@ -783,61 +789,70 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
             return;
         }
 
-        Publish(() => ProbeUrl = proxy.ProbeUrl);
-
-        if (!_browser.CanLaunch)
+        // ADR-0015: every program of this user that follows the system proxy now goes through the host. A guest that cannot
+        // be pointed at us ends here, before anything browses from the guest's own address thinking it is the host's.
+        try
         {
-            // Head-less (see NoWorkBrowser): there is no browser to launch, so nothing could bypass the proxy and
-            // browser_not_proxied would name a browser that was never started. The proxy is up on ProbeUrl and the
-            // session runs on; whatever the caller sends through it is what verifies the proxy.
-            _logger.LogInformation(
-                "Session {SessionId} is active without a work browser: the local proxy is on 127.0.0.1:{ProxyPort} ({ProbeUrl}); the probe wait is skipped",
-                run.SessionId, proxy.Port, proxy.ProbeUrl);
+            await _systemProxy.ApplyAsync(proxy.Port, Array.Empty<string>(), run.Cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (run.Cts.IsCancellationRequested)
+        {
+            return; // the session ended for another reason while we were applying
+        }
+        catch (SystemProxyException ex)
+        {
+            _logger.LogError(ex, "The system proxy could not be pointed at 127.0.0.1:{ProxyPort} ({Reason})", proxy.Port, ex.Reason);
+            Publish(() => SystemProxyFailure = ex.Reason);
+            await EndCoreAsync(TunnelEndReason.SystemProxyFailed, notifyServer: true).ConfigureAwait(false);
             return;
         }
 
-        var launch = await _browser.OpenAsync(proxy.Port, proxy.ProbeUrl, run.Cts.Token).ConfigureAwait(false);
-        if (!launch.Success)
+        if (run.Cts.IsCancellationRequested)
         {
-            _logger.LogError("The work browser did not start ({Failure}): {Detail}", launch.Failure, launch.Detail);
-            Publish(() =>
-            {
-                BrowserFailure = launch.Failure ?? BrowserLaunchFailure.Other;
-                BrowserFailureDetail = launch.Detail;
-            });
-            await EndCoreAsync(TunnelEndReason.BrowserNotProxied, notifyServer: true).ConfigureAwait(false);
+            // Ended while applying: the cleanup may already have run its restore before ours took effect.
+            await SafeAsync("system proxy restore", () => RestoreSystemProxyAsync(CancellationToken.None)).ConfigureAwait(false);
             return;
         }
 
-        Publish(() => CanReopenBrowser = true);
+        Publish(() =>
+        {
+            ProbeUrl = proxy.ProbeUrl;
+            CanOpenCheckPage = _checkPage is not null;
+        });
+        _logger.LogInformation("Session {SessionId} is active: the system proxy points at 127.0.0.1:{ProxyPort}", run.SessionId, proxy.Port);
 
-        // docs/ws-protocol.md section 5: no probe page through our proxy = the browser is not proxied.
+        if (_checkPage is { OpenOnConnect: true } opener && opener.TryOpen(proxy.ProbeUrl))
+        {
+            await AwaitCheckPageAsync(run, proxy).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Waits for the check page to come through the local proxy and records the answer. A browser that never arrives is
+    /// logged with the proxy's counters and shown as a warning; the session runs on (other programs may be fine).
+    /// </summary>
+    private async Task AwaitCheckPageAsync(SessionRun run, GuestProxyInfo proxy)
+    {
         var seen = await WaitForProbeAsync(run).ConfigureAwait(false);
         if (run.Cts.IsCancellationRequested)
         {
-            return; // the session ended for another reason while we were waiting
+            return;
         }
 
         if (seen)
         {
-            _logger.LogInformation("The work browser reached the probe page: session {SessionId} is fully active", run.SessionId);
+            _logger.LogInformation("The check page came through the local proxy: session {SessionId} is confirmed", run.SessionId);
+            Publish(() => CheckPageConfirmed = true);
             return;
         }
 
-        // What the proxy counted is the whole difference between "the browser never called us" and
-        // "it called and we turned it away", which are opposite problems with opposite fixes. Without
-        // this line the log says only that the page did not arrive, and the investigation starts from
-        // nothing - which is exactly how this failure was first met.
-        var counters = DescribeProxyCounters(run.Tunnel.ProxyCounters);
-        _logger.LogError(
-            "No probe page within {Timeout}: the work browser is not using the local proxy on 127.0.0.1:{ProxyPort} ({Counters})",
+        // What the proxy counted is the whole difference between "the browser never called us" and "it called and we turned
+        // it away", which are opposite problems with opposite fixes.
+        var counters = DescribeProxyCounters(run.Tunnel?.ProxyCounters);
+        _logger.LogWarning(
+            "No check page within {Timeout}: the default browser may not follow the system proxy on 127.0.0.1:{ProxyPort} ({Counters})",
             _options.ProbeTimeout, proxy.Port, counters);
-        Publish(() =>
-        {
-            BrowserFailure = BrowserLaunchFailure.ProbeTimeout;
-            BrowserFailureDetail = $"no request for {proxy.ProbeUrl} through 127.0.0.1:{proxy.Port} within {_options.ProbeTimeout.TotalSeconds:0} s ({counters})";
-        });
-        await EndCoreAsync(TunnelEndReason.BrowserNotProxied, notifyServer: true).ConfigureAwait(false);
+        Publish(() => CheckPageConfirmed = false);
     }
 
     /// <summary>
@@ -909,7 +924,7 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
                     BytesDown = stats.BytesDown;
                 }
 
-                CanReopenBrowser = _browser.CanLaunch && !run.IsHost && run.Connected && run.Tunnel?.Proxy is not null && _tracker.Phase == SessionPhase.Active;
+                CanOpenCheckPage = _checkPage is not null && !run.IsHost && ProbeUrl is not null && _tracker.Phase == SessionPhase.Active;
             });
 
             if (remaining <= TimeSpan.Zero)
@@ -986,7 +1001,7 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
             {
                 tunnel.ProbeSeen -= run.OnProbeSeen;
 
-                // docs/protocol.md section 7 steps 1-5: stop accepting, close the browser (our hook), GOAWAY, listener + UPnP,
+                // docs/protocol.md section 7 steps 1-5: stop accepting, put the system proxy back (our hook), GOAWAY, listener + UPnP,
                 // certificate + secret. Step 6 (session.end) is ours, below.
                 await SafeAsync("tunnel end", () => tunnel.EndAsync(reason, CancellationToken.None).WaitAsync(_options.CleanupTimeout)).ConfigureAwait(false);
 
@@ -1004,8 +1019,11 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
                 await SafeAsync("tunnel dispose", () => tunnel.DisposeAsync().AsTask().WaitAsync(_options.CleanupTimeout)).ConfigureAwait(false);
             }
 
-            // Safety net: with no tunnel (or a cleanup that threw) the browser would otherwise stay open on the proxy.
-            await SafeAsync("browser close", () => CloseBrowserAsync(CancellationToken.None)).ConfigureAwait(false);
+            // Safety net: with no tunnel (or a cleanup that threw) the system would otherwise keep pointing at a proxy that is gone.
+            if (!run.IsHost)
+            {
+                await SafeAsync("system proxy restore", () => RestoreSystemProxyAsync(CancellationToken.None)).ConfigureAwait(false);
+            }
 
             var reported = ReportedDomains(run, domains);
             Publish(() =>
@@ -1014,7 +1032,7 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
                 BytesDown = bytesDown;
                 TimeRemaining = null;
                 ProbeUrl = null;
-                CanReopenBrowser = false;
+                CanOpenCheckPage = false;
             });
 
             if (notifyServer)
@@ -1125,7 +1143,13 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
     private static bool IsServerVerdict(TunnelEndReason reason)
         => reason is TunnelEndReason.Expired or TunnelEndReason.ConnectFailed or TunnelEndReason.AdminTerminated;
 
-    private Task CloseBrowserAsync(CancellationToken ct) => _browser.CloseAsync(_options.BrowserCloseGrace, ct);
+    private async Task RestoreSystemProxyAsync(CancellationToken ct)
+    {
+        if (_systemProxy.IsApplied && !await _systemProxy.RestoreAsync(ct).ConfigureAwait(false))
+        {
+            _logger.LogError("The system proxy could not be put back; the next start or \"Repair internet settings\" will retry");
+        }
+    }
 
     // ---------- allow-list ----------
 

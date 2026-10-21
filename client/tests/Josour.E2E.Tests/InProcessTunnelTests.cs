@@ -66,6 +66,29 @@ public class InProcessTunnelTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Http_Allowlisted_GoesThroughTheTunnel_InOriginForm()
+    {
+        // ADR-0015 point 5: plain http is carried to the host and leaves from there, instead of a 307 to https.
+        var serve = _pair.Origin.ServeOnceAsync("plain http via the host");
+        using var client = await _pair.ConnectToProxyAsync();
+        var stream = client.GetStream();
+
+        await stream.WriteAsync(E2EWait.Ascii(
+            $"GET http://site.test:{_pair.OriginPort}/plain?x=1 HTTP/1.1\r\nHost: site.test:{_pair.OriginPort}\r\nProxy-Connection: keep-alive\r\n\r\n"));
+        var head = await Http.ReadHeadAsync(stream);
+        Assert.Equal(200, head.Status);
+        Assert.Equal("plain http via the host", Encoding.UTF8.GetString(await Http.ReadBodyAsync(stream, head)));
+
+        await serve.WaitAsync(Timeout);
+        Assert.StartsWith("GET /plain?x=1 HTTP/1.1", _pair.Origin.ReceivedHead);
+        Assert.Contains("Connection: close", _pair.Origin.ReceivedHead);
+        Assert.DoesNotContain("Proxy-Connection", _pair.Origin.ReceivedHead);
+        Assert.Equal(1, _pair.HostHandler.OpensOk);
+        Assert.Equal(1, _pair.ProxyServer.Counters.Tunneled);
+        Assert.Contains("site.test", _pair.Host.DomainsSeen);
+    }
+
+    [Fact]
     public async Task Http_NotAllowlisted_GoesDirect_NeverTouchingTheTunnel()
     {
         var serve = _pair.Origin.ServeOnceAsync("direct body");

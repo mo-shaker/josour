@@ -30,7 +30,7 @@ public static class ClientCapabilities
     public const string SystemProxy = "system_proxy";
 
     /// <summary>What this build sends.</summary>
-    public static IReadOnlyList<string> Current { get; } = [Contacts, Offers, TrustV2];
+    public static IReadOnlyList<string> Current { get; } = [Contacts, Offers, TrustV2, SystemProxy];
 }
 
 public sealed record HostAvailableMessage(
@@ -107,7 +107,7 @@ public sealed record ServerSettings(
     [property: JsonPropertyName("allowed_ports")] IReadOnlyList<int> AllowedPorts,
     [property: JsonPropertyName("log_domains")] bool LogDomains,
     /// <summary>
-    /// ADR-0010. false (the default) routes every site the work browser asks for through the host; the
+    /// ADR-0010. false (the default) routes every site the guest's browsers ask for through the host; the
     /// allow-list is then an optional restriction the operator can switch on. Defaulted here so a client
     /// talking to a server that predates the field behaves as the decision says, not as the old code did.
     /// </summary>

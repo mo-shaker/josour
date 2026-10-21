@@ -10,8 +10,8 @@ namespace Josour.App.Services;
 /// <summary>
 /// The one place where the App wires Track B's pieces together: <see cref="SessionCoordinator"/> asks for a tunnel and gets a
 /// real <see cref="TunnelSession"/> with the host's egress policy (<see cref="EgressTunnelAdapter"/>), the guest's local proxy
-/// (<see cref="ProxyTunnelAdapter"/>, told about the work browser so it can check the owner PID of every local connection) and
-/// the browser-close hook that puts step 2 of docs/protocol.md section 7 in its right place inside <c>EndAsync</c>.
+/// (<see cref="ProxyTunnelAdapter"/>, which on Windows admits only processes of the signed-in account) and the system-proxy
+/// restore that puts step 2 of docs/protocol.md section 7 in its right place inside <c>EndAsync</c>.
 /// <para>
 /// It exists because <c>Josour.Infrastructure</c> deliberately does not reference Tunnel/Egress/Proxy: the coordinator is
 /// testable with a fake factory, and Egress/Proxy depend on Tunnel (ADR-0006) so the direction cannot be reversed.
@@ -33,8 +33,8 @@ public sealed class TunnelSessionFactory : ITunnelSessionFactory
             AllowedPorts = request.AllowedPorts,
             OurPublicIp = request.OurPublicIp,
             HostEgress = EgressTunnelAdapter.Create,
-            GuestProxy = context => ProxyTunnelAdapter.Create(context, request.Browser),
-            CloseBrowserAsync = request.CloseBrowserAsync,
+            GuestProxy = ProxyTunnelAdapter.Create,
+            RestoreSystemProxyAsync = request.RestoreSystemProxyAsync,
             Relay = request.Relay,
         };
 

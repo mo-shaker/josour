@@ -1,0 +1,94 @@
+name: release-client
+
+# The installable clients, attached to a GitHub Release (ADR-0011: unsigned):
+#   Josour-<version>-win-x64.exe   one self-contained file (scripts/publish-exe.ps1)
+#   Josour-<version>-arm64.dmg     Apple Silicon (scripts/publish-app.sh --dmg)
+#   Josour-<version>-x64.dmg       Intel Macs   (scripts/publish-app.sh --dmg --arch x64)
+# Run it from the Actions tab (it releases the version in client/src/Josour.App/Josour.App.csproj as v<version>),
+# or push a tag v<version>. Running it again for the same version replaces the files on that release.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-client
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: read
+        run: |
+          version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' client/src/Josour.App/Josour.App.csproj | head -1)"
+          [ -n "$version" ] || { echo "::error::no <Version> in Josour.App.csproj"; exit 1; }
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "v$version" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match the project version v$version"; exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Publish Josour.exe
+        shell: pwsh
+        run: |
+          ./scripts/publish-exe.ps1 -Output publish/exe
+          Copy-Item client/publish/exe/Josour.exe "Josour-${{ needs.version.outputs.version }}-win-x64.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: Josour-*-win-x64.exe
+
+  macos:
+    needs: version
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build the disk images
+        run: |
+          scripts/publish-app.sh --arch arm64 --dmg
+          scripts/publish-app.sh --arch x64 --dmg
+          cp client/publish/mac/Josour-*.dmg .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: Josour-*.dmg
+
+  release:
+    needs: [version, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ needs.version.outputs.version }}
+        run: |
+          ls -l assets
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" assets/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" assets/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "Josour $TAG" \
+              --notes "Unsigned builds (ADR-0011). Windows: SmartScreen → More info → Run anyway. macOS: right-click the app → Open the first time. Installation: docs/self-hosting.md."
+          fi

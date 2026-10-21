@@ -48,8 +48,10 @@
         </c:Card>
 
         <StackPanel Grid.Row="2" Margin="0,12,0,0">
-            <c:InfoBar IsOpen="{Binding HasBrowserMessage, Mode=OneWay}" IsClosable="False" Severity="Warning"
-                        Message="{Binding BrowserMessage}" />
+            <c:InfoBar IsOpen="{Binding IsGuestActive, Mode=OneWay}" IsClosable="False" Severity="Informational"
+                        Message="{x:Static app:Strings.SessionGuestProxyNote}" />
+            <c:InfoBar IsOpen="{Binding HasNoticeMessage, Mode=OneWay}" IsClosable="False" Severity="Warning"
+                        Message="{Binding NoticeMessage}" />
 
             <c:Card Padding="16" Margin="0,12,0,0"
                      IsVisible="{Binding IsEnded}">
@@ -62,11 +64,11 @@
 
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button Margin="0,0,8,0"
-                       Command="{Binding ReopenBrowserCommand}"
-                       IsVisible="{Binding CanReopenBrowser}">
+                       Command="{Binding OpenCheckPageCommand}"
+                       IsVisible="{Binding CanOpenCheckPage}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <c:Icon Symbol="Globe" />
-                    <TextBlock Text="{x:Static app:Strings.SessionReopenBrowser}" VerticalAlignment="Center" />
+                    <TextBlock Text="{x:Static app:Strings.SessionOpenCheckPage}" VerticalAlignment="Center" />
                 </StackPanel>
             </Button>
             <Button Classes="danger"

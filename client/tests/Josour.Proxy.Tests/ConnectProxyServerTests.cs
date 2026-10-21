@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using Josour.Core.Allowlist;
 using Josour.Tunnel.Mux;
 
 namespace Josour.Proxy.Tests;
@@ -193,23 +194,102 @@ public class ConnectProxyServerTests
     }
 
     [Theory]
-    [InlineData("http://allowed.example/path?q=1", "https://allowed.example/path?q=1")]
-    [InlineData("http://sub.allowed.example/", "https://sub.allowed.example/")]
-    [InlineData("http://ALLOWED.example", "https://allowed.example/")]
-    [InlineData("http://allowed.example:8080/x", "https://allowed.example:8080/x")]
-    [InlineData("http://portal.example/", "https://portal.example/")]
-    public async Task Http_Allowlisted_307ToHttps_NoBytesViaTunnel(string url, string location)
+    [InlineData("http://allowed.example/path?q=1", "allowed.example", 80, "/path?q=1")]
+    [InlineData("http://sub.allowed.example/", "sub.allowed.example", 80, "/")]
+    [InlineData("http://ALLOWED.example", "allowed.example", 80, "/")]
+    [InlineData("http://allowed.example:8080/x", "allowed.example", 8080, "/x")]
+    public async Task Http_Allowlisted_GoesThroughTheTunnel_InOriginForm(string url, string host, int port, string path)
     {
-        var mux = new FakeMux();
+        // ADR-0015 point 5: no more 307 to https — plain http is carried to the host like everything else.
+        var (near, far) = await TcpPair.CreateAsync();
+        using var _far = far;
+        var mux = new FakeMux { OnOpen = (_, _, _) => Task.FromResult(MuxOpenResult.Ok(near)) };
         var resolver = new StubResolver();
-        await using var proxy = Proxies.Start(mux, resolver);
+        await using var proxy = Proxies.Start(mux, resolver, allowedPorts: new[] { 80, 443, 8080 });
         await using var client = await ProxyClient.ConnectAsync(proxy.Port);
-        await client.SendAsync($"GET {url} HTTP/1.1\r\nHost: allowed.example\r\n\r\n");
+        await client.SendAsync($"GET {url} HTTP/1.1\r\nHost: {host}\r\nProxy-Connection: keep-alive\r\n\r\n");
+
+        var received = await ReadHeadAtOriginAsync(far);
+        Assert.StartsWith($"GET {path} HTTP/1.1\r\n", received);
+        Assert.Contains("Connection: close\r\n", received);
+        Assert.DoesNotContain("Proxy-Connection", received);
+        Assert.Equal(new[] { (host, port) }, mux.Opens);
+        Assert.Equal(0, resolver.Calls);
+
+        await far.SendAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"), SocketFlags.None);
+        far.Shutdown(SocketShutdown.Send);
         var head = await client.ReadHeadAsync();
-        Assert.Equal(307, head.Status);
-        Assert.Equal(location, head.Headers["Location"]);
+        Assert.Equal(200, head.Status);
+        Assert.Equal(1, proxy.Counters.Tunneled);
+    }
+
+    private static async Task<string> ReadHeadAtOriginAsync(Socket far)
+    {
+        var buffer = new byte[4096];
+        var text = new StringBuilder();
+        while (!text.ToString().Contains("\r\n\r\n", StringComparison.Ordinal))
+        {
+            var n = await far.ReceiveAsync(buffer, SocketFlags.None).WaitAsync(Timeout);
+            if (n == 0) break;
+            text.Append(Encoding.ASCII.GetString(buffer, 0, n));
+        }
+        return text.ToString();
+    }
+
+    [Fact]
+    public async Task AllowAll_PortNotAllowed_403_InsteadOfLeavingDirectly()
+    {
+        // ADR-0015 point 3: with every site allowed, the system proxy sends the whole machine here; a port the host does not
+        // carry must be refused, not dialled from the guest's own address.
+        using var origin = new LocalOrigin();
+        var mux = new FakeMux();
+        var resolver = new StubResolver().Map("any.example", "127.0.0.1");
+        await using var proxy = Proxies.Start(mux, resolver, allowlist: new AllowAllAllowlist(1));
+        await using var client = await ProxyClient.ConnectAsync(proxy.Port);
+        await client.SendAsync($"CONNECT any.example:{origin.Port} HTTP/1.1\r\n\r\n");
+        Assert.Equal(403, (await client.ReadHeadAsync()).Status);
         Assert.Empty(mux.Opens);
         Assert.Equal(0, resolver.Calls);
+        Assert.Equal(0, proxy.Counters.DirectConnects);
+        Assert.Equal(1, proxy.Counters.Rejected);
+    }
+
+    [Fact]
+    public async Task AllowAll_HttpPortNotAllowed_403()
+    {
+        var mux = new FakeMux();
+        await using var proxy = Proxies.Start(mux, allowlist: new AllowAllAllowlist(1));
+        await using var client = await ProxyClient.ConnectAsync(proxy.Port);
+        await client.SendAsync("GET http://any.example:8081/ HTTP/1.1\r\nHost: any.example:8081\r\n\r\n");
+        Assert.Equal(403, (await client.ReadHeadAsync()).Status);
+        Assert.Empty(mux.Opens);
+        Assert.Equal(0, proxy.Counters.DirectHttpRequests);
+    }
+
+    [Fact]
+    public async Task AllowAll_OpenFailNotAllowed_403_NoDirectFallback()
+    {
+        var mux = new FakeMux { OnOpen = (_, _, _) => Task.FromResult(MuxOpenResult.Fail(OpenFailReason.NotAllowed)) };
+        var resolver = new StubResolver().Map("any.example", "127.0.0.1");
+        await using var proxy = Proxies.Start(mux, resolver, allowlist: new AllowAllAllowlist(1));
+        await using var client = await ProxyClient.ConnectAsync(proxy.Port);
+        await client.SendAsync("CONNECT any.example:443 HTTP/1.1\r\n\r\n");
+        Assert.Equal(403, (await client.ReadHeadAsync()).Status);
+        Assert.Single(mux.Opens);
+        Assert.Equal(0, resolver.Calls);
+        Assert.Equal(0, proxy.Counters.DirectConnects);
+    }
+
+    [Fact]
+    public async Task Connect_CheckPageOverHttps_502AtOnce_WithoutTheTunnel()
+    {
+        // HTTPS-First browsers try https://check.josour first; a fast failure is what makes them fall back to the http page.
+        var mux = new FakeMux();
+        await using var proxy = Proxies.Start(mux, allowlist: new AllowAllAllowlist(1));
+        await using var client = await ProxyClient.ConnectAsync(proxy.Port);
+        await client.SendAsync("CONNECT check.josour:443 HTTP/1.1\r\n\r\n");
+        Assert.Equal(502, (await client.ReadHeadAsync()).Status);
+        Assert.Empty(mux.Opens);
     }
 
     [Fact]
@@ -264,14 +344,12 @@ public class ConnectProxyServerTests
     }
 
     [Fact]
-    public async Task OwnerPid_NotOwnedByBrowser_ClosedWithoutResponse()
+    public async Task Admission_Refused_ClosedWithoutResponse()
     {
-        var browser = new FakeBrowser();
-        browser.Owned.Add(1);
-        var checker = new FakePidChecker { Pid = 4242 };
-        await using var proxy = Proxies.Start(new FakeMux(), browser: browser, checker: checker);
+        var admission = new FakeAdmission { Admits = false };
+        await using var proxy = Proxies.Start(new FakeMux(), admission: admission);
         // The refusal closes the socket at once; a FIN or an RST may arrive, and an RST may strike at the connect itself under load.
-        // The counters are the real confirmation: the check was requested once, the connection was refused, and the check page was not served.
+        // The counters are the real confirmation: the check was asked once, the connection was refused, and the check page was not served.
         try
         {
             await using var client = await ProxyClient.ConnectAsync(proxy.Port);
@@ -283,60 +361,40 @@ public class ConnectProxyServerTests
         catch (SocketException) { /* the connection was reset at once: the same result */ }
 
         await Proxies.WaitForAsync(() => proxy.Counters.RejectedByOwner == 1);
-        Assert.Equal(1, checker.Calls);
-        Assert.Equal(1, proxy.Counters.RejectedByOwner);
+        Assert.Equal(1, admission.Calls);
         Assert.Equal(0, proxy.Counters.ProbeHits);
     }
 
     [Fact]
-    public async Task OwnerPid_OwnedByBrowser_Served()
+    public async Task Admission_Admitted_Served()
     {
-        var browser = new FakeBrowser();
-        browser.Owned.Add(4242);
-        var checker = new FakePidChecker { Pid = 4242 };
-        await using var proxy = Proxies.Start(new FakeMux(), browser: browser, checker: checker);
+        var admission = new FakeAdmission { Admits = true };
+        await using var proxy = Proxies.Start(new FakeMux(), admission: admission);
+        await using var client = await ProxyClient.ConnectAsync(proxy.Port);
+        await client.SendAsync("GET http://check.josour/ HTTP/1.1\r\n\r\n");
+        Assert.Equal(200, (await client.ReadHeadAsync()).Status);
+        Assert.Equal(1, admission.Calls);
+        Assert.Equal(0, proxy.Counters.RejectedByOwner);
+    }
+
+    [Fact]
+    public async Task Admission_ThatThrows_DoesNotBreakBrowsing()
+    {
+        // The check only narrows the loopback boundary: a failing check must never turn into a proxy that refuses everything.
+        await using var proxy = Proxies.Start(new FakeMux(), admission: new FakeAdmission { Throws = true });
+        await using var client = await ProxyClient.ConnectAsync(proxy.Port);
+        await client.SendAsync("GET http://check.josour/ HTTP/1.1\r\n\r\n");
+        Assert.Equal(200, (await client.ReadHeadAsync()).Status);
+    }
+
+    [Fact]
+    public async Task NoAdmission_AcceptsEverything()
+    {
+        await using var proxy = Proxies.Start(new FakeMux());
         await using var client = await ProxyClient.ConnectAsync(proxy.Port);
         await client.SendAsync("GET http://check.josour/ HTTP/1.1\r\n\r\n");
         Assert.Equal(200, (await client.ReadHeadAsync()).Status);
         Assert.Equal(0, proxy.Counters.RejectedByOwner);
-    }
-
-    [Theory]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
-    public async Task OwnerPid_Unknown_FollowsRejectUnknownOwner(bool rejectUnknown, bool served)
-    {
-        var browser = new FakeBrowser();
-        await using var proxy = Proxies.Start(new FakeMux(), browser: browser, checker: new FakePidChecker { Pid = null }, rejectUnknown: rejectUnknown);
-        if (served)
-        {
-            await using var client = await ProxyClient.ConnectAsync(proxy.Port);
-            await client.SendAsync("GET http://check.josour/ HTTP/1.1\r\n\r\n");
-            Assert.Equal(200, (await client.ReadHeadAsync()).Status);
-            return;
-        }
-
-        // The refusal closes the socket at once: a FIN or an RST may arrive, and an RST may strike at the connect itself under load.
-        try
-        {
-            await using var client = await ProxyClient.ConnectAsync(proxy.Port);
-            try { await client.SendAsync("GET http://check.josour/ HTTP/1.1\r\n\r\n"); }
-            catch (IOException) { }
-            catch (SocketException) { }
-            Assert.True(await client.ClosedWithoutDataAsync());
-        }
-        catch (SocketException) { /* the connection was reset at once: the same result */ }
-    }
-
-    [Fact]
-    public async Task NoBrowserSession_AcceptsEverything_WithoutCheckingPid()
-    {
-        var checker = new FakePidChecker { Pid = 1 };
-        await using var proxy = Proxies.Start(new FakeMux(), checker: checker);
-        await using var client = await ProxyClient.ConnectAsync(proxy.Port);
-        await client.SendAsync("GET http://check.josour/ HTTP/1.1\r\n\r\n");
-        Assert.Equal(200, (await client.ReadHeadAsync()).Status);
-        Assert.Equal(0, checker.Calls);
     }
 
     [Fact]

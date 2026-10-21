@@ -317,15 +317,15 @@ public class TunnelSessionTests
     public async Task Pair_CleanEnd_DoesNotLookLikeDeath_AndFollowsCleanupOrder()
     {
         var order = new List<string>();
-        var certificateDisposedAtBrowserStep = true;
-        var muxClosedAtBrowserStep = true;
+        var certificateDisposedAtRestoreStep = true;
+        var muxClosedAtRestoreStep = true;
         TunnelSessionPair? pair = null;
         pair = await TunnelSessionPair.CreateAsync(
-            guestCloseBrowser: _ =>
+            guestRestoreSystemProxy: _ =>
             {
-                lock (order) order.Add("browser");
-                certificateDisposedAtBrowserStep = pair!.Guest.CertificateDisposed;
-                muxClosedAtBrowserStep = pair.Guest.MuxClosed;
+                lock (order) order.Add("system_proxy");
+                certificateDisposedAtRestoreStep = pair!.Guest.CertificateDisposed;
+                muxClosedAtRestoreStep = pair.Guest.MuxClosed;
                 return Task.CompletedTask;
             },
             sharedLog: order);
@@ -348,14 +348,14 @@ public class TunnelSessionTests
         Assert.True(pair.Proxy.Disposed);
         Assert.True(pair.Egress.Disposed);
 
-        // The docs/protocol.md section 7 order: stop accepting -> the browser -> GOAWAY and closing the tunnel -> stopping the proxy -> the certificate.
+        // The docs/protocol.md section 7 order: stop accepting -> putting the system proxy back -> GOAWAY and closing the tunnel -> stopping the proxy -> the certificate.
         var log = pair.Log;
         var stopAccepting = log.IndexOf("proxy.stop_accepting");
-        var browser = log.IndexOf("browser");
+        var restore = log.IndexOf("system_proxy");
         var stop = log.IndexOf("proxy.stop");
-        Assert.True(stopAccepting >= 0 && browser > stopAccepting && stop > browser, string.Join(",", log));
-        Assert.False(certificateDisposedAtBrowserStep);
-        Assert.False(muxClosedAtBrowserStep);
+        Assert.True(stopAccepting >= 0 && restore > stopAccepting && stop > restore, string.Join(",", log));
+        Assert.False(certificateDisposedAtRestoreStep);
+        Assert.False(muxClosedAtRestoreStep);
 
         // The final statistics are kept after the end (for the session.end message)
         Assert.Equal(11, pair.Host.Stats.BytesUp);

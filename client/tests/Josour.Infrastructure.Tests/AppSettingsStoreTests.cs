@@ -22,7 +22,7 @@ public sealed class AppSettingsStoreTests : IDisposable
         var store = new AppSettingsStore(FilePath);
 
         Assert.Equal(string.Empty, store.Current.ServerUrl);
-        Assert.Equal(BrowserPreference.Auto, store.Current.PreferredBrowser);
+        Assert.True(store.Current.OpenCheckPageOnConnect);
         Assert.False(store.Current.StartMinimized);
         Assert.Equal(string.Empty, store.Current.Language); // empty means "the default language", i.e. Arabic
         Assert.False(File.Exists(FilePath));
@@ -51,7 +51,7 @@ public sealed class AppSettingsStoreTests : IDisposable
         var store = new AppSettingsStore(FilePath);
         AppSettings? announced = null;
         store.Changed += (_, s) => announced = s;
-        var settings = new AppSettings { ServerUrl = "https://josour.example.com", PreferredBrowser = BrowserPreference.Edge, StartMinimized = true };
+        var settings = new AppSettings { ServerUrl = "https://josour.example.com", OpenCheckPageOnConnect = false, StartMinimized = true };
 
         await store.SaveAsync(settings, CancellationToken.None);
 
@@ -62,7 +62,7 @@ public sealed class AppSettingsStoreTests : IDisposable
 
         var text = await File.ReadAllTextAsync(FilePath);
         Assert.Contains("\"serverUrl\": \"https://josour.example.com\"", text);
-        Assert.Contains("\"preferredBrowser\": \"edge\"", text);
+        Assert.Contains("\"openCheckPageOnConnect\": false", text);
         Assert.Contains("\"startMinimized\": true", text);
 
         var reloaded = new AppSettingsStore(FilePath);
@@ -85,7 +85,7 @@ public sealed class AppSettingsStoreTests : IDisposable
         var store = new AppSettingsStore(FilePath);
 
         Assert.Equal("https://x.example", store.Current.ServerUrl);
-        Assert.Equal(BrowserPreference.Chrome, store.Current.PreferredBrowser);
+        Assert.True(store.Current.OpenCheckPageOnConnect); // the retired 1.x browser choice is ignored, the new setting defaults on
     }
 
     [Fact]
@@ -114,7 +114,7 @@ public sealed class AppSettingsStoreTests : IDisposable
             {
                 ServerUrl = "https://josour.example.com",
                 Language = "en",
-                PreferredBrowser = BrowserPreference.Edge,
+                OpenCheckPageOnConnect = false,
                 StartMinimized = true,
             },
             CancellationToken.None);
@@ -122,18 +122,21 @@ public sealed class AppSettingsStoreTests : IDisposable
         var reloaded = new AppSettingsStore(FilePath).Current;
         Assert.Equal("https://josour.example.com", reloaded.ServerUrl);
         Assert.Equal("en", reloaded.Language);
-        Assert.Equal(BrowserPreference.Edge, reloaded.PreferredBrowser);
+        Assert.False(reloaded.OpenCheckPageOnConnect);
         Assert.True(reloaded.StartMinimized);
     }
 
     [Fact]
-    public async Task UnknownBrowserValue_FallsBackToDefaults()
+    public async Task AFileFromBeforeTheSystemProxy_StillLoads_WithTheCheckPageOn()
     {
+        // A 1.x settings.json carries the retired work-browser choice and no check-page setting.
         Directory.CreateDirectory(_dir);
-        await File.WriteAllTextAsync(FilePath, """{"serverUrl":"https://x.example","preferredBrowser":"firefox"}""");
+        await File.WriteAllTextAsync(FilePath, """{"serverUrl":"https://x.example","preferredBrowser":"firefox","startMinimized":true}""");
 
         var store = new AppSettingsStore(FilePath);
 
-        Assert.Equal(AppSettings.Default, store.Current);
+        Assert.Equal("https://x.example", store.Current.ServerUrl);
+        Assert.True(store.Current.StartMinimized);
+        Assert.True(store.Current.OpenCheckPageOnConnect);
     }
 }

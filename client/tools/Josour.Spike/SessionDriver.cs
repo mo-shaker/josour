@@ -1,8 +1,6 @@
 using System.Diagnostics;
 using System.Net;
 using System.Text;
-using Josour.Browser;
-using Josour.Core.Browser;
 using Josour.Core.Control;
 using Josour.Core.Session;
 using Josour.Core.Tunnel;
@@ -62,7 +60,6 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
     private readonly Args _args;
     private readonly EventLog _log;
     private readonly string? _curlTest;
-    private readonly WorkBrowserSession? _browser;
     private readonly TaskCompletionSource _ended = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly object _gate = new();
 
@@ -71,27 +68,12 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
     private Ending? _ending;
     private bool _sessionEndSent;
 
-    public SessionDriver(Args args, EventLog log, string? curlTest, bool wantsBrowser)
+    public SessionDriver(Args args, EventLog log, string? curlTest)
     {
         _args = args;
         _log = log;
         _curlTest = curlTest;
-        if (wantsBrowser)
-        {
-            var kind = (args.Get("browser") ?? "chrome").ToLowerInvariant() switch
-            {
-                "edge" => BrowserKind.Edge,
-                _ => BrowserKind.Chrome,
-            };
-            _browser = new WorkBrowserSession(new SpikeBrowserProvider(kind, args.Get("profile") ?? BrowserCommandLine.DefaultProfileDirectory(), log));
-        }
     }
-
-    /// <summary>
-    /// The work browser handed to the coordinator: the real one with <c>--browser</c>, otherwise <see cref="NoWorkBrowser"/>, which makes
-    /// the coordinator skip launching and waiting for the check page instead of ending the session with <c>browser_not_proxied</c> when there is no browser at all.
-    /// </summary>
-    public IWorkBrowser Browser => _browser ?? (IWorkBrowser)NoWorkBrowser.Instance;
 
     /// <summary>The role, learned from <c>session.created</c> through the coordinator (or from the arguments before that).</summary>
     public TunnelRole Role { get; set; } = TunnelRole.Guest;
@@ -196,27 +178,13 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
 
     /// <summary>
     /// The same composition as <c>Josour.App.Services.TunnelSessionFactory</c> (<see cref="EgressTunnelAdapter.Create"/> on
-    /// the host, <see cref="ProxyTunnelAdapter.Create"/> on the guest, and the browser-close hook), plus what the tool alone adds:
-    /// <c>--listen-port</c> and <c>--no-upnp</c>, and the owning-PID check when there is a real browser. With no browser, null is passed to
-    /// the proxy: no browser process owns the local connections, and the check would have refused the <c>--curl-test</c> request itself.
+    /// the host, <see cref="ProxyTunnelAdapter.Create"/> on the guest), plus what the tool alone adds: <c>--listen-port</c> and
+    /// <c>--no-upnp</c>. The tool never points the system proxy at the guest's listener; <c>--curl-test</c> uses it directly.
     /// </summary>
     public ITunnelSession Create(TunnelSessionRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
         Role = request.Material.Role;
-        IBrowserSession? proxyBrowser = request.Browser is NoWorkBrowser ? null : request.Browser;
-
-        // Cleanup step 2: the coordinator's own hook, with a human line explaining what is happening when there really is a browser.
-        Func<CancellationToken, Task> closeBrowser = request.CloseBrowserAsync;
-        if (proxyBrowser is not null)
-        {
-            closeBrowser = async token =>
-            {
-                _log.Note("closing the work browser (WM_CLOSE, then the job object after 3 s)");
-                await request.CloseBrowserAsync(token).ConfigureAwait(false);
-            };
-        }
-
         var options = new TunnelSessionOptions
         {
             Allowlist = request.Allowlist,
@@ -225,8 +193,8 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
             ListenPort = _args.GetInt("listen-port", 0),
             EnableUpnp = !_args.Has("no-upnp"),
             HostEgress = EgressTunnelAdapter.Create,
-            GuestProxy = context => ProxyTunnelAdapter.Create(context, proxyBrowser, proxyBrowser is null ? null : OwnerChecker()),
-            CloseBrowserAsync = closeBrowser,
+            GuestProxy = context => ProxyTunnelAdapter.Create(context, admission: null),
+            RestoreSystemProxyAsync = request.RestoreSystemProxyAsync,
         };
 
         var tunnel = new TunnelSession(request.Material, options);
@@ -234,14 +202,10 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
         return new EventTunnelSession(tunnel, this);
     }
 
-    private static IOwnerPidChecker OwnerChecker()
-        => OperatingSystem.IsWindows() ? WindowsOwnerPidChecker.Instance : PermissiveOwnerPidChecker.Instance;
-
     // ---------- After connecting, on the guest's side ----------
 
     /// <summary>
     /// The direct proof with no browser: run once after the connection succeeds on the guest. Its errors are recorded and do not end the session.
-    /// (Launching the work browser is not here: the coordinator launches it at <c>session.active</c>, as the application does.)
     /// </summary>
     private async Task AfterConnectedAsync(GuestProxyInfo proxy, CancellationToken ct)
     {
@@ -387,10 +351,7 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
 
     private static string Text(object? value) => value?.ToString() ?? "null";
 
-    public async ValueTask DisposeAsync()
-    {
-        if (_browser is not null) await _browser.DisposeAsync().ConfigureAwait(false);
-    }
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private sealed record Ending(SessionOutcomeKind Kind, TunnelEndReason Reason, string? Detail);
 
@@ -603,74 +564,5 @@ internal sealed class SessionDriver : ITunnelSessionFactory, IAsyncDisposable
             _driver.SetEnding(SessionOutcomeKind.TunnelDied, reason, reason.ToString());
             Died?.Invoke(reason);
         }
-    }
-
-    /// <summary>The tool's real work browser: one kind (<c>--browser</c>) and one profile (<c>--profile</c>).</summary>
-    private sealed class SpikeBrowserProvider : IWorkBrowserProvider
-    {
-        private readonly BrowserKind _kind;
-        private readonly EventLog _log;
-
-        public SpikeBrowserProvider(BrowserKind kind, string profileDirectory, EventLog log)
-        {
-            _kind = kind;
-            _log = log;
-            ProfileDirectory = profileDirectory;
-        }
-
-        public string ProfileDirectory { get; }
-
-        public IReadOnlyList<BrowserKind> Preference() => new[] { _kind };
-
-        public IBrowserSession Create(BrowserKind kind) => new EventBrowserSession(BrowserSessions.ForCurrentPlatform(), kind, _log);
-    }
-
-    /// <summary>
-    /// The platform's own <see cref="IBrowserSession"/>, emitting a <c>browser.launch</c> event with every launch's
-    /// result. It used to construct <see cref="BrowserLauncher"/> by name, which is the Windows implementation, so
-    /// the tool that verifies the stack could not launch a browser on macOS at all.
-    /// </summary>
-    private sealed class EventBrowserSession : IBrowserSession
-    {
-        private readonly IBrowserSession _inner;
-        private readonly BrowserKind _kind;
-        private readonly EventLog _log;
-
-        public EventBrowserSession(IBrowserSession inner, BrowserKind kind, EventLog log)
-        {
-            _inner = inner;
-            _kind = kind;
-            _log = log;
-        }
-
-        public bool IsRunning => _inner.IsRunning;
-
-        public bool OwnsProcess(int pid) => _inner.OwnsProcess(pid);
-
-        public async Task<BrowserLaunchResult> LaunchAsync(BrowserLaunchOptions options, CancellationToken ct)
-        {
-            var result = await _inner.LaunchAsync(options, ct).ConfigureAwait(false);
-            _log.Emit("browser.launch", EventLog.Fields(
-                ("browser", _kind.ToString().ToLowerInvariant()), ("success", result.Success), ("failure", result.Failure?.ToString()),
-                ("detail", result.Detail), ("handoff", (_inner as BrowserLauncher)?.InstanceHandoff), ("pid", ProcessId())),
-                result.Success ? $"launched {_kind} on the check page" : $"could not launch {_kind}: {result.Failure} — {result.Detail}");
-            return result;
-        }
-
-        /// <summary>
-        /// Instance handoff is a Windows notion — a second copy of Chrome handing the URL to the first — and is left
-        /// null elsewhere rather than invented. A process id is not: every platform has one, so it is read from
-        /// whichever session ran.
-        /// </summary>
-        private int? ProcessId() => _inner switch
-        {
-            BrowserLauncher windows => windows.ProcessId,
-            MacBrowserSession mac => mac.ProcessId,
-            _ => null,
-        };
-
-        public Task CloseAsync(TimeSpan graceful, CancellationToken ct) => _inner.CloseAsync(graceful, ct);
-
-        public ValueTask DisposeAsync() => _inner.DisposeAsync();
     }
 }

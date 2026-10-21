@@ -20,7 +20,7 @@ namespace Josour.Tunnel;
 ///   the tunnel dying -> a Died event with a suggested reason (never raised for a clean close)
 ///   EndAsync     -> Ended (the six-step cleanup order, safe from any state and safe to repeat)
 ///
-/// What stays with the application (track C): launching and closing the browser (through <see cref="TunnelSessionOptions.CloseBrowserAsync"/>),
+/// What stays with the application (track C): pointing the system proxy at us and putting it back (through <see cref="TunnelSessionOptions.RestoreSystemProxyAsync"/>),
 /// and every server message (session.endpoint / connected / connect_failed / stats / end).
 ///
 /// Ownership of the secrets: the session owns <c>material.Secret</c> and wipes it in step 5 of the cleanup.
@@ -368,9 +368,9 @@ public sealed class TunnelSession : ITunnelSession
         // 1) The proxy stops accepting new connections.
         Try("proxy_stop_accepting", () => _proxy?.StopAccepting());
 
-        // 2) Closing the browser: the application's own, carried out here through the hook so it stays in its place in the order.
-        if (_options.CloseBrowserAsync is { } closeBrowser)
-            await TryAsync("browser_close", () => closeBrowser(ct)).ConfigureAwait(false);
+        // 2) Putting the system proxy back: the application's own, carried out here through the hook so it stays in its place in the order.
+        if (_options.RestoreSystemProxyAsync is { } restoreSystemProxy)
+            await TryAsync("system_proxy_restore", () => restoreSystemProxy(ct)).ConfigureAwait(false);
 
         // 3) GOAWAY(session_end) and closing the tunnel, then stopping the proxy entirely (its connections have no destination once the tunnel is closed).
         if (_mux is { } mux)

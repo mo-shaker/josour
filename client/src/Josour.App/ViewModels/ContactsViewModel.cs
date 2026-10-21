@@ -10,7 +10,7 @@ using Josour.Core.Session;
 using Josour.Infrastructure.Api;
 using Josour.Infrastructure.Contacts;
 using Josour.Infrastructure.Session;
-using Josour.Proxy;
+using Josour.Infrastructure.SystemProxy;
 
 namespace Josour.App.ViewModels;
 
@@ -139,11 +139,10 @@ public sealed partial class ContactsViewModel : ObservableObject
     public bool HasContacts => Contacts.Count > 0;
 
     /// <summary>
-    /// Whether this machine can use somebody else's connection at all. Not unless the platform can tell which process
-    /// opened a local connection: the proxy listens on loopback, and without that check it would carry any program's
-    /// traffic out through the host's address. Where the check does not exist the guest side is refused outright.
+    /// Whether this machine can use somebody else's connection at all: only where Josour can point the operating system's
+    /// proxy at its local proxy (Windows and macOS, ADR-0015). Elsewhere the guest side is refused outright.
     /// </summary>
-    public static bool IsGuestRoleSupported => OwnerPidCheckers.SupportedOnThisPlatform;
+    public static bool IsGuestRoleSupported => SystemProxyControllers.SupportedOnThisPlatform;
 
     /// <summary>The inverse, for the warning bar.</summary>
     public static bool IsGuestRoleUnavailable => !IsGuestRoleSupported;

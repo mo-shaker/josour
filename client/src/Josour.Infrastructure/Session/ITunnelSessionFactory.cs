@@ -1,5 +1,4 @@
 using Josour.Core.Allowlist;
-using Josour.Core.Browser;
 using Josour.Core.Tunnel;
 
 namespace Josour.Infrastructure.Session;
@@ -10,7 +9,7 @@ namespace Josour.Infrastructure.Session;
 /// <para>
 /// The request deliberately carries only <c>Josour.Core</c> types so that this assembly (and its tests) never has to
 /// reference <c>Josour.Tunnel</c>/<c>Egress</c>/<c>Proxy</c>: the App owns that wiring
-/// (<c>HostEgress = EgressTunnelAdapter.Create</c>, <c>GuestProxy = ctx =&gt; ProxyTunnelAdapter.Create(ctx, browser)</c>).
+/// (<c>HostEgress = EgressTunnelAdapter.Create</c>, <c>GuestProxy = ProxyTunnelAdapter.Create</c>).
 /// </para>
 /// </summary>
 /// <param name="Material">
@@ -20,18 +19,16 @@ namespace Josour.Infrastructure.Session;
 /// <param name="Allowlist">The allow-list at the session's <c>allowlist_version</c> (<c>GET /domains</c>).</param>
 /// <param name="AllowedPorts"><c>hello.ack.settings.allowed_ports</c>.</param>
 /// <param name="OurPublicIp"><c>hello.ack.public_ip</c>: the <c>public</c> candidate, and a blocked address on the host.</param>
-/// <param name="Browser">
-/// The work-browser session, passed to the guest proxy for the owner-PID check. Not launched by the tunnel:
-/// the coordinator launches it after <c>session.active</c> and closes it through <paramref name="CloseBrowserAsync"/>.
+/// <param name="RestoreSystemProxyAsync">
+/// Guest only: cleanup step 2 of docs/protocol.md section 7, run inside <c>ITunnelSession.EndAsync</c> — the system proxy
+/// the coordinator pointed at the local proxy after <c>session.active</c> is put back. null on the host.
 /// </param>
-/// <param name="CloseBrowserAsync">Cleanup step 2 of docs/protocol.md section 7, run inside <c>ITunnelSession.EndAsync</c>.</param>
 public sealed record TunnelSessionRequest(
     SessionMaterial Material,
     IAllowlist Allowlist,
     IReadOnlyList<int> AllowedPorts,
     string? OurPublicIp,
-    IBrowserSession Browser,
-    Func<CancellationToken, Task> CloseBrowserAsync,
+    Func<CancellationToken, Task>? RestoreSystemProxyAsync,
     /// <summary>From <c>session.created.relay</c>; null when the deployment has no relay (ADR-0009).</summary>
     RelayEndpointInfo? Relay = null);
 

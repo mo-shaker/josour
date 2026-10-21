@@ -177,6 +177,37 @@ public sealed class AuthSessionTests
     }
 
     [Fact]
+    public async Task SignIn_DeviceUnknownToTheServer_SignsInAgainAsANewDevice_InOneAttempt()
+    {
+        // A reinstalled server knows none of the old devices. The password is right, so the user must not have to fail once
+        // first: the stale identity is dropped and the same sign-in registers a new device.
+        using var h = new AuthHarness();
+        h.Secrets.Values[AuthSession.DeviceIdKey] = Guid.NewGuid().ToString("D");
+        h.Secrets.Values[AuthSession.DeviceSecretKey] = "stale-secret";
+        var logins = 0;
+        h.Http.On(HttpMethod.Post, AuthHarness.LoginPath, _ => ++logins == 1
+            ? FakeHttpMessageHandler.Error(HttpStatusCode.Unauthorized, "unauthorized", "Unknown device or invalid device secret")
+            : FakeHttpMessageHandler.Json(HttpStatusCode.OK, AuthHarness.AuthJson("at-3", "rt-3", AuthHarness.DeviceId, deviceSecret: "dev-secret-new")));
+
+        await h.Session.SignInAsync("guest@example.com", "Guest-pass-1234", None);
+
+        var sent = h.Http.RequestsTo(HttpMethod.Post, AuthHarness.LoginPath);
+        Assert.Equal(2, sent.Count);
+        using (var first = JsonDocument.Parse(sent[0].Body!))
+        {
+            Assert.Equal("stale-secret", first.RootElement.GetProperty("device").GetProperty("secret").GetString());
+        }
+        using (var second = JsonDocument.Parse(sent[1].Body!))
+        {
+            Assert.False(second.RootElement.GetProperty("device").TryGetProperty("id", out _));
+        }
+        Assert.True(h.Session.IsSignedIn);
+        Assert.Equal(AuthHarness.DeviceId.ToString("D"), h.Secrets.Values[AuthSession.DeviceIdKey]);
+        Assert.Equal("dev-secret-new", h.Secrets.Values[AuthSession.DeviceSecretKey]);
+        Assert.Equal("rt-3", h.Secrets.Values[AuthSession.RefreshTokenKey]);
+    }
+
+    [Fact]
     public async Task SignIn_DeviceRevoked_SurfacesCode_AndDropsStoredIdentity()
     {
         using var h = new AuthHarness();

@@ -4,10 +4,13 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Josour.App.Services;
+using Josour.App.Services.Notifications;
 using Josour.Core.Control;
+using Josour.Core.Session;
 using Josour.Infrastructure.Api;
 using Josour.Infrastructure.Device;
 using Josour.Infrastructure.Session;
+using Josour.Infrastructure.SystemProxy;
 
 namespace Josour.App.ViewModels;
 
@@ -20,6 +23,8 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly ControlChannelConnector _connector;
     private readonly IAuthSession _auth;
     private readonly IAuthFlow _authFlow;
+    private readonly ISystemProxyGuard _systemProxy;
+    private readonly INotifier _notifier;
     private readonly ILogger<MainViewModel> _logger;
 
     [ObservableProperty]
@@ -48,6 +53,8 @@ public sealed partial class MainViewModel : ObservableObject
         IAuthFlow authFlow,
         IDeviceInfoProvider deviceInfo,
         StartupOptions options,
+        ISystemProxyGuard systemProxy,
+        INotifier notifier,
         ILogger<MainViewModel> logger)
     {
         Host = host;
@@ -60,6 +67,8 @@ public sealed partial class MainViewModel : ObservableObject
         _connector = connector;
         _auth = auth;
         _authFlow = authFlow;
+        _systemProxy = systemProxy;
+        _notifier = notifier;
         _logger = logger;
 
         // "v0.1.0" is a technical value: kept left to right even in the mirrored window.
@@ -78,7 +87,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>The Contacts tab: people, invitations, requests and offers (ADR-0014).</summary>
     public ContactsViewModel Contacts { get; }
 
-    /// <summary>The session lifecycle itself (phase, tunnel, work browser); the tray and the pages ask it for state.</summary>
+    /// <summary>The session lifecycle itself (phase, tunnel, system proxy); the tray and the pages ask it for state.</summary>
     public SessionCoordinator Sessions { get; }
 
     /// <summary>The live session panel that replaces the two tabs while a session runs.</summary>
@@ -186,6 +195,36 @@ public sealed partial class MainViewModel : ObservableObject
 
     [RelayCommand]
     private void Exit() => _shell.Exit();
+
+    /// <summary>
+    /// Tray → "Repair internet settings": puts back the system proxy a guest session changed. A live guest session is what
+    /// the settings point at, so it is ended the normal way first; a change left by a crash is restored from its marker.
+    /// </summary>
+    [RelayCommand]
+    private async Task RepairInternetSettingsAsync()
+    {
+        var hadChange = _systemProxy.IsApplied;
+        bool repaired;
+        try
+        {
+            if (Sessions.CurrentSession is { IsHost: false } && Sessions.Phase is SessionPhase.Preparing or SessionPhase.Connecting or SessionPhase.Active)
+            {
+                await Sessions.DisconnectAsync();
+            }
+
+            repaired = !_systemProxy.IsApplied || await _systemProxy.RestoreAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Repairing the internet settings failed");
+            repaired = false;
+        }
+
+        _logger.LogInformation("Repair internet settings: change in force={HadChange} repaired={Repaired}", hadChange, repaired);
+        _notifier.ShowInfo(
+            Strings.TrayRepairInternet,
+            !repaired ? Strings.RepairInternetFailed : hadChange ? Strings.RepairInternetDone : Strings.RepairInternetNothing);
+    }
 
     [RelayCommand]
     private Task SimulateIncomingRequestAsync() => Host.SimulateIncomingRequestCommand.ExecuteAsync(null);

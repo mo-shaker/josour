@@ -85,6 +85,7 @@ public sealed class TrayService : IDisposable
         menu.Add(new NativeMenuItemSeparator());
         menu.Add(Item(Strings.TraySettings, _viewModel.ShowSettingsCommand));
         menu.Add(Item(Strings.TrayAbout, _viewModel.ShowAboutCommand));
+        menu.Add(Item(Strings.TrayRepairInternet, _viewModel.RepairInternetSettingsCommand));
 
         // The menu is built once, at start-up, before anyone has signed in — so the admin entry is always
         // present and its command's CanExecute decides whether it is usable. Rebuilding the native menu on

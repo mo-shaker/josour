@@ -3,6 +3,7 @@ using Josour.Infrastructure.Control;
 using Josour.Core.Tunnel;
 using Josour.Infrastructure.Api;
 using Josour.Infrastructure.Session;
+using Josour.Infrastructure.SystemProxy;
 
 namespace Josour.Spike;
 
@@ -60,16 +61,11 @@ public static class SessionCommand
         var listHosts = args.Has("list-hosts");
         var hostDevice = args.Get("host-device");
         var curlTest = args.Get("curl-test");
-        var wantsBrowser = args.Has("browser");
 
         if (!isHost && !listHosts && string.IsNullOrWhiteSpace(hostDevice))
             throw new UsageException("--host-device <id|name> is required for --role guest (or use --list-hosts)");
         if (isHost && (listHosts || hostDevice is not null || curlTest is not null))
             throw new UsageException("--list-hosts, --host-device and --curl-test are guest-only options");
-        if (wantsBrowser && curlTest is not null)
-            throw new UsageException("--browser and --curl-test cannot be combined: with a browser the proxy enforces the owner-PID check and would reject this tool's own request");
-        if (wantsBrowser && isHost)
-            throw new UsageException("--browser is a guest-only option");
         if (minutes is < 1 or > 1440) throw new UsageException("--minutes must be between 1 and 1440");
 
         var log = new EventLog(roleText) { Human = !args.Has("quiet") };
@@ -106,7 +102,7 @@ public static class SessionCommand
             $"signed in as {user.DisplayName} <{user.Email}> on device {stack.Device.DeviceName} ({deviceId})");
 
         // ---------- 2. The control channel ----------
-        await using var driver = new SessionDriver(args, log, curlTest, wantsBrowser) { Role = isHost ? TunnelRole.Host : TunnelRole.Guest };
+        await using var driver = new SessionDriver(args, log, curlTest) { Role = isHost ? TunnelRole.Host : TunnelRole.Guest };
 
         stack.Channel.StateChanged += state =>
         {
@@ -127,7 +123,7 @@ public static class SessionCommand
         // The coordinator subscribes to the channel from now — before ConnectAsync — so it sees hello.ack (the allowed ports and the public IP)
         // and every frame after it with no gap, exactly as the application does at startup.
         await using var channel = driver.Wrap(stack.Channel);
-        using var coordinator = new SessionCoordinator(channel, stack.Api, driver, driver.Browser, time: TimeProvider.System, options: SessionCoordinatorOptions.Default with
+        using var coordinator = new SessionCoordinator(channel, stack.Api, driver, HeadlessSystemProxyGuard.Instance, time: TimeProvider.System, options: SessionCoordinatorOptions.Default with
         {
             ConnectTimeout = TimeSpan.FromSeconds(args.GetInt("connect-timeout-s", 30)),
             StatsInterval = TimeSpan.FromSeconds(args.GetInt("stats-interval-s", 30)),

@@ -26,7 +26,6 @@ try
         "gather" => await GatherCommand.RunAsync(options, cancel.Token),
         "symmetric" => await SymmetricCommand.RunAsync(options, cancel.Token),
         "probe" => await ProbeCommand.RunAsync(options, cancel.Token),
-        "browser" => await BrowserCommand.RunAsync(options, cancel.Token),
         "session" => await SessionCommand.RunAsync(options, cancel.Token),
         _ => Unknown(args[0]),
     };
@@ -69,22 +68,15 @@ static void Usage()
               result + diagnostics JSON, then exchange hello/hello-ack over the authenticated stream.
               With --post-to, POST the final result JSON to <base>/api/v1/diagnostics as {session_id, role, data}.
 
-          browser --proxy-port N | --self-hosted [--browser chrome|edge] [--profile path]
-              Locate the browser (App Paths + Authenticode publisher), detect enterprise proxy/profile policies,
-              launch it inside a Job Object on http://check.josour/ (with --self-hosted: a local
-              ConnectProxyServer with an empty allowlist serves the probe page and everything goes direct),
-              report probe_hit_ms (10 s timeout), close it after 5 s and report close_ms. JSON on stdout.
-              This is the Windows browser-matrix tool (Chrome/Edge x managed/unmanaged x Win10/11).
-
           probe --api https://host --token T --ip X --port N
               POST /api/v1/probe on the backend (best effort).
 
           session --api https://host --email E --password P --role host [--available|--no-available] [--auto-reject]
           session --api https://host --email E --password P --role guest --host-device <id|name>
-                  [--minutes 30] [--list-hosts] [--curl-test <url>] [--browser chrome|edge] [--profile path]
+                  [--minutes 30] [--list-hosts] [--curl-test <url>]
                   common: [--state-dir path] [--reset-device] [--listen-port N] [--no-upnp]
                           [--connect-timeout-s 30] [--stats-interval-s 30] [--quiet] [--no-diagnostics]
-              The headless equivalent of the WPF app: sign in through ApiClient/AuthSession, open the real
+              The headless equivalent of the app: sign in through ApiClient/AuthSession, open the real
               ControlChannel over WSS, run the full TunnelSession for the role, and print one JSON event per
               line on stdout (machine-readable) with a human summary on stderr.
               Host: announces host.available (the default; --available is the explicit form, --no-available stays
@@ -94,8 +86,8 @@ static void Usage()
                     check has something to probe, and the tunnel listener binds it.
               Guest: --list-hosts prints the available hosts and exits; otherwise sends request.create, runs the
                     guest side, prints the local proxy port, and with --curl-test performs an HTTP GET through
-                    the proxy itself (no browser) so the response body proves the traffic left via the host's IP.
-                    --browser launches the real work browser instead (cannot be combined with --curl-test).
+                    the proxy itself so the response body proves the traffic left via the host's IP. The system
+                    proxy is never changed: point a browser at the printed port by hand to browse through it.
               Both honour session.terminate, expires_at and Ctrl+C with the protocol section-7 cleanup, and both
               POST the tunnel listener's unauthenticated-connection count to /api/v1/diagnostics at session end
               (docs/api.md reserved keys: listener_unauthenticated, listener_port, unauthenticated_peers).

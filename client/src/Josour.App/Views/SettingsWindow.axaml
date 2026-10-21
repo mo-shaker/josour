@@ -69,13 +69,11 @@
                             IsOpen="{Binding IsLanguageRestartNoteVisible, Mode=OneWay}"
                             Message="{x:Static app:Strings.SettingsLanguageRestartNote}" />
 
-                <TextBlock Classes="caption secondary" Margin="0,12,0,0"
-                              Text="{x:Static app:Strings.SettingsBrowserLabel}" />
-                <ComboBox Margin="0,4,0,0"
-                          ItemsSource="{Binding Source={x:Static vm:SettingsViewModel.Browsers}}"
-                          SelectedItem="{Binding SelectedBrowser, Mode=TwoWay}" />
+                <CheckBox Margin="0,12,0,0"
+                          Content="{x:Static app:Strings.SettingsCheckPageLabel}"
+                          IsChecked="{Binding OpenCheckPageOnConnect, Mode=TwoWay}" />
                 <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Margin="0,4,0,0"
-                              Text="{x:Static app:Strings.SettingsBrowserHint}" />
+                              Text="{x:Static app:Strings.SettingsCheckPageHint}" />
 
                 <!-- start-up -->
                 <TextBlock Classes="bodyStrong" Margin="0,20,0,0" Text="{x:Static app:Strings.SettingsStartupSection}" />

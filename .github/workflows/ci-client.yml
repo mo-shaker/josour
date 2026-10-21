@@ -30,15 +30,16 @@ jobs:
       - name: Mux benchmarks (informational, ADR-0006 criteria)
         continue-on-error: true
         run: dotnet test tests/Josour.Tunnel.Tests --no-build -c Release --filter "Category=Benchmark" --logger "console;verbosity=detailed"
-      # The app multi-targets (ADR-0013), so publish names the framework: the Windows one, which is the build
-      # that carries the toast notifications.
-      - name: Publish app (unsigned, artifact for QA)
-        run: dotnet publish src/Josour.App -c Release -f net8.0-windows10.0.19041.0 -r win-x64 --self-contained false -o publish/app
+      # The same single self-contained Josour.exe a user is given (scripts/publish-exe.ps1 refuses a publish that
+      # leaves anything beside it). Releases come from release-client.yml; this one is for QA of a commit.
+      - name: Publish Josour.exe (unsigned, artifact for QA)
+        shell: pwsh
+        run: ../scripts/publish-exe.ps1 -Output publish/exe
       - uses: actions/upload-artifact@v4
         with:
-          name: josour-app-unsigned
-          path: client/publish/app
-          retention-days: 7
+          name: josour-exe-unsigned
+          path: client/publish/exe/Josour.exe
+          retention-days: 14
 
   build-macos:
     # ADR-0013: macOS is a supported platform, not a place the libraries merely compile. This job builds the
@@ -56,7 +57,7 @@ jobs:
         run: dotnet build src/Josour.App -c Release -f net8.0
       - name: Test
         run: |
-          for p in Core Tunnel Proxy Egress Browser Infrastructure E2E App; do
+          for p in Core Tunnel Proxy Egress Infrastructure E2E App; do
             dotnet test tests/Josour.$p.Tests -c Release --filter "Category!=Benchmark"
           done
 
@@ -73,6 +74,6 @@ jobs:
           dotnet-version: "8.0.x"
       - name: Test libraries
         run: |
-          for p in Core Tunnel Proxy Egress Browser Infrastructure E2E; do
+          for p in Core Tunnel Proxy Egress Infrastructure E2E; do
             dotnet test tests/Josour.$p.Tests -c Release --filter "Category!=Benchmark"
           done

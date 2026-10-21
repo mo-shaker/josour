@@ -26,22 +26,23 @@ public static class LoggingSetup
     /// The path template handed to the file sink, e.g. <c>...\logs\app-.log</c>.
     /// Serilog inserts the date before the extension: <c>app-20260903.log</c>.
     /// </summary>
-    public static string GetLogPathTemplate(string? logDirectory = null) =>
-        Path.Combine(logDirectory ?? DefaultLogDirectory, FileNamePrefix + FileExtension);
+    public static string GetLogPathTemplate(string? logDirectory = null, string? fileNamePrefix = null) =>
+        Path.Combine(logDirectory ?? DefaultLogDirectory, (fileNamePrefix ?? FileNamePrefix) + FileExtension);
 
     /// <summary>File name the sink produces for a given day, e.g. <c>app-20260903.log</c>.</summary>
     public static string GetLogFileName(DateOnly date) =>
         FileNamePrefix + date.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture) + FileExtension;
 
     /// <summary>Builds the logger configuration. Call <c>.CreateLogger()</c> on the result.</summary>
-    public static LoggerConfiguration CreateConfiguration(string? logDirectory = null, LogEventLevel minimumLevel = LogEventLevel.Debug) =>
+    /// <param name="fileNamePrefix">Another file than the app's (<c>proxy-</c> for the system-proxy helpers, which run beside it).</param>
+    public static LoggerConfiguration CreateConfiguration(string? logDirectory = null, LogEventLevel minimumLevel = LogEventLevel.Debug, string? fileNamePrefix = null) =>
         new LoggerConfiguration()
             .MinimumLevel.Is(minimumLevel)
             .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
             .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
             .Enrich.FromLogContext()
             .WriteTo.File(
-                GetLogPathTemplate(logDirectory),
+                GetLogPathTemplate(logDirectory, fileNamePrefix),
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: RetainedFileCount,
                 fileSizeLimitBytes: FileSizeLimitBytes,

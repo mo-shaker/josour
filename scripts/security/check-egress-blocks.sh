@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Document requirement 14 and protocol.md §6: stopping access to the host's local network,
-# to localhost and to internal addresses, through the work browser's local proxy.
+# to localhost and to internal addresses, through the guest's local proxy.
 # Usage: ./check-egress-blocks.sh <proxy-port> [allowed-domain]
 set -euo pipefail
 PORT="${1:?usage: check-egress-blocks.sh <proxy-port> [allowed-domain]}"

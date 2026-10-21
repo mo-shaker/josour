@@ -13,6 +13,7 @@ using Josour.App.ViewModels;
 using Josour.App.Views;
 using Josour.Core.Control;
 using Josour.Core.Diagnostics;
+using Josour.Core.Net;
 using Josour.Core.Security;
 using Josour.Infrastructure;
 using Josour.Infrastructure.Api;
@@ -26,6 +27,7 @@ using Josour.Infrastructure.Logging;
 using Josour.Infrastructure.Security;
 using Josour.Infrastructure.Session;
 using Josour.Infrastructure.Settings;
+using Josour.Infrastructure.SystemProxy;
 using Serilog;
 using Serilog.Extensions.Logging;
 
@@ -43,6 +45,7 @@ public partial class App : Application
     private IAppSettingsStore? _settings;
     private string _languageSource = "default";
     private bool _exited;
+    private ISystemProxyGuard? _systemProxy;
 
     public App()
         : this(StartupOptions.Parse(Array.Empty<string>()), null)
@@ -72,6 +75,11 @@ public partial class App : Application
             desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnExplicitShutdown;
             desktop.Exit += (_, e) => OnExit(e.ApplicationExitCode);
 
+            // Log-off and shut-down (WM_QUERYENDSESSION on Windows, the quit event on macOS) and a plain SIGTERM do not
+            // go through Tray → Exit: the system proxy is put back right there, while there is still time.
+            desktop.ShutdownRequested += (_, _) => RestoreSystemProxyNow("shutdown requested");
+            AppDomain.CurrentDomain.ProcessExit += (_, _) => RestoreSystemProxyNow("process exit");
+
             // Only a real desktop run starts the app. The headless UI tests build this same class, and starting there
             // meant every test run signed in to the developer's real server with the developer's real stored session -
             // dozens of parallel refreshes of one rotating token, which the server rightly treats as theft.
@@ -84,6 +92,10 @@ public partial class App : Application
     private void Start()
     {
         Log.Logger = LoggingSetup.CreateConfiguration().CreateLogger();
+
+        // Before any HTTP client or WebSocket exists: while a guest session points the system proxy at our own listener,
+        // this process's traffic (the API, the control channel, the proxy's direct path) must not follow it (ADR-0015).
+        LoopSafeWebProxy.InstallAsDefault();
 
         // The language decides every string in this method, the failure message box included, so it is resolved before
         // anything else — and before the first FrameworkElement exists, which is what makes the metadata override below
@@ -143,9 +155,9 @@ public partial class App : Application
                 _instance.StartListening();
             }
 
-            var guard = services.GetRequiredService<StaleWorkBrowserGuard>();
+            _systemProxy = services.GetRequiredService<ISystemProxyGuard>();
             var flow = services.GetRequiredService<IAuthFlow>();
-            _ = RunStartupFlowAsync(guard, flow, logger);
+            _ = RunStartupFlowAsync(_systemProxy, flow, logger);
         }
         catch (Exception ex)
         {
@@ -192,18 +204,23 @@ public partial class App : Application
         Thread.CurrentThread.CurrentUICulture = pack.Culture;
     }
 
-    private static async Task RunStartupFlowAsync(StaleWorkBrowserGuard guard, IAuthFlow flow, ILogger<App> logger)
+    private static async Task RunStartupFlowAsync(ISystemProxyGuard systemProxy, IAuthFlow flow, ILogger<App> logger)
     {
         RetireLocalTrustRules(logger);
+        RetireWorkBrowser(logger);
 
         try
         {
-            // Before anything can start a session: close a work browser a previous, unclean run left behind (plan 8.5).
-            await guard.CleanupAsync(CancellationToken.None);
+            // Before anything can start a session: a system proxy that a previous, unclean run left pointing at a listener
+            // that no longer exists means no browsing at all on this machine. Put it back first (ADR-0015).
+            if (systemProxy.IsApplied && await systemProxy.RestoreAsync(CancellationToken.None))
+            {
+                logger.LogWarning("Put back the system proxy settings an earlier session left behind");
+            }
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "The start-up clean-up of a leftover work browser failed");
+            logger.LogError(ex, "The start-up restore of the system proxy failed");
         }
 
         try
@@ -234,6 +251,43 @@ public partial class App : Application
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             logger.LogWarning("Could not remove the old trusted-guest file: {Message}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// The 1.x work browser (ADR-0010) is gone (ADR-0015): its crash marker and its separate browser profile are removed
+    /// once, so they do not sit in the data folder looking as though they still meant something.
+    /// </summary>
+    private static void RetireWorkBrowser(ILogger<App> logger)
+    {
+        try
+        {
+            if (File.Exists(AppPaths.LegacyWorkBrowserMarkerFile)) File.Delete(AppPaths.LegacyWorkBrowserMarkerFile);
+            if (Directory.Exists(AppPaths.LegacyBrowserProfileDirectory))
+            {
+                Directory.Delete(AppPaths.LegacyBrowserProfileDirectory, recursive: true);
+                logger.LogInformation("Removed the old work-browser profile; any browser now goes through the host");
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning("Could not remove the old work-browser files: {Message}", ex.Message);
+        }
+    }
+
+    /// <summary>Synchronous and bounded: it runs where the process may be about to go away.</summary>
+    private void RestoreSystemProxyNow(string why)
+    {
+        var guard = _systemProxy;
+        if (guard is null || !guard.IsApplied) return;
+        try
+        {
+            Log.Warning("Putting the system proxy back ({Why})", why);
+            guard.RestoreAsync(CancellationToken.None).Wait(TimeSpan.FromSeconds(10));
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Putting the system proxy back failed ({Why})", why);
         }
     }
 
@@ -352,28 +406,28 @@ public partial class App : Application
             sp.GetRequiredService<IApiClient>(),
             sp.GetRequiredService<ILogger<AllowlistDisclosureService>>()));
 
-        // Crash recovery (plan 8.5): the marker a running work browser leaves, and the start-up guard that acts on it.
-        services.AddSingleton<IWorkBrowserRunMarkerStore>(sp => new WorkBrowserRunMarkerStore(
-            sp.GetRequiredService<ILogger<WorkBrowserRunMarkerStore>>()));
-        services.AddSingleton<IProcessController>(sp => new SystemProcessController(
-            sp.GetRequiredService<ILogger<SystemProcessController>>()));
-        services.AddSingleton(sp => new StaleWorkBrowserGuard(
-            sp.GetRequiredService<IWorkBrowserRunMarkerStore>(),
-            sp.GetRequiredService<IProcessController>(),
-            sp.GetRequiredService<ILogger<StaleWorkBrowserGuard>>()));
+        // The guest's system proxy (ADR-0015): this platform's controller, the marker written before any change, and the
+        // guardian process + restore at login that put the settings back when this process cannot.
+        services.AddSingleton<ISystemProxyController>(sp => SystemProxyControllers.ForCurrentPlatform(sp.GetRequiredService<ILoggerFactory>()));
+        services.AddSingleton<ISystemProxyMarkerStore>(sp => new SystemProxyMarkerStore(sp.GetRequiredService<ILogger<SystemProxyMarkerStore>>()));
+        services.AddSingleton<ISystemProxySafetyNet>(sp => new SystemProxySafetyNet(sp.GetRequiredService<ILogger<SystemProxySafetyNet>>()));
+        services.AddSingleton<ISystemProxyGuard>(sp => new SystemProxyGuard(
+            sp.GetRequiredService<ISystemProxyController>(),
+            sp.GetRequiredService<ISystemProxyMarkerStore>(),
+            sp.GetRequiredService<ISystemProxySafetyNet>(),
+            sp.GetRequiredService<ILogger<SystemProxyGuard>>()));
+        services.AddSingleton<ICheckPageOpener>(sp => new CheckPageOpener(
+            sp.GetRequiredService<IAppSettingsStore>(),
+            () => sp.GetRequiredService<IShellService>()));
 
-        // The session: the real tunnel (Track B) behind an injectable factory, and the work browser behind a provider that
-        // knows which of Chrome/Edge is installed and unmanaged. Both are the only places the App references Tunnel/Browser.
+        // The session: the real tunnel (Track B) behind an injectable factory — the only place the App references Tunnel/Proxy.
         services.AddSingleton<ITunnelSessionFactory, TunnelSessionFactory>();
-        services.AddSingleton<IWorkBrowserProvider, WorkBrowserProvider>();
-        services.AddSingleton<IWorkBrowser>(sp => new WorkBrowserSession(
-            sp.GetRequiredService<IWorkBrowserProvider>(),
-            sp.GetRequiredService<ILogger<WorkBrowserSession>>()));
         services.AddSingleton(sp => new SessionCoordinator(
             sp.GetRequiredService<IControlChannel>(),
             sp.GetRequiredService<IApiClient>(),
             sp.GetRequiredService<ITunnelSessionFactory>(),
-            sp.GetRequiredService<IWorkBrowser>(),
+            sp.GetRequiredService<ISystemProxyGuard>(),
+            sp.GetRequiredService<ICheckPageOpener>(),
             sp.GetRequiredService<ILogger<SessionCoordinator>>(),
             TimeProvider.System,
             SessionCoordinatorOptions.Default with { Post = UiThread.Post }));
@@ -430,8 +484,9 @@ public partial class App : Application
                 _host.Services.GetService<SystemConnectivitySignals>()?.Dispose(); // SystemEvents holds a strong reference
                 _host.Services.GetService<ConnectivityWatcher>()?.Dispose();
                 _host.StopAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
+                RestoreSystemProxyNow("exit");
 
-                // DisposeAsync, not Dispose: the control channel and the work browser are IAsyncDisposable, and a container
+                // DisposeAsync, not Dispose: the control channel is IAsyncDisposable, and a container
                 // torn down synchronously refuses those.
                 if (_host is IAsyncDisposable asyncHost)
                 {

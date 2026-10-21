@@ -10,7 +10,6 @@
     <ProjectReference Include="../../src/Josour.Core/Josour.Core.csproj" />
     <ProjectReference Include="../../src/Josour.Tunnel/Josour.Tunnel.csproj" />
     <ProjectReference Include="../../src/Josour.Proxy/Josour.Proxy.csproj" />
-    <ProjectReference Include="../../src/Josour.Browser/Josour.Browser.csproj" />
     <!-- Week 4: the session command drives the real stack, so it needs the host's side (Egress) and the server layer (Infrastructure) -->
     <ProjectReference Include="../../src/Josour.Egress/Josour.Egress.csproj" />
     <ProjectReference Include="../../src/Josour.Infrastructure/Josour.Infrastructure.csproj" />

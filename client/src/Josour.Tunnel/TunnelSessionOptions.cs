@@ -153,11 +153,11 @@ public sealed record TunnelSessionOptions
     public bool StartGuestProxy { get; init; } = true;
 
     /// <summary>
-    /// Cleanup step 2 (docs/protocol.md section 7): the polite browser close, then the Job Object. The tunnel does not own the browser,
-    /// so the application passes its close in here to be carried out in its right place in the order: after the proxy stops accepting and before the GOAWAY.
-    /// Its errors are swallowed and recorded in Diagnostics and do not stop the rest of the cleanup.
+    /// Cleanup step 2 of docs/protocol.md section 7 on the guest: the application puts the operating system's proxy back
+    /// (ADR-0015), here, after the local proxy stops accepting and before the GOAWAY, so nothing is left pointing at a proxy
+    /// that is about to disappear. Its errors are swallowed and recorded in Diagnostics and do not stop the rest of the cleanup.
     /// </summary>
-    public Func<CancellationToken, Task>? CloseBrowserAsync { get; init; }
+    public Func<CancellationToken, Task>? RestoreSystemProxyAsync { get; init; }
 
     /// <summary>The timeout for each closing step in EndAsync, so ending a session does not hang on a dead peer.</summary>
     public TimeSpan CleanupStepTimeout { get; init; } = TimeSpan.FromSeconds(5);

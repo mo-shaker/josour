@@ -246,7 +246,7 @@ public sealed class ControlMessageSerializerTests
     public void Hello_CarriesTheCapabilities_AndAnOlderAckStillReads()
     {
         var hello = ControlMessageSerializer.Serialize(new HelloMessage("t", Guid.Empty, "2.0.0", null, ClientCapabilities.Current));
-        Assert.Contains("\"capabilities\":[\"contacts\",\"offers\",\"trust_v2\"]", hello);
+        Assert.Contains("\"capabilities\":[\"contacts\",\"offers\",\"trust_v2\",\"system_proxy\"]", hello);
 
         var oldAck = Assert.IsType<HelloAckMessage>(ControlMessageSerializer.Deserialize("""
             {"type":"hello.ack","server_time":"2026-09-04T10:15:30.123Z","public_ip":"203.0.113.10",

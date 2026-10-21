@@ -130,7 +130,7 @@ public sealed class ShellService : IShellService
     }
 
     /// <summary>
-    /// Tray → Exit. A live session is ended first (docs/protocol.md section 7: the work browser goes away, the tunnel sends
+    /// Tray → Exit. A live session is ended first (docs/protocol.md section 7: the system proxy is put back, the tunnel sends
     /// GOAWAY, the listener and the UPnP mapping are dropped, the secret is zeroed, <c>session.end</c> is reported) and only
     /// then does the process shut down — the UI thread is never blocked while that happens.
     /// </summary>

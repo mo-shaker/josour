@@ -177,9 +177,6 @@
   <data name="GuestPageTitle" xml:space="preserve">
     <value>التصفح عبر مضيف</value>
   </data>
-  <data name="GuestPageDescription" xml:space="preserve">
-    <value>اختر مضيفًا متاحًا ليُفتح متصفح العمل الذي يوجّه المواقع المسموح بها عبر اتصال ذلك المضيف.</value>
-  </data>
   <data name="GuestRefresh" xml:space="preserve">
     <value>تحديث</value>
   </data>
@@ -301,9 +298,6 @@
   <data name="SessionDisconnect" xml:space="preserve">
     <value>قطع الاتصال</value>
   </data>
-  <data name="SessionReopenBrowser" xml:space="preserve">
-    <value>إعادة فتح متصفح العمل</value>
-  </data>
   <data name="SessionDismiss" xml:space="preserve">
     <value>إغلاق</value>
   </data>
@@ -356,22 +350,7 @@
   <data name="SessionEndedUnknownFormat" xml:space="preserve">
     <value>انتهت الجلسة ({0}).</value>
   </data>
-  <!-- work browser -->
-  <data name="BrowserErrorNotFound" xml:space="preserve">
-    <value>يلزم تثبيت Google Chrome أو Microsoft Edge لفتح متصفح العمل.</value>
-  </data>
-  <data name="BrowserErrorManagedByPolicy" xml:space="preserve">
-    <value>سياسة المتصفح في مؤسستك تتجاوز إعداد الوسيط، فلا يستطيع متصفح العمل استخدام هذه الجلسة.</value>
-  </data>
-  <data name="BrowserErrorInstanceHandoff" xml:space="preserve">
-    <value>ما زالت نافذة متصفح جسور أخرى مفتوحة. أغلقها ثم ابدأ الجلسة من جديد.</value>
-  </data>
-  <data name="BrowserErrorProbeTimeout" xml:space="preserve">
-    <value>لم يمرّر متصفح العمل حركته عبر جسور.</value>
-  </data>
-  <data name="BrowserErrorOther" xml:space="preserve">
-    <value>تعذّر تشغيل متصفح العمل.</value>
-  </data>
+  <!-- session notices -->
   <!-- incoming request: the pre-accept disclosure (product document section 15) -->
   <data name="IncomingRequestWindowTitle" xml:space="preserve">
     <value>طلب اتصال وارد</value>
@@ -410,7 +389,7 @@
     <value>لا يسمح الإصدار الحالي من القائمة بأي موقع.</value>
   </data>
   <data name="AllowedSitesUnrestricted" xml:space="preserve">
-    <value>سيتمكّن من تصفّح أي موقع عبر اتصالك، لا قائمة محددة.</value>
+    <value>كل برنامج على جهازه يتبع إعدادات البروكسي في النظام (أي متصفح) سيصل إلى أي موقع عبر اتصالك وبعنوانك.</value>
   </data>
   <data name="IncomingRequestWarningTitle" xml:space="preserve">
     <value>تنبيه خصوصية</value>
@@ -606,21 +585,6 @@
   </data>
   <data name="SettingsLanguageRestartNote" xml:space="preserve">
     <value>تسري اللغة الجديدة عند إعادة تشغيل جسور.</value>
-  </data>
-  <data name="SettingsBrowserLabel" xml:space="preserve">
-    <value>متصفح العمل</value>
-  </data>
-  <data name="SettingsBrowserHint" xml:space="preserve">
-    <value>المتصفح الذي يُفتح بملف تعريف منفصل أثناء الجلسة.</value>
-  </data>
-  <data name="SettingsBrowserAuto" xml:space="preserve">
-    <value>تلقائي</value>
-  </data>
-  <data name="SettingsBrowserChrome" xml:space="preserve">
-    <value>Chrome</value>
-  </data>
-  <data name="SettingsBrowserEdge" xml:space="preserve">
-    <value>Edge</value>
   </data>
   <data name="SettingsStartupSection" xml:space="preserve">
     <value>بدء التشغيل</value>
@@ -819,7 +783,7 @@
     <value>دور الضيف غير متاح على هذا النظام</value>
   </data>
   <data name="GuestRoleUnavailableMessage" xml:space="preserve">
-    <value>يستطيع Josour أن يضمن أن متصفح العمل وحده هو ما يمر عبر المضيف على Windows فقط. وبدون ذلك الضمان قد يخرج كل ما على جهازك من عنوان المضيف، وهو ليس ما وافق عليه. هذا الجهاز يصلح مضيفًا؛ ودور الضيف يحتاج جهاز Windows.</value>
+    <value>يستطيع جسور تغيير إعدادات البروكسي على Windows وmacOS فقط، وبها تمر متصفحاتك عبر المضيف. هذا الجهاز يصلح مضيفًا.</value>
   </data>
   <data name="AdminWindowTitle" xml:space="preserve">
     <value>إدارة المستخدمين</value>
@@ -1087,5 +1051,41 @@
   </data>
   <data name="AdminOpenWebDashboard" xml:space="preserve">
     <value>افتح لوحة الإدارة الكاملة على الويب (التسجيلات، جهات الاتصال، الجلسات، الإعدادات)</value>
+  </data>
+  <data name="SessionOpenCheckPage" xml:space="preserve">
+    <value>افتح صفحة الفحص</value>
+  </data>
+  <data name="SessionGuestProxyNote" xml:space="preserve">
+    <value>أي متصفح على هذا الجهاز يمر الآن عبر اتصال المضيف حتى تنتهي الجلسة. يستطيع المضيف أن يرى أسماء المواقع التي تفتحها، ومحتوى الصفحات غير المشفّرة (غير https).</value>
+  </data>
+  <data name="CheckPageNotConfirmed" xml:space="preserve">
+    <value>لم تصل صفحة الفحص عبر المضيف. قد يكون هذا المتصفح مضبوطًا على تجاهل إعدادات البروكسي في النظام، وقد تعمل المتصفحات الأخرى.</value>
+  </data>
+  <data name="SystemProxyErrorPolicyLocked" xml:space="preserve">
+    <value>سياسة مؤسستك لا تسمح لهذا الحساب بتغيير إعدادات البروكسي، فلا يصلح هذا الجهاز ضيفًا.</value>
+  </data>
+  <data name="SystemProxyErrorAuthorizationDenied" xml:space="preserve">
+    <value>لم تُدخل كلمة مرور المدير، فلم تتغير إعدادات البروكسي.</value>
+  </data>
+  <data name="SystemProxyErrorOther" xml:space="preserve">
+    <value>تعذّر على جسور تغيير إعدادات البروكسي على هذا الجهاز. التفاصيل في السجل.</value>
+  </data>
+  <data name="TrayRepairInternet" xml:space="preserve">
+    <value>إصلاح إعدادات الإنترنت</value>
+  </data>
+  <data name="RepairInternetDone" xml:space="preserve">
+    <value>عادت إعدادات الإنترنت كما كانت.</value>
+  </data>
+  <data name="RepairInternetNothing" xml:space="preserve">
+    <value>إعدادات الإنترنت سليمة، ولا شيء يحتاج إصلاحًا.</value>
+  </data>
+  <data name="RepairInternetFailed" xml:space="preserve">
+    <value>تعذّرت إعادة إعدادات الإنترنت. حاول مرة أخرى، أو راجع السجل.</value>
+  </data>
+  <data name="SettingsCheckPageLabel" xml:space="preserve">
+    <value>افتح صفحة الفحص عند بدء الجلسة</value>
+  </data>
+  <data name="SettingsCheckPageHint" xml:space="preserve">
+    <value>عندما تكون ضيفًا، يوجّه جسور إعدادات البروكسي في هذا الجهاز إلى المضيف طوال الجلسة، فيمر أي متصفح عبره، ثم يعيدها كما كانت. وتعرض صفحة الفحص العنوان الذي ستراه المواقع.</value>
   </data>
 </root>

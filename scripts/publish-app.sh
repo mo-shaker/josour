@@ -172,8 +172,12 @@ for lib in libSkiaSharp.dylib libHarfBuzzSharp.dylib; do
 done
 
 # And the app must actually start. Launching it headless for a moment catches a bundle that assembles cleanly
-# and still dies on a missing dependency — the only way to know is to run it.
-if ! "$app/Contents/MacOS/Josour" --uninstall-notifications >/dev/null 2>&1; then
+# and still dies on a missing dependency — the only way to know is to run it. An Intel build on an Apple Silicon
+# machine without Rosetta (a CI runner, say) cannot run here at all; that is said, not mistaken for a broken bundle.
+host_arch="$(uname -m)"
+if [[ "$arch" == "x64" && "$host_arch" == "arm64" ]] && ! arch -x86_64 /usr/bin/true 2>/dev/null; then
+    echo "note: skipping the run check — an x64 build cannot run on this arm64 Mac without Rosetta." >&2
+elif ! "$app/Contents/MacOS/Josour" --uninstall-notifications >/dev/null 2>&1; then
     echo "the bundled executable could not run (tried --uninstall-notifications, which exits immediately)." >&2
     exit 1
 fi

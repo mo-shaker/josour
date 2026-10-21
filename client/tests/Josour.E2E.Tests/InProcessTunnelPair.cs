@@ -130,7 +130,7 @@ internal sealed class InProcessTunnelPair : IAsyncDisposable
                     GuestProxy = context =>
                     {
                         // No system proxy by default: the in-process test is not affected by the developer machine's settings.
-                        var adapter = (ProxyTunnelAdapter)ProxyTunnelAdapter.Create(context, null, null, guestBlocker, guestSystemProxy ?? NoSystemProxy.Instance);
+                        var adapter = (ProxyTunnelAdapter)ProxyTunnelAdapter.Create(context, admission: null, guestBlocker, guestSystemProxy ?? NoSystemProxy.Instance);
                         proxyServer = adapter.Server;
                         return adapter;
                     },

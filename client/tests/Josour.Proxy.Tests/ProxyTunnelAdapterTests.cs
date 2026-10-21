@@ -82,11 +82,10 @@ public class ProxyTunnelAdapterTests
     }
 
     [Fact]
-    public async Task Create_WithBrowser_AppliesOwnerPidCheck()
+    public async Task Create_WithAdmission_AppliesIt()
     {
-        var browser = new FakeBrowser(); // it owns no PID
-        var checker = new FakePidChecker { Pid = 4242 };
-        await using var adapter = ProxyTunnelAdapter.Create(Context(new FakeMux()), browser, checker);
+        var admission = new FakeAdmission { Admits = false };
+        await using var adapter = ProxyTunnelAdapter.Create(Context(new FakeMux()), admission);
         adapter.Start();
 
         // The refusal closes the socket at once; the write or the connect itself may fail with a reset, and the counters are the confirmation.
@@ -103,7 +102,7 @@ public class ProxyTunnelAdapterTests
         var deadline = DateTime.UtcNow.AddSeconds(5);
         while (server.Counters.RejectedByOwner == 0 && DateTime.UtcNow < deadline) await Task.Delay(20);
         Assert.Equal(1, server.Counters.RejectedByOwner);
-        Assert.Equal(1, checker.Calls);
+        Assert.Equal(1, admission.Calls);
         Assert.Equal(0, server.Counters.Tunneled);
     }
 

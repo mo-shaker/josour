@@ -11,7 +11,7 @@
              d:DesignWidth="440" d:DesignHeight="520">
     <Grid Margin="4,12,4,4" RowDefinitions="Auto,Auto,*,Auto">
         <!--
-            Where the platform cannot tell the work browser's connections from the rest of the machine's, this device
+            Where Josour cannot point the operating system's proxy at itself (anything but Windows and macOS), this device
             cannot use anybody's connection: offering stays possible, using does not.
         -->
         <c:InfoBar Grid.Row="1" Margin="0,0,0,10" IsClosable="False" Severity="Warning"

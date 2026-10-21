@@ -30,8 +30,16 @@ public static class AppPaths
     public static string AutoAcceptFile => Path.Combine(LocalAppDataRoot, "auto-accept.json");
 
     /// <summary>
-    /// <c>%LOCALAPPDATA%\Josour\work-browser.json</c>: the note that says a work browser is running, so a start-up
-    /// after a crash can close it (see <c>Session.StaleWorkBrowserGuard</c>). Present only while a browser is up.
+    /// <c>%LOCALAPPDATA%\Josour\system-proxy.json</c>: the settings to put back while a session points the system proxy at
+    /// this app (see <c>SystemProxy.SystemProxyGuard</c>). Present only while the change is in force.
     /// </summary>
-    public static string WorkBrowserMarkerFile => Path.Combine(LocalAppDataRoot, "work-browser.json");
+    public static string SystemProxyMarkerFile => Path.Combine(LocalAppDataRoot, "system-proxy.json");
+
+    /// <summary>
+    /// <c>%LOCALAPPDATA%\Josour\work-browser.json</c> and <c>BrowserProfile</c>: what a 1.x app kept for its work browser,
+    /// retired by ADR-0015 and only named so the app can delete what was left behind.
+    /// </summary>
+    public static string LegacyWorkBrowserMarkerFile => Path.Combine(LocalAppDataRoot, "work-browser.json");
+
+    public static string LegacyBrowserProfileDirectory => Path.Combine(LocalAppDataRoot, "BrowserProfile");
 }

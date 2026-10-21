@@ -9,14 +9,14 @@ public sealed record SessionCoordinatorOptions
     public static SessionCoordinatorOptions Default { get; } = new();
 
     /// <summary>
-    /// How the observable properties reach the UI thread. The default runs inline (tests, head-less use); the WPF app passes
+    /// How the observable properties reach the UI thread. The default runs inline (tests, head-less use); the Avalonia app passes
     /// its dispatcher post so that bindings are updated on the UI thread.
     /// </summary>
     public Action<Action> Post { get; init; } = action => action();
 
     /// <summary>
-    /// How long the guest waits for the probe page to come through the local proxy after the browser started.
-    /// Nothing within this window means the browser is not using our proxy → <c>browser_not_proxied</c>.
+    /// How long the guest waits for the check page to come through the local proxy after opening it in the default browser.
+    /// Nothing within this window is a warning (that browser may ignore the system proxy), never an ending.
     /// </summary>
     public TimeSpan ProbeTimeout { get; init; } = TimeSpan.FromSeconds(10);
 
@@ -32,9 +32,6 @@ public sealed record SessionCoordinatorOptions
 
     /// <summary>Countdown / stats tick.</summary>
     public TimeSpan Tick { get; init; } = TimeSpan.FromSeconds(1);
-
-    /// <summary>Polite window before the browser's Job Object is closed (docs/protocol.md section 7 step 2).</summary>
-    public TimeSpan BrowserCloseGrace { get; init; } = TimeSpan.FromSeconds(3);
 
     /// <summary>Upper bound for one cleanup step so ending never hangs on a dead peer.</summary>
     public TimeSpan CleanupTimeout { get; init; } = TimeSpan.FromSeconds(15);

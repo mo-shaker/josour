@@ -9,7 +9,7 @@ using Josour.App.ViewModels;
 using Josour.App.Views;
 using Josour.Infrastructure.Localization;
 using Josour.Infrastructure.Session;
-using Josour.Proxy;
+using Josour.Infrastructure.SystemProxy;
 
 namespace Josour.App.Tests;
 
@@ -129,11 +129,10 @@ public class ViewsLoadTests
     }
 
     [AvaloniaFact]
-    public void The_contacts_page_offers_the_guest_role_only_where_the_platform_can_police_it()
+    public void The_contacts_page_offers_the_guest_role_only_where_the_system_proxy_can_be_set()
     {
-        // The proxy listens on loopback; without an owner check every program on the machine could leave
-        // through the host's address. So the page either offers the role or says why it cannot — never both,
-        // and never neither.
+        // Being a guest means pointing this machine's proxy settings at the host (ADR-0015). So the page either offers
+        // the role or says why it cannot — never both, and never neither.
         var page = new ContactsPage();
 
         using var rendered = Render(page);
@@ -142,8 +141,8 @@ public class ViewsLoadTests
         var warning = bars.SingleOrDefault(b => b.Title == Strings.GuestRoleUnavailableTitle);
 
         Assert.NotNull(warning);
-        Assert.Equal(!OwnerPidCheckers.SupportedOnThisPlatform, warning!.IsVisible);
-        Assert.Equal(OwnerPidCheckers.SupportedOnThisPlatform, ContactsViewModel.IsGuestRoleSupported);
+        Assert.Equal(!SystemProxyControllers.SupportedOnThisPlatform, warning!.IsVisible);
+        Assert.Equal(SystemProxyControllers.SupportedOnThisPlatform, ContactsViewModel.IsGuestRoleSupported);
     }
 
     [AvaloniaFact]

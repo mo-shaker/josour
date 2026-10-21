@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using Josour.Core.Allowlist;
-using Josour.Core.Browser;
 using Josour.Core.Net;
 using Josour.Tunnel.Mux;
 
@@ -29,14 +28,18 @@ internal sealed class FakeMux : IMuxConnection
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 
-internal sealed class FakeBrowser : IBrowserSession
+internal sealed class FakeAdmission : IConnectionAdmission
 {
-    public HashSet<int> Owned { get; } = new();
-    public bool IsRunning => true;
-    public bool OwnsProcess(int pid) => Owned.Contains(pid);
-    public Task<BrowserLaunchResult> LaunchAsync(BrowserLaunchOptions options, CancellationToken ct) => Task.FromResult(new BrowserLaunchResult(true, null, null));
-    public Task CloseAsync(TimeSpan graceful, CancellationToken ct) => Task.CompletedTask;
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public bool Admits { get; set; } = true;
+    public bool Throws { get; set; }
+    public int Calls { get; private set; }
+
+    public bool Admit(IPEndPoint remoteEndPoint, IPEndPoint localEndPoint)
+    {
+        Calls++;
+        if (Throws) throw new InvalidOperationException("the check itself failed");
+        return Admits;
+    }
 }
 
 internal sealed class FakePidChecker : IOwnerPidChecker
@@ -264,24 +267,21 @@ internal static class Proxies
     public static ConnectProxyServer Start(
         FakeMux? mux = null,
         StubResolver? resolver = null,
-        IBrowserSession? browser = null,
-        IOwnerPidChecker? checker = null,
-        bool? rejectUnknown = null,
+        IConnectionAdmission? admission = null,
         string[]? entries = null,
+        IAllowlist? allowlist = null,
         int[]? allowedPorts = null,
         Func<IPAddress, bool>? addressBlocker = null,
         ISystemProxyResolver? systemProxy = null)
     {
         var server = new ConnectProxyServer(new ConnectProxyOptions
         {
-            Allowlist = AllowlistMatcher.Parse(1, entries ?? DefaultEntries),
+            Allowlist = allowlist ?? AllowlistMatcher.Parse(1, entries ?? DefaultEntries),
             AllowedPorts = allowedPorts ?? new[] { 80, 443 },
             PeerPublicIp = "203.0.113.9",
             Mux = mux,
             Resolver = resolver ?? new StubResolver(),
-            Browser = browser,
-            OwnerPidChecker = checker ?? PermissiveOwnerPidChecker.Instance,
-            RejectUnknownOwner = rejectUnknown,
+            Admission = admission,
             AddressBlocker = addressBlocker ?? BlockedExceptLoopback,
             // The default: no system proxy. The tests do not depend on the developer machine's settings or its environment variables.
             SystemProxy = systemProxy ?? NoSystemProxy.Instance,

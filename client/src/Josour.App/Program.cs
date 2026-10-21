@@ -26,6 +26,17 @@ public static class Program
             return NotifierFactory.Uninstall();
         }
 
+        // The system-proxy helpers (ADR-0015) run beside the app, not instead of it: no window, no single-instance mutex.
+        if (_options.ProxyGuardian is { } guardian)
+        {
+            return SystemProxyCommands.RunGuardian(guardian);
+        }
+
+        if (_options.RestoreProxy)
+        {
+            return SystemProxyCommands.Restore();
+        }
+
         using var instance = SingleInstanceGuard.TryAcquire();
         if (instance is null)
         {

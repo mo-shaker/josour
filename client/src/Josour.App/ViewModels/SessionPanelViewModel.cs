@@ -4,7 +4,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Josour.App.Services;
-using Josour.Core.Browser;
 using Josour.Core.Control;
 using Josour.Core.Session;
 using Josour.Infrastructure.Session;
@@ -15,7 +14,7 @@ namespace Josour.App.ViewModels;
 /// The session panel shown over both tabs while a session is Preparing / Connecting / Active, and after it ended until the
 /// user dismisses the summary. It is a pure projection of <see cref="SessionCoordinator"/> into display strings
 /// (all of them from <see cref="Strings"/>): peer, phase, the monotonic countdown, the approximate data used, Disconnect,
-/// and — for the guest — "Reopen work browser" when the window was closed by hand.
+/// and — for the guest — a note that every browser now goes through the host, and "Open the check page".
 /// </summary>
 public sealed partial class SessionPanelViewModel : ObservableObject, IDisposable
 {
@@ -53,18 +52,21 @@ public sealed partial class SessionPanelViewModel : ObservableObject, IDisposabl
     private string _endedText = string.Empty;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ReopenBrowserCommand))]
-    private bool _canReopenBrowser;
+    [NotifyCanExecuteChangedFor(nameof(OpenCheckPageCommand))]
+    private bool _canOpenCheckPage;
+
+    [ObservableProperty]
+    private bool _isGuestActive;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(DisconnectCommand))]
     private bool _canDisconnect;
 
     [ObservableProperty]
-    private string _browserMessage = string.Empty;
+    private string _noticeMessage = string.Empty;
 
     [ObservableProperty]
-    private bool _hasBrowserMessage;
+    private bool _hasNoticeMessage;
 
     public SessionPanelViewModel(SessionCoordinator sessions, ILogger<SessionPanelViewModel> logger)
     {
@@ -109,11 +111,12 @@ public sealed partial class SessionPanelViewModel : ObservableObject, IDisposabl
             FormatBytes(_sessions.BytesUp),
             FormatBytes(_sessions.BytesDown));
 
-        CanReopenBrowser = _sessions.CanReopenBrowser;
+        CanOpenCheckPage = _sessions.CanOpenCheckPage;
+        IsGuestActive = IsActive && session is { IsHost: false } && _sessions.ProbeUrl is not null;
 
-        var browser = DescribeBrowserFailure(_sessions.BrowserFailure);
-        HasBrowserMessage = browser is not null;
-        BrowserMessage = browser ?? string.Empty;
+        var notice = DescribeNotice(_sessions.SystemProxyFailure, _sessions.CheckPageConfirmed);
+        HasNoticeMessage = notice is not null;
+        NoticeMessage = notice ?? string.Empty;
 
         EndedText = IsEnded
             ? string.Format(UiFlow.Culture, Strings.SessionSummaryFormat, DescribeEndReason(_sessions.LastEndReason, session?.IsHost ?? false), DataUsedText)
@@ -133,16 +136,16 @@ public sealed partial class SessionPanelViewModel : ObservableObject, IDisposabl
         }
     }
 
-    [RelayCommand(CanExecute = nameof(CanReopenBrowser))]
-    private async Task ReopenBrowserAsync(CancellationToken ct)
+    [RelayCommand(CanExecute = nameof(CanOpenCheckPage))]
+    private async Task OpenCheckPageAsync()
     {
         try
         {
-            await _sessions.ReopenBrowserAsync(ct).ConfigureAwait(true);
+            await _sessions.OpenCheckPageAsync().ConfigureAwait(true);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "Reopening the work browser failed");
+            _logger.LogError(ex, "Opening the check page failed");
         }
     }
 
@@ -177,15 +180,16 @@ public sealed partial class SessionPanelViewModel : ObservableObject, IDisposabl
         _ => string.Format(UiFlow.Culture, Strings.SessionEndedUnknownFormat, reason),
     };
 
-    /// <summary>Why the work browser is unusable, naming the cause the launch result reported.</summary>
-    public static string? DescribeBrowserFailure(BrowserLaunchFailure? failure) => failure switch
+    /// <summary>
+    /// The guest's one line of trouble: why the system proxy could not be set (the session then ended), or a check page that
+    /// did not come through (the session runs on). null when there is nothing to say.
+    /// </summary>
+    public static string? DescribeNotice(string? systemProxyFailure, bool? checkPageConfirmed) => systemProxyFailure switch
     {
-        null => null,
-        BrowserLaunchFailure.NotFound => Strings.BrowserErrorNotFound,
-        BrowserLaunchFailure.ManagedByPolicy => Strings.BrowserErrorManagedByPolicy,
-        BrowserLaunchFailure.InstanceHandoff => Strings.BrowserErrorInstanceHandoff,
-        BrowserLaunchFailure.ProbeTimeout => Strings.BrowserErrorProbeTimeout,
-        _ => Strings.BrowserErrorOther,
+        "policy_locked" => Strings.SystemProxyErrorPolicyLocked,
+        "authorization_denied" => Strings.SystemProxyErrorAuthorizationDenied,
+        { Length: > 0 } => Strings.SystemProxyErrorOther,
+        _ => checkPageConfirmed == false ? Strings.CheckPageNotConfirmed : null,
     };
 
     /// <summary>h:mm:ss above an hour, m:ss below it.</summary>

@@ -11,13 +11,13 @@ namespace Josour.Infrastructure.Tests.Support;
 /// </summary>
 public sealed class FakeTunnelSession : ITunnelSession
 {
-    private readonly Func<CancellationToken, Task>? _closeBrowser;
+    private readonly Func<CancellationToken, Task>? _restoreSystemProxy;
     private int _endCount;
 
-    public FakeTunnelSession(SessionMaterial material, Func<CancellationToken, Task>? closeBrowser = null)
+    public FakeTunnelSession(SessionMaterial material, Func<CancellationToken, Task>? restoreSystemProxy = null)
     {
         Material = material;
-        _closeBrowser = closeBrowser;
+        _restoreSystemProxy = restoreSystemProxy;
         SessionId = material.SessionId;
         Role = material.Role;
     }
@@ -107,10 +107,10 @@ public sealed class FakeTunnelSession : ITunnelSession
             EndReason = reason;
         }
 
-        // docs/protocol.md section 7 step 2: the app's browser hook runs inside the tunnel's cleanup.
-        if (_closeBrowser is not null)
+        // docs/protocol.md section 7 step 2: the app's system-proxy restore runs inside the tunnel's cleanup.
+        if (_restoreSystemProxy is not null)
         {
-            await _closeBrowser(ct).ConfigureAwait(false);
+            await _restoreSystemProxy(ct).ConfigureAwait(false);
         }
 
         SetState(TunnelState.Ended);
@@ -164,7 +164,7 @@ public sealed class FakeTunnelSessionFactory : ITunnelSessionFactory
             throw error;
         }
 
-        var session = new FakeTunnelSession(request.Material, request.CloseBrowserAsync)
+        var session = new FakeTunnelSession(request.Material, request.RestoreSystemProxyAsync)
         {
             DomainsSeen = Domains,
             Proxy = request.Material.Role == TunnelRole.Guest ? Proxy : null,

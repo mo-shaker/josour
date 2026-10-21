@@ -57,7 +57,6 @@ public static class UiStringKeys
 
     // ---- guest page ----
     public const string GuestPageTitle = "GuestPageTitle";
-    public const string GuestPageDescription = "GuestPageDescription";
     public const string GuestRefresh = "GuestRefresh";
     public const string GuestNoHostsTitle = "GuestNoHostsTitle";
     public const string GuestNoHostsText = "GuestNoHostsText";
@@ -102,7 +101,6 @@ public static class UiStringKeys
     public const string SessionTimeUp = "SessionTimeUp";
     public const string SessionDataUsedFormat = "SessionDataUsedFormat";
     public const string SessionDisconnect = "SessionDisconnect";
-    public const string SessionReopenBrowser = "SessionReopenBrowser";
     public const string SessionDismiss = "SessionDismiss";
     public const string SessionSummaryFormat = "SessionSummaryFormat";
     public const string BytesFormat = "BytesFormat";
@@ -123,13 +121,7 @@ public static class UiStringKeys
     public const string SessionEndedProtocolError = "SessionEndedProtocolError";
     public const string SessionEndedUnknownFormat = "SessionEndedUnknownFormat";
 
-    // ---- work browser ----
-    public const string BrowserErrorNotFound = "BrowserErrorNotFound";
-    public const string BrowserErrorManagedByPolicy = "BrowserErrorManagedByPolicy";
-    public const string BrowserErrorInstanceHandoff = "BrowserErrorInstanceHandoff";
-    public const string BrowserErrorProbeTimeout = "BrowserErrorProbeTimeout";
-    public const string BrowserErrorOther = "BrowserErrorOther";
-
+    // ---- session notices ----
     // ---- incoming request: the pre-accept disclosure (product document section 15) ----
     public const string IncomingRequestWindowTitle = "IncomingRequestWindowTitle";
     public const string IncomingRequestHeadingFormat = "IncomingRequestHeadingFormat";
@@ -222,11 +214,6 @@ public static class UiStringKeys
     public const string SettingsLanguageArabic = "SettingsLanguageArabic";
     public const string SettingsLanguageEnglish = "SettingsLanguageEnglish";
     public const string SettingsLanguageRestartNote = "SettingsLanguageRestartNote";
-    public const string SettingsBrowserLabel = "SettingsBrowserLabel";
-    public const string SettingsBrowserHint = "SettingsBrowserHint";
-    public const string SettingsBrowserAuto = "SettingsBrowserAuto";
-    public const string SettingsBrowserChrome = "SettingsBrowserChrome";
-    public const string SettingsBrowserEdge = "SettingsBrowserEdge";
     public const string SettingsStartupSection = "SettingsStartupSection";
     public const string SettingsStartAtLogin = "SettingsStartAtLogin";
     public const string SettingsStartAtLoginUnavailable = "SettingsStartAtLoginUnavailable";
@@ -453,4 +440,28 @@ public static class UiStringKeys
     public const string SessionEndedSystemProxyFailed = "SessionEndedSystemProxyFailed";
 
     public const string AdminOpenWebDashboard = "AdminOpenWebDashboard";
+
+    public const string SessionOpenCheckPage = "SessionOpenCheckPage";
+
+    public const string SessionGuestProxyNote = "SessionGuestProxyNote";
+
+    public const string CheckPageNotConfirmed = "CheckPageNotConfirmed";
+
+    public const string SystemProxyErrorPolicyLocked = "SystemProxyErrorPolicyLocked";
+
+    public const string SystemProxyErrorAuthorizationDenied = "SystemProxyErrorAuthorizationDenied";
+
+    public const string SystemProxyErrorOther = "SystemProxyErrorOther";
+
+    public const string TrayRepairInternet = "TrayRepairInternet";
+
+    public const string RepairInternetDone = "RepairInternetDone";
+
+    public const string RepairInternetNothing = "RepairInternetNothing";
+
+    public const string RepairInternetFailed = "RepairInternetFailed";
+
+    public const string SettingsCheckPageLabel = "SettingsCheckPageLabel";
+
+    public const string SettingsCheckPageHint = "SettingsCheckPageHint";
 }

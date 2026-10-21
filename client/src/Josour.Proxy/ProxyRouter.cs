@@ -11,11 +11,17 @@ public sealed record RouteDecision(RouteKind Kind, string Host, int Port, string
 
 /// <summary>
 /// The routing decision on the user's side (docs/protocol.md and plan 7.5): an address literal (any address) or a local name -> a local 403 refusal (defence in depth;
-/// an IP cannot be listed to begin with); allowed -> through the tunnel; otherwise -> a direct connection from the user's machine (ADR-0004).
+/// an IP cannot be listed to begin with); allowed -> through the tunnel; otherwise -> a direct connection from the user's machine (ADR-0004)
+/// when <c>directAllowed</c>, and a 403 when it is not.
+/// <para>
+/// Direct is only ever a choice in the host's enforce mode, where "not on the list" means "use your own connection". With every site
+/// allowed the system proxy sends the whole machine here, and anything that is not tunnelled — a port outside <c>allowed_ports</c>, an
+/// OPEN_FAIL — must be refused rather than leave quietly from the guest's own address (ADR-0015 point 3).
+/// </para>
 /// </summary>
 public static class ProxyRouter
 {
-    public static RouteDecision Decide(string host, int port, IAllowlist allowlist, IReadOnlyList<int> allowedPorts)
+    public static RouteDecision Decide(string host, int port, IAllowlist allowlist, IReadOnlyList<int> allowedPorts, bool directAllowed = true)
     {
         ArgumentNullException.ThrowIfNull(allowlist);
         ArgumentNullException.ThrowIfNull(allowedPorts);
@@ -30,18 +36,20 @@ public static class ProxyRouter
         catch (ArgumentException) { return new RouteDecision(RouteKind.Reject, raw, port, "bad_host"); }
         if (IsLocalName(normalized)) return new RouteDecision(RouteKind.Reject, normalized, port, "local");
 
-        return allowlist.IsAllowed(normalized, port, allowedPorts)
-            ? new RouteDecision(RouteKind.Tunnel, normalized, port, null)
-            : new RouteDecision(RouteKind.Direct, normalized, port, null);
+        if (allowlist.IsAllowed(normalized, port, allowedPorts)) return new RouteDecision(RouteKind.Tunnel, normalized, port, null);
+        if (directAllowed) return new RouteDecision(RouteKind.Direct, normalized, port, null);
+        return new RouteDecision(RouteKind.Reject, normalized, port, allowedPorts.Contains(port) ? "not_allowed" : "port_not_allowed");
     }
+
+    /// <summary>
+    /// Is there a direct path at all? Only when the host enforces a list: with <see cref="AllowAllAllowlist"/> everything the host
+    /// allows is tunnelled and nothing else may leave from the guest's own connection.
+    /// </summary>
+    public static bool DirectAllowedFor(IAllowlist allowlist) => allowlist is not AllowAllAllowlist;
 
     /// <summary>localhost and *.localhost are refused locally (the browser does not usually pass them to the proxy, but defence in depth is required).</summary>
     public static bool IsLocalName(string normalizedHost)
         => normalizedHost == "localhost" || normalizedHost.EndsWith(".localhost", StringComparison.Ordinal);
-
-    /// <summary>Does the name match any entry in the list regardless of the port (for the 307 answer to http://)?</summary>
-    public static bool HostIsAllowlisted(string normalizedHost, IAllowlist allowlist)
-        => allowlist.HostMatches(normalizedHost);
 
     /// <summary>OPEN_FAIL -> a truthful HTTP code for the browser: 403 policy, 502 unreachable, 503 limits.</summary>
     public static int StatusForOpenFail(OpenFailReason reason) => reason switch
@@ -55,7 +63,6 @@ public static class ProxyRouter
     public static string ReasonPhrase(int status) => status switch
     {
         200 => "OK",
-        307 => "Temporary Redirect",
         400 => "Bad Request",
         403 => "Forbidden",
         502 => "Bad Gateway",

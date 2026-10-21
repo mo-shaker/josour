@@ -1,5 +1,4 @@
 using System.Net;
-using Josour.Core.Browser;
 using Josour.Core.Net;
 using Josour.Tunnel;
 
@@ -7,11 +6,11 @@ namespace Josour.Proxy;
 
 /// <summary>
 /// The guest's side of <see cref="TunnelSession"/>: it builds a <see cref="ConnectProxyServer"/> over the mux and exposes its port, the check page's URL
-/// and the signal that it was reached. The session exposes those three to the application in <c>Proxy</c> and <c>ProbeSeen</c> so it can launch the browser and detect
-/// <c>browser_not_proxied</c>.
+/// and the signal that it was reached. The session exposes those three to the application in <c>Proxy</c> and <c>ProbeSeen</c> so it can point the
+/// system proxy at the port and confirm a browser came through.
 ///
 /// Why a factory: <c>Josour.Proxy</c> depends on <c>Josour.Tunnel</c> (the mux), so the direction cannot be reversed.
-/// Track C passes <c>ProxyTunnelAdapter.Create</c>, or <c>ctx =&gt; ProxyTunnelAdapter.Create(ctx, browser)</c> to enable the owning-PID check.
+/// The application passes <c>ProxyTunnelAdapter.Create</c>.
 /// </summary>
 public sealed class ProxyTunnelAdapter : ITunnelProxy
 {
@@ -36,11 +35,10 @@ public sealed class ProxyTunnelAdapter : ITunnelProxy
         ["via_system_proxy"] = _server.Counters.ViaSystemProxy,
     };
 
-    /// <summary>The production use with no owner check: <c>GuestProxy = ProxyTunnelAdapter.Create</c>.</summary>
-    public static ITunnelProxy Create(TunnelProxyContext context) => Create(context, null);
+    /// <summary>The production use: <c>GuestProxy = ProxyTunnelAdapter.Create</c>, with this platform's admission check.</summary>
+    public static ITunnelProxy Create(TunnelProxyContext context) => Create(context, DefaultAdmission());
 
-    /// <param name="browser">The browser session for the owning-PID check; null = every local connection is accepted (the tests and the Spike tool).</param>
-    /// <param name="ownerPidChecker">A custom PID checker; null = the default.</param>
+    /// <param name="admission">Which local processes may connect; null = every local connection is accepted (the tests and the Spike tool).</param>
     /// <param name="addressBlocker">
     /// Replacing the address-blocking check on the direct path; for in-process tests only (to permit 127.0.0.1).
     /// null = the <c>IpRangePolicy</c> policy (the counterpart of <c>EgressTunnelAdapter.Create</c> on the host).
@@ -51,8 +49,7 @@ public sealed class ProxyTunnelAdapter : ITunnelProxy
     /// </param>
     public static ITunnelProxy Create(
         TunnelProxyContext context,
-        IBrowserSession? browser,
-        IOwnerPidChecker? ownerPidChecker = null,
+        IConnectionAdmission? admission,
         Func<IPAddress, bool>? addressBlocker = null,
         ISystemProxyResolver? systemProxy = null)
     {
@@ -64,12 +61,7 @@ public sealed class ProxyTunnelAdapter : ITunnelProxy
             Resolver = context.Resolver,
             PeerPublicIp = context.PeerPublicIp,
             Mux = context.Mux,
-            Browser = browser,
-            // The default must match the platform, not the tests. PermissiveOwnerPidChecker answers
-            // "I don't know" to every question, and on Windows an unknown owner is refused - so wiring a
-            // browser without also wiring a checker refused every connection the browser made, which is
-            // exactly what shipped: accepted=33 rejected_by_owner=33 and a session that could not browse.
-            OwnerPidChecker = ownerPidChecker ?? DefaultOwnerPidChecker(),
+            Admission = admission,
             AddressBlocker = addressBlocker,
             SystemProxy = systemProxy ?? SystemProxyResolver.Default,
         };
@@ -77,12 +69,11 @@ public sealed class ProxyTunnelAdapter : ITunnelProxy
     }
 
     /// <summary>
-    /// The checker that can actually answer on this platform (<see cref="OwnerPidCheckers.ForCurrentPlatform"/>).
-    /// Only Windows has one. Elsewhere this returns the permissive checker and the proxy then refuses to start,
-    /// which is the intended outcome: a guest role that cannot tell the work browser from the rest of the machine
-    /// is not a guest role, and pretending otherwise would hand the host's address to every program on it.
+    /// The account check this platform has: Windows can tell another account's process apart (<see cref="SameUserAdmission"/>).
+    /// macOS relies on the loopback listener alone; asking lsof for every connection of a whole machine's browsing costs a
+    /// process per connection.
     /// </summary>
-    private static IOwnerPidChecker DefaultOwnerPidChecker() => OwnerPidCheckers.ForCurrentPlatform();
+    public static IConnectionAdmission? DefaultAdmission() => OperatingSystem.IsWindows() ? new SameUserAdmission() : null;
 
     /// <summary>The underlying server (the detailed counters, and when the check page was first reached).</summary>
     public ConnectProxyServer Server => _server;

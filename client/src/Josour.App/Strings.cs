@@ -67,7 +67,6 @@ public static class Strings
 
     // ---- guest page ----
     public static string GuestPageTitle => LocalizedStrings.Current[UiStringKeys.GuestPageTitle];
-    public static string GuestPageDescription => LocalizedStrings.Current[UiStringKeys.GuestPageDescription];
     public static string GuestRefresh => LocalizedStrings.Current[UiStringKeys.GuestRefresh];
     public static string GuestNoHostsTitle => LocalizedStrings.Current[UiStringKeys.GuestNoHostsTitle];
     public static string GuestNoHostsText => LocalizedStrings.Current[UiStringKeys.GuestNoHostsText];
@@ -112,7 +111,6 @@ public static class Strings
     public static string SessionTimeUp => LocalizedStrings.Current[UiStringKeys.SessionTimeUp];
     public static string SessionDataUsedFormat => LocalizedStrings.Current[UiStringKeys.SessionDataUsedFormat];
     public static string SessionDisconnect => LocalizedStrings.Current[UiStringKeys.SessionDisconnect];
-    public static string SessionReopenBrowser => LocalizedStrings.Current[UiStringKeys.SessionReopenBrowser];
     public static string SessionDismiss => LocalizedStrings.Current[UiStringKeys.SessionDismiss];
     public static string SessionSummaryFormat => LocalizedStrings.Current[UiStringKeys.SessionSummaryFormat];
     public static string BytesFormat => LocalizedStrings.Current[UiStringKeys.BytesFormat];
@@ -133,13 +131,7 @@ public static class Strings
     public static string SessionEndedProtocolError => LocalizedStrings.Current[UiStringKeys.SessionEndedProtocolError];
     public static string SessionEndedUnknownFormat => LocalizedStrings.Current[UiStringKeys.SessionEndedUnknownFormat];
 
-    // ---- work browser ----
-    public static string BrowserErrorNotFound => LocalizedStrings.Current[UiStringKeys.BrowserErrorNotFound];
-    public static string BrowserErrorManagedByPolicy => LocalizedStrings.Current[UiStringKeys.BrowserErrorManagedByPolicy];
-    public static string BrowserErrorInstanceHandoff => LocalizedStrings.Current[UiStringKeys.BrowserErrorInstanceHandoff];
-    public static string BrowserErrorProbeTimeout => LocalizedStrings.Current[UiStringKeys.BrowserErrorProbeTimeout];
-    public static string BrowserErrorOther => LocalizedStrings.Current[UiStringKeys.BrowserErrorOther];
-
+    // ---- session notices ----
     // ---- incoming request: the pre-accept disclosure (product document section 15) ----
     public static string IncomingRequestWindowTitle => LocalizedStrings.Current[UiStringKeys.IncomingRequestWindowTitle];
     public static string IncomingRequestHeadingFormat => LocalizedStrings.Current[UiStringKeys.IncomingRequestHeadingFormat];
@@ -229,11 +221,6 @@ public static class Strings
     public static string SettingsLanguageArabic => LocalizedStrings.Current[UiStringKeys.SettingsLanguageArabic];
     public static string SettingsLanguageEnglish => LocalizedStrings.Current[UiStringKeys.SettingsLanguageEnglish];
     public static string SettingsLanguageRestartNote => LocalizedStrings.Current[UiStringKeys.SettingsLanguageRestartNote];
-    public static string SettingsBrowserLabel => LocalizedStrings.Current[UiStringKeys.SettingsBrowserLabel];
-    public static string SettingsBrowserHint => LocalizedStrings.Current[UiStringKeys.SettingsBrowserHint];
-    public static string SettingsBrowserAuto => LocalizedStrings.Current[UiStringKeys.SettingsBrowserAuto];
-    public static string SettingsBrowserChrome => LocalizedStrings.Current[UiStringKeys.SettingsBrowserChrome];
-    public static string SettingsBrowserEdge => LocalizedStrings.Current[UiStringKeys.SettingsBrowserEdge];
     public static string SettingsStartupSection => LocalizedStrings.Current[UiStringKeys.SettingsStartupSection];
     public static string SettingsStartAtLogin => LocalizedStrings.Current[UiStringKeys.SettingsStartAtLogin];
     public static string SettingsStartAtLoginUnavailable => LocalizedStrings.Current[UiStringKeys.SettingsStartAtLoginUnavailable];
@@ -453,4 +440,28 @@ public static class Strings
     public static string SessionEndedSystemProxyFailed => LocalizedStrings.Current[UiStringKeys.SessionEndedSystemProxyFailed];
 
     public static string AdminOpenWebDashboard => LocalizedStrings.Current[UiStringKeys.AdminOpenWebDashboard];
+
+    public static string SessionOpenCheckPage => LocalizedStrings.Current[UiStringKeys.SessionOpenCheckPage];
+
+    public static string SessionGuestProxyNote => LocalizedStrings.Current[UiStringKeys.SessionGuestProxyNote];
+
+    public static string CheckPageNotConfirmed => LocalizedStrings.Current[UiStringKeys.CheckPageNotConfirmed];
+
+    public static string SystemProxyErrorPolicyLocked => LocalizedStrings.Current[UiStringKeys.SystemProxyErrorPolicyLocked];
+
+    public static string SystemProxyErrorAuthorizationDenied => LocalizedStrings.Current[UiStringKeys.SystemProxyErrorAuthorizationDenied];
+
+    public static string SystemProxyErrorOther => LocalizedStrings.Current[UiStringKeys.SystemProxyErrorOther];
+
+    public static string TrayRepairInternet => LocalizedStrings.Current[UiStringKeys.TrayRepairInternet];
+
+    public static string RepairInternetDone => LocalizedStrings.Current[UiStringKeys.RepairInternetDone];
+
+    public static string RepairInternetNothing => LocalizedStrings.Current[UiStringKeys.RepairInternetNothing];
+
+    public static string RepairInternetFailed => LocalizedStrings.Current[UiStringKeys.RepairInternetFailed];
+
+    public static string SettingsCheckPageLabel => LocalizedStrings.Current[UiStringKeys.SettingsCheckPageLabel];
+
+    public static string SettingsCheckPageHint => LocalizedStrings.Current[UiStringKeys.SettingsCheckPageHint];
 }

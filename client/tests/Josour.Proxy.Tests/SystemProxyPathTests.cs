@@ -212,17 +212,18 @@ public class SystemProxyPathTests
     }
 
     [Fact]
-    public async Task Http_AllowlistedHost_StillRedirectsLocallyToHttps()
+    public async Task Http_AllowlistedHost_GoesThroughTheTunnel_NotTheSystemProxy()
     {
-        // The old rule stands: no plaintext bytes through the tunnel, and no going through the system proxy.
+        // An allowed host is the host's to reach (ADR-0015 point 5): over the mux, never via this machine's own proxy.
         await using var upstream = new FakeUpstreamProxy();
-        await using var proxy = Proxies.Start(new FakeMux(), systemProxy: upstream.AsResolver());
+        var mux = new FakeMux();
+        await using var proxy = Proxies.Start(mux, systemProxy: upstream.AsResolver());
         await using var client = await ProxyClient.ConnectAsync(proxy.Port);
 
         await client.SendAsync("GET http://allowed.example/x HTTP/1.1\r\nHost: allowed.example\r\n\r\n");
         var head = await client.ReadHeadAsync();
-        Assert.Equal(307, head.Status);
-        Assert.Equal("https://allowed.example/x", head.Headers["Location"]);
+        Assert.Equal(403, head.Status); // FakeMux answers OPEN_FAIL(not_allowed) by default
+        Assert.Equal(new[] { ("allowed.example", 80) }, mux.Opens);
         Assert.Equal(0, upstream.Connections);
     }
 

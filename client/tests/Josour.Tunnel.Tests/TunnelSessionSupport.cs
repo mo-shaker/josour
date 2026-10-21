@@ -187,7 +187,7 @@ internal sealed class TunnelSessionPair : IAsyncDisposable
 
     public static async Task<TunnelSessionPair> CreateAsync(
         TimeSpan? timeout = null,
-        Func<CancellationToken, Task>? guestCloseBrowser = null,
+        Func<CancellationToken, Task>? guestRestoreSystemProxy = null,
         List<string>? sharedLog = null,
         TimeSpan? connectDelay = null,
         MuxOptions? muxOverride = null)
@@ -221,7 +221,7 @@ internal sealed class TunnelSessionPair : IAsyncDisposable
                 BindAddress = IPAddress.Loopback,
                 CandidateSource = () => new StaticCandidateSource(),
                 GuestProxy = ctx => { guestMux = ctx.Mux; return proxy; },
-                CloseBrowserAsync = guestCloseBrowser,
+                RestoreSystemProxyAsync = guestRestoreSystemProxy,
                 // A short liveness rather than disabling it: the main death-detection path is EOF, and this is a safety net
                 // that makes the detection deterministic within the test's timeout instead of waiting out the default 60 seconds.
                 Mux = muxOverride ?? new MuxOptions { PingInterval = TimeSpan.FromSeconds(2), DeadAfter = TimeSpan.FromSeconds(8) },

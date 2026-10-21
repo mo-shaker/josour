@@ -4,7 +4,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using Josour.Core.Allowlist;
-using Josour.Core.Browser;
 using Josour.Core.Net;
 using Josour.Tunnel.Mux;
 
@@ -19,29 +18,19 @@ public sealed class ConnectProxyOptions
     /// <summary>null = no tunnel (everything direct; the self-hosted mode in the Spike tool).</summary>
     public IMuxConnection? Mux { get; init; }
     public IHostResolver Resolver { get; init; } = DnsHostResolver.Instance;
-    public IOwnerPidChecker OwnerPidChecker { get; init; } = PermissiveOwnerPidChecker.Instance;
-    /// <summary>null = no owner check (every local connection is accepted).</summary>
-    public IBrowserSession? Browser { get; init; }
+    /// <summary>Which local processes may use the proxy (ADR-0015 point 4). null = every local connection is accepted.</summary>
+    public IConnectionAdmission? Admission { get; init; }
+    /// <summary>
+    /// May a request that is not tunnelled leave directly from this machine? null = decided by the list
+    /// (<see cref="ProxyRouter.DirectAllowedFor"/>): only in the host's enforce mode. Otherwise it gets a 403.
+    /// </summary>
+    public bool? DirectAllowed { get; init; }
     /// <summary>
     /// The blocked check for one address on the direct path after the name is resolved. The default is <see cref="IpRangePolicy.IsBlocked(IPAddress, IEnumerable{IPAddress}?)"/>:
     /// a name that resolves to loopback or a private address is not connected to, so the local proxy does not become a bridge towards whatever this machine is listening on
     /// (the tunnel's own listener, the relay's port, services on 127.0.0.1). Replaced in in-process tests only, to permit loopback.
     /// </summary>
     public Func<IPAddress, bool>? AddressBlocker { get; init; }
-    /// <summary>
-    /// When a Browser is present: is a connection whose owner cannot be determined refused? **The default is `true` on every system** (fail-closed).
-    /// <para>
-    /// The default used to be `OperatingSystem.IsWindows()`, that is, "refuse on Windows and accept everywhere else". And with
-    /// <see cref="PermissiveOwnerPidChecker"/> — which is all that exists off Windows — that meant the local proxy
-    /// **accepted every process on the machine**, not the work browser alone. That was not a decision taken but the side effect of a default,
-    /// and it silently dropped acceptance criterion 10 on any system that is not Windows.
-    /// </para>
-    /// <para>
-    /// Whoever wants "accept everything" must say so explicitly with `false` — as the in-process tests and the Spike tool do. The difference
-    /// between a declared choice and a silent default is the whole difference here.
-    /// </para>
-    /// </summary>
-    public bool? RejectUnknownOwner { get; init; }
     public TimeSpan DirectConnectTimeout { get; init; } = TimeSpan.FromSeconds(5);
     public TimeSpan RequestHeadTimeout { get; init; } = TimeSpan.FromSeconds(30);
     /// <summary>
@@ -78,12 +67,13 @@ public sealed class ProxyCounters
 }
 
 /// <summary>
-/// A local proxy on 127.0.0.1:0 for the work browser (docs/protocol.md and plan 7.5):
-/// - An owner check for every connection (the PID inside the browser's Job Object).
+/// A local proxy on 127.0.0.1:0 that the guest's system proxy points at during a session (docs/protocol.md, ADR-0015):
+/// - An admission check for every connection (<see cref="ConnectProxyOptions.Admission"/>: on Windows, processes of the same account only).
 /// - CONNECT host:port (ws/wss too, and [IPv6]:port): an address literal/local -> 403; allowed -> OPEN through the tunnel, and 200 only after OPEN_OK
-///   (OPEN_FAIL -> a truthful 403/502/503, and not_allowed during a list-version divergence -> falling back to direct); not allowed -> direct TCP (5 s).
-/// - An http:// absolute-URI: check.josour -> the check page; allowed -> a 307 to https://; otherwise -> one request per connection in origin-form
-///   with Connection: close, pumped until the origin closes.
+///   (OPEN_FAIL -> a truthful 403/502/503); not allowed -> direct TCP (5 s) in the host's enforce mode only, a 403 otherwise.
+///   CONNECT check.josour:443 -> 502 at once, so a browser that tries https first falls back to the http check page.
+/// - An http:// absolute-URI: check.josour -> the check page; allowed -> through the tunnel (ADR-0015 point 5); otherwise -> direct in enforce
+///   mode only. One request per connection in origin-form with Connection: close, pumped until the origin closes.
 /// One connection = one request, always; the local replies carry Connection: close.
 /// </summary>
 public sealed class ConnectProxyServer : IAsyncDisposable
@@ -95,7 +85,7 @@ public sealed class ConnectProxyServer : IAsyncDisposable
     private readonly Socket _listener;
     private readonly CancellationTokenSource _cts = new();
     private readonly ConcurrentDictionary<Task, byte> _connections = new();
-    private readonly bool _rejectUnknownOwner;
+    private readonly bool _directAllowed;
     private readonly Func<IPAddress, bool> _isBlocked;
     private Task? _acceptLoop;
     private int _accepting;
@@ -106,19 +96,7 @@ public sealed class ConnectProxyServer : IAsyncDisposable
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         ArgumentNullException.ThrowIfNull(options.Allowlist);
-        _rejectUnknownOwner = options.RejectUnknownOwner ?? true;
-        // A browser to check against, a checker that never identifies anyone, and a policy of refusing
-        // whoever it cannot identify: that combination admits nothing, ever. It is not a strict policy,
-        // it is a wiring mistake, and it shipped once - every connection the work browser made was
-        // refused and the only symptom was a session that would not browse. Refuse to start instead.
-        if (options.Browser is not null && _rejectUnknownOwner && options.OwnerPidChecker is PermissiveOwnerPidChecker)
-        {
-            throw new ArgumentException(
-                "the proxy would refuse every connection: a browser is configured for owner checks, but the owner " +
-                "checker cannot identify anyone and unknown owners are rejected. Supply a real IOwnerPidChecker, " +
-                "or set RejectUnknownOwner = false if this really is meant to admit everything.",
-                nameof(options));
-        }
+        _directAllowed = options.DirectAllowed ?? ProxyRouter.DirectAllowedFor(options.Allowlist);
         _isBlocked = options.AddressBlocker ?? (address => IpRangePolicy.IsBlocked(address));
         _listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         _listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
@@ -195,13 +173,9 @@ public sealed class ConnectProxyServer : IAsyncDisposable
 
     private bool Admit(IPEndPoint? remote)
     {
-        if (_options.Browser is null) return true;
-        if (remote is null) return !_rejectUnknownOwner;
-        int? pid;
-        try { pid = _options.OwnerPidChecker.GetOwnerPid(remote, LocalEndPoint); }
-        catch { pid = null; }
-        if (pid is null) return !_rejectUnknownOwner;
-        return _options.Browser.OwnsProcess(pid.Value);
+        if (_options.Admission is not { } admission || remote is null) return true;
+        try { return admission.Admit(remote, LocalEndPoint); }
+        catch { return true; } // the check only narrows the loopback boundary; it must not break browsing when it fails
     }
 
     private async Task HandleConnectionAsync(Socket socket, CancellationToken ct)
@@ -253,7 +227,15 @@ public sealed class ConnectProxyServer : IAsyncDisposable
             return;
         }
 
-        var route = ProxyRouter.Decide(host, port, _options.Allowlist, _options.AllowedPorts);
+        if (string.Equals(host, ProbePage.Host, StringComparison.OrdinalIgnoreCase))
+        {
+            // The check page is http only. A browser that tries https first (HTTPS-First, HTTPS-Upgrades) must fail fast and fall back,
+            // not wait for the host to fail resolving a name that does not exist.
+            await TryRespondAsync(client, 502, ct).ConfigureAwait(false);
+            return;
+        }
+
+        var route = ProxyRouter.Decide(host, port, _options.Allowlist, _options.AllowedPorts, _directAllowed);
         if (route.Kind == RouteKind.Reject)
         {
             Counters.Reject();
@@ -283,7 +265,7 @@ public sealed class ConnectProxyServer : IAsyncDisposable
                 return;
             }
 
-            if (open.Reason != OpenFailReason.NotAllowed)
+            if (open.Reason != OpenFailReason.NotAllowed || !_directAllowed)
             {
                 var status = ProxyRouter.StatusForOpenFail(open.Reason ?? OpenFailReason.ConnectFailed);
                 if (status == 403) Counters.Reject();
@@ -400,7 +382,7 @@ public sealed class ConnectProxyServer : IAsyncDisposable
             return;
         }
 
-        var route = ProxyRouter.Decide(host, port, _options.Allowlist, _options.AllowedPorts);
+        var route = ProxyRouter.Decide(host, port, _options.Allowlist, _options.AllowedPorts, _directAllowed);
         if (route.Kind == RouteKind.Reject)
         {
             Counters.Reject();
@@ -408,11 +390,12 @@ public sealed class ConnectProxyServer : IAsyncDisposable
             return;
         }
 
-        if (ProxyRouter.HostIsAllowlisted(route.Host, _options.Allowlist))
+        if (route.Kind == RouteKind.Tunnel && _options.Mux is { } mux)
         {
-            // No plaintext bytes through the tunnel: a local redirect to https
-            var location = port == 80 ? $"https://{route.Host}{path}" : $"https://{route.Host}:{port}{path}";
-            await TryRespondAsync(client, 307, ct, ("Location", location)).ConfigureAwait(false);
+            // Plain http goes through the host like everything else (ADR-0015 point 5): a redirect to https would break http-only
+            // sites and the certificate checks (OCSP, CRL) once every browser is behind the system proxy. The host can read these bytes;
+            // the disclosure says so.
+            await TunnelHttpAsync(client, request, mux, route.Host, port, path, ct).ConfigureAwait(false);
             return;
         }
 
@@ -452,6 +435,34 @@ public sealed class ConnectProxyServer : IAsyncDisposable
             // One request per connection: we pump the body if there is one and relay the reply until the origin closes, then close towards the browser.
             await PumpUntilOriginClosesAsync(client, origin, request.Remainder, ct).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>One plain-http request over a mux stream to the host, in origin-form with Connection: close, until the origin closes.</summary>
+    private async Task TunnelHttpAsync(SocketStream client, ProxyRequest request, IMuxConnection mux, string host, int port, string path, CancellationToken ct)
+    {
+        MuxOpenResult open;
+        try
+        {
+            open = await mux.OpenStreamAsync(host, port, ct).ConfigureAwait(false);
+        }
+        catch (MuxClosedException)
+        {
+            await TryRespondAsync(client, 502, ct).ConfigureAwait(false);
+            return;
+        }
+
+        if (!open.IsOpen)
+        {
+            var status = ProxyRouter.StatusForOpenFail(open.Reason ?? OpenFailReason.ConnectFailed);
+            if (status == 403) Counters.Reject();
+            await TryRespondAsync(client, status, ct).ConfigureAwait(false);
+            return;
+        }
+
+        await using var tunnel = open.Stream!;
+        Counters.Tunnel();
+        await tunnel.WriteAsync(BuildOriginFormHead(request, path), ct).ConfigureAwait(false);
+        await PumpUntilOriginClosesAsync(client, tunnel, request.Remainder, ct).ConfigureAwait(false);
     }
 
     /// <summary>

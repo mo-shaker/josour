@@ -177,9 +177,6 @@
   <data name="GuestPageTitle" xml:space="preserve">
     <value>Browse through a host</value>
   </data>
-  <data name="GuestPageDescription" xml:space="preserve">
-    <value>Pick an available host to open a work browser that routes allowed sites through their connection.</value>
-  </data>
   <data name="GuestRefresh" xml:space="preserve">
     <value>Refresh</value>
   </data>
@@ -301,9 +298,6 @@
   <data name="SessionDisconnect" xml:space="preserve">
     <value>Disconnect</value>
   </data>
-  <data name="SessionReopenBrowser" xml:space="preserve">
-    <value>Reopen work browser</value>
-  </data>
   <data name="SessionDismiss" xml:space="preserve">
     <value>Dismiss</value>
   </data>
@@ -356,22 +350,7 @@
   <data name="SessionEndedUnknownFormat" xml:space="preserve">
     <value>The session ended ({0}).</value>
   </data>
-  <!-- work browser -->
-  <data name="BrowserErrorNotFound" xml:space="preserve">
-    <value>Google Chrome or Microsoft Edge must be installed to open the work browser.</value>
-  </data>
-  <data name="BrowserErrorManagedByPolicy" xml:space="preserve">
-    <value>Your organisation's browser policy overrides the proxy setting, so the work browser cannot use this session.</value>
-  </data>
-  <data name="BrowserErrorInstanceHandoff" xml:space="preserve">
-    <value>Another Josour browser window is still open. Close it and start the session again.</value>
-  </data>
-  <data name="BrowserErrorProbeTimeout" xml:space="preserve">
-    <value>The work browser did not send its traffic through Josour.</value>
-  </data>
-  <data name="BrowserErrorOther" xml:space="preserve">
-    <value>The work browser could not be started.</value>
-  </data>
+  <!-- session notices -->
   <!-- incoming request: the pre-accept disclosure (product document section 15) -->
   <data name="IncomingRequestWindowTitle" xml:space="preserve">
     <value>Incoming request</value>
@@ -410,7 +389,7 @@
     <value>The current version of the list allows no site at all.</value>
   </data>
   <data name="AllowedSitesUnrestricted" xml:space="preserve">
-    <value>They will be able to browse any site through your connection, not a fixed list.</value>
+    <value>Every program on their computer that follows the system proxy settings (any browser) will reach any site through your connection, with your address.</value>
   </data>
   <data name="IncomingRequestWarningTitle" xml:space="preserve">
     <value>Privacy notice</value>
@@ -606,21 +585,6 @@
   </data>
   <data name="SettingsLanguageRestartNote" xml:space="preserve">
     <value>The new language applies the next time Josour starts.</value>
-  </data>
-  <data name="SettingsBrowserLabel" xml:space="preserve">
-    <value>Work browser</value>
-  </data>
-  <data name="SettingsBrowserHint" xml:space="preserve">
-    <value>The browser opened with a separate profile during a session.</value>
-  </data>
-  <data name="SettingsBrowserAuto" xml:space="preserve">
-    <value>Automatic</value>
-  </data>
-  <data name="SettingsBrowserChrome" xml:space="preserve">
-    <value>Chrome</value>
-  </data>
-  <data name="SettingsBrowserEdge" xml:space="preserve">
-    <value>Edge</value>
   </data>
   <data name="SettingsStartupSection" xml:space="preserve">
     <value>Start-up</value>
@@ -819,7 +783,7 @@
     <value>The guest role is not available on this system</value>
   </data>
   <data name="GuestRoleUnavailableMessage" xml:space="preserve">
-    <value>Josour can only guarantee that the work browser alone goes through the host on Windows. Without that guarantee everything on your machine could leave from the host's address, which is not what they agreed to. This machine can still be a host; being a guest needs Windows.</value>
+    <value>Josour can change the proxy settings only on Windows and macOS, and that is what sends your browsers through the host. This computer can still be a host.</value>
   </data>
   <data name="AdminWindowTitle" xml:space="preserve">
     <value>User management</value>
@@ -1087,5 +1051,41 @@
   </data>
   <data name="AdminOpenWebDashboard" xml:space="preserve">
     <value>Open the full web dashboard (registrations, contacts, sessions, settings)</value>
+  </data>
+  <data name="SessionOpenCheckPage" xml:space="preserve">
+    <value>Open the check page</value>
+  </data>
+  <data name="SessionGuestProxyNote" xml:space="preserve">
+    <value>Any browser on this computer now goes through the host's connection, until the session ends. The host can see the names of the sites you open, and the content of pages that are not https.</value>
+  </data>
+  <data name="CheckPageNotConfirmed" xml:space="preserve">
+    <value>The check page did not come through the host. That browser may be set to ignore the system proxy settings; other browsers may still work.</value>
+  </data>
+  <data name="SystemProxyErrorPolicyLocked" xml:space="preserve">
+    <value>Your organisation's policy does not let this account change the proxy settings, so this computer cannot be a guest.</value>
+  </data>
+  <data name="SystemProxyErrorAuthorizationDenied" xml:space="preserve">
+    <value>The administrator password was not entered, so the proxy settings were not changed.</value>
+  </data>
+  <data name="SystemProxyErrorOther" xml:space="preserve">
+    <value>Josour could not change this computer's proxy settings. The details are in the log.</value>
+  </data>
+  <data name="TrayRepairInternet" xml:space="preserve">
+    <value>Repair internet settings</value>
+  </data>
+  <data name="RepairInternetDone" xml:space="preserve">
+    <value>The internet settings are back to how they were.</value>
+  </data>
+  <data name="RepairInternetNothing" xml:space="preserve">
+    <value>The internet settings are fine; there was nothing to repair.</value>
+  </data>
+  <data name="RepairInternetFailed" xml:space="preserve">
+    <value>The internet settings could not be put back. Try again, or see the log.</value>
+  </data>
+  <data name="SettingsCheckPageLabel" xml:space="preserve">
+    <value>Open the check page when a session starts</value>
+  </data>
+  <data name="SettingsCheckPageHint" xml:space="preserve">
+    <value>As a guest, Josour points this computer's proxy settings at the host for as long as a session lasts, so any browser goes through it, and puts them back afterwards. The check page shows the address sites will see.</value>
   </data>
 </root>

@@ -18,10 +18,9 @@ public sealed record SettingsChoice<T>(T Value, string Display)
 }
 
 /// <summary>
-/// The settings window: server address, interface language, work browser, "start with Windows" and "start minimized".
-/// Until week 6 none of these could be changed by the person using the app — the address was whatever the sign-in window
-/// happened to have been given, the language needed a command-line switch, and the browser preference existed in the
-/// settings file but nothing wrote it.
+/// The settings window: server address, interface language, opening the check page when a guest session starts,
+/// "start with Windows" and "start minimized". Until week 6 none of these could be changed by the person using the app —
+/// the address was whatever the sign-in window happened to have been given, and the language needed a command-line switch.
 /// <para>
 /// The address is the one setting that can be wrong in a way the user cannot see, so it gets a real check: validated the
 /// same way the API client validates it, then asked <c>GET /healthz</c> with a short budget. The result is stated in one
@@ -53,7 +52,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     private SettingsChoice<UiLanguage> _selectedLanguage;
 
     [ObservableProperty]
-    private SettingsChoice<BrowserPreference> _selectedBrowser;
+    private bool _openCheckPageOnConnect;
 
     [ObservableProperty]
     private bool _startAtLogin;
@@ -98,7 +97,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         _serverUrl = current.ServerUrl;
         _languageAtOpen = UiLanguages.ParseOrDefault(current.Language);
         _selectedLanguage = Languages.First(l => l.Value == _languageAtOpen);
-        _selectedBrowser = Browsers.First(b => b.Value == current.PreferredBrowser);
+        _openCheckPageOnConnect = current.OpenCheckPageOnConnect;
         _startMinimized = current.StartMinimized;
         _startAtLogin = SafeStartupState();
     }
@@ -108,13 +107,6 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         new SettingsChoice<UiLanguage>(UiLanguage.Arabic, Strings.SettingsLanguageArabic),
         new SettingsChoice<UiLanguage>(UiLanguage.English, Strings.SettingsLanguageEnglish),
-    };
-
-    public static IReadOnlyList<SettingsChoice<BrowserPreference>> Browsers { get; } = new[]
-    {
-        new SettingsChoice<BrowserPreference>(BrowserPreference.Auto, Strings.SettingsBrowserAuto),
-        new SettingsChoice<BrowserPreference>(BrowserPreference.Chrome, Strings.SettingsBrowserChrome),
-        new SettingsChoice<BrowserPreference>(BrowserPreference.Edge, Strings.SettingsBrowserEdge),
     };
 
     public bool IsIdle => !IsBusy;
@@ -194,17 +186,17 @@ public sealed partial class SettingsViewModel : ObservableObject
                 {
                     ServerUrl = validated.NormalizedUrl!,
                     Language = SelectedLanguage.Value.ToCode(),
-                    PreferredBrowser = SelectedBrowser.Value,
+                    OpenCheckPageOnConnect = OpenCheckPageOnConnect,
                     StartMinimized = StartMinimized,
                 },
                 ct);
 
             ApplyStartupRegistration();
             _logger.LogInformation(
-                "Settings saved: server={ServerUrl} language={Language} browser={Browser} startMinimized={StartMinimized} startAtLogin={StartAtLogin}",
+                "Settings saved: server={ServerUrl} language={Language} openCheckPage={OpenCheckPage} startMinimized={StartMinimized} startAtLogin={StartAtLogin}",
                 validated.NormalizedUrl,
                 SelectedLanguage.Value.ToCode(),
-                SelectedBrowser.Value,
+                OpenCheckPageOnConnect,
                 StartMinimized,
                 StartAtLogin);
 

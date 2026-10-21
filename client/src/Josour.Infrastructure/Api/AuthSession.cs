@@ -174,11 +174,20 @@ public sealed class AuthSession : IAuthSession, IAccessTokenSource
         {
             response = await _api.LoginAsync(email, password, device, ct).ConfigureAwait(false);
         }
-        catch (ApiException ex) when (hasIdentity && ex.Code is ApiErrorCodes.DeviceRevoked or ApiErrorCodes.Unauthorized)
+        catch (ApiException ex) when (hasIdentity && ex.Code is ApiErrorCodes.Unauthorized)
         {
-            // The server no longer accepts this device identity (revoked, or the secret is stale). Drop it so the
-            // next sign-in registers a fresh device instead of failing forever; the error still reaches the UI.
-            _logger.LogWarning("Device identity {DeviceId} rejected ({Code}); discarding it", storedId, ex.Code);
+            // The password was right but the server does not know this device (a reinstalled or reset server, or a stale
+            // secret). Drop the identity and sign in once more as a new device, rather than make the user fail once first:
+            // anyone holding the password could register a new device anyway.
+            _logger.LogWarning("Device identity {DeviceId} unknown to the server; discarding it and signing in as a new device", storedId);
+            await ClearDeviceIdentityAsync(ct).ConfigureAwait(false);
+            response = await _api.LoginAsync(email, password, device with { Id = null, Secret = null }, ct).ConfigureAwait(false);
+        }
+        catch (ApiException ex) when (hasIdentity && ex.Code is ApiErrorCodes.DeviceRevoked)
+        {
+            // An administrator revoked this device on purpose: it stays revoked. The identity is dropped so the next sign-in
+            // registers a fresh device the administrator can see and decide on; the error still reaches the UI.
+            _logger.LogWarning("Device identity {DeviceId} revoked; discarding it", storedId);
             await ClearDeviceIdentityAsync(ct).ConfigureAwait(false);
             throw;
         }

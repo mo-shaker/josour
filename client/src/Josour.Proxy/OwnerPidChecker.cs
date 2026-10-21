@@ -13,38 +13,7 @@ public interface IOwnerPidChecker
     int? GetOwnerPid(IPEndPoint remoteEndPoint, IPEndPoint localEndPoint);
 }
 
-/// <summary>
-/// Which platforms can answer "which process opened this connection", and the checker for the running one.
-/// <para>
-/// This is the control that keeps the product from being a device-wide proxy: the local CONNECT proxy listens on
-/// loopback, so any program on the machine can reach it, and only the owner check tells the work browser apart from
-/// everything else. Acceptance criterion 10 — Teams and Outlook and the normal browser stay on the user's own
-/// connection — rests entirely on it.
-/// </para>
-/// <para>
-/// So a platform without an implementation has no guest role, and says so. It must never quietly become a platform
-/// where the check passes for everybody.
-/// </para>
-/// </summary>
-public static class OwnerPidCheckers
-{
-    /// <summary>True where a connection's owning process can actually be identified.</summary>
-    public static bool SupportedOnThisPlatform => OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
-
-    /// <summary>
-    /// The checker this machine has. Off Windows it is <see cref="PermissiveOwnerPidChecker"/>, which identifies
-    /// nobody — which is why <see cref="ConnectProxyOptions.RejectUnknownOwner"/> defaults to refusing, and why a
-    /// proxy wired for owner checks on such a platform refuses to start rather than admitting everything.
-    /// </summary>
-    public static IOwnerPidChecker ForCurrentPlatform() => true switch
-    {
-        _ when OperatingSystem.IsWindows() => WindowsOwnerPidChecker.Instance,
-        _ when OperatingSystem.IsMacOS() => MacOwnerPidChecker.Instance,
-        _ => PermissiveOwnerPidChecker.Instance,
-    };
-}
-
-/// <summary>It knows nothing (off Windows, and the tests). Accepting the connection then rests on RejectUnknownOwner.</summary>
+/// <summary>It knows nothing (off Windows, and the tests).</summary>
 public sealed class PermissiveOwnerPidChecker : IOwnerPidChecker
 {
     public static readonly PermissiveOwnerPidChecker Instance = new();
@@ -53,7 +22,7 @@ public sealed class PermissiveOwnerPidChecker : IOwnerPidChecker
 
 /// <summary>
 /// WINDOWS-ONLY: iphlpapi!GetExtendedTcpTable(TCP_TABLE_OWNER_PID_ALL) for both the IPv4 and IPv6 tables; it looks for the row whose local port =
-/// the inbound connection's remote port and whose remote port = the proxy's port. It has not been run on Windows yet (a code review only).
+/// the inbound connection's remote port and whose remote port = the proxy's port. <see cref="SameUserAdmission"/> uses it to find the process behind a connection.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class WindowsOwnerPidChecker : IOwnerPidChecker

@@ -1,17 +1,17 @@
-using Josour.Core.Browser;
 using Josour.Core.Control;
 using Josour.Core.Session;
 using Josour.Core.Tunnel;
 using Josour.Infrastructure.Api;
 using Josour.Infrastructure.Control;
 using Josour.Infrastructure.Session;
+using Josour.Infrastructure.SystemProxy;
 using Josour.Infrastructure.Tests.Support;
 
 namespace Josour.Infrastructure.Tests;
 
 /// <summary>
 /// The whole week-4 session lifecycle of <see cref="SessionCoordinator"/> against the real <see cref="ControlChannel"/> on
-/// <see cref="FakeControlServer"/> (a WebSocket on 127.0.0.1) with a fake tunnel, a fake work browser and a hand-driven clock:
+/// <see cref="FakeControlServer"/> (a WebSocket on 127.0.0.1) with a fake tunnel, a fake system proxy and a hand-driven clock:
 /// docs/ws-protocol.md sections 3-5 and the cleanup order of docs/protocol.md section 7.
 /// </summary>
 public sealed class SessionCoordinatorTests
@@ -55,26 +55,27 @@ public sealed class SessionCoordinatorTests
         Assert.Equal(CandidateType.Public, Assert.Single(rig.Tunnels.Last.Peer!.Candidates).Type);
         await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Connecting);
 
-        // 3. session.active → the work browser opens on the probe page through the local proxy
+        // 3. session.active → the system proxy points at the local proxy, then the check page opens in the default browser
         await rig.SendActiveAsync(created);
-        await rig.WaitAsync(() => rig.Browsers.Created.Count == 1);
-        var options = rig.Browsers.Last.Options!;
-        Assert.Equal(BrowserKind.Chrome, options.Kind);
-        Assert.Equal(8080, options.ProxyPort);
-        Assert.Equal(ProbeUrl, options.ProbeUrl);
-        Assert.Equal(rig.Browsers.ProfileDirectory, options.ProfileDirectory);
+        await rig.WaitAsync(() => rig.CheckPage.Opened.Count == 1);
+        Assert.Equal(1, rig.SystemProxy.ApplyCount);
+        Assert.Equal(8080, rig.SystemProxy.Port);
+        Assert.True(rig.SystemProxy.IsApplied);
+        Assert.Equal(ProbeUrl, rig.CheckPage.Opened[0]);
         Assert.Equal(ProbeUrl, rig.Coordinator.ProbeUrl);
+        Assert.Null(rig.Coordinator.CheckPageConfirmed);
 
-        // 4. the probe page arrives: the browser is really proxied
+        // 4. the check page arrives: that browser really follows the system proxy
         rig.Tunnels.Last.RaiseProbeSeen();
-        await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Active);
+        await rig.WaitAsync(() => rig.Coordinator.CheckPageConfirmed == true);
+        Assert.Equal(SessionPhase.Active, rig.Coordinator.Phase);
 
         // 5. countdown and data used follow the tick
         rig.Tunnels.Last.Stats = new TunnelStats(1234, 5678, 2);
         rig.Clock.Advance(TimeSpan.FromSeconds(1));
         await rig.WaitAsync(() => rig.Coordinator.BytesUp == 1234 && rig.Coordinator.BytesDown == 5678);
         Assert.Equal(TimeSpan.FromMinutes(30) - TimeSpan.FromSeconds(1), rig.Coordinator.TimeRemaining);
-        Assert.True(rig.Coordinator.CanReopenBrowser);
+        Assert.True(rig.Coordinator.CanOpenCheckPage);
 
         // 6. Disconnect → cleanup, then session.end with this role's reason
         await rig.Coordinator.DisconnectAsync();
@@ -88,12 +89,13 @@ public sealed class SessionCoordinatorTests
         // the guest never claims session.connected (docs/ws-protocol.md section 5: host only)
         Assert.DoesNotContain(rig.Connection.Received, m => m is SessionConnectedMessage);
 
-        // no leak: tunnel ended once and disposed, browser closed, phase Ended, then back to Idle
+        // no leak: tunnel ended once and disposed, the system proxy put back once, phase Ended, then back to Idle
         Assert.Equal(1, rig.Tunnels.Last.EndCount);
         Assert.Equal(TunnelEndReason.GuestEnded, rig.Tunnels.Last.EndReason);
         Assert.True(rig.Tunnels.Last.Disposed);
-        Assert.True(rig.Browsers.Last.CloseCount > 0);
-        Assert.False(rig.Browsers.Last.IsRunning);
+        Assert.Equal(1, rig.SystemProxy.RestoreCount);
+        Assert.False(rig.SystemProxy.IsApplied);
+        Assert.False(rig.Coordinator.CanOpenCheckPage);
         await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Ended);
         Assert.False(rig.Coordinator.HasLiveSession);
         rig.Coordinator.Acknowledge();
@@ -102,18 +104,16 @@ public sealed class SessionCoordinatorTests
     }
 
     [Fact]
-    public async Task Guest_CanReopenTheWorkBrowserWhileTheSessionRuns()
+    public async Task Guest_CanOpenTheCheckPageAgainWhileTheSessionRuns()
     {
         await using var rig = await Rig.StartAsync();
         var session = await rig.RunToActiveAsync(SessionInfo.GuestRole);
 
-        var result = await rig.Coordinator.ReopenBrowserAsync(None);
+        Assert.True(await rig.Coordinator.OpenCheckPageAsync());
 
-        Assert.NotNull(result);
-        Assert.True(result!.Success);
-        Assert.Equal(2, rig.Browsers.Created.Count); // a relaunch is a fresh launcher; the first one was closed
-        Assert.True(rig.Browsers.Created[0].CloseCount > 0);
-        Assert.Equal(ProbeUrl, rig.Browsers.Last.Options!.ProbeUrl);
+        Assert.Equal(new[] { ProbeUrl, ProbeUrl }, rig.CheckPage.Opened);
+        Assert.True(rig.Coordinator.CheckPageConfirmed);
+        Assert.Equal(1, rig.SystemProxy.ApplyCount); // opening the page again does not touch the settings
         Assert.Equal(session, rig.Coordinator.CurrentSession!.SessionId);
     }
 
@@ -206,10 +206,10 @@ public sealed class SessionCoordinatorTests
         Assert.Empty((await rig.Connection.NextAsync<SessionEndMessage>()).Domains);
     }
 
-    // ---------- the work browser ----------
+    // ---------- the system proxy and the check page ----------
 
     [Fact]
-    public async Task Guest_WithoutTheProbePage_EndsWithBrowserNotProxied()
+    public async Task Guest_WithoutTheCheckPage_WarnsButKeepsTheSessionRunning()
     {
         await using var rig = await Rig.StartAsync();
         var session = await rig.CreateSessionAsync(SessionInfo.GuestRole);
@@ -217,25 +217,22 @@ public sealed class SessionCoordinatorTests
         await rig.SendPeerEndpointAsync(session);
         await rig.WaitAsync(() => rig.Tunnels.Last.ConnectCount == 1);
         await rig.SendActiveAsync(session);
-        await rig.WaitAsync(() => rig.Browsers.Created.Count == 1);
+        await rig.WaitAsync(() => rig.CheckPage.Opened.Count == 1);
 
-        // the browser is up but nothing ever reaches the probe page: it is not using our proxy
-        var end = await rig.AdvanceUntilAsync(rig.Connection.NextAsync<SessionEndMessage>(), TimeSpan.FromSeconds(1), steps: 20);
+        // the page was opened but nothing came through: that browser may ignore the system proxy, others may not
+        await rig.AdvanceUntilAsync(() => rig.Coordinator.CheckPageConfirmed == false, TimeSpan.FromSeconds(1), steps: 20);
 
-        Assert.Equal(SessionEndReasonNames.BrowserNotProxied, end.Reason);
-        Assert.Equal(TunnelEndReason.BrowserNotProxied, rig.Tunnels.Last.EndReason);
-        Assert.Equal(BrowserLaunchFailure.ProbeTimeout, rig.Coordinator.BrowserFailure);
-        Assert.Contains(ProbeUrl, rig.Coordinator.BrowserFailureDetail ?? string.Empty);
-        Assert.True(rig.Browsers.Last.CloseCount > 0);
+        Assert.False(rig.Coordinator.CheckPageConfirmed);
+        Assert.Equal(SessionPhase.Active, rig.Coordinator.Phase);
+        Assert.True(rig.SystemProxy.IsApplied);
+        Assert.DoesNotContain(rig.Connection.Received, m => m is SessionEndMessage);
     }
 
     [Fact]
-    public async Task Guest_WithoutTheProbePage_ReportsWhatTheProxyCounted()
+    public async Task Guest_WithoutTheCheckPage_LogsWhatTheProxyCounted()
     {
-        // "the page did not arrive" is where the investigation used to start and stop. A browser that
-        // never connected and one whose connection the owner check turned away produce the identical
-        // sentence, and they are opposite faults. The counters are what tell them apart, so they have
-        // to reach the log and the failure detail, not just exist.
+        // A browser that never connected and one whose connection was turned away are opposite faults; the counters
+        // are what tell them apart, so they have to reach the log.
         await using var rig = await Rig.StartAsync();
         var session = await rig.CreateSessionAsync(SessionInfo.GuestRole);
         await rig.Connection.NextAsync<SessionEndpointMessage>();
@@ -248,22 +245,18 @@ public sealed class SessionCoordinatorTests
             ["probe_hits"] = 0,
         };
         await rig.SendActiveAsync(session);
-        await rig.WaitAsync(() => rig.Browsers.Created.Count == 1);
+        await rig.WaitAsync(() => rig.CheckPage.Opened.Count == 1);
 
-        await rig.AdvanceUntilAsync(rig.Connection.NextAsync<SessionEndMessage>(), TimeSpan.FromSeconds(1), steps: 20);
+        await rig.AdvanceUntilAsync(() => rig.Coordinator.CheckPageConfirmed == false, TimeSpan.FromSeconds(1), steps: 20);
 
-        var detail = rig.Coordinator.BrowserFailureDetail ?? string.Empty;
-        Assert.Contains("accepted=4", detail, StringComparison.Ordinal);
-        Assert.Contains("rejected_by_owner=4", detail, StringComparison.Ordinal);
-        Assert.DoesNotContain("probe_hits", detail, StringComparison.Ordinal); // zeros are noise
-        Assert.True(rig.Logger.Contains("rejected_by_owner=4"), "the counters must reach the log too");
+        Assert.True(rig.Logger.Contains("accepted=4"), "the counters must reach the log");
+        Assert.True(rig.Logger.Contains("rejected_by_owner=4"));
+        Assert.False(rig.Logger.Contains("probe_hits=0"), "zeros are noise");
     }
 
     [Fact]
-    public async Task Guest_WithoutTheProbePage_SaysSoWhenNothingEverConnected()
+    public async Task Guest_WithoutTheCheckPage_SaysSoWhenNothingEverConnected()
     {
-        // The other half of the same question: all-zero counters are not "no information", they are
-        // the finding that the browser never reached the proxy at all.
         await using var rig = await Rig.StartAsync();
         var session = await rig.CreateSessionAsync(SessionInfo.GuestRole);
         await rig.Connection.NextAsync<SessionEndpointMessage>();
@@ -275,49 +268,47 @@ public sealed class SessionCoordinatorTests
             ["rejected_by_owner"] = 0,
         };
         await rig.SendActiveAsync(session);
-        await rig.WaitAsync(() => rig.Browsers.Created.Count == 1);
+        await rig.WaitAsync(() => rig.CheckPage.Opened.Count == 1);
 
-        await rig.AdvanceUntilAsync(rig.Connection.NextAsync<SessionEndMessage>(), TimeSpan.FromSeconds(1), steps: 20);
+        await rig.AdvanceUntilAsync(() => rig.Coordinator.CheckPageConfirmed == false, TimeSpan.FromSeconds(1), steps: 20);
 
-        Assert.Contains(
-            "nothing ever connected", rig.Coordinator.BrowserFailureDetail ?? string.Empty,
-            StringComparison.Ordinal);
+        Assert.True(rig.Logger.Contains("nothing ever connected"));
     }
 
     [Fact]
-    public async Task Guest_WithoutAWorkBrowser_SkipsTheProbeWait_AndKeepsTheSessionRunning()
+    public async Task Guest_WithTheCheckPageSettingOff_DoesNotOpenIt_ButCanOnRequest()
     {
-        // NoWorkBrowser: nothing was launched, so nothing could bypass the proxy and browser_not_proxied would be a lie.
-        // The proxy is up and the session runs on; the caller verifies it with whatever it sends through ProbeUrl.
-        await using var rig = await Rig.StartAsync(browser: NoWorkBrowser.Instance);
+        await using var rig = await Rig.StartAsync();
+        rig.CheckPage.OpenOnConnect = false;
         var session = await rig.CreateSessionAsync(SessionInfo.GuestRole);
         await rig.Connection.NextAsync<SessionEndpointMessage>();
         await rig.SendPeerEndpointAsync(session);
         await rig.WaitAsync(() => rig.Tunnels.Last.ConnectCount == 1);
 
         await rig.SendActiveAsync(session);
-        await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Active && rig.Clock.TimerCount >= 1);
+        await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Active && rig.SystemProxy.IsApplied && rig.Coordinator.ProbeUrl is not null);
 
-        // well past the probe timeout: still active, no browser was ever asked for, nothing to reopen
-        await rig.AdvanceUntilAsync(() => false, TimeSpan.FromSeconds(1), steps: 20);
+        // well past the check-page timeout: nothing was opened, so nothing is claimed either way
+        await rig.AdvanceUntilAsync(() => false, TimeSpan.FromSeconds(1), steps: 15);
+        Assert.Empty(rig.CheckPage.Opened);
+        Assert.Null(rig.Coordinator.CheckPageConfirmed);
         Assert.Equal(SessionPhase.Active, rig.Coordinator.Phase);
-        Assert.Empty(rig.Browsers.Created);
-        Assert.Equal(ProbeUrl, rig.Coordinator.ProbeUrl);
-        Assert.Null(rig.Coordinator.BrowserFailure);
-        Assert.False(rig.Coordinator.CanReopenBrowser);
-        Assert.Null(await rig.Coordinator.ReopenBrowserAsync(None));
-        Assert.DoesNotContain(rig.Connection.Received, m => m is SessionEndMessage);
 
-        // and it still ends the ordinary way
-        await rig.Coordinator.DisconnectAsync();
-        Assert.Equal(SessionEndReasonNames.GuestEnded, (await rig.Connection.NextAsync<SessionEndMessage>()).Reason);
+        // the user asks for it
+        rig.Tunnels.Last.RaiseProbeSeen();
+        Assert.True(await rig.Coordinator.OpenCheckPageAsync());
+        Assert.Single(rig.CheckPage.Opened);
+        Assert.True(rig.Coordinator.CheckPageConfirmed);
     }
 
-    [Fact]
-    public async Task Guest_WithAManagedBrowser_EndsWithBrowserNotProxied_AndNamesTheCause()
+    [Theory]
+    [InlineData("policy_locked")]
+    [InlineData("authorization_denied")]
+    [InlineData("apply_failed")]
+    public async Task Guest_WhenTheSystemProxyCannotBeSet_EndsWithSystemProxyFailed_AndNamesTheCause(string reason)
     {
         await using var rig = await Rig.StartAsync();
-        rig.Browsers.Results[BrowserKind.Chrome] = new BrowserLaunchResult(false, BrowserLaunchFailure.ManagedByPolicy, "HKLM:ProxyMode=system");
+        rig.SystemProxy.FailWith = reason;
         var session = await rig.CreateSessionAsync(SessionInfo.GuestRole);
         await rig.Connection.NextAsync<SessionEndpointMessage>();
         await rig.SendPeerEndpointAsync(session);
@@ -326,25 +317,25 @@ public sealed class SessionCoordinatorTests
         await rig.SendActiveAsync(session);
 
         var end = await rig.Connection.NextAsync<SessionEndMessage>();
-        Assert.Equal(SessionEndReasonNames.BrowserNotProxied, end.Reason);
-        Assert.Equal(BrowserLaunchFailure.ManagedByPolicy, rig.Coordinator.BrowserFailure);
-        Assert.Equal("HKLM:ProxyMode=system", rig.Coordinator.BrowserFailureDetail);
+        Assert.Equal(SessionEndReasonNames.SystemProxyFailed, end.Reason);
+        Assert.Equal(TunnelEndReason.SystemProxyFailed, rig.Tunnels.Last.EndReason);
+        Assert.Equal(reason, rig.Coordinator.SystemProxyFailure);
+        Assert.Empty(rig.CheckPage.Opened);
+        Assert.False(rig.SystemProxy.IsApplied);
     }
 
     [Fact]
-    public async Task Guest_WithNoBrowserInstalled_EndsWithBrowserNotProxied_AndSaysNotFound()
+    public async Task Host_NeverTouchesTheSystemProxy()
     {
         await using var rig = await Rig.StartAsync();
-        rig.Browsers.Installed.Clear();
-        var session = await rig.CreateSessionAsync(SessionInfo.GuestRole);
-        await rig.Connection.NextAsync<SessionEndpointMessage>();
-        await rig.SendPeerEndpointAsync(session);
-        await rig.WaitAsync(() => rig.Tunnels.Last.ConnectCount == 1);
+        await rig.RunToActiveAsync(SessionInfo.HostRole);
+        await rig.Coordinator.DisconnectAsync();
+        await rig.Connection.NextAsync<SessionEndMessage>();
 
-        await rig.SendActiveAsync(session);
-
-        Assert.Equal(SessionEndReasonNames.BrowserNotProxied, (await rig.Connection.NextAsync<SessionEndMessage>()).Reason);
-        Assert.Equal(BrowserLaunchFailure.NotFound, rig.Coordinator.BrowserFailure);
+        Assert.Equal(0, rig.SystemProxy.ApplyCount);
+        Assert.Equal(0, rig.SystemProxy.RestoreCount);
+        Assert.Empty(rig.CheckPage.Opened);
+        Assert.Null(rig.Tunnels.Requests[0].RestoreSystemProxyAsync);
     }
 
     // ---------- the ending triggers ----------
@@ -470,7 +461,8 @@ public sealed class SessionCoordinatorTests
         await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Ended);
         Assert.Equal(TunnelEndReason.AdminTerminated, rig.Tunnels.Last.EndReason);
         Assert.True(rig.Tunnels.Last.Disposed);
-        Assert.True(rig.Browsers.Last.CloseCount > 0);
+        Assert.Equal(1, rig.SystemProxy.RestoreCount);
+        Assert.False(rig.SystemProxy.IsApplied);
         Assert.Equal(SessionEndReasonNames.AdminTerminated, rig.Coordinator.LastEndReason);
         await Task.Delay(150);
         Assert.DoesNotContain(rig.Connection.Received, m => m is SessionEndMessage);
@@ -525,7 +517,8 @@ public sealed class SessionCoordinatorTests
         await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Ended, TimeSpan.FromSeconds(10));
         Assert.Equal(TunnelEndReason.GuestDisconnected, rig.Tunnels.Last.EndReason);
         Assert.True(rig.Tunnels.Last.Disposed);
-        Assert.True(rig.Browsers.Last.CloseCount > 0);
+        Assert.Equal(1, rig.SystemProxy.RestoreCount);
+        Assert.False(rig.SystemProxy.IsApplied);
         Assert.DoesNotContain(rig.Connection.Received, m => m is SessionEndMessage);
     }
 
@@ -547,7 +540,8 @@ public sealed class SessionCoordinatorTests
         await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Ended, TimeSpan.FromSeconds(10));
         Assert.Equal(TunnelEndReason.GuestDisconnected, rig.Tunnels.Last.EndReason);
         Assert.True(rig.Tunnels.Last.Disposed);
-        Assert.True(rig.Browsers.Last.CloseCount > 0);
+        Assert.Equal(1, rig.SystemProxy.RestoreCount);
+        Assert.False(rig.SystemProxy.IsApplied);
         Assert.DoesNotContain(rig.Connection.Received, m => m is SessionEndMessage);
 
         await rig.WaitAsync(() => rig.Channel.State == ControlChannelState.Connected, TimeSpan.FromSeconds(10));
@@ -569,7 +563,8 @@ public sealed class SessionCoordinatorTests
         await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Ended, TimeSpan.FromSeconds(10));
         Assert.Equal(TunnelEndReason.GuestDisconnected, rig.Tunnels.Last.EndReason);
         Assert.True(rig.Tunnels.Last.Disposed);
-        Assert.True(rig.Browsers.Last.CloseCount > 0);
+        Assert.Equal(1, rig.SystemProxy.RestoreCount);
+        Assert.False(rig.SystemProxy.IsApplied);
         Assert.DoesNotContain(rig.Connection.Received, m => m is SessionEndMessage); // the socket was gone; the server knows
 
         // The channel itself recovered on the refreshed token, so the app is usable again without signing in.
@@ -588,7 +583,7 @@ public sealed class SessionCoordinatorTests
         Assert.Equal(SessionEndReasonNames.HostEnded, (await rig.Connection.NextAsync<SessionEndMessage>()).Reason);
         Assert.False(rig.Coordinator.HasLiveSession);
         Assert.True(rig.Tunnels.Last.Disposed);
-        Assert.True(rig.Browsers.Created.Count == 0 || rig.Browsers.Last.CloseCount > 0);
+        Assert.Equal(0, rig.SystemProxy.ApplyCount);
     }
 
     // ---------- the allow-list ----------
@@ -940,7 +935,7 @@ public sealed class SessionCoordinatorTests
     {
         private readonly List<SessionPhase> _phases = new();
 
-        private Rig(FakeControlServer server, TestClock clock, RecordingLogger<SessionCoordinator> logger, IWorkBrowser? browser)
+        private Rig(FakeControlServer server, TestClock clock, RecordingLogger<SessionCoordinator> logger)
         {
             Server = server;
             Clock = clock;
@@ -959,12 +954,12 @@ public sealed class SessionCoordinatorTests
                     NextJitter = () => 0,
                 });
 
-            Browser = new WorkBrowserSession(Browsers);
             Coordinator = new SessionCoordinator(
                 Channel,
                 Api,
                 Tunnels,
-                browser ?? Browser,
+                SystemProxy,
+                CheckPage,
                 logger,
                 clock,
                 SessionCoordinatorOptions.Default with { ProbeTimeout = TimeSpan.FromSeconds(10) });
@@ -994,9 +989,9 @@ public sealed class SessionCoordinatorTests
 
         public FakeTunnelSessionFactory Tunnels { get; } = new();
 
-        public FakeWorkBrowserProvider Browsers { get; } = new();
+        public FakeSystemProxyGuard SystemProxy { get; } = new();
 
-        public WorkBrowserSession Browser { get; }
+        public FakeCheckPageOpener CheckPage { get; } = new();
 
         public SessionCoordinator Coordinator { get; }
 
@@ -1020,12 +1015,10 @@ public sealed class SessionCoordinatorTests
         /// <summary>The time the server believes it is (what <c>expires_at</c> is expressed in).</summary>
         public DateTimeOffset ServerNow => Clock.GetUtcNow() + ServerOffset;
 
-        /// <param name="browser">Overrides the default fake work browser (pass <see cref="NoWorkBrowser.Instance"/> for a head-less run).</param>
         /// <param name="serverOffset">Clock skew: how far <c>hello.ack.server_time</c> is ahead of this machine's clock.</param>
         public static async Task<Rig> StartAsync(
             Action<FakeTunnelSession>? configure = null,
             bool logDomains = false,
-            IWorkBrowser? browser = null,
             TimeSpan? serverOffset = null,
             bool enforceAllowlist = false)
         {
@@ -1040,7 +1033,7 @@ public sealed class SessionCoordinatorTests
                     AllowlistVersion: 7),
             };
 
-            var rig = new Rig(server, clock, new RecordingLogger<SessionCoordinator>(), browser) { ServerOffset = offset };
+            var rig = new Rig(server, clock, new RecordingLogger<SessionCoordinator>()) { ServerOffset = offset };
             rig.Tunnels.Configure = configure;
             await rig.Channel.ConnectAsync("at-1", DeviceId, null, None);
             rig.Connection = await server.NextConnectionAsync();
@@ -1102,7 +1095,7 @@ public sealed class SessionCoordinatorTests
 
         public Task SendActiveAsync(Guid sessionId) => Connection.SendAsync(new SessionActiveMessage(sessionId, ServerNow.AddMinutes(30)));
 
-        /// <summary>created → endpoint → peer_endpoint → connected → active (+ the probe page on the guest).</summary>
+        /// <summary>created → endpoint → peer_endpoint → connected → active (+ the system proxy and the check page on the guest).</summary>
         public async Task<Guid> RunToActiveAsync(string role)
         {
             var sessionId = await CreateSessionAsync(role);
@@ -1113,8 +1106,9 @@ public sealed class SessionCoordinatorTests
             await WaitAsync(() => Coordinator.Phase == SessionPhase.Active && Clock.TimerCount >= 1);
             if (role == SessionInfo.GuestRole)
             {
-                await WaitAsync(() => Browsers.Created.Count == 1);
+                await WaitAsync(() => CheckPage.Opened.Count == 1);
                 Tunnels.Last.RaiseProbeSeen();
+                await WaitAsync(() => Coordinator.CheckPageConfirmed == true);
             }
 
             return sessionId;
@@ -1162,7 +1156,6 @@ public sealed class SessionCoordinatorTests
         public async ValueTask DisposeAsync()
         {
             Coordinator.Dispose();
-            await Browser.DisposeAsync();
             await Channel.DisposeAsync();
             await Server.DisposeAsync();
         }
