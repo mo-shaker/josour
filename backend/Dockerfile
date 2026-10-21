@@ -14,9 +14,9 @@ RUN pip install . && rm -rf build *.egg-info
 COPY alembic.ini manage.py ./
 COPY alembic ./alembic
 
-RUN useradd --system --uid 10001 --create-home routebridge \
-    && chown -R routebridge:routebridge /app
-USER routebridge
+RUN useradd --system --uid 10001 --create-home josour \
+    && chown -R josour:josour /app
+USER josour
 
 EXPOSE 8000
 

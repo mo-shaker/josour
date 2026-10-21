@@ -62,23 +62,34 @@ python3.12 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 pytest -q
 ruff check . && ruff format --check .
-RELAY_SECRET="$(openssl rand -base64 48)" RELAY_PORT=8443 python -m relay
+RELAY_SECRET="$(openssl rand -hex 32)" RELAY_PORT=8443 python -m relay
 ```
 
 ## Deployment
 
-On a separate host in the Gulf ([ADR-0009](../docs/decisions/0009-relay-default.md) item 4): the relay sits on the path
-between the two sides, so Egypt ↔ Saudi Arabia via Jeddah is about 40 milliseconds and via Europe about 150.
+Its own Compose stack, `deploy/docker-compose.relay.yml`, with its own settings file and project name — on the
+backend server's machine or, better, on a host of its own in the Gulf
+([ADR-0009](../docs/decisions/0009-relay-default.md) item 4): the relay sits on the path between the two sides, so
+Egypt ↔ Saudi Arabia via Jeddah is about 40 milliseconds and via Europe about 150.
 
 ```bash
 cd deploy
-cp .env.relay.example .env      # the same RELAY_SECRET that is on the backend server
-docker compose -f docker-compose.relay.yml up -d --build
+cp .env.relay.example .env.relay      # RELAY_SECRET: the same value as in the backend's deploy/.env
+docker compose -p josour-relay --env-file .env.relay -f docker-compose.relay.yml up -d --build
 ```
 
-The container listens on 8443 as a non-root user (which cannot bind below 1024) and is published on 443 from the host.
-**Nothing terminates TLS in front of it**: the bytes are already encrypted between the two machines, so an intermediary
-adds a hop and reads nothing.
+Use all three flags on every command (`ps`, `logs`, `down`, …). `.env.relay`, not `.env`: on the backend's machine
+`deploy/.env` is the API's configuration, and copying the relay's example over it would wipe the database password
+and `JWT_SECRET`. `-p josour-relay`: both compose files live in `deploy/`, so without it the two stacks would share
+the project name `deploy` and treat each other's containers as orphans.
+
+The container listens on 8443 as a non-root user (which cannot bind below 1024) and is published on the host as
+`RELAY_PUBLIC_PORT`: 443 on a dedicated host, 8443 beside the backend (whose Caddy holds 443). The backend then
+announces it with `RELAY_HOST`, `RELAY_PORT` and the shared `RELAY_SECRET` in `deploy/.env`. Docker publishes the port
+past ufw, so `ufw allow` is not what opens it; a cloud provider's firewall does apply. **Nothing terminates TLS in
+front of it**: the bytes are already encrypted between the two machines, so an intermediary adds a hop and reads
+nothing. The full walk-through, including checking the port from outside: [docs/self-hosting.md part
+3](../docs/self-hosting.md#3-the-relay--what-makes-a-session-work-with-no-router-configuration).
 
 ## The limits
 

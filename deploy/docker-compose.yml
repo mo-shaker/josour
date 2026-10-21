@@ -1,5 +1,13 @@
-# Josour control plane: Caddy (TLS) + FastAPI (1 worker) + PostgreSQL + daily backup
-# Usage: cp .env.example .env && docker compose up -d
+# Josour control plane: Caddy (TLS) + FastAPI (1 worker) + PostgreSQL + daily backup.
+# The full guide, from an empty server: docs/self-hosting.md
+#
+#   cp .env.example .env && nano .env     # DOMAIN, ACME_EMAIL, POSTGRES_PASSWORD, JWT_SECRET
+#   docker compose up -d --build
+#   docker compose exec api python manage.py create-admin --email you@example.com --display-name "You"
+#
+# Run it from this directory with the default project name (`deploy`): backup/restore.sh, the
+# scripts in scripts/security and the staging workflow all assume it. The relay is a separate
+# stack with its own project name and env file - see docker-compose.relay.yml.
 services:
   caddy:
     image: caddy:2
@@ -9,8 +17,8 @@ services:
       - "443:443"
       - "443:443/udp"
     environment:
-      DOMAIN: ${DOMAIN}
-      ACME_EMAIL: ${ACME_EMAIL}
+      DOMAIN: ${DOMAIN:?set DOMAIN in deploy/.env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in deploy/.env}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -24,8 +32,8 @@ services:
     restart: unless-stopped
     environment:
       ENV: prod
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-josour}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}@db:5432/${POSTGRES_DB:-josour}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in deploy/.env (openssl rand -hex 32)}
       ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-15}
       REFRESH_TOKEN_DAYS: ${REFRESH_TOKEN_DAYS:-30}
       # Rate limiting (ADR-0008). The defaults here are the code's defaults; they are stated explicitly so the operator can tune them.
@@ -41,6 +49,8 @@ services:
       DEVICE_RISK_REFRESH_REUSE: ${DEVICE_RISK_REFRESH_REUSE:-3}
       # Relay (ADR-0009). Leave RELAY_HOST empty to run direct-only; setting one of the two
       # without the other stops the API at boot rather than degrading every session in silence.
+      # The API never dials the relay itself: it only tells the apps where it is and signs a
+      # token for each side, so the relay stack can start before or after this one.
       RELAY_HOST: ${RELAY_HOST:-}
       RELAY_PORT: ${RELAY_PORT:-443}
       RELAY_SECRET: ${RELAY_SECRET:-}
@@ -71,13 +81,13 @@ services:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-josour}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-josour}
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-josour} -d ${POSTGRES_DB:-josour}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -87,9 +97,9 @@ services:
     restart: unless-stopped
     environment:
       PGHOST: db
-      PGUSER: ${POSTGRES_USER}
-      PGPASSWORD: ${POSTGRES_PASSWORD}
-      PGDATABASE: ${POSTGRES_DB}
+      PGUSER: ${POSTGRES_USER:-josour}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      PGDATABASE: ${POSTGRES_DB:-josour}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
     volumes:
       - ./backups:/backups

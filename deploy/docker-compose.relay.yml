@@ -1,20 +1,32 @@
-# The Josour relay, deployed on its own host (ADR-0009).
+# The Josour relay (ADR-0009): pairs the two apps of a session and pumps opaque bytes between them.
+# Plain TCP: the TLS between the two machines runs inside the stream, so nothing terminates TLS here.
 #
-# Separate from the control plane on purpose, for two reasons: the relay wants to own port 443,
-# which the API's Caddy already holds; and its useful location is different. The relay sits on the
-# path between the two peers, so for an Egypt <-> Saudi pair a Gulf region (Jeddah, Dubai, Bahrain)
+# A stack of its own, for two reasons: the relay wants port 443, which the API's Caddy already
+# holds on the API's machine; and its useful location is different. The relay sits on the path
+# between the two peers, so for an Egypt <-> Saudi pair a Gulf region (Jeddah, Dubai, Bahrain)
 # costs ~40 ms while a European one costs ~150 ms. The API can live anywhere.
 #
-# Usage on the relay host:
-#   cp .env.relay.example .env && $EDITOR .env   # RELAY_SECRET must match the API's
-#   docker compose -f docker-compose.relay.yml up -d --build
+# Usage, from this directory, on the API's machine or a machine of its own (docs/self-hosting.md):
+#   cp .env.relay.example .env.relay && nano .env.relay   # RELAY_SECRET must match the API's
+#   docker compose -p josour-relay --env-file .env.relay -f docker-compose.relay.yml up -d --build
+#
+# Always pass all three flags, on every command (ps, logs, down, ...):
+#   -p josour-relay          its own project, so it neither adopts nor orphans the API's containers
+#                            (both files live in this directory, whose default project is "deploy")
+#   --env-file .env.relay    its own settings; .env is the API's and must not be overwritten
+#   -f docker-compose.relay.yml
+#
+# Docker publishes the port itself, past ufw: `ufw allow` neither opens nor closes it. A cloud
+# provider's firewall (security group) does apply, so open the port there.
+name: josour-relay
+
 services:
   relay:
     build:
       context: ../relay
     restart: unless-stopped
     environment:
-      RELAY_SECRET: ${RELAY_SECRET}
+      RELAY_SECRET: ${RELAY_SECRET:?set RELAY_SECRET in deploy/.env.relay (openssl rand -hex 32)}
       RELAY_PORT: 8443
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       # Deadlines. PAIR_TIMEOUT_SECONDS is sized to the control plane's connect deadline: waiting
@@ -29,8 +41,8 @@ services:
       MAX_BYTES_PER_SESSION: ${MAX_BYTES_PER_SESSION:-0}
     ports:
       # 443 on the host is the point: it is the one outbound port open on essentially every
-      # network. Set RELAY_PUBLIC_PORT when something else already holds it - the API's Caddy
-      # does, if you are running both on one machine for a first test.
+      # network. Set RELAY_PUBLIC_PORT (in .env.relay) when something else already holds it -
+      # the API's Caddy does, when both run on one machine: 8443 there, and RELAY_PORT=8443 in .env.
       - "${RELAY_PUBLIC_PORT:-443}:8443"
     healthcheck:
       # The relay speaks its own binary protocol, so "is the port accepting?" is the only check

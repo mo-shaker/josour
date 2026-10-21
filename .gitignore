@@ -20,6 +20,7 @@ client/**/publish/
 
 # Deploy
 deploy/.env
+deploy/.env.relay
 deploy/backups/
 deploy/caddy_data/
 
