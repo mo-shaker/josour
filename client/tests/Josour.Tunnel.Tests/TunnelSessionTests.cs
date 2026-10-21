@@ -410,19 +410,22 @@ public class TunnelSessionTests
     }
 
     /// <summary>
-    /// A near link (20 ms) => the lowest band: 1 MiB and 256 streams as the contract had it before the amendment.
-    /// If this fails on a loaded machine, look at the connect_ms printed: a loopback handshake slower than 40 ms leaves the band.
+    /// A near link (20 ms) => the band of the connect_ms actually measured, and its limit reaches the egress policy. On a quiet machine
+    /// that is the lowest band (1 MiB and 256 streams); the macOS CI runners spend 45-160 ms on the loopback handshake on top of the delay
+    /// (connect_ms 64-177 ms), which lands a band higher, so the band is checked against the measurement rather than pinned.
+    /// The table itself (20 ms => 1 MiB, the 60 ms boundary) is pinned in MuxWindowTests.
     /// </summary>
     [Fact]
-    public async Task Pair_OnANearLink_KeepsTheOneMiBWindow_And256Streams()
+    public async Task Pair_OnANearLink_DerivesTheWindowFromTheMeasuredRoundTrip()
     {
         await using var pair = await TunnelSessionPair.CreateAsync(connectDelay: TimeSpan.FromMilliseconds(20));
 
         Assert.True(pair.HostResult.Connected, pair.HostResult.FailureReason);
-        Assert.InRange(pair.HostResult.ConnectMs, 20, 60);
-        Assert.Equal(1024 * 1024, pair.Host.Diagnostics["mux_window"]);
-        Assert.Equal(256, pair.Host.Diagnostics["mux_max_streams"]);
-        Assert.Equal(256, pair.EgressContext!.MaxConcurrentStreams);
+        Assert.InRange(pair.HostResult.ConnectMs, 20, 5000); // the delay is inside the measurement, and the number is a plausible RTT
+        var expected = MuxWindow.ForRoundTrip(TimeSpan.FromMilliseconds(pair.HostResult.ConnectMs));
+        Assert.Equal(expected.ReceiveWindow, pair.Host.Diagnostics["mux_window"]);
+        Assert.Equal(expected.MaxConcurrentStreams, pair.Host.Diagnostics["mux_max_streams"]);
+        Assert.Equal(expected.MaxConcurrentStreams, pair.EgressContext!.MaxConcurrentStreams);
     }
 
     /// <summary>The explicit override (the tests, the Spike tool) beats the derivation, and the limit follows the imposed window.</summary>
@@ -456,9 +459,11 @@ public class TunnelSessionTests
         }
         else
         {
-            // A loopback handshake may take a millisecond or two: a correct band rather than the fallback.
-            Assert.Equal(1024 * 1024, window);
-            Assert.Equal(256, streams);
+            // A loopback handshake may take a millisecond or two (or far more on a loaded runner): a correct band rather than the fallback.
+            var expected = MuxWindow.ForRoundTrip(TimeSpan.FromMilliseconds(pair.HostResult.ConnectMs));
+            Assert.False(expected.IsFallback);
+            Assert.Equal(expected.ReceiveWindow, window);
+            Assert.Equal(expected.MaxConcurrentStreams, streams);
         }
         Assert.Equal(MuxWindow.MemoryBudget, (long)window * streams);
     }

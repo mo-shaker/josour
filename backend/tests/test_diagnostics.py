@@ -181,7 +181,7 @@ async def test_listener_signal_records_a_count_and_addresses_and_nothing_else(
                     "not-an-ip",
                     "198.51.100.4",
                     "198.51.100.4",  # duplicate
-                    "::FFFF:0:0",  # canonicalised
+                    "2001:DB8:0:0:0:0:0:1",  # canonicalised
                     *peers,
                 ],
                 "url": "https://example.com/secret?token=abc",
@@ -196,7 +196,7 @@ async def test_listener_signal_records_a_count_and_addresses_and_nothing_else(
     assert set(details) == {"count", "peers"}
     assert details["count"] == MAX_REPORTED_COUNT
     assert len(details["peers"]) == MAX_REPORTED_PEERS
-    assert details["peers"][:2] == ["198.51.100.4", "::ffff:0:0"]
+    assert details["peers"][:2] == ["198.51.100.4", "2001:db8::1"]
     serialised = json.dumps(details)
     assert "internal.corp" not in serialised and "example.com" not in serialised
 
