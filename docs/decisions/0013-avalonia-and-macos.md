@@ -5,6 +5,10 @@
 Windows machine, and the signing decision. **Supersedes [ADR-0001](0001-ui-framework-wpf.md)** (WPF on .NET 8), which
 was still "proposed".
 
+> **Amended on 2026-10-21 by [ADR-0015](0015-system-proxy-instead-of-work-browser.md):** the work browser, `Josour.Browser`
+> and the connection-owner check (`lsof` on macOS) are gone; the platform seam is now the system proxy (WinINet on
+> Windows, `networksetup` on macOS). What follows is kept for context.
+
 ## Context
 
 The product was asked to work on macOS in both roles: as a host sharing their connection, and as a guest borrowing

@@ -2,6 +2,32 @@
 
 The items' source: section 16 of the product document.
 
+## Round 2: client 2.0 on a freshly installed server (to run after the reinstall)
+
+Client 2.0 replaced the work browser with the guest's system proxy
+([ADR-0015](decisions/0015-system-proxy-instead-of-work-browser.md)), so items 7, 9, 10, 11, 12 and 13 below are
+re-worded for it; the first round underneath stays as it was recorded. Install from
+[self-hosting.md](self-hosting.md) and test with two machines on two different networks, one Windows and one Mac if
+you have both. Record each result with its date and the log line that shows it.
+
+| # | What | How | Pass when |
+|---|---|---|---|
+| 2.1 | The server comes up from nothing | Sections 2.1–2.5 of the guide on a formatted machine | `https://<domain>/healthz` says `"version":"2.0.0"`; the dashboard signs in |
+| 2.2 | Registration and approval | *Create account* in the app → approve in *Registrations* | Pending until approved, then signs in |
+| 2.3 | Contacts | Invite by email in the app (or `seed-contacts --all-active`) | Each sees the other; nobody else sees either |
+| 2.4 | A request, host consents | Guest asks; host accepts | Both panels show the session; the guest's says every browser now goes through the host |
+| 2.5 | Any browser goes through the host (was 7 and 9) | The check page opens by itself; then Safari/Chrome/Edge/Firefox on `https://api.ipify.org` | The host's address in each browser that follows the system proxy |
+| 2.6 | The proxy setting while a session runs | Windows: *Settings → Network → Proxy*; macOS: *System Settings → Network → (service) → Proxies* | `127.0.0.1:<port>` for web and secure web, during the session only |
+| 2.7 | Plain http and odd ports | `http://neverssl.com` through the session; a site on port 8080 | The http page loads through the host; port 8080 is refused (403), not sent from the guest's own address |
+| 2.8 | Disconnect from either side (was 11) | Disconnect on the host, then on the guest in a second session | The guest's proxy setting is back to what it was; `api.ipify.org` shows its own address |
+| 2.9 | The session's duration runs out (was 12) | A 15-minute session left alone | `reason=expired` ± 5 s, and the setting is back |
+| 2.10 | A crash during a session (was 13) | Kill Josour on the guest (Task Manager / Force Quit) | Within seconds browsing works on the guest's own connection; `logs/proxy-*.log` names the guardian's restore |
+| 2.11 | A power cut during a session | Switch the guest off hard, start it again, sign in to the OS | The setting is put back at login (or when Josour starts) |
+| 2.12 | Repair internet settings | Tray / menu bar → *Repair internet settings* | With a session: it ends and the setting is back; without: "nothing to repair" |
+| 2.13 | macOS authorisation | The first guest session on each Mac | Either no prompt, or macOS's own password dialog once per change; cancelling ends the session with "the administrator password was not entered" |
+| 2.14 | The host's network stays out of reach (was 15) | From the guest: `http://192.168.1.1`, `http://localhost`, the host's public IP | Refused |
+| 2.15 | After a server reinstall, the old client | Sign in from a client that was signed in to the old server | Signs in at the first attempt as a new device |
+
 > ## ⏸ Stopped by the product owner's decision — 2026-09-10
 >
 > The manual round is **stopped at this state**, not abandoned halfway. What is recorded below is true and dated, and

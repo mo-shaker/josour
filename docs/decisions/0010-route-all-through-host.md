@@ -45,6 +45,10 @@ Step 6 is the real security boundary: it is what keeps the guest away from the h
 page, their `localhost` services and their public address. **"Pass everything" does not in any way mean disabling
 that guard**, and acceptance criterion 15 stays as it is and must stay green.
 
+> **Superseded on 2026-10-21 by [ADR-0015](0015-system-proxy-instead-of-work-browser.md):** there is no work browser any
+> more; during a session the guest's system proxy points at the local proxy, so every application that follows it goes
+> through the host. The paragraph below is kept for context.
+
 Likewise **the scope of enforcement is unaffected:** the proxy serves **the work browser alone** (the owning-PID check
 inside a Job Object). So Teams, Outlook and the ordinary browser stay on the user's own connection with their own
 address. Acceptance criterion 10 still stands, and the product does not become a device-wide VPN.

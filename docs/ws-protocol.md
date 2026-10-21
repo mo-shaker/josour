@@ -266,7 +266,7 @@ timer. `session.connected` re-arms the expiry timer with no double effect, so th
 |---|---|---|
 | `guest_ended` / `host_ended` | The one named | The user stopped the session themselves |
 | `guest_disconnected` / `host_disconnected` | **The peer**, not the one named | The tunnel died while both control channels stayed alive, and that is the one moment the server cannot observe itself |
-| `browser_not_proxied` | Either side | The work browser did not go through the proxy |
+| `browser_not_proxied` | Either side | The work browser did not go through the proxy (1.x clients only; a 2.0 guest reports `system_proxy_failed` when it cannot set the system proxy, and a check page that does not come through is only a warning) |
 | `protocol_error` | Either side | A protocol fault |
 
 And `expired`, `connect_failed` and `admin_terminated` are **the server's judgements alone**: it has its timers, its

@@ -189,7 +189,8 @@ On `OPEN(host, port)`, in order:
 ## 7. The cleanup order when the session ends
 
 1. The proxy stops accepting new connections.
-2. A polite browser close (WM_CLOSE), then closing the Job Object after 3 seconds.
+2. The guest puts its system proxy back ([ADR-0015](decisions/0015-system-proxy-instead-of-work-browser.md)) — before the
+   tunnel closes, so nothing is left pointing at a proxy about to disappear. (1.x: closing the work browser.)
 3. `GOAWAY(session_end)` and closing the tunnel.
 4. Closing the listener and removing the UPnP mapping.
 5. Disposing the certificates and wiping the secret.

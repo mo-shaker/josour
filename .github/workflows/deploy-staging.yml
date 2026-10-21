@@ -5,7 +5,7 @@ name: deploy-staging
 #   STAGING_HOST      the server's address or name
 #   STAGING_USER      the SSH user
 #   STAGING_SSH_KEY   a private key (ed25519) with no passphrase
-#   STAGING_PATH      the repository's path on the server, e.g. /opt/routebridge
+#   STAGING_PATH      the repository's path on the server, e.g. /opt/josour
 # Until they are all set, an automatic run skips the deploy with a notice (the job stays green);
 # a run started by hand still fails, because someone asked for a deploy.
 # The server must already be prepared per docs/runbook.md with deploy/.env in place.

@@ -136,7 +136,7 @@ Only contacts can see each other's hosts and ask for or offer a connection.
   silence. The denominator (how many sessions saw nothing) is derived from the sessions table, so it is lost under
   neither behaviour.
 
-- `GET /healthz` (unauthenticated, and outside `/api/v1`) → `{ "status": "ok", "product":"josour", "version": "0.1.0" }`.
+- `GET /healthz` (unauthenticated, and outside `/api/v1`) → `{ "status": "ok", "product":"josour", "version": "2.0.0" }`.
 
   The structure is part of the contract even though it is outside OpenAPI: the client's first-run and settings screens
   decide from it **whether this is a Josour server** before letting the user continue, and without the product marker a
@@ -187,7 +187,7 @@ Only contacts can see each other's hosts and ask for or offer a connection.
 | `request_timeout_seconds` | 60 |
 | `connect_timeout_seconds` | 30 |
 | `log_domains` | false |
-| `enforce_allowlist` | false — **[ADR-0010](decisions/0010-route-all-through-host.md)**: everything the work browser asks for goes through the host. The list restricts only when an administrator turns this key on |
+| `enforce_allowlist` | false — **[ADR-0010](decisions/0010-route-all-through-host.md)**: everything the guest's browsers ask for goes through the host. The list restricts only when an administrator turns this key on |
 | `allowed_ports` | `[80, 443]` |
 | `registration_mode` | `approval` — [ADR-0017](decisions/0017-self-registration-with-approval.md) |
 | `min_client_version` | `""` (no floor) |

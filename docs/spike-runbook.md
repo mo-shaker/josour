@@ -313,6 +313,11 @@ Added to the list in section 5 above:
 
 # The system proxy spikes S1–S3 (ADR-0015, phase 0 of the restructure)
 
+> **Not run — skipped by the owner's decision on 2026-10-21.** Client 2.0 shipped the system proxy without these
+> measurements and handles each outcome they could have shown ([ADR-0015](decisions/0015-system-proxy-instead-of-work-browser.md),
+> "Not measured first"). The scripts stay for diagnosing a machine where it misbehaves: they change the system proxy,
+> so run them only on a machine you can fix by hand.
+
 The goal: to settle how the guest app changes the operating system's proxy ([ADR-0015](decisions/0015-system-proxy-instead-of-work-browser.md))
 before any of it is built. S1 decides the macOS path (`networksetup` called directly, or a small root-installed
 helper); S2 confirms the WinINet per-user path on Windows and its Group Policy and VPN edges; S3 lists what still

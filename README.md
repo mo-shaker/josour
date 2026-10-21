@@ -2,9 +2,10 @@
 
 A desktop application for Windows and macOS that lets one person (the guest) use another person's internet
 connection (the host's) temporarily and with their explicit consent, so that sites which only work from inside the
-host's country become reachable — an expatriate who needs their bank or their government's portal. Everything the
-work browser asks for leaves from the host's address ([ADR-0010](docs/decisions/0010-route-all-through-host.md)),
-and nothing else on either machine is affected.
+host's country become reachable — an expatriate who needs their bank or their government's portal. While a session
+lasts, the guest's computer points its proxy settings at Josour, so **any browser** on it leaves from the host's address
+([ADR-0010](docs/decisions/0010-route-all-through-host.md), [ADR-0015](docs/decisions/0015-system-proxy-instead-of-work-browser.md));
+when the session ends the settings go back exactly as they were.
 
 > ## Read this before you host
 >
@@ -19,8 +20,9 @@ and nothing else on either machine is affected.
 > This is also a category of software (routing traffic through a residential address) that is widely abused: ad
 > fraud, credential stuffing, evading bans. Know that while you decide.
 >
-> What does **not** happen: your other applications are unaffected, your local network and `localhost` services
-> stay out of reach, and the guest goes through an isolated work browser and nothing else.
+> What does **not** happen: nothing on your own computer changes, and your local network and `localhost` services stay
+> out of reach. On the guest's side, every program that follows the system proxy settings (any browser) goes through
+> you for as long as the session lasts, and only then.
 
 User management happens in a **web dashboard on your own server**, at `https://<your domain>/admin`
 ([ADR-0016](docs/decisions/0016-web-admin-dashboard.md)): approving the people who register from the app
@@ -58,7 +60,7 @@ See [licensing and distribution](docs/licensing.md) for details and an Arabic su
 | Directory | Contents |
 |---|---|
 | `backend/` | Control server: Python 3.12 + FastAPI + PostgreSQL + WebSockets |
-| `client/` | .NET 8 solution: tunnel, proxy, egress and browser libraries + the Avalonia app ([ADR-0013](docs/decisions/0013-avalonia-and-macos.md)) |
+| `client/` | .NET 8 solution: tunnel, proxy and egress libraries + the Avalonia app ([ADR-0013](docs/decisions/0013-avalonia-and-macos.md)) |
 | `relay/` | Relay service: pairs the two ends of a session and pumps opaque bytes ([ADR-0009](docs/decisions/0009-relay-default.md)) |
 | `deploy/` | Production Docker Compose (Caddy + API + PostgreSQL + backups) and a **standalone relay** |
 | `docs/` | Implementation plan, the frozen contracts (REST / WebSocket / channel protocol), ADRs, runbook |
@@ -152,9 +154,9 @@ dotnet run --project src/Josour.App -f net8.0 -- --mock   # the interface agains
 dotnet test tests/Josour.App.Tests                          # the headless interface tests
 ```
 
-**macOS status:** both roles work. The connection-owner check — the control that keeps the proxy serving the work
-browser alone — is implemented with `lsof`, and the browser is launched from inside its bundle with ownership read
-from the process tree. The detail is in [docs/macos-port.md](docs/macos-port.md).
+**macOS status:** both roles work. As a guest the app points every enabled network service's proxy at itself with
+`networksetup` for the length of a session (macOS may ask for an administrator's password) and puts it back afterwards
+([ADR-0015](docs/decisions/0015-system-proxy-instead-of-work-browser.md)). The detail is in [docs/macos-port.md](docs/macos-port.md).
 
 ### The relay
 
@@ -175,6 +177,6 @@ Benchmarks: `pip install -e ".[bench]" && python -m bench` — detail in
 |---|---|
 | A: the server | `backend/` |
 | A: the server and the relay | `backend/`, `relay/` |
-| B: networking | `client/src/Josour.{Core,Tunnel,Proxy,Egress,Browser}` + `client/tools/` |
+| B: networking | `client/src/Josour.{Core,Tunnel,Proxy,Egress}` + `client/tools/` |
 | C: the application | `client/src/Josour.{Infrastructure,App}` |
 | D: DevOps/QA | `deploy/`, `.github/`, `client/installer/`, `docs/runbook.md`, `docs/acceptance-checklist.md` |

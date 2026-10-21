@@ -26,14 +26,19 @@ The boundaries the whole product rests on, worst-first by what breaking them wou
 | Boundary | Where it lives | Why it matters |
 |---|---|---|
 | Refusing private addresses after name resolution | `IpRangePolicy`, step 6 in [docs/protocol.md](docs/protocol.md) | It alone keeps the guest away from the host's local network, their router's admin page and their `localhost` services |
-| The connection-owner check | `OwnerPidChecker` | It alone keeps the product from becoming a device-wide VPN on the guest's machine, sending **everything** out through the host's address |
+| Putting the guest's system proxy back | `SystemProxyGuard`, the guardian process, [ADR-0015](docs/decisions/0015-system-proxy-instead-of-work-browser.md) | During a session every application on the guest's computer that follows the system proxy leaves from the host's address; after it, nothing may. A session that ends — cleanly, by a crash, by a power cut — must leave the settings exactly as they were |
+| Nothing leaves directly by accident | `ProxyRouter`, `ConnectProxyServer` | A port outside `allowed_ports`, an address literal or a failed open is refused with 403; with every site allowed, nothing the proxy receives may go out from the guest's own address |
 | The host's consent | [ADR-0012](docs/decisions/0012-auto-accept-trusted-guests.md), section 5a in [docs/ws-protocol.md](docs/ws-protocol.md) | Any path that creates a session without consent — or makes a trust rule apply to somebody it was not written about — breaks the product rather than having a bug in it |
 | The tunnel secret and the relay token | `session_keys`, `relay_tokens` | End-to-end encryption rests on them, and the server is not supposed to be able to read anything |
-| Work-browser isolation | `Josour.Browser` | The machine's other applications must never pass through here |
+| The local proxy stays local | `ConnectProxyServer` (loopback only), `SameUserAdmission` | It is the door to the host's address: only this machine, and on Windows only the signed-in account's processes |
 
 ## What differs between the two systems
 
-The connection-owner check is implemented on both, by two mechanisms: `GetExtendedTcpTable` on Windows and `lsof`
-on macOS, because there is no public call there that maps a socket to a process. Browser ownership comes from a Job
-Object on Windows and from the process tree on macOS. If you find a way to make either of them admit a connection
-the work browser did not open, that is what I want to hear about more than anything else.
+Windows changes the current user's WinINet settings with `InternetSetOptionW` and needs no administrator rights; a
+Group Policy that keeps proxy settings per machine (`ProxySettingsPerUser=0`) makes the guest role unavailable rather
+than half-applied. macOS changes every enabled network service with `networksetup`, and when macOS asks for
+authorisation it shows its own password dialog — Josour never holds a password. On Windows the local proxy admits only
+processes of the same Windows account (the owning process from `GetExtendedTcpTable`, its account from its token); on
+macOS the loopback listener is the boundary. If you find a way to make the settings stay pointed at a dead proxy after a
+session, or to make the local proxy send something out from the guest's own address, that is what I want to hear about
+more than anything else.

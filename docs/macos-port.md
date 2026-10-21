@@ -28,10 +28,7 @@ everything the host does with the bytes — needs nothing.
 |---|---|---|---|---|
 | 1 | Secret storage | DPAPI (`DpapiSecretStore`) | A file with `0600` permissions (`FileSecretStore`) — the Keychain was tried first and fell, see [ADR-0013](decisions/0013-avalonia-and-macos.md) | ✅ (`FileSecretStore`, `SecretStores`) |
 | 2 | Device information | Registry keys | `sw_vers` | ✅ (`DeviceInfoProvider.ReadMacVersion`) |
-| 3 | Locating the browser's path | The registry | `/Applications` and `~/Applications` (`MacBrowserLocator`, reached through `BrowserSessions.IsInstalled`) | ✅ |
-| 4 | Launching the work browser | `--proxy-server` + an isolated profile | The same arguments; executing directly inside the bundle rather than `open` (`MacBrowserSession`) | ✅ |
-| 5 | Containing the browser | A Job Object | The process tree: SIGTERM to the tree then SIGKILL (`MacProcessTree`) | ✅ |
-| 6 | **The connection-owner check** | `iphlpapi!GetExtendedTcpTable` | `lsof` (`MacOwnerPidChecker`) + the process tree | ✅ **implemented and tested both ways** |
+| 3–6 | **The guest's system proxy** ([ADR-0015](decisions/0015-system-proxy-instead-of-work-browser.md); replaced the work browser, its locator, its containment and the `lsof` owner check) | WinINet per-connection options (`WindowsSystemProxyController`); same-account admission | `networksetup` per enabled service, with macOS's own password prompt when it asks (`MacSystemProxyController`) | ✅ implemented; ⬜ a real session on each system |
 | 7 | Firewall diagnostics | `netsh advfirewall` | `socketfilterfw` | ✅ (`MacFirewallDiagnostics`) |
 | 8 | Start on login | The `Run` key | A `LaunchAgent` in `~/Library/LaunchAgents` | ✅ (`StartupRegistration`) |
 | 9 | The tray icon | `H.NotifyIcon.Wpf` | Avalonia's `TrayIcon` (the menu bar) | ✅ (`TrayService`) |
@@ -42,77 +39,18 @@ everything the host does with the bytes — needs nothing.
 | 14 | The clipboard and sound | WPF | `TopLevel.Clipboard` and `afplay` | ✅ (`ClipboardService`, `AttentionSound`) |
 | 15 | Distribution | One file ([ADR-0011](decisions/0011-no-code-signing-certificate.md)) | A `.app` inside a `.dmg` via [publish-app.sh](../scripts/publish-app.sh) | ✅ **for the build**; ⬜ signing and Gatekeeper |
 
-## Seam 6: the connection-owner check — why it is the hardest
+## Seams 3–6: the guest's system proxy
 
-The local proxy serves **the work browser alone**; that is what keeps the product from becoming a device-wide VPN, and
-it is acceptance criterion 10 and an explicit consequence in
-[ADR-0010](decisions/0010-route-all-through-host.md). On Windows it is implemented by asking `iphlpapi` for the
-socket's owner and then checking that it is inside the Job Object.
+Until client 2.0 the guest browsed through a dedicated work browser, and the local proxy admitted that browser's
+processes alone — on macOS by asking `lsof` for every connection's owner. ADR-0015 replaced all of it: while a session
+lasts, every enabled network service's web and secure web proxy points at `127.0.0.1:<port>` (`networksetup`), PAC and
+auto-discovery are off, and everything is put back when the session ends — by the session itself, by a guardian process
+if the app dies, by a launch agent (`com.josour.proxy-restore`) at the next login, at the app's next start, or from
+"Repair internet settings" in the menu-bar menu.
 
-On macOS there is no Job Object. And what exists today is `PermissiveOwnerPidChecker` — which literally means "I do not
-know", and which on Windows is a rare fallback and on a Mac would be **the permanent state**. That is, a naive port
-drops this control silently.
-
-### What was done now: refusing instead of passing silently
-
-The default was `RejectUnknownOwner ?? OperatingSystem.IsWindows()` — that is, "refuse the unknown on Windows **and
-accept it everywhere else**". And with `PermissiveOwnerPidChecker`, which is all that exists off Windows, that meant
-the local proxy **accepted every process on the machine**. It was not a decision taken but the side effect of a
-default, and it dropped acceptance criterion 10 without anyone saying anything.
-
-The default is now **`true` on every system** (fail-closed). And whoever wants "accept everything" must say so
-explicitly — as the in-process tests and the Spike tool do. The difference between a declared choice and a silent
-default is the whole difference here.
-
-Its effect on macOS is that the existing guard in `ConnectProxyServer` fires: the proxy refuses to be constructed at
-all. And above it `GuestViewModel.IsGuestRoleSupported`, so the guest page shows the reason and the request button is
-disabled — the user knows before they ask, rather than by an exception after a session has been created.
-
-### How it was implemented, and why in this shape
-
-**`lsof`, not `libproc`.** macOS has no public call binding a socket to a process; the only route through the system
-is `proc_listpids` then `proc_pidfdinfo` on every descriptor of every process, unpacking the large,
-version-sensitive `socket_fdinfo` structure — a structure laid out by hand for a security control that may not be
-quietly wrong. And `lsof` does that same walk, ships with every macOS, and has a documented field format (`-F`). It is
-what the project already does for platform facts (`netsh`, `socketfilterfw`, `sw_vers`).
-
-**No caching.** Measured: 20 milliseconds per call, cheap enough to ask on every connection. And a cached table opens a
-real hole: an ephemeral port the browser released may be picked up by another process inside the caching window, so an
-old row accepts it. Twenty milliseconds is a smaller price than an answer that is sometimes wrong.
-
-**Ownership from the process tree.** Chrome does not open sockets from the process that was launched but from a child
-of it, so comparing the launched PID alone would have refused every connection the browser makes. And the tree is read
-every time rather than once: a cached set, with process ids being reused, is a route to accepting a process nobody
-launched.
-
-**And the browser is launched from inside its bundle rather than with `open`:** `open` hands the request to an existing
-instance and returns, so no process remains that we own, wait for or kill — and the owner check needs a process of our
-own.
-
-### What was exercised
-
-| | |
-|---|---|
-| The positive case | Actually running the stack with the `Spike` tool: Chrome started, the check page arrived, and the counters read `accepted: 19, rejected_by_owner: 0` — the opposite of the historic `33/33` failure recorded in the code |
-| The negative case | An integration test: the real proxy + the real `lsof` checker + a browser that owns nothing ⇒ `RejectedByOwner: 1, Tunneled: 0` |
-| That the refusal is a decision, not an inability | A test proving the checker **names the test's own process** — a refusal caused by failing to identify anything would have looked identical, and would mean the control does not work |
-
-**Not exercised:** a real mac ↔ Windows session in both roles. It needs two machines.
-
-**And what the `Spike` tool could not exercise, discovered on 2026-09-23.** The positive case above ran through the
-tool's `browser` command, which does ask for this platform's session. Two paths around it did not, and both were blind
-to macOS:
-
-- `WorkBrowserProvider.Preference()` — the app's own gate — asked `BrowserLocator`, which knows `chrome.exe`, the
-  registry and the Windows default paths. On macOS it answered "not installed" however many browsers were there, so a
-  guest session that had connected, relayed and gone active ended with `browser_not_proxied` in the same instant. The
-  tool never reached this code: its provider answers the browser named on the command line without asking whether it is
-  installed.
-- `SessionDriver`'s provider constructed `BrowserLauncher` — the Windows implementation — by name, so the tool's own
-  `session` command could not launch a browser on macOS either.
-
-Both now go through `BrowserSessions.IsInstalled` / `ForCurrentPlatform`, and the regression is pinned in
-`BrowserSessionsTests`. The lesson is the one this table exists for: what the tool exercised was not what the app ran.
+When `networksetup` refuses for lack of authorisation, the same commands run once through macOS's own administrator
+dialog (`osascript … with administrator privileges`); cancelling it ends the session with `system_proxy_failed`. How
+often macOS asks was never measured on real machines (the S1 spike was skipped); the first real sessions will show it.
 
 ## The interface: what actually changed
 

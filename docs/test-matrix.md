@@ -58,10 +58,12 @@ Tested by hand on Windows; the automated tests cover their logic but not the sys
 
 | Case | How it is tested | Expected |
 |---|---|---|
-| Sleep and wake | Closing the lid for more than two minutes during a live session | The session ends with a clear reason, the work browser closes, and the control channel comes back within seconds of waking (a "backoff shortened" line in the log) |
+| Sleep and wake | Closing the lid for more than two minutes during a live session | The session ends with a clear reason, the system proxy is put back, and the control channel comes back within seconds of waking (a "backoff shortened" line in the log) |
 | A network change | Switching from Wi-Fi to Ethernet during a session | Immediate reconnection with no wait for the exponential backoff |
-| An application crash and an abandoned browser | Killing `Josour.exe` from Task Manager and restarting | The abandoned window closes before the application becomes usable, and the marker file is deleted |
-| The user's personal browser | Starting personal Chrome first, then killing and restarting the application | The personal browser is **not** closed |
+| An application crash during a guest session | Killing `Josour.exe` (Task Manager) or `Josour` (Activity Monitor, Force Quit) while a guest session is active | Within a couple of seconds the guardian puts the proxy settings back and browsing works on the guest's own connection; `logs/proxy-*.log` says so, and `system-proxy.json` is gone |
+| A power cut during a guest session | Switching the guest machine off hard during a session, then starting it again | At the next login (or at Josour's next start, before sign-in) the proxy settings are put back |
+| Repair internet settings | Tray → "Repair internet settings", with and without a session | With a session: it ends and the settings come back. Without: "nothing to repair" |
+| A browser that ignores the system proxy | Firefox set to "No proxy" during a guest session | The check page warning appears; that browser uses the guest's own connection, the others the host's |
 | The access token expiring during a session | The server closing the connection with code 4401 | One refresh and a reconnection, or a clean teardown if that is not possible |
 | Clock drift | Setting the machine's clock 45 minutes fast | The session's duration neither shortens nor lengthens, and a warning appears in the log |
 | A right-to-left interface | Running in Arabic (the default) and with `--lang en` | The layout is a correct mirror, addresses, device names and numbers read from the left inside Arabic text, and the digits are Western |

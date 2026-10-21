@@ -85,7 +85,7 @@ track C's.
 | # | Item | State | Note |
 |---|---|---|---|
 | 15.7 | Prohibiting illegal activity | Not the server's concern | Policy text (product/legal) |
-| 15.8 | Not sharing the connection with people who are not trusted | Not the server's concern | Policy text. It is technically supported by the local proxy accepting the work browser alone (the PID check, plan decision 2) |
+| 15.8 | Not sharing the connection with people who are not trusted | Not the server's concern | Policy text. Technically, the guest's local proxy listens on loopback and, on Windows, admits only the signed-in account's processes ([ADR-0015](decisions/0015-system-proxy-instead-of-work-browser.md)) |
 | 15.9 | Abiding by the sites' terms | Not the server's concern | Policy text |
 | 15.10 | The user's responsibility for the session | Met (by the record) | Every session is bound to all four users and devices in `sessions`, and is never deleted |
 | 15.11 | The company's responsibility for determining the allowed sites | Met | The list is central and governed by an administrator: `PUT /admin/domains` validates **every** entry and refuses the whole request on any error, and publishes an immutable version (`allowlist_versions`) and broadcasts `allowlist.updated`. No path lets an ordinary user widen the list |
