@@ -156,12 +156,9 @@ public class MacOwnerCheckIntegrationTests
             checker: MacOwnerPidChecker.Instance,
             rejectUnknown: true);
 
-        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        await client.ConnectAsync(new IPEndPoint(IPAddress.Loopback, proxy.Port));
-
         // The proxy identifies the owner (this test), asks the browser whether it is one of its own, is told no,
         // and drops it.
-        await AssertRefusedAsync(client);
+        await AssertRefusedAsync(proxy.Port);
 
         Assert.Equal(1, proxy.Counters.RejectedByOwner);
         Assert.Equal(0, proxy.Counters.Tunneled);
@@ -178,21 +175,23 @@ public class MacOwnerCheckIntegrationTests
         await using var proxy = Proxies.Start(
             browser: browser, checker: MacOwnerPidChecker.Instance, rejectUnknown: true);
 
-        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        await client.ConnectAsync(new IPEndPoint(IPAddress.Loopback, proxy.Port));
-        await AssertRefusedAsync(client);
+        await AssertRefusedAsync(proxy.Port);
 
         Assert.Equal(Environment.ProcessId, Assert.Single(browser.Asked));
     }
 
     /// <summary>
-    /// Waits for the proxy to drop the connection. Whether that arrives as an orderly close or a reset is the
-    /// kernel's business and varies; what must be true is that nothing was served.
+    /// Connects and waits for the proxy to drop the connection. Whether that arrives as an orderly close or a reset
+    /// is the kernel's business and varies — on a loaded macOS runner the reset can even land before the connect's
+    /// own completion and surface from ConnectAsync; what must be true is that nothing was served. The proxy counts
+    /// the refusal and asks the browser before it resets, so the callers' assertions hold whichever way it arrives.
     /// </summary>
-    private static async Task AssertRefusedAsync(Socket client)
+    private static async Task AssertRefusedAsync(int proxyPort)
     {
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         try
         {
+            await client.ConnectAsync(new IPEndPoint(IPAddress.Loopback, proxyPort));
             var read = await client.ReceiveAsync(new byte[1], SocketFlags.None);
             Assert.Equal(0, read);
         }
