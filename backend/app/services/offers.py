@@ -30,6 +30,7 @@ from app.services import contacts as contact_service
 from app.services import requests as request_service
 from app.services import sessions as session_service
 from app.services.app_settings import settings_service
+from app.services.request_state import settle
 from app.services.session_timer import scheduler
 from app.ws import notify
 from app.ws.connection_manager import Connection, connection_manager
@@ -158,8 +159,8 @@ async def cancel(*, offer_id: uuid.UUID, device_id: uuid.UUID, ref: str) -> None
         if offer.host_device_id != device_id:
             raise WsError(ErrorCode.FORBIDDEN, "This offer is not yours", ref=ref)
         _still_pending(offer, ref=ref)
-        offer.status = RequestStatus.CANCELLED
-        offer.responded_at = utcnow()
+        if not await settle(db, offer, RequestStatus.CANCELLED):
+            raise WsError(ErrorCode.NOT_FOUND, request_service.NO_LONGER_PENDING, ref=ref)
         await db.commit()
         guest_user_id = offer.guest_user_id
     scheduler.cancel(timer_key(offer_id))
@@ -185,8 +186,8 @@ async def reject(
         if offer.guest_user_id != user_id:
             raise WsError(ErrorCode.FORBIDDEN, "This offer is not addressed to you", ref=ref)
         _still_pending(offer, ref=ref)
-        offer.status = RequestStatus.REJECTED
-        offer.responded_at = utcnow()
+        if not await settle(db, offer, RequestStatus.REJECTED):
+            raise WsError(ErrorCode.NOT_FOUND, request_service.NO_LONGER_PENDING, ref=ref)
         await db.commit()
         host_device_id = offer.host_device_id
     scheduler.cancel(timer_key(offer_id))
@@ -206,7 +207,11 @@ async def accept(
     ref: str,
     runtime: Settings | None = None,
 ) -> None:
-    """``offer.accept``: the accepting device becomes the guest device and the session opens."""
+    """``offer.accept``: the accepting device becomes the guest device and the session opens.
+
+    Two of the guest's devices accepting at once: the first claim wins (``requests.open_session``)
+    and the other is answered ``not_found``, then hears ``offer.closed(accepted_elsewhere)`` like
+    every other device of the guest."""
     runtime = runtime or get_settings()
     async with session_scope() as db:
         settings = await settings_service.get(db)
@@ -227,7 +232,6 @@ async def accept(
         if pending is not None:
             raise WsError(ErrorCode.REQUEST_PENDING, "This device has a request pending", ref=ref)
 
-        offer.guest_device_id = device_id
         guest = await request_service.load_party(db, user_id, device_id)
         host = await request_service.load_party(db, offer.host_user_id, offer.host_device_id)
         session, key = await request_service.open_session(
@@ -275,8 +279,8 @@ async def expire(offer_id: uuid.UUID) -> bool:
             or offer.initiator != RequestInitiator.HOST
         ):
             return False
-        offer.status = RequestStatus.EXPIRED
-        offer.responded_at = utcnow()
+        if not await settle(db, offer, RequestStatus.EXPIRED):
+            return False
         await db.commit()
         host_device_id, guest_user_id = offer.host_device_id, offer.guest_user_id
     await notify.send_to_device(

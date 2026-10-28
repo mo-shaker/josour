@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, String, Uuid, false
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Uuid, false, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.clock import utcnow
@@ -27,6 +27,14 @@ class AdminWebSession(Base):
     mfa_passed: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
+    """A TOTP code was verified in *this* session. Never set by the password alone, so a
+    session that only knows the password is still sent to the code (or enrolment) page if the
+    administrator enables TOTP or the operator turns on ``ADMIN_WEB_REQUIRE_TOTP`` later."""
+    totp_failures: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    """Wrong TOTP codes submitted in this session; the session is ended at
+    ``app.web.views.MAX_TOTP_FAILURES``."""
     ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)

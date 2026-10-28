@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clock import ensure_utc, utcnow
@@ -44,6 +45,7 @@ from app.services import hosts as host_service
 from app.services import sessions as session_service
 from app.services.app_settings import settings_service
 from app.services.effects import SettledRequest
+from app.services.request_state import settle
 from app.services.session_timer import scheduler
 from app.ws import notify
 from app.ws.connection_manager import connection_manager
@@ -95,6 +97,9 @@ async def load_party(db: AsyncSession, user_id: uuid.UUID, device_id: uuid.UUID)
     if user is None or device is None:  # pragma: no cover - foreign keys guarantee both
         raise WsError(ErrorCode.INTERNAL, "Request references an unknown party")
     return Party(user=user, device=device, presence=await db.get(Presence, device_id))
+
+
+NO_LONGER_PENDING = "No longer pending: it was answered, withdrawn or expired a moment ago"
 
 
 def validate_duration(duration_min: int, settings: AppSettings, *, ref: str) -> None:
@@ -240,8 +245,8 @@ async def cancel(*, request_id: uuid.UUID, device_id: uuid.UUID, ref: str) -> No
     the only server frame the contract gives for that (section 4)."""
     async with session_scope() as db:
         request = await _load_pending(db, request_id, device_id=device_id, is_host=False, ref=ref)
-        request.status = RequestStatus.CANCELLED
-        request.responded_at = utcnow()
+        if not await settle(db, request, RequestStatus.CANCELLED):
+            raise WsError(ErrorCode.NOT_FOUND, NO_LONGER_PENDING, ref=ref)
         await db.commit()
         guest_device_id, host_device_id = request.guest_device_id, request.host_device_id
     scheduler.cancel(timer_key(request_id))
@@ -257,8 +262,8 @@ async def reject(*, request_id: uuid.UUID, device_id: uuid.UUID, ref: str) -> No
     """``request.reject`` from the addressed host -> ``request.result(false, rejected)``."""
     async with session_scope() as db:
         request = await _load_pending(db, request_id, device_id=device_id, is_host=True, ref=ref)
-        request.status = RequestStatus.REJECTED
-        request.responded_at = utcnow()
+        if not await settle(db, request, RequestStatus.REJECTED):
+            raise WsError(ErrorCode.NOT_FOUND, NO_LONGER_PENDING, ref=ref)
         await db.commit()
         guest_device_id = request.guest_device_id
     scheduler.cancel(timer_key(request_id))
@@ -355,7 +360,12 @@ async def open_session(
     ref: str,
 ) -> tuple[Session, SessionKey]:
     """Mark ``request`` accepted and insert the session plus its secret. Flushes; the caller
-    commits and then calls :func:`announce_session`. ``grant`` is set when nobody was asked."""
+    commits and then calls :func:`announce_session`. ``grant`` is set when nobody was asked.
+
+    The acceptance is a conditional claim (:func:`app.services.request_state.settle`): if a
+    cancel, reject, expiry or another device's acceptance got there first, this one answers
+    ``not_found`` and opens nothing. ``guest_device_id`` is written by the same claim, which is
+    what makes "the first device of the guest to accept an offer" well defined."""
     # The partial unique indexes enforce this too; checking first turns a would-be
     # IntegrityError into the documented error code.
     for device in (guest.device, host.device):
@@ -365,10 +375,15 @@ async def open_session(
         if await session_service.get_live_for_user(db, user.id) is not None:
             raise WsError(ErrorCode.SESSION_EXISTS, "A session is already live", ref=ref)
 
+    if not await settle(
+        db,
+        request,
+        RequestStatus.ACCEPTED,
+        auto_accepted=grant is not None,
+        guest_device_id=guest.device.id,
+    ):
+        raise WsError(ErrorCode.NOT_FOUND, NO_LONGER_PENDING, ref=ref)
     now = utcnow()
-    request.status = RequestStatus.ACCEPTED
-    request.responded_at = now
-    request.auto_accepted = grant is not None
     session = Session(
         request_id=request.id,
         guest_user_id=guest.user.id,
@@ -380,7 +395,12 @@ async def open_session(
         expires_at=now + timedelta(minutes=request.requested_minutes),
     )
     db.add(session)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        # Another request for one of these four parties opened its session in the same instant;
+        # the partial unique indexes kept the second one out.
+        raise WsError(ErrorCode.SESSION_EXISTS, "A session is already live", ref=ref) from exc
     # Never logged: the tunnel pre-shared secret, deleted again by ``end_session``.
     key = SessionKey(session_id=session.id, secret=secrets.token_bytes(SECRET_BYTES))
     db.add(key)
@@ -493,8 +513,8 @@ async def expire(request_id: uuid.UUID) -> bool:
             or request.initiator != RequestInitiator.GUEST
         ):
             return False
-        request.status = RequestStatus.EXPIRED
-        request.responded_at = utcnow()
+        if not await settle(db, request, RequestStatus.EXPIRED):
+            return False
         await db.commit()
         guest_device_id, host_device_id = request.guest_device_id, request.host_device_id
     assert guest_device_id is not None
@@ -524,11 +544,10 @@ async def cancel_for_device(db: AsyncSession, device_id: uuid.UUID) -> int:
     )
     if not rows:
         return 0
-    now = utcnow()
     settled = []
     for request in rows:
-        request.status = RequestStatus.CANCELLED
-        request.responded_at = now
+        if not await settle(db, request, RequestStatus.CANCELLED):
+            continue  # answered a moment ago by the other side; its own frames went out
         settled.append(
             SettledRequest(
                 request_id=request.id,
@@ -541,7 +560,7 @@ async def cancel_for_device(db: AsyncSession, device_id: uuid.UUID) -> int:
         )
     await db.commit()
     await announce_settled(settled)
-    return len(rows)
+    return len(settled)
 
 
 async def announce_settled(items: list[SettledRequest]) -> None:

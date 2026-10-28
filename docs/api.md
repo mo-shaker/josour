@@ -23,12 +23,19 @@ administrators in production). This file pins the shapes track C depends on.
 | `POST /probe` | `user_id` | 10/minute |
 | `POST /auth/register` | IP address | 5/hour (added 2026-10-13, [ADR-0017](decisions/0017-self-registration-with-approval.md)) |
 | `POST /contacts/invites` | `user_id` | 20/day (added 2026-10-13, [ADR-0014](decisions/0014-contacts-and-server-held-trust.md)) |
+| `POST /diagnostics` | `user_id` | 60/hour (added 2026-10-28: every call stores up to 64 KB) |
 
   The email-keyed limit is what protects the account: the IP limit alone is got past by twenty different addresses,
   and in return it punishes a whole team behind one NAT. Its capacity (5) is deliberately **below the account-lockout
   threshold** (10 failures), so no burst can lock an account: the lockout is a denial of service an attacker can
   trigger. And returning the credit on success makes failures alone consume the quota.
-- The account locks for 15 minutes after 10 failed attempts → `423 account_locked`.
+- The account locks for 15 minutes after 10 failed attempts → `423 account_locked`. Since 2026-10-28 a wrong
+  second-factor code in the web dashboard counts as a failed attempt too, and in the dashboard the failure counter is
+  cleared only once the code has passed, not by the password alone.
+- **Concurrent writes** (added 2026-10-28). Two requests that would write the same unique row at the same moment
+  never produce a `500`. The ones with a documented answer are retried once and get it: the same address registered
+  twice → both `202 pending` in `approval` mode (`409 conflict` in `open` mode); the same invitation sent twice → both
+  `202 {}`; two people accepting each other's invitations → both `200`. Anything else answers `409 conflict`.
 
 ## Authentication
 
@@ -56,6 +63,11 @@ The `200` response:
   A request without a Josour User-Agent is not steered.
 
 ### `POST /auth/refresh`  `{ "refresh_token": "…" }` → the same response shape as above, without `device.secret`.
+
+The rotation is a conditional write: two refreshes presenting the **same** token at the same moment cannot both rotate
+it. One gets `200`; the other is treated as a reuse (pinned 2026-10-28) — `401 unauthorized`, every live refresh token
+of that device revoked (the winner's new one included) and a `refresh_reuse` security event, exactly as for a late
+reuse. A client must therefore never refresh in parallel.
 ### `POST /auth/logout`  `{ "refresh_token": "…" }` → `204`.
 
 ### Self-registration (added on 2026-10-13, [ADR-0017](decisions/0017-self-registration-with-approval.md))
@@ -115,7 +127,8 @@ Only contacts can see each other's hosts and ask for or offer a connection.
   with `400 validation_error`. The server tries a TCP connection with a 3-second timeout and closes it at once. Used in
   the week-1 prototype and in reachability probing.
 - `POST /diagnostics`  `{ "session_id": "uuid|null", "role": "guest|host|null", "data": { … } }` → `201 { "id": "…" }`.
-  Requires authentication (any role). Stores a row in `connect_diagnostics` for the sender's device (from the token).
+  Requires authentication (any role); 60 an hour per user, then `429 rate_limited`. Stores a row in
+  `connect_diagnostics` for the sender's device (from the token).
   `data` is a free JSON object of at most 64 KB once serialised, otherwise `422 validation_error`. When `session_id` is
   passed the session must exist (`404 not_found`) and the user must be one of its two parties (`403 forbidden`). The
   week-2 NAT prototype tool uses it to upload the ten pairs' results; the summary is through `GET /admin/diagnostics`.
@@ -145,12 +158,16 @@ Only contacts can see each other's hosts and ask for or offer a connection.
 
 ## Administration (role = admin)
 
-- `POST /admin/users` `{ email, password, display_name, role }` → `201` the user (approved and active).
+- `POST /admin/users` `{ email, password, display_name, role }` → `201` the user (approved and active). A
+  `user_created` security event names the role and the administrator (added 2026-10-28; `manage.py create-user`
+  writes it with `via: "cli"`).
 - `GET /admin/users?q=&state=&role=&limit=&offset=` → a list; `state` is `active`, `disabled`, `pending`, `rejected`
   or `deleted`, and each row carries `state`, `approval_status`, `registered_via`, `approved_at`, `deleted_at` and
   `last_login_at` (added 2026-10-13). `PATCH /admin/users/{id}`
   `{ is_active?, password?, display_name?, email?, role?, unlock?: true }` (`email` and `role` added 2026-10-13).
   - `password` and `is_active: false` both revoke the refresh tokens.
+  - Every change is audited (added 2026-10-28): `user_updated` with `details` carrying `email_changed`, `role`,
+    `password_set`, `activated` and/or `unlocked`, plus `actor_user_id`; deactivation is `user_deactivated`.
   - **`is_active: false` takes effect at once**: it clears the user's presence and closes every live control channel of
     theirs with code `4403`, as revoking a device does. Without that, revoking the tokens alone left a disabled account
     browsing over someone else's connection until its access token expired. A `user_deactivated` row is written, naming
@@ -158,7 +175,8 @@ Only contacts can see each other's hosts and ask for or offer a connection.
   - The devices themselves are **not revoked**: it is the account that is disabled, not the hardware, so reactivation
     does not leave the user registering their devices again.
   - A pending or rejected account cannot be activated this way (`409`) — approve it instead. Nobody may disable or
-    demote themselves, nor the last active administrator (`409`).
+    demote themselves, nor the last active administrator (`409`). Two administrators disabling or demoting each
+    other at the same moment cannot both succeed: the second gets `409`.
 - `POST /admin/users/{id}/approve`, `POST /admin/users/{id}/reject` → the user (added 2026-10-13). Approving delivers
   the contact invitations that were waiting for the address.
 - `DELETE /admin/users/{id}` → `204` (added 2026-10-13). A **soft** delete: email, name and password are replaced,
@@ -176,8 +194,15 @@ Only contacts can see each other's hosts and ask for or offer a connection.
 - `GET /admin/security-events?limit=`, `GET /admin/diagnostics` → a summary: the number of sessions, the
   `connect_result=ok` rate (with `timeout` counted as a failure), the distribution of `winner_type`, of `tls_version`,
   and of `end_reason` (added in week 4).
-- `GET /admin/settings`, `PATCH /admin/settings` `{ max_session_minutes?, request_timeout_seconds?, log_domains?, enforce_allowlist?, allowed_ports?, registration_mode?, min_client_version?, invite_ttl_days? }`.
+- `GET /admin/settings`, `PATCH /admin/settings` `{ max_session_minutes?, request_timeout_seconds?, connect_timeout_seconds?, log_domains?, enforce_allowlist?, allowed_ports?, registration_mode?, min_client_version?, invite_ttl_days? }`.
   Every change is written as a `settings_changed` security event.
+- **The web dashboard** (`/admin`, [ADR-0016](decisions/0016-web-admin-dashboard.md)) calls the same services, so it
+  writes the same security events; each one it writes for an administrative action also carries `details.via: "web"`
+  (`user_created`, `user_updated`, `user_deactivated`, `user_approved`, `user_rejected`, `user_deleted`,
+  `device_revoked`, `contact_removed`, `trust_revoked`, `settings_changed`, `session_admin_terminated`, `totp_enabled`,
+  `totp_disabled`). Its own sign-in events (`admin_web_login_*`, `admin_web_logout`) are web-only by type. A published
+  allow-list is recorded in `allowlist_versions.created_by` rather than as a security event, from the API and the
+  dashboard alike.
 
 ## The settings' default values
 

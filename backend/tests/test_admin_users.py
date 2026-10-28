@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from datetime import timedelta
 from typing import Any
@@ -8,7 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clock import utcnow
 from app.models import Device, Presence, RefreshToken, SecurityEvent, User
-from app.models.enums import DeviceStatus, SecurityEventType
+from app.models.enums import DeviceStatus, SecurityEventType, UserRole
+from app.services.users import create_user
 from app.ws.protocol import CloseCode
 from tests.conftest import PASSWORD, LoginBody
 
@@ -367,3 +369,82 @@ async def test_reactivating_writes_no_deactivation_event_and_closes_nothing(
         )
     )
     assert events == []
+
+
+# ---------------------------------------------------------------- audit trail, last administrator
+
+
+async def _events_of(db: AsyncSession, event_type: SecurityEventType) -> list[SecurityEvent]:
+    await db.rollback()
+    return list(await db.scalars(select(SecurityEvent).where(SecurityEvent.type == event_type)))
+
+
+async def test_creating_an_account_is_on_the_record(
+    client: AsyncClient, admin_headers: dict, admin: User, db: AsyncSession
+) -> None:
+    created = await client.post(
+        USERS,
+        headers=admin_headers,
+        json={
+            "email": "backup-admin@example.com",
+            "password": "long-enough-1",
+            "display_name": "Backup",
+            "role": "admin",
+        },
+    )
+    assert created.status_code == 201
+    (event,) = await _events_of(db, SecurityEventType.USER_CREATED)
+    assert str(event.user_id) == created.json()["id"]
+    assert event.details == {"role": "admin", "actor_user_id": str(admin.id)}
+
+
+async def test_password_reactivation_and_unlock_are_on_the_record(
+    client: AsyncClient, admin_headers: dict, admin: User, user: User, db: AsyncSession
+) -> None:
+    for body in ({"password": "brand-new-pw"}, {"is_active": False}, {"is_active": True}):
+        response = await client.patch(f"{USERS}/{user.id}", json=body, headers=admin_headers)
+        assert response.status_code == 200
+    user.failed_logins = 3
+    await db.commit()
+    await client.patch(f"{USERS}/{user.id}", json={"unlock": True}, headers=admin_headers)
+
+    details = [e.details for e in await _events_of(db, SecurityEventType.USER_UPDATED)]
+    actor = str(admin.id)
+    assert {"password_set": True, "actor_user_id": actor} in details
+    assert {"activated": True, "actor_user_id": actor} in details
+    assert {"unlocked": True, "actor_user_id": actor} in details
+
+
+async def test_two_admins_disabling_each_other_at_once_leave_one(
+    client: AsyncClient,
+    admin_headers: dict,
+    admin: User,
+    db: AsyncSession,
+    login_body: LoginBody,
+) -> None:
+    """Each request alone is allowed (the other admin remains). Both at once used to succeed
+    and leave no administrator; the re-check after the write refuses the second."""
+    other = await create_user(
+        db,
+        email="other-admin@example.com",
+        password=PASSWORD,
+        display_name="Other",
+        role=UserRole.ADMIN,
+    )
+    await db.commit()
+    other_login = await client.post(
+        "/api/v1/auth/login", json=login_body(email=other.email, name="OTHER-PC")
+    )
+    other_headers = {"Authorization": f"Bearer {other_login.json()['access_token']}"}
+
+    first, second = await asyncio.gather(
+        client.patch(f"{USERS}/{other.id}", json={"is_active": False}, headers=admin_headers),
+        client.patch(f"{USERS}/{admin.id}", json={"is_active": False}, headers=other_headers),
+    )
+    codes = sorted((first.status_code, second.status_code))
+    assert codes in ([200, 401], [200, 409]), (first.text, second.text)
+    await db.rollback()
+    remaining = await db.scalars(
+        select(User).where(User.role == UserRole.ADMIN, User.is_active.is_(True))
+    )
+    assert len(list(remaining)) == 1

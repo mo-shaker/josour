@@ -29,7 +29,11 @@ async def get_security_events(
     Types: `login_success`, `login_failed` (with `details.reason`: `unknown_user`, `bad_password`,
     `device_secret_invalid`, `device_revoked`, `account_disabled`), `login_locked`, `logout`,
     `refresh_reuse`, `device_revoked`, `session_admin_terminated`, and
-    `listener_unauthenticated`.
+    `listener_unauthenticated`; for accounts `user_created`, `user_updated` (`details` names what
+    changed: `email_changed`, `role`, `password_set`, `activated`, `unlocked`),
+    `user_deactivated`, `user_approved`, `user_rejected`, `user_deleted`; and the registration,
+    contact, trust, settings and dashboard types listed in docs/api.md. A row written by the web
+    dashboard for an administrative action carries `details.via: "web"`.
 
     `details` never contains a secret, a URL or any browsing content. A `device_revoked` row says
     who did it in `details.by` - `admin`, `owner`, or `auto` for an automatic revocation, which

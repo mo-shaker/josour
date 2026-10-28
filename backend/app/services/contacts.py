@@ -41,6 +41,7 @@ from app.schemas.contacts import (
     OutgoingInviteOut,
 )
 from app.services.effects import Effects, SettledRequest
+from app.services.request_state import settle
 from app.services.security_events import record_event
 
 OUTGOING_LIMIT = 50
@@ -430,6 +431,7 @@ async def set_trust(
     *,
     actor_user_id: uuid.UUID | None = None,
     ip: str | None = None,
+    via: str | None = None,
 ) -> Effects:
     """``PUT /contacts/{id}/trust`` (the owner) or an administrator withdrawing a grant.
 
@@ -445,6 +447,8 @@ async def set_trust(
     details: dict[str, Any] = {"contact_user_id": str(contact_id)}
     if actor_user_id is not None and actor_user_id != owner_id:
         details["actor_user_id"] = str(actor_user_id)
+    if via is not None:
+        details["via"] = via
     record_event(
         db,
         SecurityEventType.TRUST_GRANTED if auto_accept else SecurityEventType.TRUST_REVOKED,
@@ -467,11 +471,10 @@ async def _settle_pending(db: AsyncSession, condition: Any, reason: str) -> list
             )
         )
     )
-    now = utcnow()
     settled = []
     for row in rows:
-        row.status = RequestStatus.CANCELLED
-        row.responded_at = now
+        if not await settle(db, row, RequestStatus.CANCELLED):
+            continue  # answered in the same instant; whoever won told both sides
         settled.append(
             SettledRequest(
                 request_id=row.id,
@@ -500,6 +503,7 @@ async def remove_contact(
     *,
     actor_user_id: uuid.UUID | None = None,
     ip: str | None = None,
+    via: str | None = None,
 ) -> Effects:
     """Either side ends the relationship; both rows go. Anything pending between the two is
     settled and a live session between them ends as ``contact_removed`` - removing someone is
@@ -534,6 +538,8 @@ async def remove_contact(
     details: dict[str, Any] = {"contact_user_id": str(other_id)}
     if actor_user_id is not None and actor_user_id != user_id:
         details["actor_user_id"] = str(actor_user_id)
+    if via is not None:
+        details["via"] = via
     record_event(db, SecurityEventType.CONTACT_REMOVED, user_id=user_id, ip=ip, details=details)
     await db.flush()
     return effects

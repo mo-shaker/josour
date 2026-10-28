@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Path, Request, Response, status
 
 from app.api.deps import AuthDep, DbDep, client_ip, invite_rate_limit
 from app.api.openapi import errors
+from app.db.session import commit_retrying_once
 from app.schemas.contacts import AcceptedOut, ContactOut, InviteIn, InvitesOut, TrustIn
 from app.services import contacts as contact_service
 from app.services import effects
@@ -99,10 +100,14 @@ async def invite(payload: InviteIn, auth: AuthDep, db: DbDep, request: Request) 
     it already invited you (in which case you are now contacts). An address without an account
     receives the invitation if it registers and is approved before it expires."""
     settings = await settings_service.get(db)
-    result = await contact_service.invite(
-        db, auth.user, payload.email, ttl_days=settings.invite_ttl_days, ip=client_ip(request)
-    )
-    await db.commit()
+
+    async def invite_once() -> effects.Effects:
+        return await contact_service.invite(
+            db, auth.user, payload.email, ttl_days=settings.invite_ttl_days, ip=client_ip(request)
+        )
+
+    # A double submit: the second is retried and finds the first one's live invitation.
+    result = await commit_retrying_once(db, invite_once, reload=(auth.user,))
     await effects.apply(result)
     return {}
 
@@ -116,10 +121,12 @@ async def invite(payload: InviteIn, auth: AuthDep, db: DbDep, request: Request) 
 async def accept_invite(
     invite_id: InviteId, auth: AuthDep, db: DbDep, request: Request
 ) -> AcceptedOut:
-    contact_id, result = await contact_service.accept_invite(
-        db, auth.user, invite_id, ip=client_ip(request)
-    )
-    await db.commit()
+    async def accept_once() -> tuple[uuid.UUID, effects.Effects]:
+        return await contact_service.accept_invite(db, auth.user, invite_id, ip=client_ip(request))
+
+    # Both sides accepting each other's invitation at once: the second is retried and finds the
+    # contact rows already written (``_connect`` is idempotent).
+    contact_id, result = await commit_retrying_once(db, accept_once, reload=(auth.user,))
     await effects.apply(result)
     contact = await contact_service.get_contact(
         db, auth.user.id, contact_id, is_online=connection_manager.is_user_online

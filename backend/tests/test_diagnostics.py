@@ -246,3 +246,23 @@ async def test_the_signal_is_visible_to_an_administrator(
     assert len(body) == 1
     assert body[0]["type"] == "listener_unauthenticated"
     assert body[0]["details"] == {"count": 2, "peers": ["203.0.113.9"]}
+
+
+async def test_diagnostics_are_rate_limited_per_user(
+    app_factory: Any, db: AsyncSession, login_body: Any
+) -> None:
+    from httpx import ASGITransport
+
+    from tests.conftest import PASSWORD, make_settings
+
+    app = app_factory(make_settings(rate_limit_enabled=True, diagnostics_rate_limit_per_hour=2))
+    await create_user(db, email="alice@example.com", password=PASSWORD, display_name="Alice")
+    await db.commit()
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        token = (await c.post("/api/v1/auth/login", json=login_body())).json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        codes = [
+            (await c.post(DIAGNOSTICS, json={"data": {"n": i}}, headers=headers)).status_code
+            for i in range(3)
+        ]
+    assert codes == [201, 201, 429]

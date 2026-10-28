@@ -1,5 +1,6 @@
 """Self-registration and approval (ADR-0017)."""
 
+import asyncio
 from typing import Any
 
 from httpx import ASGITransport, AsyncClient
@@ -198,3 +199,18 @@ async def test_an_outdated_app_is_told_to_upgrade(
 
     bad = await client.patch(SETTINGS, json={"min_client_version": "two"}, headers=admin_headers)
     assert bad.status_code == 422
+
+
+async def test_the_same_address_registered_twice_at_once_gets_two_identical_answers(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    """The second INSERT hits the unique email index; it is retried and answered like any taken
+    address in approval mode - 202 pending - never a 500 that would say "somebody just took it"."""
+    first, second = await asyncio.gather(
+        client.post(REGISTER, json=_body(email="twice@example.com")),
+        client.post(REGISTER, json=_body(email="twice@example.com")),
+    )
+    assert (first.status_code, first.json()) == (second.status_code, second.json())
+    assert first.status_code == 202
+    users = list(await db.scalars(select(User).where(User.email == "twice@example.com")))
+    assert len(users) == 1

@@ -13,7 +13,7 @@ and the returned ``SessionEnded`` event is published on the bus by the caller af
 """
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import datetime
 from typing import Any
 
@@ -92,11 +92,19 @@ async def list_for_user(db: AsyncSession, user_id: uuid.UUID, *, limit: int) -> 
 
 
 async def list_all(
-    db: AsyncSession, *, status: SessionStatus | None = None, limit: int = 100
+    db: AsyncSession,
+    *,
+    status: SessionStatus | None = None,
+    statuses: Collection[str] | None = None,
+    limit: int = 100,
 ) -> list[AdminSessionOut]:
+    """Newest first. ``statuses`` filters in SQL, so "every live session" is never cut short
+    by ``limit`` counting ended ones."""
     stmt = _rows_query().limit(limit)
     if status is not None:
         stmt = stmt.where(Session.status == status)
+    if statuses is not None:
+        stmt = stmt.where(Session.status.in_(tuple(statuses)))
     rows: Sequence[SessionRow] = (await db.execute(stmt)).all()  # type: ignore[assignment]
     return [
         AdminSessionOut(

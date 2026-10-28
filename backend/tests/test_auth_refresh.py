@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from typing import Any
 
@@ -6,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Device, RefreshToken, SecurityEvent
-from app.models.enums import DeviceStatus
+from app.models.enums import DeviceStatus, SecurityEventType
 
 REFRESH = "/api/v1/auth/refresh"
 LOGOUT = "/api/v1/auth/logout"
@@ -77,3 +78,27 @@ async def test_refresh_with_revoked_device(
     response = await client.post(REFRESH, json={"refresh_token": logged_in["refresh_token"]})
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "device_revoked"
+
+
+async def test_two_refreshes_with_one_token_at_once_are_a_reuse(
+    client: AsyncClient, logged_in: dict[str, Any], db: AsyncSession
+) -> None:
+    """Both used to rotate it, leaving two live chains and no ``refresh_reuse``. The rotation is
+    a conditional claim now: one wins, the other is a reuse exactly like a late one - so the
+    whole chain, the winner's new token included, is revoked."""
+    token = logged_in["refresh_token"]
+    first, second = await asyncio.gather(
+        client.post(REFRESH, json={"refresh_token": token}),
+        client.post(REFRESH, json={"refresh_token": token}),
+    )
+    assert sorted((first.status_code, second.status_code)) == [200, 401]
+    winner = first if first.status_code == 200 else second
+    later = await client.post(REFRESH, json={"refresh_token": winner.json()["refresh_token"]})
+    assert later.status_code == 401
+
+    reuse = await db.scalar(
+        select(SecurityEvent).where(SecurityEvent.type == SecurityEventType.REFRESH_REUSE)
+    )
+    assert reuse is not None
+    live = await db.scalars(select(RefreshToken).where(RefreshToken.revoked_at.is_(None)))
+    assert list(live) == []

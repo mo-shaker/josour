@@ -1,5 +1,6 @@
 """Request lifecycle over the control channel (docs/ws-protocol.md section 5)."""
 
+import asyncio
 import base64
 import uuid
 from dataclasses import dataclass
@@ -510,3 +511,60 @@ async def test_auto_accept_from_anyone_but_the_addressed_host_is_refused(
     assert await _accepted_auto_events(db) == []
     row = await db.get(ConnectionRequest, uuid.UUID(request_id))
     assert row is not None and row.status == RequestStatus.PENDING
+
+
+# ---------------------------------------------------------------- races
+
+
+@pytest.mark.parametrize("cancel_first", [False, True])
+async def test_accept_and_cancel_at_once_have_one_winner(
+    ws_connect: WsFactory, make_actor: ActorFactory, db: AsyncSession, cancel_first: bool
+) -> None:
+    """Both used to succeed: the guest heard ``cancelled`` and got a session anyway. Every
+    transition out of ``pending`` is now a conditional claim, so the loser is ``not_found`` and
+    the row and the sessions table agree with what the winner announced."""
+    pair = await _pair(ws_connect, make_actor)
+    request_id, _ = await _open_request(pair)
+    rid = uuid.UUID(request_id)
+    accept = request_service.accept(
+        request_id=rid, device_id=uuid.UUID(pair.host.device_id), ref="h1"
+    )
+    cancel = request_service.cancel(
+        request_id=rid, device_id=uuid.UUID(pair.guest.device_id), ref="g1"
+    )
+    calls = [cancel, accept] if cancel_first else [accept, cancel]
+    results = await asyncio.gather(*calls, return_exceptions=True)
+
+    errors = [r for r in results if isinstance(r, BaseException)]
+    assert len(errors) == 1 and getattr(errors[0], "code", None) == "not_found", results
+    db.expire_all()
+    row = await db.get(ConnectionRequest, rid)
+    sessions = list(await db.scalars(select(Session).where(Session.request_id == rid)))
+    assert row is not None
+    if row.status == RequestStatus.ACCEPTED:
+        assert len(sessions) == 1
+    else:
+        assert row.status == RequestStatus.CANCELLED and sessions == []
+
+
+async def test_a_late_accept_loses_to_the_expiry(
+    ws_connect: WsFactory, make_actor: ActorFactory, db: AsyncSession
+) -> None:
+    pair = await _pair(ws_connect, make_actor)
+    request_id, _ = await _open_request(pair)
+    rid = uuid.UUID(request_id)
+    expired, accepted = await asyncio.gather(
+        request_service.expire(rid),
+        request_service.accept(request_id=rid, device_id=uuid.UUID(pair.host.device_id), ref="h1"),
+        return_exceptions=True,
+    )
+    db.expire_all()
+    row = await db.get(ConnectionRequest, rid)
+    sessions = list(await db.scalars(select(Session).where(Session.request_id == rid)))
+    assert row is not None
+    if expired is True:
+        assert getattr(accepted, "code", None) == "not_found"
+        assert row.status == RequestStatus.EXPIRED and sessions == []
+    else:
+        assert expired is False and isinstance(accepted, Session)
+        assert row.status == RequestStatus.ACCEPTED and len(sessions) == 1

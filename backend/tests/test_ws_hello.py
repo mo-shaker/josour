@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import ConnectDiagnostic, Presence
 from app.models.enums import DeviceStatus
 from app.ws import router as ws_router
-from app.ws.protocol import CloseCode
+from app.ws.protocol import MAX_DIAGNOSTIC_KEYS, MAX_FRAME_CHARS, MAX_HELLO_CHARS, CloseCode
 from tests.conftest import ActorFactory, WsFactory
 from tests.ws_client import ASGIWebSocket
 
@@ -327,3 +327,34 @@ async def test_hello_ack_carries_the_routing_mode(app_factory, ws_connect, make_
     actor = await make_actor("host@example.com")
     ws = await ws_connect(actor)
     assert ws.hello_ack["settings"]["enforce_allowlist"] is True
+
+
+async def test_an_oversized_hello_is_refused_before_it_is_parsed(app: Any) -> None:
+    """The first frame is read before anyone has proven who they are, so it gets the smallest
+    allowance: anything above it is refused unparsed and the socket closed with 4401."""
+    async with ASGIWebSocket(app) as ws:
+        await ws.send_text('{"type": "hello", "pad": "' + "x" * MAX_HELLO_CHARS + '"}')
+        error = await ws.receive()
+        assert (error["code"], error["message"]) == ("bad_request", "hello frame too large")
+        assert await ws.wait_closed() == CloseCode.NO_HELLO
+
+
+async def test_an_oversized_frame_is_refused_and_the_connection_kept(
+    ws_connect: WsFactory, make_actor: ActorFactory
+) -> None:
+    actor = await make_actor("big@example.com")
+    ws = await ws_connect(actor)
+    await ws.send_text('{"type": "ping", "pad": "' + "x" * MAX_FRAME_CHARS + '"}')
+    error = await ws.expect("error")
+    assert (error["code"], error["message"]) == ("bad_request", "Frame too large")
+    await ws.send({"type": "ping"})
+    assert await ws.expect("pong") == {"type": "pong"}
+
+
+async def test_hello_diagnostics_with_too_many_keys_are_dropped_not_fatal(
+    ws_connect: WsFactory, make_actor: ActorFactory, db: AsyncSession
+) -> None:
+    actor = await make_actor("diag@example.com")
+    ws = await ws_connect(actor, diagnostics={f"k{i}": i for i in range(MAX_DIAGNOSTIC_KEYS + 1)})
+    assert ws.hello_ack is not None
+    assert (await db.scalar(select(ConnectDiagnostic))) is None

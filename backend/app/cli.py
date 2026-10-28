@@ -18,7 +18,7 @@ from app.services import allowlist
 from app.services import contacts as contact_service
 from app.services import sessions as session_service
 from app.services import users as user_service
-from app.services.users import create_user
+from app.services.users import create_user, record_created
 
 cli = typer.Typer(help="Josour management commands.", no_args_is_help=True)
 
@@ -83,6 +83,7 @@ def _create(email: str, password: str, display_name: str | None, role: UserRole)
             role=role,
             registered_via=RegisteredVia.CLI,
         )
+        record_created(db, user, actor_user_id=None, ip=None)
         return str(user.id), user.email
 
     user_id, user_email = _run(op)

@@ -11,6 +11,7 @@ from app.api.deps import (
     register_rate_limit,
 )
 from app.api.openapi import errors
+from app.db.session import commit_retrying_once
 from app.schemas.auth import (
     LoginRequest,
     LogoutRequest,
@@ -150,17 +151,22 @@ async def register(
     `201 {"status": "active"}`, and a taken email is a `409` - that mode cannot hide it.
 
     Rate limited per client IP."""
-    outcome = await registration.register(
-        db,
-        email=payload.email,
-        password=payload.password,
-        display_name=payload.display_name,
-        ip=client_ip(request),
-        # The application's own configuration (tests build apps with their own); the
-        # dependency falls back to the process-wide one.
-        max_pending=getattr(request.app.state, "settings", settings).max_pending_registrations,
-    )
-    await db.commit()
+
+    async def register_once() -> registration.RegistrationOutcome:
+        return await registration.register(
+            db,
+            email=payload.email,
+            password=payload.password,
+            display_name=payload.display_name,
+            ip=client_ip(request),
+            # The application's own configuration (tests build apps with their own); the
+            # dependency falls back to the process-wide one.
+            max_pending=getattr(request.app.state, "settings", settings).max_pending_registrations,
+        )
+
+    # Two registrations of one address at the same moment: the second is retried and then
+    # answered like any registration of a taken address (202 pending, or 409 in open mode).
+    outcome = await commit_retrying_once(db, register_once)
     if outcome == registration.RegistrationOutcome.ACTIVE:
         response.status_code = status.HTTP_201_CREATED
     return RegisterOut(status=outcome.value)

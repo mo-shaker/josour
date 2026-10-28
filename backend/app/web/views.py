@@ -66,7 +66,17 @@ from app.ws.connection_manager import connection_manager
 router = APIRouter(prefix="/admin", include_in_schema=False)
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 PAGE_SIZE = 50
+MAX_PAGE = 10_000
+"""The users list's ``?page=`` ceiling: a larger one would overflow the SQL OFFSET."""
+MAX_TOTP_FAILURES = 5
+"""Wrong codes one dashboard session may submit; then the session ends and only the password
+can start another. Every wrong code also counts toward the account lockout, like a wrong
+password, so the second factor cannot be guessed at the speed of the server."""
+VIA = "web"
+"""``details.via`` of every audit row the dashboard writes for an administrative action."""
 _CODE = re.compile(r"[a-z_]{1,40}")
+_LOGIN_REASONS = {"locked": "login.locked", "totp_limit": "login.totp_limit"}
+"""``/admin/login?reason=`` - why a session was just ended - and what the page then says."""
 
 
 @pass_context
@@ -121,14 +131,7 @@ async def _page(
     error = request.query_params.get("error")
     pending = 0
     if ctx is not None:
-        pending = int(
-            await db.scalar(
-                select(func.count())
-                .select_from(User)
-                .where(user_service._state_filter(user_service.UserState.PENDING))
-            )
-            or 0
-        )
+        pending = await user_service.count_pending(db)
     return templates.TemplateResponse(
         request,
         template,
@@ -182,7 +185,7 @@ async def login_page(request: Request) -> Response:
             None,
             "login.html",
             next=safe_next(request.query_params.get("next")),
-            message=None,
+            message=_LOGIN_REASONS.get(request.query_params.get("reason") or ""),
         )
 
 
@@ -237,12 +240,18 @@ async def login(request: Request) -> Response:
             )
             await db.commit()
             return await fail("login.failed", 401)
-        await auth_service.mark_signed_in(user, password)
         needs_second_factor = user.totp_enabled_at is not None or settings.admin_web_require_totp
+        if needs_second_factor:
+            # The password alone is not a sign-in yet: the failure counter is only cleared once
+            # the code has passed too (``totp_submit``), so wrong codes keep counting.
+            await auth_service.upgrade_password_hash(user, password)
+        else:
+            await auth_service.mark_signed_in(user, password)
         issued = await admin_web_sessions.create(
             db,
             user,
-            mfa_passed=not needs_second_factor,
+            # Only ever set by a verified code (see AdminWebSession.mfa_passed).
+            mfa_passed=False,
             ip=client_ip(request),
             user_agent=request.headers.get("user-agent"),
             absolute_hours=settings.admin_web_absolute_hours,
@@ -261,6 +270,50 @@ async def login(request: Request) -> Response:
         target if not needs_second_factor else "/admin/login/totp", status_code=303
     )
     _set_session_cookie(response, issued.token, settings.admin_web_absolute_hours)
+    return response
+
+
+async def _totp_failed(
+    db: AsyncSession, ctx: WebContext, request: Request, *, reason: str
+) -> str | None:
+    """Count one wrong code against the session and against the account, and commit.
+
+    Returns why the session was ended - ``locked`` (the account reached the lockout) or
+    ``totp_limit`` (:data:`MAX_TOTP_FAILURES` in this session) - or ``None`` while it may try
+    again."""
+    now = utcnow()
+    ctx.session.totp_failures += 1
+    locked = auth_service.count_failure(ctx.user, now=now)
+    ip = client_ip(request)
+    record_event(
+        db,
+        SecurityEventType.ADMIN_WEB_LOGIN_FAILED,
+        user_id=ctx.user.id,
+        ip=ip,
+        details={"reason": reason, "failures": ctx.session.totp_failures},
+    )
+    ended: str | None = None
+    if locked:
+        ended = "locked"
+        record_event(
+            db,
+            SecurityEventType.LOGIN_LOCKED,
+            user_id=ctx.user.id,
+            ip=ip,
+            details={"reason": "too_many_failures", "channel": VIA},
+        )
+    elif ctx.session.totp_failures >= MAX_TOTP_FAILURES:
+        ended = "totp_limit"
+    if ended is not None:
+        await admin_web_sessions.revoke(db, ctx.session)
+    await db.commit()
+    return ended
+
+
+def _back_to_sign_in(reason: str) -> RedirectResponse:
+    """The session was ended: forget its cookie and say why on the sign-in page."""
+    response = RedirectResponse(f"/admin/login?reason={reason}", status_code=303)
+    response.delete_cookie(SESSION_COOKIE, path="/", secure=True, httponly=True, samesite="strict")
     return response
 
 
@@ -306,6 +359,12 @@ async def totp_submit(request: Request) -> Response:
         ctx = await current(request, db, allow_without_mfa=True)
         form = await verified_form(request, ctx)
         user = ctx.user
+        if auth_service.is_locked(user):
+            # Locked meanwhile (by wrong codes here, or wrong passwords anywhere): this session
+            # cannot finish signing in.
+            await admin_web_sessions.revoke(db, ctx.session)
+            await db.commit()
+            return _back_to_sign_in("locked")
         secret = user.totp_secret
         step = (
             totp.verify(secret, form.get("code", ""), last_step=user.totp_last_step)
@@ -313,19 +372,21 @@ async def totp_submit(request: Request) -> Response:
             else None
         )
         if step is None:
-            record_event(
-                db,
-                SecurityEventType.ADMIN_WEB_LOGIN_FAILED,
-                user_id=user.id,
-                ip=client_ip(request),
-                details={"reason": "totp"},
-            )
-            await db.commit()
+            ended = await _totp_failed(db, ctx, request, reason="totp")
+            if ended is not None:
+                return _back_to_sign_in(ended)
             return RedirectResponse("/admin/login/totp?wrong=1", status_code=303)
         user.totp_last_step = step
         if user.totp_enabled_at is None:
             user.totp_enabled_at = utcnow()
-            record_event(db, SecurityEventType.TOTP_ENABLED, user_id=user.id, ip=client_ip(request))
+            record_event(
+                db,
+                SecurityEventType.TOTP_ENABLED,
+                user_id=user.id,
+                ip=client_ip(request),
+                details={"via": VIA},
+            )
+        auth_service.complete_sign_in(user)
         ctx.session.mfa_passed = True
         token = await admin_web_sessions.rotate(db, ctx.session)
         record_event(
@@ -407,7 +468,7 @@ async def users_list(request: Request) -> Response:
             else None
         )
         try:
-            page = max(0, int(request.query_params.get("page") or 0))
+            page = min(MAX_PAGE, max(0, int(request.query_params.get("page") or 0)))
         except ValueError:
             page = 0
         rows = await user_service.list_users(
@@ -447,6 +508,9 @@ async def user_new(request: Request) -> Response:
                 password=form.get("password", ""),
                 display_name=form.get("display_name", ""),
                 role=role,
+            )
+            user_service.record_created(
+                db, user, actor_user_id=ctx.user.id, ip=client_ip(request), via=VIA
             )
             await db.commit()
         except ApiError as exc:
@@ -501,7 +565,7 @@ async def _patch(
         user = await _user(db, user_id)
         patch = AdminUserPatch(**build(form))
         disconnect = await user_service.update_user(
-            db, user, patch, actor_user_id=ctx.user.id, ip=client_ip(request)
+            db, user, patch, actor_user_id=ctx.user.id, ip=client_ip(request), via=VIA
         )
         return Effects(disconnect=disconnect)
 
@@ -554,7 +618,11 @@ async def user_approve(request: Request, user_id: uuid.UUID) -> Response:
 
     async def action(db: AsyncSession) -> None:
         await user_service.approve_user(
-            db, await _user(db, user_id), actor_user_id=ctx.user.id, ip=client_ip(request)
+            db,
+            await _user(db, user_id),
+            actor_user_id=ctx.user.id,
+            ip=client_ip(request),
+            via=VIA,
         )
 
     return await _act(request, ctx, safe_next(form.get("next")), "approved", action)
@@ -564,10 +632,19 @@ async def user_approve(request: Request, user_id: uuid.UUID) -> Response:
 
 
 async def _confirm(
-    request: Request, message: str, action: str, back: str, **values: object
+    request: Request,
+    message: str,
+    action: str,
+    back: str,
+    describe: Any = None,
 ) -> Response:
+    """The confirmation page. ``describe(db)`` names what is about to happen (and may override
+    ``back``); it runs only after the administrator is known, so nobody else can make the
+    dashboard look anything up."""
     async with _Db(request) as db:
         ctx = await current(request, db)
+        values: dict[str, object] = dict(await describe(db)) if describe is not None else {}
+        back = str(values.pop("back", back))
         return await _page(
             request,
             db,
@@ -579,17 +656,22 @@ async def _confirm(
         )
 
 
+async def _user_name(db: AsyncSession, user_id: uuid.UUID) -> str:
+    user = await db.get(User, user_id)
+    return user.display_name if user else "?"
+
+
 @router.get("/users/{user_id}/reject")
 async def user_reject_confirm(request: Request, user_id: uuid.UUID) -> Response:
-    async with _Db(request) as db:
-        user = await db.get(User, user_id)
-        name = user.display_name if user else "?"
+    async def describe(db: AsyncSession) -> dict[str, object]:
+        return {"name": await _user_name(db, user_id)}
+
     return await _confirm(
         request,
         "confirm.reject_user",
         f"/admin/users/{user_id}/reject",
         "/admin/registrations",
-        name=name,
+        describe,
     )
 
 
@@ -601,7 +683,11 @@ async def user_reject(request: Request, user_id: uuid.UUID) -> Response:
 
     async def action(db: AsyncSession) -> None:
         await user_service.reject_user(
-            db, await _user(db, user_id), actor_user_id=ctx.user.id, ip=client_ip(request)
+            db,
+            await _user(db, user_id),
+            actor_user_id=ctx.user.id,
+            ip=client_ip(request),
+            via=VIA,
         )
 
     return await _act(request, ctx, "/admin/registrations", "rejected", action)
@@ -609,15 +695,15 @@ async def user_reject(request: Request, user_id: uuid.UUID) -> Response:
 
 @router.get("/users/{user_id}/delete")
 async def user_delete_confirm(request: Request, user_id: uuid.UUID) -> Response:
-    async with _Db(request) as db:
-        user = await db.get(User, user_id)
-        name = user.display_name if user else "?"
+    async def describe(db: AsyncSession) -> dict[str, object]:
+        return {"name": await _user_name(db, user_id)}
+
     return await _confirm(
         request,
         "confirm.delete_user",
         f"/admin/users/{user_id}/delete",
         f"/admin/users/{user_id}",
-        name=name,
+        describe,
     )
 
 
@@ -629,7 +715,11 @@ async def user_delete(request: Request, user_id: uuid.UUID) -> Response:
 
     async def action(db: AsyncSession) -> Effects:
         return await user_service.delete_user(
-            db, await _user(db, user_id), actor_user_id=ctx.user.id, ip=client_ip(request)
+            db,
+            await _user(db, user_id),
+            actor_user_id=ctx.user.id,
+            ip=client_ip(request),
+            via=VIA,
         )
 
     return await _act(request, ctx, f"/admin/users/{user_id}", "deleted", action)
@@ -637,15 +727,18 @@ async def user_delete(request: Request, user_id: uuid.UUID) -> Response:
 
 @router.get("/devices/{device_id}/revoke")
 async def device_revoke_confirm(request: Request, device_id: uuid.UUID) -> Response:
-    async with _Db(request) as db:
+    async def describe(db: AsyncSession) -> dict[str, object]:
         device = await db.get(Device, device_id)
-        name, owner = (device.name, device.user_id) if device else ("?", None)
+        if device is None:
+            return {"name": "?"}
+        return {"name": device.name, "back": f"/admin/users/{device.user_id}"}
+
     return await _confirm(
         request,
         "confirm.revoke_device",
         f"/admin/devices/{device_id}/revoke",
-        f"/admin/users/{owner}" if owner else "/admin/users",
-        name=name,
+        "/admin/users",
+        describe,
     )
 
 
@@ -662,7 +755,7 @@ async def device_revoke(request: Request, device_id: uuid.UUID) -> Response:
         if row is None:
             raise NotFound("Device not found")
         changed = await device_service.revoke_device(
-            db, row, by="admin", actor_user_id=ctx.user.id, ip=client_ip(request)
+            db, row, by="admin", actor_user_id=ctx.user.id, ip=client_ip(request), via=VIA
         )
         return Effects(disconnect=[row.id] if changed else [])
 
@@ -674,16 +767,15 @@ async def device_revoke(request: Request, device_id: uuid.UUID) -> Response:
 async def contact_remove_confirm(
     request: Request, user_id: uuid.UUID, contact_id: uuid.UUID
 ) -> Response:
-    async with _Db(request) as db:
-        a, b = await db.get(User, user_id), await db.get(User, contact_id)
-        names = (a.display_name if a else "?", b.display_name if b else "?")
+    async def describe(db: AsyncSession) -> dict[str, object]:
+        return {"a": await _user_name(db, user_id), "b": await _user_name(db, contact_id)}
+
     return await _confirm(
         request,
         "confirm.remove_contact",
         f"/admin/contacts/{user_id}/{contact_id}/remove",
         f"/admin/users/{user_id}",
-        a=names[0],
-        b=names[1],
+        describe,
     )
 
 
@@ -695,7 +787,7 @@ async def contact_remove(request: Request, user_id: uuid.UUID, contact_id: uuid.
 
     async def action(db: AsyncSession) -> Effects:
         return await contact_service.remove_contact(
-            db, user_id, contact_id, actor_user_id=ctx.user.id, ip=client_ip(request)
+            db, user_id, contact_id, actor_user_id=ctx.user.id, ip=client_ip(request), via=VIA
         )
 
     return await _act(request, ctx, f"/admin/users/{user_id}", "contact_removed", action)
@@ -711,7 +803,13 @@ async def contact_revoke_trust(
 
     async def action(db: AsyncSession) -> Effects:
         return await contact_service.set_trust(
-            db, user_id, contact_id, False, actor_user_id=ctx.user.id, ip=client_ip(request)
+            db,
+            user_id,
+            contact_id,
+            False,
+            actor_user_id=ctx.user.id,
+            ip=client_ip(request),
+            via=VIA,
         )
 
     return await _act(request, ctx, f"/admin/users/{user_id}", "trust_revoked", action)
@@ -756,9 +854,9 @@ async def sessions(request: Request) -> Response:
     async with _Db(request) as db:
         ctx = await current(request, db)
         live_only = request.query_params.get("live") == "1"
-        rows = await session_service.list_all(db, limit=200)
-        if live_only:
-            rows = [r for r in rows if r.status in NON_ENDED_SESSION_STATUSES]
+        rows = await session_service.list_all(
+            db, statuses=NON_ENDED_SESSION_STATUSES if live_only else None, limit=200
+        )
         return await _page(request, db, ctx, "sessions.html", sessions=rows, live_only=live_only)
 
 
@@ -785,7 +883,7 @@ async def session_terminate(request: Request, session_id: uuid.UUID) -> Response
             admin_user_id=ctx.user.id,
             admin_device_id=None,
             ip=client_ip(request),
-            via="web",
+            via=VIA,
         )
         return Effects(session_events=[event])
 
@@ -855,7 +953,9 @@ async def settings_save(request: Request) -> Response:
         return _back("/admin/settings", error="validation_error")
 
     async def action(db: AsyncSession) -> None:
-        await settings_service.update(db, patch, actor_user_id=ctx.user.id, ip=client_ip(request))
+        await settings_service.update(
+            db, patch, actor_user_id=ctx.user.id, ip=client_ip(request), via=VIA
+        )
 
     return await _act(request, ctx, "/admin/settings", "saved", action)
 
@@ -919,6 +1019,7 @@ async def account_password(request: Request) -> Response:
                 AdminUserPatch(password=form.get("password", "")),
                 actor_user_id=ctx.user.id,
                 ip=client_ip(request),
+                via=VIA,
             )
         except (ApiError, ValueError):
             await db.rollback()
@@ -949,13 +1050,26 @@ async def account_totp_confirm(request: Request) -> Response:
             return RedirectResponse("/admin/account", status_code=303)
         step = totp.verify(user.totp_secret, form.get("code", ""), last_step=user.totp_last_step)
         if step is None:
+            ended = await _totp_failed(db, ctx, request, reason="totp_enrol")
+            if ended is not None:
+                return _back_to_sign_in(ended)
             return _back("/admin/account", error="totp")
         user.totp_last_step = step
         user.totp_enabled_at = utcnow()
         ctx.session.mfa_passed = True
-        record_event(db, SecurityEventType.TOTP_ENABLED, user_id=user.id, ip=client_ip(request))
+        # The session just gained a privilege: a token seen before is worth nothing now.
+        token = await admin_web_sessions.rotate(db, ctx.session)
+        record_event(
+            db,
+            SecurityEventType.TOTP_ENABLED,
+            user_id=user.id,
+            ip=client_ip(request),
+            details={"via": VIA},
+        )
         await db.commit()
-    return _back("/admin/account", done="saved")
+    response = _back("/admin/account", done="saved")
+    _set_session_cookie(response, token, runtime(request).admin_web_absolute_hours)
+    return response
 
 
 @router.post("/account/totp/disable")
@@ -971,7 +1085,11 @@ async def account_totp_disable(request: Request) -> Response:
         ctx.user.totp_enabled_at = None
         ctx.user.totp_last_step = None
         record_event(
-            db, SecurityEventType.TOTP_DISABLED, user_id=ctx.user.id, ip=client_ip(request)
+            db,
+            SecurityEventType.TOTP_DISABLED,
+            user_id=ctx.user.id,
+            ip=client_ip(request),
+            details={"via": VIA},
         )
         await db.commit()
     return _back("/admin/account", done="saved")

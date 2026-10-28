@@ -57,29 +57,41 @@ async def revoke_user_tokens(db: AsyncSession, user_id: uuid.UUID) -> int:
     return result.rowcount or 0
 
 
+async def _reuse(
+    db: AsyncSession, user_id: uuid.UUID, device_id: uuid.UUID, ip: str | None
+) -> Unauthorized:
+    """Revoke the device's whole chain and record ``refresh_reuse``; commits. The caller raises."""
+    revoked = await revoke_device_tokens(db, device_id)
+    record_event(
+        db,
+        SecurityEventType.REFRESH_REUSE,
+        user_id=user_id,
+        device_id=device_id,
+        ip=ip,
+        details={"revoked_tokens": revoked},
+    )
+    await db.commit()
+    return Unauthorized("Refresh token reuse detected; session revoked")
+
+
 async def rotate_refresh_token(
     db: AsyncSession, settings: Settings, presented: str, ip: str | None
 ) -> tuple[str, User, Device]:
     """Validate ``presented``, revoke it and issue a replacement.
 
     Reuse detection: a token that was already rotated/revoked revokes every live token of the
-    same device (the whole chain) and the request fails. Commits on every outcome."""
+    same device (the whole chain) and the request fails. Commits on every outcome.
+
+    The rotation itself is a conditional ``UPDATE ... WHERE revoked_at IS NULL``: two requests
+    presenting the same token at the same moment cannot both rotate it. The one that loses is
+    a reuse exactly like a late one - which is the point: a stolen token raced against the real
+    client is the case reuse detection exists for."""
     row = await find_refresh_token(db, presented)
     if row is None:
         raise Unauthorized("Invalid refresh token")
     now = utcnow()
     if row.revoked_at is not None:
-        revoked = await revoke_device_tokens(db, row.device_id)
-        record_event(
-            db,
-            SecurityEventType.REFRESH_REUSE,
-            user_id=row.user_id,
-            device_id=row.device_id,
-            ip=ip,
-            details={"revoked_tokens": revoked},
-        )
-        await db.commit()
-        raise Unauthorized("Refresh token reuse detected; session revoked")
+        raise await _reuse(db, row.user_id, row.device_id, ip)
     expires_at = ensure_utc(row.expires_at)
     if expires_at is None or expires_at <= now:
         row.revoked_at = now
@@ -95,7 +107,14 @@ async def rotate_refresh_token(
     if device.status == DeviceStatus.REVOKED:
         raise ApiError(403, "device_revoked", "Device has been revoked")
 
-    row.revoked_at = now
+    claimed = await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.id == row.id, RefreshToken.revoked_at.is_(None))
+        .values(revoked_at=now)
+        .execution_options(synchronize_session=False)
+    )
+    if (claimed.rowcount or 0) != 1:  # type: ignore[attr-defined]
+        raise await _reuse(db, user.id, device.id, ip)
     new_token = await issue_refresh_token(db, settings, user.id, device.id)
     device.last_seen_at = now
     await db.commit()

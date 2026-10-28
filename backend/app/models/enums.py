@@ -133,8 +133,12 @@ class SecurityEventType(enum.StrEnum):
     USER_APPROVED = "user_approved"
     USER_REJECTED = "user_rejected"
     USER_DELETED = "user_deleted"
+    USER_CREATED = "user_created"
+    """An administrator (or the shell) created an account; ``details`` names the role and who did
+    it. Self-registration is ``registration_submitted`` instead."""
     USER_UPDATED = "user_updated"
-    """An administrator changed an account's email or role."""
+    """An administrator changed an account: ``details`` carries ``email_changed``, ``role``,
+    ``password_set``, ``activated`` and/or ``unlocked``. Deactivation is ``user_deactivated``."""
     CONTACT_INVITE_SENT = "contact_invite_sent"
     CONTACT_ADDED = "contact_added"
     CONTACT_REMOVED = "contact_removed"

@@ -129,6 +129,8 @@ class RateLimiters:
     """``POST /contacts/invites`` per authenticated user (ADR-0014)."""
     admin_login_ip: TokenBucketLimiter
     """``POST /admin/login`` (the web dashboard) per client IP (ADR-0016)."""
+    diagnostics_user: TokenBucketLimiter
+    """``POST /diagnostics`` per authenticated user."""
 
     def reset(self) -> None:
         for limiter in (
@@ -139,5 +141,6 @@ class RateLimiters:
             self.register_ip,
             self.invite_user,
             self.admin_login_ip,
+            self.diagnostics_user,
         ):
             limiter.reset()

@@ -30,6 +30,7 @@ async def revoke_device(
     actor_user_id: uuid.UUID | None,
     ip: str | None,
     reason: Mapping[str, Any] | None = None,
+    via: str | None = None,
 ) -> bool:
     """Mark the device revoked, revoke its refresh tokens and clear its presence row. Idempotent:
     returns False (and writes nothing) when it was already revoked. Callers commit and then call
@@ -52,6 +53,8 @@ async def revoke_device(
         details["actor_user_id"] = str(actor_user_id)
     if reason:
         details.update(reason)
+    if via is not None:
+        details["via"] = via
     record_event(
         db,
         SecurityEventType.DEVICE_REVOKED,

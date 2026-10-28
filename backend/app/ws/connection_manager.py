@@ -38,6 +38,13 @@ is well under ten per window - and a client that exceeds it gets ``error(rate_li
 (docs/ws-protocol.md section 2) for the offending frame, not a disconnect."""
 
 
+SEND_TIMEOUT_SECONDS = 10.0
+"""How long one frame may take to leave. A client that stops reading fills its socket buffers,
+and then every send to it would wait - holding this connection's lock and stalling the loop
+that called it, which for ``hosts.update`` is a fan-out every request flow awaits. A send that
+times out marks the connection closed, so its owning task tears it down."""
+
+
 class Connection:
     """One authenticated WebSocket. ``send`` is serialised per connection so concurrent
     producers (heartbeat, broadcasts, request flows) cannot interleave frames."""
@@ -102,10 +109,16 @@ class Connection:
         if self.closed.is_set():
             return False
         async with self._lock:
+            if self.closed.is_set():
+                return False  # closed while this send was queued behind another
             if self.websocket.application_state is not WebSocketState.CONNECTED:
                 return False
             try:
-                await self.websocket.send_text(text)
+                await asyncio.wait_for(self.websocket.send_text(text), SEND_TIMEOUT_SECONDS)
+            except TimeoutError:
+                log.warning("ws send timed out", extra={"device_id": str(self.device_id)})
+                self.closed.set()
+                return False
             except _SEND_ERRORS as exc:
                 log.debug(
                     "ws send failed", extra={"device_id": str(self.device_id), "error": str(exc)}

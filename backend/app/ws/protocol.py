@@ -19,6 +19,7 @@ from typing import Annotated, Any, Literal
 from pydantic import (
     AfterValidator,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     PlainSerializer,
@@ -105,6 +106,24 @@ UtcTime = Annotated[datetime, PlainSerializer(_iso_z, return_type=str, when_used
 MAX_CANDIDATES = 16
 """Both parties gather LAN + v6 + UPnP + public addresses; 16 is far above any real gather and
 bounds what ``session_keys`` stores and what the server forwards."""
+
+MAX_FRAME_CHARS = 1024 * 1024
+"""Largest client frame the server parses, once signed in. uvicorn's ``--ws-max-size`` (the
+Dockerfile) enforces the same bound on the wire and closes with 1009 above it; this check is the
+second line, for a server started without that flag. The largest legitimate frame is a
+``session.end`` with a long ``domains`` list, which is why this is not smaller."""
+
+MAX_HELLO_CHARS = 128 * 1024
+"""Largest first frame, read before the token is checked: the 64 KB ``hello.diagnostics``
+allowance plus room for the rest, and not one byte of JSON parsing more for a stranger."""
+
+MAX_DIAGNOSTIC_KEYS = 256
+"""Top-level keys in ``hello.diagnostics`` / ``session.connect_failed.diagnostics``. More is
+treated like an oversized payload: dropped, never fatal (section 8)."""
+
+MAX_REPORTED_DOMAINS = 2000
+"""Entries of ``session.end.domains`` the server looks at; the rest of the list is ignored, not
+refused, so a long session can always be ended. At most 200 distinct names are stored."""
 
 MAX_CONNECT_MS = 2_147_483_647
 """``sessions.connect_ms`` is a 32-bit integer column."""
@@ -203,6 +222,20 @@ SERVER_FEATURES: tuple[str, ...] = ("contacts", "offers", "trust_v2", "registrat
 server apart without guessing from errors."""
 
 
+def _bounded_diagnostics(value: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Too many keys: the report is dropped (``None``) rather than the frame refused."""
+    if value is not None and len(value) > MAX_DIAGNOSTIC_KEYS:
+        return None
+    return value
+
+
+def _first_domains(value: object) -> object:
+    """Keep the first :data:`MAX_REPORTED_DOMAINS` entries, before the items are validated."""
+    if isinstance(value, list) and len(value) > MAX_REPORTED_DOMAINS:
+        return value[:MAX_REPORTED_DOMAINS]
+    return value
+
+
 def _capabilities(value: list[str]) -> list[str]:
     if len(value) > 32 or any(len(item) > 32 for item in value):
         raise ValueError("at most 32 capabilities of at most 32 characters each")
@@ -214,7 +247,7 @@ class Hello(_ClientFrame):
     token: str
     device_id: uuid.UUID
     app_version: str | None = None
-    diagnostics: dict[str, Any] | None = None
+    diagnostics: Annotated[dict[str, Any] | None, AfterValidator(_bounded_diagnostics)] = None
     capabilities: Annotated[list[str], AfterValidator(_capabilities)] = Field(default_factory=list)
     """Unknown names are kept and ignored, so a newer client never breaks an older server."""
 
@@ -307,8 +340,11 @@ class SessionConnected(_ClientFrame):
 class SessionConnectFailed(_ClientFrame):
     type: Literal["session.connect_failed"]
     session_id: uuid.UUID
-    diagnostics: dict[str, Any]
-    """Free-form: the candidates tried, and the timing and error of each."""
+    diagnostics: Annotated[
+        dict[str, Any], AfterValidator(lambda value: _bounded_diagnostics(value) or {})
+    ]
+    """Free-form: the candidates tried, and the timing and error of each. More than
+    :data:`MAX_DIAGNOSTIC_KEYS` keys and it is stored as ``{}``; the session still ends."""
 
 
 class SessionStats(_ClientFrame):
@@ -343,8 +379,9 @@ class SessionEnd(_ClientFrame):
     reason: ClientEndReason
     bytes_up: int = Field(ge=0, le=MAX_BYTES)
     bytes_down: int = Field(ge=0, le=MAX_BYTES)
-    domains: list[str] = Field(default_factory=list)
-    """Only ever persisted when the ``log_domains`` setting is on; sanitised by the service."""
+    domains: Annotated[list[str], BeforeValidator(_first_domains)] = Field(default_factory=list)
+    """Only ever persisted when the ``log_domains`` setting is on; sanitised by the service.
+    Only the first :data:`MAX_REPORTED_DOMAINS` entries are read."""
 
 
 class ClientPing(_ClientFrame):

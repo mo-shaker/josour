@@ -1,6 +1,6 @@
 """Login flow: password check, lockout, device registration/verification, token issuance."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -156,9 +156,7 @@ async def authenticate_password(
         user.failed_logins = 0
 
     if not await verify_password_async(user.password_hash, password):
-        user.failed_logins += 1
-        if user.failed_logins >= MAX_FAILED_LOGINS:
-            user.locked_until = now + LOCKOUT_DURATION
+        if count_failure(user, now=now):
             raise await _fail(
                 db,
                 SecurityEventType.LOGIN_LOCKED,
@@ -211,16 +209,44 @@ async def authenticate_password(
     return user
 
 
+def count_failure(user: User, *, now: datetime | None = None) -> bool:
+    """One failed attempt against the account - a wrong password, or a wrong second-factor code
+    in the web dashboard. Returns ``True`` when this attempt locked the account."""
+    user.failed_logins += 1
+    if user.failed_logins >= MAX_FAILED_LOGINS:
+        user.locked_until = (now or utcnow()) + LOCKOUT_DURATION
+        return True
+    return False
+
+
+def is_locked(user: User, *, now: datetime | None = None) -> bool:
+    locked_until = ensure_utc(user.locked_until)
+    return locked_until is not None and locked_until > (now or utcnow())
+
+
+async def upgrade_password_hash(user: User, password: str) -> None:
+    """Re-hash a just-verified password whose argon2 parameters are outdated (ADR-0007)."""
+    if password_needs_rehash(user.password_hash):
+        user.password_hash = await hash_password_async(password)
+
+
+def complete_sign_in(user: User) -> None:
+    """Every factor has passed: clear the failure counter and record the time.
+
+    The web dashboard calls this only after the second factor, so a correct password followed by
+    wrong codes keeps counting toward the lockout instead of resetting it."""
+    user.failed_logins = 0
+    user.locked_until = None
+    user.last_login_at = utcnow()
+
+
 async def mark_signed_in(user: User, password: str) -> None:
     """After every other check of a sign-in has passed: clear the failure counter, record the
     time and upgrade the password hash if its parameters are outdated. Separate from
     :func:`authenticate_password` so a sign-in that fails later (a wrong device secret) does not
     reset the lockout counter."""
-    user.failed_logins = 0
-    user.locked_until = None
-    user.last_login_at = utcnow()
-    if password_needs_rehash(user.password_hash):
-        user.password_hash = await hash_password_async(password)
+    complete_sign_in(user)
+    await upgrade_password_hash(user, password)
 
 
 async def login(

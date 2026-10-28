@@ -40,10 +40,13 @@ async def _get(db: DbDep, user_id: uuid.UUID) -> User:
         custom={409: "`conflict` - that email address already belongs to an account."},
     ),
 )
-async def create_user(payload: AdminUserCreate, _: AdminDep, db: DbDep) -> AdminUserOut:
+async def create_user(
+    payload: AdminUserCreate, auth: AdminDep, db: DbDep, request: Request
+) -> AdminUserOut:
     """Creates an account. The password is hashed with argon2id (ADR-0007) and never stored or
     logged in the clear. Email addresses are lower-cased and must be unique. An account an
-    administrator creates is approved and active at once."""
+    administrator creates is approved and active at once, and a `user_created` row names who
+    created it and with which role."""
     user = await user_service.create_user(
         db,
         email=payload.email,
@@ -51,6 +54,7 @@ async def create_user(payload: AdminUserCreate, _: AdminDep, db: DbDep) -> Admin
         display_name=payload.display_name,
         role=payload.role,
     )
+    user_service.record_created(db, user, actor_user_id=auth.user.id, ip=client_ip(request))
     await db.commit()
     return AdminUserOut.model_validate(user)
 

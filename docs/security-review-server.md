@@ -7,6 +7,10 @@ The states: **met** · **fixed in week 5** · **completed in week 6** · **not t
 
 > **Week 6 update (2026-09-05):** all four reservations were closed. This review no longer contains an unmet item, nor
 > an item met under an open reservation. The detail is in section 3.
+>
+> **2026-10-28 update:** a code review of the contacts, self-registration and web-dashboard work (ADR-0014..0017)
+> found twelve defects, all fixed — the second factor could be guessed without limit, requests and refresh tokens had
+> lost-update races, and more. Section 3.6 lists them; 3.7 is one design note that stays open.
 
 **The tally:** 34 items —
 
@@ -56,7 +60,7 @@ is in `docs/load-test-week5.md`.
 | 14.14 | Signing the Windows application | Not the server's concern | The build and distribution path |
 | 14.15 | Distributing updates from a trusted source | Not the server's concern | The distribution path |
 | 14.16 | Recording sign-in attempts | Met | `security_events` records `login_success` and `login_failed` (with the reason: `unknown_user`, `bad_password`, `device_secret_invalid`, `device_revoked`, `account_disabled`) and `login_locked` and `logout` and `refresh_reuse` and `device_revoked` and `session_admin_terminated`, all with the IP. `GET /admin/security-events` displays them |
-| 14.17 | Rate limiting | **Met (completed in week 6)** | Three layers: **a frame budget per WebSocket connection** (100 frames/10 seconds, `app/ws/connection_manager.py::FRAME_BUDGET`) answering `error(rate_limited)` and dropping the frame without cutting the connection (added in week 5); and **four REST limits** by [ADR-0008](decisions/0008-rate-limit-policy.md): `/auth/login` keyed by IP (30/minute) **and keyed by email** (5 per 15 minutes, returned on success), and `/auth/refresh` (60/minute/IP), and `/probe` (10/minute per user); and the 15-minute account lockout after 10 failures as a last safety net. The detail is in 3.1 |
+| 14.17 | Rate limiting | **Met (completed in week 6; extended 2026-10-28)** | Three layers (plus, since 2026-10-28, `/diagnostics` at 60/hour per user, a WebSocket frame size limit and 5 dashboard TOTP attempts per session, section 3.6): **a frame budget per WebSocket connection** (100 frames/10 seconds, `app/ws/connection_manager.py::FRAME_BUDGET`) answering `error(rate_limited)` and dropping the frame without cutting the connection (added in week 5); and **four REST limits** by [ADR-0008](decisions/0008-rate-limit-policy.md): `/auth/login` keyed by IP (30/minute) **and keyed by email** (5 per 15 minutes, returned on success), and `/auth/refresh` (60/minute/IP), and `/probe` (10/minute per user); and the 15-minute account lockout after 10 failures as a last safety net. The detail is in 3.1 |
 | 14.18 | Blocking suspicious devices | **Met (completed in week 6)** | By hand: revoking a device, by an administrator or by its owner, revokes the refresh tokens, clears the presence, **and closes the live control channel at once with code 4403** (`notify.close_device`). And automatically (ADR-0008): **a periodic task** on the existing timer schedule reads `security_events` and revokes the device on two conservative patterns (10 `device_secret_invalid` in an hour with no successful sign-in, or 3 `refresh_reuse`), by the same path and with an audit row explaining what fired it. And refresh-reuse detection still revokes the device's whole chain at once. The detail is in 3.2 |
 | 14.19 | The ability to end a session centrally | **Fixed in week 5 (completed)** | `POST /admin/sessions/{id}/terminate` existed; `manage.py end-session` was added, going through the same path (`sessions.admin_terminate`), so it ends the row, deletes the key and writes the audit row with `via: "cli"`. `manage.py list-sessions` was added. An explicit warning in the output: the command-line version runs outside the API's process, so it does not send `session.terminate` to the two clients |
 | 14.20 | Not decrypting HTTPS | Met by design | Not one byte of browsing passes through FastAPI; the server is a control plane only (technical decision 17). In the whole repository there is no outbound HTTP client except the reachability probe, **and it sends no byte**: it opens TCP, measures and closes (`reachability_probe.tcp_probe`) |
@@ -196,6 +200,30 @@ content, but it is personal data in a text log. It was never a reservation again
 that is why it stayed open while the four reservations were closed. It is dealt with by dropping the access log or
 stripping the query at the first cleanup.
 
+### 3.6 The 2026-10-28 code review — **closed**
+
+| # | Severity | What it was | The fix |
+|---|---|---|---|
+| 1 | High | The dashboard's TOTP step had no attempt limit: with the password, a session could submit codes until one matched (≈3 in 10⁶ per guess, 12 hours to try) | 5 wrong codes per dashboard session end it (`app/web/views.py::MAX_TOTP_FAILURES`), every wrong code counts toward the account lockout, and the password alone no longer clears the failure counter when a code must follow. Same for the enrolment form |
+| 2 | Medium | No WebSocket frame size limit (uvicorn's default 16 MiB), and the first frame was parsed before authentication | uvicorn `--ws-max-size 1048576`; 128 KiB for `hello` and 1 MiB afterwards checked before parsing; diagnostics objects and the domain list bounded (`docs/ws-protocol.md` section 2) |
+| 3 | Medium | Accept/cancel/reject/expiry read `pending` and then wrote: both sides of a race "won" (a guest told `cancelled` still got a session) | Every transition is a conditional `UPDATE … WHERE status = 'pending'` (`app/services/request_state.py`); the loser gets `not_found` |
+| 4 | Medium | Two refreshes with the same token at once both rotated it — reuse detection never saw it | Conditional `UPDATE … WHERE revoked_at IS NULL`; the loser is a `refresh_reuse` and the chain is revoked |
+| 5 | Medium | Creating accounts (an administrator included), password resets, reactivation and unlocking left no audit row | `user_created`; `user_updated` with `password_set` / `activated` / `unlocked`; dashboard rows carry `via: "web"` |
+| 6 | Low | Concurrent duplicate writes (registration, invitation, two-way acceptance, two devices taking one offer) answered `500` | Retried once to their documented answer; anything else is `409 conflict`; a session collision is `session_exists` |
+| 7 | Low | Two administrators disabling each other at once left none | Admin rows locked `FOR UPDATE` and the count re-checked after the write |
+| 8 | Low | The dashboard's "live sessions" view filtered the newest 200 rows in Python and could hide a live session | Filtered in SQL |
+| 9 | Low | Turning on `ADMIN_WEB_REQUIRE_TOTP` did not reach password-only sessions already open | `mfa_passed` now means "a code was verified in this session"; migration `0003` clears it where no TOTP was enrolled |
+| 10 | Low | Outside `ADMIN_WEB_ALLOWED_CIDRS` the 404 was the dashboard's own page, and `/admin/static` was served to anyone | One middleware answers every `/admin*` path with the API's own 404 body, without the dashboard's headers |
+| 11 | Low | A client that stopped reading could stall every `hosts.update` fan-out | Each frame has 10 seconds to leave (`SEND_TIMEOUT_SECONDS`), then the connection is treated as gone |
+| 12 | Low | `POST /diagnostics` (64 KB a row) had no rate limit | 60 an hour per user |
+
+### 3.7 (A design note, **still open**) The dashboard's second factor does not cover the admin REST API
+
+TOTP protects the web dashboard only. `/api/v1/admin/*` is reached with the app's sign-in — a password, and a new
+device is registered on first sign-in — so a stolen administrator password still opens the REST administration.
+Closing that means a second factor (or a device approval) on the app's sign-in for `role = admin`, which is a product
+decision rather than a fix, and it is recorded here so it is not mistaken for covered.
+
 ---
 
 ## 4. What must be verified on the deployed server (no test can prove it)
@@ -216,6 +244,8 @@ stripping the query at the first cleanup.
 | 12 | The per-account sign-in limit's effect | From **different addresses** against the same email with a wrong password: the sixth attempt returns 429 and `Retry-After: 180`, and the account **is not locked** (`failed_logins` stays at 5) |
 | 13 | The per-user `/probe` limit | With one token: the eleventh request within a minute returns 429 even from another address |
 | 14 | The automatic detection works and does not overreach | `GET /admin/security-events?type=device_revoked` after a week of operation: every `by: "auto"` row must have an understandable cause. **Zero automatic revocations on a healthy fleet is the expected result**; any unjustified automatic revocation means raising the threshold in `DEVICE_RISK_*` |
+| 15 | The WebSocket frame limit is in force | `docker compose exec api sh -c "tr '\\0' ' ' < /proc/1/cmdline"` shows `--ws-max-size 1048576`; a 2 MiB frame to `/ws` is closed with 1009 |
+| 16 | The dashboard is invisible outside its networks | With `ADMIN_WEB_ALLOWED_CIDRS` set, from another address: `/admin/login` and `/admin/static/admin.css` return the same JSON 404 as `/no-such-path`, with no `Content-Security-Policy` header |
 
 ---
 
@@ -240,3 +270,15 @@ stripping the query at the first cleanup.
 | `tests/test_device_risk.py` | Every rule fires at its threshold and does **not** fire at the threshold minus one; a successful sign-in inside the window clears the suspicion; events outside the window are not counted; the count is per **device** and not per user; the revocation is idempotent (one audit row, not two); it revokes the refresh tokens; it closes the live channel with **4403**; `listener_unauthenticated` and `bad_password` **never revoke a device**; and the thresholds can be set and disabled |
 | `tests/test_diagnostics.py` | Consuming `listener_unauthenticated`: a diagnostic row and a security row together, the boolean `true` is not counted as a number, the peers are capped at ten and canonical and deduplicated, and **anything that is not an IP address is dropped** (a domain name or a URL in the payload does not reach `security_events`), and the signal is visible in `GET /admin/security-events` |
 | `tests/test_openapi.py` | Every path in the generated document carries an **explicit** `summary` (not the name FastAPI invents) and a real description, documents its errors, every error is rendered with the shared envelope (so no FastAPI `HTTPValidationError` is left), every request/response model has an example, and every tag has a description |
+
+### 5.3 Added on 2026-10-28
+
+| File | What it proves |
+|---|---|
+| `tests/test_admin_web.py` | Five wrong codes end the session (even the right code is worthless afterwards); wrong codes reach the account lockout; the right code clears the counter; enrolment is limited and rotates the session's token and CSRF; requiring TOTP later reaches an open session; dashboard actions are audited with `via: "web"`; the live view lists a live session older than 200 ended ones; outside the networks every `/admin*` path is the API's 404 |
+| `tests/test_ws_requests.py`, `tests/test_ws_offers.py` | Accept and cancel at once, in either order, and accept against the expiry: one winner, the loser `not_found`, the row and the sessions table agree. Two devices accepting one offer open one session; a device without `offers` cannot accept |
+| `tests/test_auth_refresh.py` | Two refreshes with one token at once: one `200`, one reuse, the whole chain revoked |
+| `tests/test_admin_users.py` | `user_created` and the `user_updated` details; two administrators disabling each other at once leave one |
+| `tests/test_register.py`, `tests/test_contacts.py`, `tests/test_health.py` | A double registration and a double invitation get their documented answers; an unretried unique conflict is `409` |
+| `tests/test_ws_hello.py`, `tests/test_ws_units.py` | The `hello` and frame size limits, the diagnostics and domain bounds, and the send timeout |
+| `tests/test_diagnostics.py` | The per-user `/diagnostics` limit |

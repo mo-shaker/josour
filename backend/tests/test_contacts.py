@@ -1,5 +1,6 @@
 """Contacts, invitations and trust over REST (ADR-0014)."""
 
+import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import timedelta
@@ -310,3 +311,22 @@ async def test_invitations_are_rate_limited_per_user(
             for i in range(3)
         ]
     assert codes == [202, 202, 429]
+
+
+async def test_a_double_submitted_invitation_is_one_invitation(
+    client: AsyncClient, person: PersonFactory, db: AsyncSession
+) -> None:
+    """The second insert hits the one-pending-invitation-per-pair index; it is retried, finds the
+    first one live, and answers the same 202."""
+    alice = await person("alice@example.com", "Alice")
+    first, second = await asyncio.gather(
+        client.post(INVITES, json={"email": "nobody@example.com"}, headers=alice.headers),
+        client.post(INVITES, json={"email": "nobody@example.com"}, headers=alice.headers),
+    )
+    assert first.status_code == second.status_code == 202
+    rows = list(
+        await db.scalars(
+            select(ContactInvite).where(ContactInvite.invitee_email == "nobody@example.com")
+        )
+    )
+    assert len(rows) == 1

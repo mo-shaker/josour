@@ -16,6 +16,7 @@ from app.models import AdminWebSession, SecurityEvent, Session, User
 from app.models.enums import ApprovalStatus, SecurityEventType, SessionStatus
 from app.services.users import create_user
 from app.web.i18n import STRINGS
+from app.web.views import MAX_TOTP_FAILURES
 from tests.conftest import (
     ADMIN_EMAIL,
     PASSWORD,
@@ -400,7 +401,15 @@ async def test_outside_the_allowed_networks_the_dashboard_does_not_exist(
         base_url=ORIGIN,
         headers={"origin": ORIGIN},
     ) as outside:
-        assert (await outside.get("/admin/login")).status_code == 404
+        page = await outside.get("/admin/login")
+        unknown = await outside.get("/no-such-path")
+        # Not the dashboard's own error page: exactly what any unknown path gets, without the
+        # dashboard's headers - and the stylesheet is not served either.
+        assert page.status_code == unknown.status_code == 404
+        assert page.json() == unknown.json()
+        assert "content-security-policy" not in page.headers
+        assert (await outside.get("/admin/static/admin.css")).status_code == 404
+        assert (await outside.get("/admin/users/x/delete")).json() == unknown.json()
     async with AsyncClient(
         transport=ASGITransport(app=app, client=("10.1.2.3", 1234)),
         base_url=ORIGIN,
@@ -426,3 +435,237 @@ def test_every_string_has_both_languages() -> None:
     for key, (arabic, english) in STRINGS.items():
         assert arabic.strip() and english.strip(), key
         assert set(re.findall(r"\{(\w+)\}", arabic)) == set(re.findall(r"\{(\w+)\}", english)), key
+
+
+# ---------------------------------------------------------------- second factor: limits
+
+
+async def _with_totp(db: AsyncSession, admin: User) -> str:
+    admin.totp_secret = totp.generate_secret()
+    admin.totp_enabled_at = utcnow()
+    await db.commit()
+    return admin.totp_secret
+
+
+def _wrong_codes(secret: str, count: int) -> list[str]:
+    valid = {totp.code_at(secret, totp.current_step() + d) for d in (-1, 0, 1)}
+    return [code for code in (f"{i:06d}" for i in range(count + 3)) if code not in valid][:count]
+
+
+async def _events(db: AsyncSession, event_type: SecurityEventType) -> list[SecurityEvent]:
+    db.expire_all()
+    return list(await db.scalars(select(SecurityEvent).where(SecurityEvent.type == event_type)))
+
+
+async def test_five_wrong_codes_end_the_session(
+    web: AsyncClient, admin: User, db: AsyncSession
+) -> None:
+    secret = await _with_totp(db, admin)
+    assert (await _sign_in(web)).headers["location"] == "/admin/login/totp"
+    csrf = await _csrf(web, "/admin/login/totp")
+    answers = [
+        await web.post("/admin/login/totp", data={"code": code, "csrf": csrf})
+        for code in _wrong_codes(secret, MAX_TOTP_FAILURES)
+    ]
+    assert all(a.headers["location"].endswith("wrong=1") for a in answers[:-1])
+    assert answers[-1].headers["location"] == "/admin/login?reason=totp_limit"
+    assert "__Host-josour_admin=" in answers[-1].headers["set-cookie"]  # deleted
+
+    db.expire_all()
+    row = await db.scalar(select(AdminWebSession))
+    assert row is not None and row.revoked_at is not None and row.totp_failures == 5
+    await db.refresh(admin)
+    assert admin.failed_logins == MAX_TOTP_FAILURES  # counted like wrong passwords
+    # Even the right code is worth nothing now: only the password starts a new session.
+    right = await web.post(
+        "/admin/login/totp",
+        data={"code": totp.code_at(secret, totp.current_step()), "csrf": csrf},
+    )
+    assert right.headers["location"].startswith("/admin/login?next=")
+    page = await web.get("/admin/login?reason=totp_limit")
+    assert STRINGS["login.totp_limit"][0] in page.text
+    failed = await _events(db, SecurityEventType.ADMIN_WEB_LOGIN_FAILED)
+    assert sorted(e.details["failures"] for e in failed) == [1, 2, 3, 4, 5]
+
+
+async def test_wrong_codes_reach_the_account_lockout(
+    web: AsyncClient, admin: User, db: AsyncSession
+) -> None:
+    """The password alone no longer clears the failure counter when a code must follow, so
+    guessing codes across fresh sessions still ends in the lockout."""
+    secret = await _with_totp(db, admin)
+    admin.failed_logins = 8
+    await db.commit()
+    assert (await _sign_in(web)).headers["location"] == "/admin/login/totp"
+    await db.refresh(admin)
+    assert admin.failed_logins == 8
+    csrf = await _csrf(web, "/admin/login/totp")
+    first, second = _wrong_codes(secret, 2)
+    assert (
+        (await web.post("/admin/login/totp", data={"code": first, "csrf": csrf}))
+        .headers["location"]
+        .endswith("wrong=1")
+    )
+    locked = await web.post("/admin/login/totp", data={"code": second, "csrf": csrf})
+    assert locked.headers["location"] == "/admin/login?reason=locked"
+    await db.refresh(admin)
+    assert admin.locked_until is not None
+    assert len(await _events(db, SecurityEventType.LOGIN_LOCKED)) == 1
+    again = await _sign_in(web)
+    assert again.status_code == 403 and STRINGS["login.locked"][0] in again.text
+
+
+async def test_the_right_code_clears_the_failure_counter(
+    web: AsyncClient, admin: User, db: AsyncSession
+) -> None:
+    secret = await _with_totp(db, admin)
+    await _sign_in(web)
+    csrf = await _csrf(web, "/admin/login/totp")
+    await web.post("/admin/login/totp", data={"code": _wrong_codes(secret, 1)[0], "csrf": csrf})
+    passed = await web.post(
+        "/admin/login/totp",
+        data={"code": totp.code_at(secret, totp.current_step()), "csrf": csrf},
+    )
+    assert passed.headers["location"] == "/admin"
+    await db.refresh(admin)
+    assert admin.failed_logins == 0 and admin.last_login_at is not None
+
+
+async def test_enrolment_codes_are_limited_and_success_rotates_the_session(
+    signed_in: AsyncClient, admin: User, db: AsyncSession
+) -> None:
+    await _post(signed_in, "/admin/account/totp/start", from_page="/admin/account")
+    await db.refresh(admin)
+    assert admin.totp_secret is not None
+    secret = admin.totp_secret
+    wrong = await _post(
+        signed_in,
+        "/admin/account/totp/confirm",
+        {"code": _wrong_codes(secret, 1)[0]},
+        from_page="/admin/account",
+    )
+    assert wrong.headers["location"].endswith("error=totp")
+    await db.refresh(admin)
+    assert admin.failed_logins == 1
+
+    old_csrf = await _csrf(signed_in, "/admin/account")
+    confirmed = await signed_in.post(
+        "/admin/account/totp/confirm",
+        data={"code": totp.code_at(secret, totp.current_step()), "csrf": old_csrf},
+    )
+    assert confirmed.headers["location"].endswith("done=saved")
+    assert "__Host-josour_admin=" in confirmed.headers["set-cookie"]
+    # The session gained a privilege: the CSRF token seen before is worthless now.
+    stale = await signed_in.post("/admin/logout", data={"csrf": old_csrf})
+    assert stale.status_code == 403
+    assert (await signed_in.get("/admin")).status_code == 200
+    enabled = await _events(db, SecurityEventType.TOTP_ENABLED)
+    assert [e.details for e in enabled] == [{"via": "web"}]
+
+
+async def test_enrolment_ends_the_session_after_five_wrong_codes(
+    signed_in: AsyncClient, admin: User, db: AsyncSession
+) -> None:
+    await _post(signed_in, "/admin/account/totp/start", from_page="/admin/account")
+    await db.refresh(admin)
+    assert admin.totp_secret is not None
+    csrf = await _csrf(signed_in, "/admin/account")
+    answers = [
+        await signed_in.post("/admin/account/totp/confirm", data={"code": code, "csrf": csrf})
+        for code in _wrong_codes(admin.totp_secret, MAX_TOTP_FAILURES)
+    ]
+    assert answers[-1].headers["location"] == "/admin/login?reason=totp_limit"
+    assert (await signed_in.get("/admin")).headers["location"].startswith("/admin/login")
+
+
+async def test_requiring_totp_later_reaches_sessions_already_open(
+    app_factory: AppFactory, admin: User
+) -> None:
+    """A password-only session is not "second factor passed": when the operator turns on
+    ADMIN_WEB_REQUIRE_TOTP, the same cookie is sent to enrolment on its next page."""
+    relaxed = app_factory(None)
+    strict = app_factory(make_settings(admin_web_require_totp=True))
+    async with AsyncClient(
+        transport=ASGITransport(app=relaxed), base_url=ORIGIN, headers={"origin": ORIGIN}
+    ) as browser:
+        assert (await _sign_in(browser)).headers["location"] == "/admin"
+        assert (await browser.get("/admin")).status_code == 200
+        cookies = browser.cookies
+    async with AsyncClient(
+        transport=ASGITransport(app=strict),
+        base_url=ORIGIN,
+        headers={"origin": ORIGIN},
+        cookies=cookies,
+    ) as same_browser:
+        response = await same_browser.get("/admin")
+        assert response.status_code == 303
+        assert response.headers["location"] == "/admin/login/totp"
+
+
+# ---------------------------------------------------------------- audit, lists, confirmations
+
+
+async def test_dashboard_actions_are_audited_as_web(
+    signed_in: AsyncClient, admin: User, user: User, db: AsyncSession
+) -> None:
+    detail = f"/admin/users/{user.id}"
+    await _post(signed_in, f"{detail}/password", {"password": "another-password"}, from_page=detail)
+    await _post(signed_in, f"{detail}/deactivate", from_page=detail)
+    await _post(signed_in, f"{detail}/activate", from_page=detail)
+    created = await _post(
+        signed_in,
+        "/admin/users/new",
+        {
+            "email": "second-admin@example.com",
+            "password": "long-enough-1",
+            "display_name": "Second",
+            "role": "admin",
+        },
+        from_page="/admin/users/new",
+    )
+    assert created.status_code == 303
+
+    actor = str(admin.id)
+    updates = await _events(db, SecurityEventType.USER_UPDATED)
+    assert {"password_set": True, "actor_user_id": actor, "via": "web"} in [
+        e.details for e in updates
+    ]
+    assert {"activated": True, "actor_user_id": actor, "via": "web"} in [e.details for e in updates]
+    (deactivated,) = await _events(db, SecurityEventType.USER_DEACTIVATED)
+    assert deactivated.details["via"] == "web" and deactivated.details["actor_user_id"] == actor
+    (made,) = await _events(db, SecurityEventType.USER_CREATED)
+    assert made.details == {"role": "admin", "actor_user_id": actor, "via": "web"}
+
+
+async def test_the_live_view_lists_every_live_session(
+    signed_in: AsyncClient, make_actor: ActorFactory, make_session: SessionFactory
+) -> None:
+    """It used to take the newest 200 sessions and filter them: a live session older than 200
+    ended ones disappeared from the page that exists to terminate it."""
+    guest = await make_actor("g@example.com")
+    host = await make_actor("h@example.com", device_name="HOST-PC")
+    live = await make_session(
+        guest.user,
+        guest.device,
+        host.user,
+        host.device,
+        created_at=utcnow() - timedelta(hours=1),
+    )
+    for _ in range(201):
+        await make_session(
+            guest.user, guest.device, host.user, host.device, status=SessionStatus.ENDED
+        )
+    page = await signed_in.get("/admin/sessions?live=1")
+    assert page.status_code == 200 and f"/admin/sessions/{live.id}/terminate" in page.text
+
+
+async def test_a_huge_page_number_is_not_an_error(signed_in: AsyncClient) -> None:
+    assert (await signed_in.get("/admin/users?page=99999999999999999999")).status_code == 200
+
+
+async def test_a_confirmation_page_needs_a_signed_in_administrator(
+    web: AsyncClient, user: User
+) -> None:
+    response = await web.get(f"/admin/users/{user.id}/delete")
+    assert response.status_code == 303
+    assert response.headers["location"].startswith("/admin/login?next=")

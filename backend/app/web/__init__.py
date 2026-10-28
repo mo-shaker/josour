@@ -6,11 +6,12 @@ from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from app.api.errors import error_response
 from app.core.config import Settings
 from app.db.session import session_scope
 from app.services import admin_web_sessions
 from app.services.session_timer import scheduler
-from app.web.security import WebForbidden, WebNotFound, WebRedirect
+from app.web.security import WebForbidden, WebNotFound, WebRedirect, network_allowed
 
 log = logging.getLogger(__name__)
 
@@ -46,8 +47,8 @@ def mount(app: FastAPI) -> None:
         return RedirectResponse(exc.url, status_code=303)
 
     @app.exception_handler(WebNotFound)
-    async def _not_found(request: Request, _: WebNotFound) -> Response:
-        return await render_error(request, "error.not_found", 404)
+    async def _not_found(_: Request, __: WebNotFound) -> Response:
+        return _absent()
 
     @app.exception_handler(WebForbidden)
     async def _forbidden(request: Request, _: WebForbidden) -> Response:
@@ -55,11 +56,26 @@ def mount(app: FastAPI) -> None:
 
     @app.middleware("http")
     async def _headers(request: Request, call_next):  # type: ignore[no-untyped-def]
+        if not _is_dashboard(request.url.path):
+            return await call_next(request)
+        if not network_allowed(request):
+            # Outside ADMIN_WEB_ALLOWED_CIDRS the dashboard does not exist: the very answer an
+            # unknown path gets, with none of the dashboard's headers - and for the stylesheet
+            # too, which is served by a mount the views' own check never sees.
+            return _absent()
         response = await call_next(request)
-        if request.url.path == "/admin" or request.url.path.startswith("/admin/"):
-            for name, value in SECURITY_HEADERS.items():
-                response.headers.setdefault(name, value)
+        for name, value in SECURITY_HEADERS.items():
+            response.headers.setdefault(name, value)
         return response
+
+
+def _is_dashboard(path: str) -> bool:
+    return path == "/admin" or path.startswith("/admin/")
+
+
+def _absent() -> Response:
+    """Byte for byte what the API answers for a path it does not have."""
+    return error_response(404, "not_found", "Not Found")
 
 
 def start_housekeeping(settings: Settings) -> bool:

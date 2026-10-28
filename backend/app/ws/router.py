@@ -28,6 +28,8 @@ from app.services.events import event_bus
 from app.ws import notify
 from app.ws.connection_manager import Connection, connection_manager
 from app.ws.protocol import (
+    MAX_FRAME_CHARS,
+    MAX_HELLO_CHARS,
     Capability,
     ClientMessage,
     ClientPing,
@@ -130,6 +132,12 @@ async def _read_hello(websocket: WebSocket) -> Hello:
         raise _HandshakeRejected(CloseCode.NO_HELLO, "no hello within the deadline") from exc
     except (KeyError, WebSocketDisconnect, RuntimeError) as exc:
         raise _HandshakeRejected(CloseCode.NO_HELLO, "connection closed before hello") from exc
+    if len(raw) > MAX_HELLO_CHARS:
+        # Refused before parsing: nobody has proven who they are yet.
+        await _send_raw(
+            websocket, ErrorFrame(code=ErrorCode.BAD_REQUEST, message="hello frame too large")
+        )
+        raise _HandshakeRejected(CloseCode.NO_HELLO, "hello frame too large")
     try:
         message = parse_client_message(raw)
     except WsError as exc:
@@ -296,6 +304,11 @@ async def _handle(connection: Connection, message: ClientMessage) -> None:
                 offer_id=message.offer_id, device_id=connection.device_id, ref=message.ref
             )
         case OfferAccept():
+            if not connection.can(Capability.OFFERS):
+                # Section 10: only a device that can be rung by offer.incoming may take one.
+                raise WsError(
+                    ErrorCode.FORBIDDEN, "This device did not declare the offers capability"
+                )
             await offers.accept(
                 offer_id=message.offer_id,
                 user_id=connection.user_id,
@@ -355,6 +368,9 @@ async def _dispatch(connection: Connection, raw: str) -> None:
         await connection.send(
             ErrorFrame(code=ErrorCode.RATE_LIMITED, message="Too many frames; slow down")
         )
+        return
+    if len(raw) > MAX_FRAME_CHARS:
+        await connection.send(ErrorFrame(code=ErrorCode.BAD_REQUEST, message="Frame too large"))
         return
     try:
         message = parse_client_message(raw)

@@ -22,4 +22,6 @@ EXPOSE 8000
 
 # Single worker by design (in-memory WebSocket registry). Caddy terminates TLS in front of
 # this container on a private network, so forwarded headers are trusted from any peer.
-CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips='*'"]
+# --ws-max-size: 1 MiB per WebSocket frame (uvicorn's default is 16 MiB); see MAX_FRAME_CHARS in
+# app/ws/protocol.py.
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --ws-max-size 1048576 --proxy-headers --forwarded-allow-ips='*'"]

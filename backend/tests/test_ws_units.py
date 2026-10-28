@@ -13,6 +13,8 @@ from app.core.clock import utcnow
 from app.services.session_timer import TimerScheduler
 from app.ws.connection_manager import Connection, ConnectionManager
 from app.ws.protocol import (
+    MAX_DIAGNOSTIC_KEYS,
+    MAX_REPORTED_DOMAINS,
     CloseCode,
     ErrorCode,
     ErrorFrame,
@@ -22,6 +24,7 @@ from app.ws.protocol import (
     RequestCreated,
     RequestResult,
     SessionConnected,
+    SessionConnectFailed,
     SessionEnd,
     SessionEndpoint,
     WsError,
@@ -380,3 +383,59 @@ def test_relay_wins_a_session_but_is_never_a_candidate() -> None:
         parse_client_message(
             _endpoint_frame(candidates=[{"type": "relay", "ip": "10.0.0.4", "port": 443}])
         )
+
+
+def test_session_end_reads_only_the_first_reported_domains() -> None:
+    """A long session's ``session.end`` is never refused for its domain list: the server reads
+    the first MAX_REPORTED_DOMAINS entries (it stores at most 200 distinct names anyway)."""
+    frame = parse_client_message(
+        json.dumps(
+            {
+                "type": "session.end",
+                "session_id": str(uuid.uuid4()),
+                "reason": "guest_ended",
+                "bytes_up": 0,
+                "bytes_down": 0,
+                "domains": [f"d{i}.example" for i in range(MAX_REPORTED_DOMAINS + 50)],
+            }
+        )
+    )
+    assert isinstance(frame, SessionEnd) and len(frame.domains) == MAX_REPORTED_DOMAINS
+
+
+def test_connect_failed_diagnostics_with_too_many_keys_become_empty() -> None:
+    frame = parse_client_message(
+        json.dumps(
+            {
+                "type": "session.connect_failed",
+                "session_id": str(uuid.uuid4()),
+                "diagnostics": {f"k{i}": i for i in range(MAX_DIAGNOSTIC_KEYS + 1)},
+            }
+        )
+    )
+    assert isinstance(frame, SessionConnectFailed) and frame.diagnostics == {}
+
+
+class StuckWebSocket(FakeWebSocket):
+    """A peer that stopped reading: every send waits forever."""
+
+    async def send_text(self, text: str) -> None:
+        await asyncio.Event().wait()
+
+
+async def test_a_send_to_a_peer_that_stopped_reading_times_out(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.ws import connection_manager as module
+
+    monkeypatch.setattr(module, "SEND_TIMEOUT_SECONDS", 0.05)
+    stuck = Connection(
+        StuckWebSocket(),  # type: ignore[arg-type]
+        device_id=uuid.uuid4(),
+        user_id=uuid.uuid4(),
+        public_ip=None,
+    )
+    assert await asyncio.wait_for(stuck.send(Ping()), 2.0) is False
+    assert stuck.closed.is_set()
+    # A frame queued behind it is not sent into the dead socket either.
+    assert await stuck.send(Ping()) is False

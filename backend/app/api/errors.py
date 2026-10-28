@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.errors import ApiError
@@ -57,6 +58,14 @@ def register_exception_handlers(app: FastAPI) -> None:
         code = _HTTP_STATUS_CODES.get(exc.status_code, "http_error")
         message = exc.detail if isinstance(exc.detail, str) else code.replace("_", " ")
         return error_response(exc.status_code, code, message, exc.headers)
+
+    @app.exception_handler(IntegrityError)
+    async def _integrity_error(request: Request, _: IntegrityError) -> JSONResponse:
+        # A unique index refused a write that a concurrent request made first. The handlers
+        # that can say something more specific retry (app.db.session.commit_retrying_once);
+        # anything else is a conflict, not a server fault.
+        log.warning("integrity conflict", extra={"path": request.url.path})
+        return error_response(409, "conflict", "A concurrent change conflicts with this one")
 
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception) -> JSONResponse:

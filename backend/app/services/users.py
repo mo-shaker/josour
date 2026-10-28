@@ -103,6 +103,16 @@ async def list_users(
     return list(await db.scalars(stmt))
 
 
+async def count_pending(db: AsyncSession) -> int:
+    """Registrations waiting for an administrator (the dashboard's badge)."""
+    return int(
+        await db.scalar(
+            select(func.count()).select_from(User).where(_state_filter(UserState.PENDING))
+        )
+        or 0
+    )
+
+
 async def count_by_state(db: AsyncSession) -> dict[UserState, int]:
     """Totals for the dashboard overview, one query per state (a handful of rows to count)."""
     counts: dict[UserState, int] = {}
@@ -120,6 +130,7 @@ async def update_user(
     *,
     actor_user_id: uuid.UUID | None = None,
     ip: str | None = None,
+    via: str | None = None,
 ) -> list[uuid.UUID]:
     """``PATCH /admin/users/{id}``. Returns the devices whose live control channel the caller must
     close (see below); commits are the caller's.
@@ -136,6 +147,10 @@ async def update_user(
 
     A pending or rejected account cannot be activated here - that is what approving it is for -
     and a deleted one cannot be changed at all.
+
+    Every change is on the record: ``user_updated`` (email, role, password, reactivation,
+    unlock) or ``user_deactivated``, naming the administrator and, from the dashboard,
+    ``via: "web"``.
     """
     if user.deleted_at is not None:
         raise Conflict("a deleted account cannot be changed")
@@ -154,33 +169,48 @@ async def update_user(
         user.password_hash = await hash_password_async(changes["password"])
         await revoke_user_tokens(db, user.id)
         await admin_web_sessions.revoke_all_for_user(db, user.id)
+        audit["password_set"] = True
 
     disconnect: list[uuid.UUID] = []
+    admin_lost = False
     if changes.get("is_active") is not None and changes["is_active"] != user.is_active:
         if changes["is_active"] and user.approval_status != ApprovalStatus.APPROVED:
             raise Conflict("approve the account before activating it")
         if not changes["is_active"]:
             await _assert_not_last_admin(db, user, actor_user_id=actor_user_id)
+            admin_lost = user.role == UserRole.ADMIN
         user.is_active = changes["is_active"]
-        if not user.is_active:
+        if user.is_active:
+            audit["activated"] = True
+        else:
             await revoke_user_tokens(db, user.id)
             await admin_web_sessions.revoke_all_for_user(db, user.id)
-            disconnect = await _cut_off(db, user, actor_user_id=actor_user_id, ip=ip)
+            disconnect = await _cut_off(db, user, actor_user_id=actor_user_id, ip=ip, via=via)
 
     if changes.get("unlock"):
         user.failed_logins = 0
         user.locked_until = None
+        audit["unlocked"] = True
     if audit:
         details: dict[str, Any] = dict(audit)
         if actor_user_id is not None:
             details["actor_user_id"] = str(actor_user_id)
+        if via is not None:
+            details["via"] = via
         record_event(db, SecurityEventType.USER_UPDATED, user_id=user.id, ip=ip, details=details)
     await db.flush()
+    if admin_lost or audit.get("role") == UserRole.USER.value:
+        await _assert_an_admin_remains(db)
     return disconnect
 
 
 async def _cut_off(
-    db: AsyncSession, user: User, *, actor_user_id: uuid.UUID | None, ip: str | None
+    db: AsyncSession,
+    user: User,
+    *,
+    actor_user_id: uuid.UUID | None,
+    ip: str | None,
+    via: str | None = None,
 ) -> list[uuid.UUID]:
     """Clear the user's presence, record who disabled them, and name the channels to close.
 
@@ -192,6 +222,8 @@ async def _cut_off(
     details: dict[str, Any] = {"devices_disconnected": len(device_ids)}
     if actor_user_id is not None and actor_user_id != user.id:
         details["actor_user_id"] = str(actor_user_id)
+    if via is not None:
+        details["via"] = via
     record_event(
         db,
         SecurityEventType.USER_DEACTIVATED,
@@ -227,17 +259,34 @@ async def _assert_not_last_admin(
         raise Conflict("you cannot do this to your own account")
     if user.role != UserRole.ADMIN or not user.is_active:
         return
-    others = await db.scalar(
-        select(func.count())
-        .select_from(User)
+    # Locks every active administrator row (PostgreSQL; SQLite ignores it), in one order, so two
+    # administrators removing each other at the same moment are serialised here and the second
+    # one sees the first one's change. :func:`_assert_an_admin_remains` re-checks after the
+    # write, which is what serialises SQLite (its write lock waits for the other commit).
+    others = [admin for admin in await _active_admin_ids(db, lock=True) if admin != user.id]
+    if not others:
+        raise Conflict("this is the last active administrator")
+
+
+async def _active_admin_ids(db: AsyncSession, *, lock: bool) -> list[uuid.UUID]:
+    stmt = (
+        select(User.id)
         .where(
             User.role == UserRole.ADMIN,
             User.is_active.is_(True),
             User.deleted_at.is_(None),
-            User.id != user.id,
         )
+        .order_by(User.id)
     )
-    if not others:
+    if lock:
+        stmt = stmt.with_for_update()
+    return list(await db.scalars(stmt))
+
+
+async def _assert_an_admin_remains(db: AsyncSession) -> None:
+    """After the write that disabled, demoted or deleted an administrator (flushed): if a
+    concurrent change took the other one meanwhile, refuse rather than commit no admin at all."""
+    if not await _active_admin_ids(db, lock=False):
         raise Conflict("this is the last active administrator")
 
 
@@ -312,8 +361,32 @@ async def create_user(
     return user
 
 
+def record_created(
+    db: AsyncSession,
+    user: User,
+    *,
+    actor_user_id: uuid.UUID | None,
+    ip: str | None,
+    via: str | None = None,
+) -> None:
+    """``user_created`` for an account an administrator (or the shell) made. Not part of
+    :func:`create_user`, which self-registration uses too and audits as its own event."""
+    record_event(
+        db,
+        SecurityEventType.USER_CREATED,
+        user_id=user.id,
+        ip=ip,
+        details={"role": str(user.role), **_actor_details(actor_user_id, via)},
+    )
+
+
 async def approve_user(
-    db: AsyncSession, user: User, *, actor_user_id: uuid.UUID | None, ip: str | None
+    db: AsyncSession,
+    user: User,
+    *,
+    actor_user_id: uuid.UUID | None,
+    ip: str | None,
+    via: str | None = None,
 ) -> None:
     """Let a self-registered account in. A rejected account may be approved after all - an
     administrator changing their mind is not an error - but an approved or deleted one may not."""
@@ -336,12 +409,17 @@ async def approve_user(
         SecurityEventType.USER_APPROVED,
         user_id=user.id,
         ip=ip,
-        details=_actor_details(actor_user_id),
+        details=_actor_details(actor_user_id, via),
     )
 
 
 async def reject_user(
-    db: AsyncSession, user: User, *, actor_user_id: uuid.UUID | None, ip: str | None
+    db: AsyncSession,
+    user: User,
+    *,
+    actor_user_id: uuid.UUID | None,
+    ip: str | None,
+    via: str | None = None,
 ) -> None:
     """Turn a pending registration down. The account stays (so the same email cannot simply
     register again) but can never sign in; an administrator can still approve it later."""
@@ -358,12 +436,17 @@ async def reject_user(
         SecurityEventType.USER_REJECTED,
         user_id=user.id,
         ip=ip,
-        details=_actor_details(actor_user_id),
+        details=_actor_details(actor_user_id, via),
     )
 
 
 async def delete_user(
-    db: AsyncSession, user: User, *, actor_user_id: uuid.UUID | None, ip: str | None
+    db: AsyncSession,
+    user: User,
+    *,
+    actor_user_id: uuid.UUID | None,
+    ip: str | None,
+    via: str | None = None,
 ) -> Effects:
     """Soft delete (ADR-0017). The row stays, because session history of *other* people points
     at it and a hard delete would cascade through theirs; everything that identifies the person
@@ -382,6 +465,7 @@ async def delete_user(
     if user.deleted_at is not None:
         raise Conflict("this account is already deleted")
     await _assert_not_last_admin(db, user, actor_user_id=actor_user_id)
+    was_admin = user.role == UserRole.ADMIN and user.is_active
 
     change = Effects()
     live = await session_service.get_live_for_user(db, user.id)
@@ -400,6 +484,7 @@ async def delete_user(
             actor_user_id=actor_user_id,
             ip=ip,
             reason={"cause": "user_deleted"},
+            via=via,
         )
     change.disconnect = [device.id for device in devices]
     await revoke_user_tokens(db, user.id)
@@ -416,15 +501,24 @@ async def delete_user(
     user.totp_secret = None
     user.totp_enabled_at = None
     await db.flush()
+    if was_admin:
+        await _assert_an_admin_remains(db)
     record_event(
         db,
         SecurityEventType.USER_DELETED,
         user_id=user.id,
         ip=ip,
-        details={**_actor_details(actor_user_id), "devices_revoked": len(devices)},
+        details={**_actor_details(actor_user_id, via), "devices_revoked": len(devices)},
     )
     return change
 
 
-def _actor_details(actor_user_id: uuid.UUID | None) -> dict[str, Any]:
-    return {"actor_user_id": str(actor_user_id)} if actor_user_id is not None else {"via": "cli"}
+def _actor_details(actor_user_id: uuid.UUID | None, via: str | None = None) -> dict[str, Any]:
+    """Who did it: an administrator (and from where, ``via: "web"`` for the dashboard), or the
+    shell (``via: "cli"``)."""
+    if actor_user_id is None:
+        return {"via": via or "cli"}
+    details: dict[str, Any] = {"actor_user_id": str(actor_user_id)}
+    if via is not None:
+        details["via"] = via
+    return details

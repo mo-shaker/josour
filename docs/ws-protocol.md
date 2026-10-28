@@ -34,6 +34,23 @@ The `error` codes: `unauthorized`, `bad_request`, `not_found`, `host_unavailable
 in 10 seconds); exceeding it returns `rate_limited` **without dropping the connection**, protecting the single worker
 from an authenticated device flooding the event loop.
 
+**Frame sizes** (added 2026-10-28). The server parses at most **1 MiB** per frame and the first frame (`hello`, read
+before the token is checked) at most **128 KiB**. A larger `hello` is answered `bad_request` ("hello frame too large")
+and closed with `4401`, unparsed; a larger frame after `hello` is answered `bad_request` ("Frame too large") and
+dropped, and the connection stays. The deployment also runs uvicorn with `--ws-max-size 1048576`, which closes with
+`1009` on the wire above 1 MiB. The lists and objects inside frames are bounded too, and none of these bounds can stop
+a session from ending:
+
+| Field | Bound | Above it |
+|---|---|---|
+| `hello.diagnostics`, `session.connect_failed.diagnostics` | 256 top-level keys | Dropped (`hello`: not stored; `connect_failed`: stored as `{}`); the frame is still accepted |
+| `session.end.domains` | The first 2,000 entries are read | The rest is ignored, never refused (at most 200 distinct names are stored anyway) |
+| `session.endpoint.candidates` | 16 | `bad_request` (section 9) |
+| `hello.capabilities` | 32 names of at most 32 characters | `bad_request` (section 10) |
+
+The server gives each outgoing frame **10 seconds** to leave. A client that stops reading its socket is then treated
+as disconnected (section 1), so it cannot hold up the frames other clients are owed.
+
 When each code is used in `request.create` (pinned in week 3):
 
 | Situation | Code |
@@ -44,6 +61,7 @@ When each code is used in `request.create` (pinned in week 3):
 | `host_device_id` does not correspond to a device | `not_found` |
 | The requested device is one of the user's own | `bad_request` |
 | Someone other than the addressed host tries to accept or reject | `forbidden` |
+| The request was settled a moment earlier — accepted, rejected, withdrawn or expired (see "Races" in section 5) | `not_found` |
 
 All times are ISO-8601 in UTC with a `Z` suffix. Identifiers are UUID strings.
 
@@ -122,6 +140,20 @@ Rules:
   section 2.
 - A host with an unfinished session does not appear in `hosts.*` until it ends.
 - `session.connected` from the user is ignored with `error(forbidden)`.
+
+**Races** (pinned 2026-10-28). A request or offer leaves `pending` exactly once. Accepting, rejecting, withdrawing,
+the expiry timer and the disconnect/contact-removal sweeps all settle it with a conditional write ("only if it is
+still pending"), so when two of them meet, the first one wins and does everything it announces; the other changes
+nothing:
+
+| The loser | What it gets |
+|---|---|
+| `request.accept`, `request.reject`, `request.cancel`, `offer.accept`, `offer.reject`, `offer.cancel` | `error(not_found)` with its `ref` |
+| The expiry timer, a disconnect, a contact removal | Nothing: the winner's frames already told both sides |
+| A second guest device accepting the same offer | `error(not_found)`, and `offer.closed(accepted_elsewhere)` like every other device of the guest |
+| An acceptance whose session collides with another session of one of the four parties opened in the same instant | `error(session_exists)`, and the request stays `pending` |
+
+So a guest can no longer hear `request.result(cancelled)` and receive `session.created` for the same request.
 
 ## 5a. Auto-accepting a trusted guest
 
@@ -293,9 +325,9 @@ are ignored), and `hello.ack` gains `features` (what the server implements: `con
 | Capability | What it changes |
 |---|---|
 | `contacts` | The client receives `contacts.presence`, `contacts.changed` and `host.state` |
-| `offers` | The device can be rung by `offer.incoming`; a device without it is never offered a connection |
+| `offers` | The device can be rung by `offer.incoming`; a device without it is never offered a connection, and its `offer.accept` is answered `error(forbidden)` |
 | `trust_v2` | The host's `request.accept {auto: true}` is checked against the trust the server holds |
-| `system_proxy` | The guest routes through the system proxy rather than a work browser ([ADR-0015](decisions/0015-system-proxy-instead-of-work-browser.md)) |
+| `system_proxy` | **Informational.** The guest routes through the system proxy rather than a work browser ([ADR-0015](decisions/0015-system-proxy-instead-of-work-browser.md)). The server changes nothing for it; it is kept with the other capabilities so a server can tell 2.x clients apart |
 
 **Contacts only.** `hosts.snapshot`, `hosts.update` and `GET /hosts` list only the hosts of the recipient's contacts,
 and each entry gains `user_id`. `request.create` to a non-contact answers `not_contact`. Each connection is sent
@@ -323,7 +355,7 @@ gets `host.state` instead.
 |---|---|---|
 | `offer.create` | `ref`, `guest_user_id`, `duration_min` | A host device |
 | `offer.cancel` | `ref`, `offer_id` | The offering device |
-| `offer.accept` | `ref`, `offer_id` | Any `offers` device of the guest; it becomes the session's guest device |
+| `offer.accept` | `ref`, `offer_id` | Any `offers` device of the guest (another device: `forbidden`); it becomes the session's guest device. Two devices at once: the first wins, the other gets `not_found` (section 5, "Races") |
 | `offer.reject` | `ref`, `offer_id` | Any device of the guest |
 
 ```

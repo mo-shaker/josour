@@ -38,6 +38,10 @@ STRINGS: Final[dict[str, tuple[str, str]]] = {
         "Too many attempts; try again shortly.",
     ),
     "login.expired": ("انتهت الجلسة، سجّل الدخول من جديد.", "Your session ended; sign in again."),
+    "login.totp_limit": (
+        "أُدخلت رموز تحقق خاطئة كثيرة فانتهت الجلسة. سجّل الدخول من جديد.",
+        "Too many wrong verification codes ended the session; sign in again.",
+    ),
     "totp.title": ("رمز التحقق", "Verification code"),
     "totp.prompt": (
         "أدخل الرمز المكوّن من 6 أرقام من تطبيق المصادقة.",

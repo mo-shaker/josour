@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, Depends, Request, status
 
-from app.api.deps import AuthDep, DbDep, client_ip
+from app.api.deps import AuthDep, DbDep, client_ip, diagnostics_rate_limit
 from app.api.openapi import errors
 from app.schemas.diagnostics import DiagnosticCreated, DiagnosticIn
 from app.services import diagnostics
@@ -13,16 +13,20 @@ router = APIRouter(prefix="/diagnostics", tags=["diagnostics"])
     status_code=status.HTTP_201_CREATED,
     response_model=DiagnosticCreated,
     summary="Report connection diagnostics",
+    dependencies=[Depends(diagnostics_rate_limit)],
     responses=errors(
         401,
         403,
         404,
         422,
+        429,
         custom={
             403: "`forbidden` - the named session exists but the caller is not one of its two "
             "participants.",
             404: "`not_found` - no session with that id.",
             422: "`validation_error` - malformed body, or `data` larger than 64 KB serialised.",
+            429: "`rate_limited` - the per-user budget (60 an hour) is spent; retry after "
+            "`Retry-After` seconds.",
         },
     ),
 )

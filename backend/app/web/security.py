@@ -64,15 +64,20 @@ def client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None
 
 
-def check_network(request: Request) -> None:
+def network_allowed(request: Request) -> bool:
+    """``ADMIN_WEB_ALLOWED_CIDRS`` (empty allows everyone)."""
     networks = runtime(request).admin_web_networks
     if not networks:
-        return
+        return True
     try:
         address = ipaddress.ip_address(client_ip(request) or "")
-    except ValueError as exc:
-        raise WebNotFound() from exc
-    if not any(address in network for network in networks):
+    except ValueError:
+        return False
+    return any(address in network for network in networks)
+
+
+def check_network(request: Request) -> None:
+    if not network_allowed(request):
         raise WebNotFound()
 
 
@@ -87,11 +92,13 @@ def expected_origin(request: Request) -> str:
 def check_origin(request: Request) -> None:
     """Refuse a form that a browser says came from another site.
 
-    ``Origin`` is the first witness, but a browser replaces it with ``null`` when the page's
-    referrer policy is ``no-referrer`` - which ours is, and which Caddy sets for the whole site -
-    so ``Sec-Fetch-Site`` (sent by every current browser, and not settable by a page) is the
-    second. Only a request carrying neither falls back on the CSRF token and the SameSite cookie
-    alone; a ``null`` origin with nothing else to vouch for it (a sandboxed frame) is refused."""
+    ``Origin`` is the first witness. A browser replaces it with ``null`` when the page's referrer
+    policy is ``no-referrer`` - which is why the dashboard sends ``Referrer-Policy: same-origin``
+    (``app.web.SECURITY_HEADERS``) and Caddy only adds ``no-referrer`` where the application set
+    none - and in a few other cases, so ``Sec-Fetch-Site`` (sent by every current browser, and
+    not settable by a page) is the second. Only a request carrying neither falls back on the
+    CSRF token and the SameSite cookie alone; a ``null`` origin with nothing else to vouch for it
+    (a sandboxed frame) is refused."""
     origin = request.headers.get("origin")
     if origin and origin != "null":
         if origin.rstrip("/") != expected_origin(request):
@@ -128,6 +135,9 @@ async def current(
 
 
 def mfa_satisfied(session: AdminWebSession, user: User, settings: Settings) -> bool:
+    """A code was verified in this session, or none is needed: the administrator has no TOTP
+    and the server does not require one. Evaluated on every request, so enrolling TOTP or
+    turning on ``ADMIN_WEB_REQUIRE_TOTP`` reaches sessions that already exist."""
     if session.mfa_passed:
         return True
     return user.totp_enabled_at is None and not settings.admin_web_require_totp

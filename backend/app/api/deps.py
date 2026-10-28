@@ -102,6 +102,7 @@ def build_rate_limiters(settings: Settings) -> RateLimiters | None:
         register_ip=TokenBucketLimiter(settings.register_rate_limit_per_hour, 3600.0),
         invite_user=TokenBucketLimiter(settings.invite_rate_limit_per_day, 86400.0),
         admin_login_ip=TokenBucketLimiter(settings.admin_login_rate_limit_per_minute, 60.0),
+        diagnostics_user=TokenBucketLimiter(settings.diagnostics_rate_limit_per_hour, 3600.0),
     )
 
 
@@ -202,3 +203,11 @@ async def probe_rate_limit(request: Request, auth: AuthDep) -> None:
     if limiters is None:
         return
     _spend(limiters.probe_user, str(auth.user.id))
+
+
+async def diagnostics_rate_limit(request: Request, auth: AuthDep) -> None:
+    """``POST /diagnostics``: per authenticated user; every call is a row of up to 64 KB."""
+    limiters = get_rate_limiters(request)
+    if limiters is None:
+        return
+    _spend(limiters.diagnostics_user, str(auth.user.id))

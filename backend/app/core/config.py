@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     approval mode, a row an administrator has to read, so this is deliberately tight."""
     invite_rate_limit_per_day: int = Field(default=20, ge=1)
     """``POST /contacts/invites`` per user: an invitation lands in somebody else's app."""
+    diagnostics_rate_limit_per_hour: int = Field(default=60, ge=1)
+    """``POST /diagnostics`` per user: each call stores up to 64 KB and may write a security
+    event, so an account must not be able to fill the database with them. A client reports one
+    failed connect per session; the NAT prototype tool sends ten pairs per run."""
 
     admin_login_rate_limit_per_minute: int = Field(default=10, ge=1)
     """``POST /admin/login`` (the web dashboard) per client IP. The per-email bucket and the

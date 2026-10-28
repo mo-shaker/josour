@@ -40,6 +40,7 @@ class SettingsService:
         *,
         actor_user_id: uuid.UUID | None = None,
         ip: str | None = None,
+        via: str | None = None,
     ) -> AppSettings:
         """Upsert the keys present in ``patch``. Commits and invalidates the cache."""
         changes = patch.model_dump(mode="json", exclude_unset=True, exclude_none=True)
@@ -52,12 +53,15 @@ class SettingsService:
             else:
                 row.value = value
         if changes:
+            details: dict[str, Any] = {"changes": changes}
+            if via is not None:
+                details["via"] = via
             record_event(
                 db,
                 SecurityEventType.SETTINGS_CHANGED,
                 user_id=actor_user_id,
                 ip=ip,
-                details={"changes": changes},
+                details=details,
             )
         await db.commit()
         self.invalidate()

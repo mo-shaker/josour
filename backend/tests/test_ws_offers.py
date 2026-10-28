@@ -1,10 +1,12 @@
 """Offers: a host offering its connection to a contact (ADR-0014, docs/ws-protocol.md 5b)."""
 
+import asyncio
 import base64
 import uuid
 from dataclasses import dataclass
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import ConnectionRequest, Device, Session
@@ -244,3 +246,53 @@ async def test_an_offer_cannot_be_answered_with_request_frames(
     assert (await scene.host_ws.expect("error", skip=NOISE))["code"] == "not_found"
     row = await db.get(ConnectionRequest, uuid.UUID(offer_id))
     assert row is not None and row.status == RequestStatus.PENDING
+
+
+async def test_only_a_device_with_the_capability_may_accept(
+    ws_connect: WsFactory, make_actor: ActorFactory, db: AsyncSession, access_token
+) -> None:
+    """Section 10: a device that never declared ``offers`` is never rung, and cannot answer an
+    offer by guessing its id either."""
+    scene = await _scene(ws_connect, make_actor, db, access_token, phone_caps=[])
+    offer_id = await _offer(scene)
+    await scene.phone_ws.send({"type": "offer.accept", "ref": "p1", "offer_id": offer_id})
+    error = await scene.phone_ws.expect("error", skip=NOISE)
+    assert (error["code"], error["ref"]) == ("forbidden", "p1")
+    row = await db.get(ConnectionRequest, uuid.UUID(offer_id))
+    assert row is not None and row.status == RequestStatus.PENDING
+
+
+async def test_two_devices_accepting_at_once_open_one_session(
+    ws_connect: WsFactory, make_actor: ActorFactory, db: AsyncSession, access_token
+) -> None:
+    """The acceptance is a conditional claim: exactly one device wins, the other is told
+    ``not_found`` (and ``offer.closed(accepted_elsewhere)``), and nothing fails with a 500-style
+    ``internal``."""
+    scene = await _scene(ws_connect, make_actor, db, access_token)
+    offer_id = await _offer(scene)
+    results = await asyncio.gather(
+        offer_service.accept(
+            offer_id=uuid.UUID(offer_id),
+            user_id=scene.guest.user.id,
+            device_id=scene.guest.device.id,
+            ref="l1",
+        ),
+        offer_service.accept(
+            offer_id=uuid.UUID(offer_id),
+            user_id=scene.guest.user.id,
+            device_id=scene.phone.id,
+            ref="p1",
+        ),
+        return_exceptions=True,
+    )
+    errors = [r for r in results if isinstance(r, BaseException)]
+    assert len(errors) == 1 and getattr(errors[0], "code", None) == "not_found", results
+
+    db.expire_all()
+    sessions = list(
+        await db.scalars(select(Session).where(Session.request_id == uuid.UUID(offer_id)))
+    )
+    assert len(sessions) == 1
+    row = await db.get(ConnectionRequest, uuid.UUID(offer_id))
+    assert row is not None and row.status == RequestStatus.ACCEPTED
+    assert row.guest_device_id == sessions[0].guest_device_id
