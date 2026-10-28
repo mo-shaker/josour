@@ -6,6 +6,8 @@ on:
     paths: ["client/**", ".github/workflows/ci-client.yml"]
   pull_request:
     paths: ["client/**", ".github/workflows/ci-client.yml"]
+  # By hand, from the Actions tab: everything above plus the soak and deep-fuzz job below.
+  workflow_dispatch:
 
 jobs:
   build-test:
@@ -26,10 +28,12 @@ jobs:
         run: dotnet test Josour.sln --no-build -c Release --filter "Category!=Benchmark" --logger "trx;LogFileName=results.trx"
 
       # Throughput and timing on a shared runner: the numbers are for reading, so a missed criterion warns rather than
-      # failing the job (and skipping the QA artifact below).
+      # failing the job (and skipping the QA artifact below). Only the mux measurements: the rest of the Benchmark
+      # category is the soak and the deep fuzz, over an hour on a runner, and runs in the `soak` job when asked for.
       - name: Mux benchmarks (informational, ADR-0006 criteria)
         continue-on-error: true
-        run: dotnet test tests/Josour.Tunnel.Tests --no-build -c Release --filter "Category=Benchmark" --logger "console;verbosity=detailed"
+        timeout-minutes: 15
+        run: dotnet test tests/Josour.Tunnel.Tests --no-build -c Release --filter "Category=Benchmark&FullyQualifiedName~Josour.Tunnel.Tests.Mux.MuxBenchmarks" --logger "console;verbosity=detailed"
       # The same single self-contained Josour.exe a user is given (scripts/publish-exe.ps1 refuses a publish that
       # leaves anything beside it). Releases come from release-client.yml; this one is for QA of a commit.
       - name: Publish Josour.exe (unsigned, artifact for QA)
@@ -77,3 +81,19 @@ jobs:
           for p in Core Tunnel Proxy Egress Infrastructure E2E; do
             dotnet test tests/Josour.$p.Tests -c Release --filter "Category!=Benchmark"
           done
+
+  soak:
+    # The long runs (docs/soak-and-fuzz-week6.md): soak, deep fuzz and the WAN measurements. By hand only.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Soak, deep fuzz and benchmarks
+        run: dotnet test tests/Josour.Tunnel.Tests -c Release --filter "Category=Benchmark" --logger "console;verbosity=detailed"

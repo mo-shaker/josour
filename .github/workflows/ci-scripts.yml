@@ -1,0 +1,21 @@
+name: ci-scripts
+
+# The shell scripts people run on their servers and to release, and the one version number they rely on.
+
+on:
+  push:
+    paths: ["deploy/**", "scripts/**", "**/pyproject.toml", "relay/relay/__init__.py", "client/src/Josour.App/Josour.App.csproj", ".github/workflows/ci-scripts.yml"]
+  pull_request:
+    paths: ["deploy/**", "scripts/**", "**/pyproject.toml", "relay/relay/__init__.py", "client/src/Josour.App/Josour.App.csproj", ".github/workflows/ci-scripts.yml"]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: One version everywhere
+        run: scripts/check-versions.sh
+      - name: shellcheck
+        run: shellcheck -S warning deploy/install.sh deploy/backup/backup.sh deploy/backup/restore.sh scripts/release.sh scripts/check-versions.sh scripts/publish-app.sh
+      - name: The installer's help runs
+        run: bash deploy/install.sh --help

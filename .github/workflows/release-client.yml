@@ -1,11 +1,18 @@
 name: release-client
 
-# The installable clients, attached to a GitHub Release (ADR-0011: unsigned):
-#   Josour-<version>-win-x64.exe   one self-contained file (scripts/publish-exe.ps1)
-#   Josour-<version>-arm64.dmg     Apple Silicon (scripts/publish-app.sh --dmg)
-#   Josour-<version>-x64.dmg       Intel Macs   (scripts/publish-app.sh --dmg --arch x64)
-# Run it from the Actions tab (it releases the version in client/src/Josour.App/Josour.App.csproj as v<version>),
-# or push a tag v<version>. Running it again for the same version replaces the files on that release.
+# The installable clients, attached to a GitHub Release (ADR-0011: unsigned). docs/releasing.md has the whole
+# procedure; in short, `scripts/release.sh X.Y.Z && git push origin main vX.Y.Z`.
+#
+# Each release carries every file twice: under its version, and under a fixed name that the links in the README
+# use, so that https://github.com/<owner>/<repo>/releases/latest/download/Josour-win-x64.exe is always the newest.
+#   Josour-<version>-win-x64.exe   and  Josour-win-x64.exe        Windows 10/11, one self-contained file
+#   Josour-<version>-arm64.dmg     and  Josour-macos-arm64.dmg    Apple silicon
+#   Josour-<version>-x64.dmg       and  Josour-macos-x64.dmg      Intel Macs
+#   SHA256SUMS.txt                                                the SHA-256 of each file above
+#
+# Started by pushing a tag v<version>, or by hand from the Actions tab (it then releases the version in the
+# project files as v<version>). A version that has been released from one commit is never rebuilt from another:
+# a run for an existing tag that points elsewhere fails and asks for a new version.
 
 on:
   push:
@@ -28,10 +35,15 @@ jobs:
       - uses: actions/checkout@v4
       - id: read
         run: |
-          version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' client/src/Josour.App/Josour.App.csproj | head -1)"
-          [ -n "$version" ] || { echo "::error::no <Version> in Josour.App.csproj"; exit 1; }
+          version="$(scripts/check-versions.sh)"
           if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "v$version" ]; then
             echo "::error::tag ${GITHUB_REF_NAME} does not match the project version v$version"; exit 1
+          fi
+          # The commit an existing tag names (peeled, for an annotated tag); empty when there is no such tag.
+          tagged="$(git ls-remote origin "refs/tags/v$version^{}" "refs/tags/v$version" | awk 'NR==1 || /\^\{\}$/ {sha=$1} END {print sha}')"
+          if [ -n "$tagged" ] && [ "$tagged" != "$GITHUB_SHA" ]; then
+            echo "::error::v$version was already released from ${tagged}. Give this commit a new version: scripts/release.sh <next version>"
+            exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
@@ -48,10 +60,17 @@ jobs:
         run: |
           ./scripts/publish-exe.ps1 -Output publish/exe
           Copy-Item client/publish/exe/Josour.exe "Josour-${{ needs.version.outputs.version }}-win-x64.exe"
+          Copy-Item client/publish/exe/Josour.exe "Josour-win-x64.exe"
+          # The version Windows shows under Properties > Details should be the release's.
+          $shown = (Get-Item "Josour-win-x64.exe").VersionInfo.ProductVersion
+          Write-Output "the exe reports version $shown"
+          if (-not "$shown".StartsWith("${{ needs.version.outputs.version }}")) {
+            Write-Output "::warning::Josour-win-x64.exe reports version '$shown', not ${{ needs.version.outputs.version }}"
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: Josour-*-win-x64.exe
+          path: Josour-*win-x64.exe
 
   macos:
     needs: version
@@ -63,9 +82,12 @@ jobs:
           dotnet-version: "8.0.x"
       - name: Build the disk images
         run: |
+          v="${{ needs.version.outputs.version }}"
           scripts/publish-app.sh --arch arm64 --dmg
           scripts/publish-app.sh --arch x64 --dmg
-          cp client/publish/mac/Josour-*.dmg .
+          cp "client/publish/mac/Josour-$v-arm64.dmg" "client/publish/mac/Josour-$v-x64.dmg" .
+          cp "Josour-$v-arm64.dmg" Josour-macos-arm64.dmg
+          cp "Josour-$v-x64.dmg" Josour-macos-x64.dmg
       - uses: actions/upload-artifact@v4
         with:
           name: macos
@@ -75,10 +97,38 @@ jobs:
     needs: [version, windows, macos]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: assets
           merge-multiple: true
+      - name: Checksums and release notes
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          (cd assets && sha256sum Josour-* > SHA256SUMS.txt && cat SHA256SUMS.txt)
+          # This version's section of CHANGELOG.md, then what every release says.
+          awk -v v="$VERSION" '$0 ~ "^## " v "([^0-9.]|$)" {on = 1; next} /^## / {on = 0} on' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Josour $VERSION." > notes.md
+          repo="https://github.com/${GITHUB_REPOSITORY}"
+          cat >> notes.md <<EOF
+
+          ## Download
+
+          | | File |
+          |---|---|
+          | Windows 10/11 (64-bit) | [Josour-$VERSION-win-x64.exe]($repo/releases/download/v$VERSION/Josour-$VERSION-win-x64.exe) |
+          | Mac with Apple silicon (M1 and later) | [Josour-$VERSION-arm64.dmg]($repo/releases/download/v$VERSION/Josour-$VERSION-arm64.dmg) |
+          | Mac with an Intel processor | [Josour-$VERSION-x64.dmg]($repo/releases/download/v$VERSION/Josour-$VERSION-x64.dmg) |
+
+          The builds are unsigned (ADR-0011). Windows: "Windows protected your PC" → **More info** → **Run anyway**.
+          macOS: right-click the app → **Open** the first time (macOS 15: System Settings → Privacy & Security → **Open Anyway**).
+          Check a file against \`SHA256SUMS.txt\` before you pass it on.
+
+          Server: a new server installs with one command, and \`sudo bash /opt/josour/deploy/install.sh\` updates an
+          existing one to this release ([docs/install-server.md]($repo/blob/v$VERSION/docs/install-server.md)).
+          EOF
+          cat notes.md
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -87,8 +137,8 @@ jobs:
           ls -l assets
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$TAG" assets/* --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit "$TAG" --notes-file notes.md --repo "$GITHUB_REPOSITORY"
           else
             gh release create "$TAG" assets/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-              --title "Josour $TAG" \
-              --notes "Unsigned builds (ADR-0011). Windows: SmartScreen → More info → Run anyway. macOS: right-click the app → Open the first time. Installation: docs/self-hosting.md."
+              --title "Josour $TAG" --notes-file notes.md --latest
           fi
