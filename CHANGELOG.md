@@ -6,6 +6,8 @@ Every release of Josour: the apps, the server and the relay share one version nu
 
 ## Unreleased
 
+## 2.1.0 - 2026-10-28
+
 ### Install and release
 - **A server installs with one command** on a fresh Ubuntu or Debian machine: `deploy/install.sh` asks for the name,
   an email and the administrator's password, and sets up the firewall, Docker, the certificate, the secrets, the relay
