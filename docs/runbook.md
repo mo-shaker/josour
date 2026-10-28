@@ -32,6 +32,9 @@ curl -fsSL https://get.docker.com | sh
 
 ## 2. The first deployment
 
+`sudo bash deploy/install.sh` (fetched as in [install-server.md](install-server.md)) does all of this section and the
+relay on 8443, on Ubuntu or Debian. By hand:
+
 ```bash
 git clone https://github.com/mo-shaker/josour.git /opt/josour && cd /opt/josour/deploy
 cp .env.example .env && chmod 600 .env
@@ -86,10 +89,14 @@ environment from scratch, and it does not touch the relay stack.
 
 ## 4. Upgrading
 
+Production servers follow release tags ([releasing.md](releasing.md)). `sudo bash /opt/josour/deploy/install.sh`
+backs up, checks out the newest tag and rebuilds both stacks; by hand:
+
 ```bash
-cd /opt/josour && git pull
-cd deploy
+cd /opt/josour/deploy
 docker compose exec backup /usr/local/bin/backup.sh     # a backup first
+cd /opt/josour && git fetch --tags && git checkout "$(git tag -l 'v*' --sort=-v:refname | head -1)"
+cd deploy
 docker compose up -d --build
 docker compose logs --tail=50 api
 # if the relay runs on this machine:

@@ -62,25 +62,45 @@ See [licensing and distribution](docs/licensing.md) for details and an Arabic su
 | `backend/` | Control server: Python 3.12 + FastAPI + PostgreSQL + WebSockets |
 | `client/` | .NET 8 solution: tunnel, proxy and egress libraries + the Avalonia app ([ADR-0013](docs/decisions/0013-avalonia-and-macos.md)) |
 | `relay/` | Relay service: pairs the two ends of a session and pumps opaque bytes ([ADR-0009](docs/decisions/0009-relay-default.md)) |
-| `deploy/` | Production Docker Compose (Caddy + API + PostgreSQL + backups) and a **standalone relay** |
+| `deploy/` | The one-command installer (`install.sh`), production Docker Compose (Caddy + API + PostgreSQL + backups) and a **standalone relay** |
 | `docs/` | Implementation plan, the frozen contracts (REST / WebSocket / channel protocol), ADRs, runbook |
 
-## Install it and use it
+## Download the app
 
-**[docs/self-hosting.md](docs/self-hosting.md)** is the complete guide: from an empty VPS to a running server, then
-the app on two machines, then a session you can verify.
-
-**There is a Windows app and a macOS app**, and they are the same application — one codebase, one interface, both
-roles (host and guest) on both systems ([ADR-0013](docs/decisions/0013-avalonia-and-macos.md)):
-
-| | Windows | macOS |
+| Windows 10/11 | Mac with Apple silicon (M1 and later) | Mac with an Intel processor |
 |---|---|---|
-| Build it | `scripts\publish-exe.ps1` → one `Josour.exe` | `scripts/publish-app.sh --dmg` → `Josour.app` + a `.dmg` |
-| Needs .NET installed on the user's machine? | No | No |
-| First launch, once per machine | SmartScreen: **More info → Run anyway** | Gatekeeper: **right-click → Open → Open** |
+| **[Josour-win-x64.exe](https://github.com/mo-shaker/josour/releases/latest/download/Josour-win-x64.exe)** | **[Josour-macos-arm64.dmg](https://github.com/mo-shaker/josour/releases/latest/download/Josour-macos-arm64.dmg)** | **[Josour-macos-x64.dmg](https://github.com/mo-shaker/josour/releases/latest/download/Josour-macos-x64.dmg)** |
 
-Both are unsigned by decision ([ADR-0011](docs/decisions/0011-no-code-signing-certificate.md)); the Windows build
-prints a SHA-256 to check the file by.
+These links always give the newest release; every version, its notes and a `SHA256SUMS.txt` to check the files
+against are on the [Releases page](https://github.com/mo-shaker/josour/releases), and what changed is in
+[CHANGELOG.md](CHANGELOG.md). Nothing else needs installing: .NET travels inside each file. They are the same
+application — one codebase, one interface, both roles (host and guest) on both systems
+([ADR-0013](docs/decisions/0013-avalonia-and-macos.md)).
+
+Both are unsigned by decision ([ADR-0011](docs/decisions/0011-no-code-signing-certificate.md)), so the first launch,
+once per machine, needs one extra click: on Windows, SmartScreen → **More info → Run anyway**; on a Mac,
+**right-click → Open → Open** (macOS 15: System Settings → Privacy & Security → **Open Anyway**).
+
+The app needs a Josour server to sign in to. Nobody runs a public one: you install your own, below.
+
+## Install a server
+
+On a fresh Ubuntu 24.04 server whose name already points at it, one command does everything — firewall, Docker,
+certificate, secrets, the relay, the administrator and the daily backups — and the same command updates it later:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mo-shaker/josour/main/deploy/install.sh -o josour-install.sh
+sudo bash josour-install.sh
+```
+
+- **[docs/install-server.md](docs/install-server.md)** ([بالعربية](docs/install-server.ar.md)) — step by step, for
+  someone who has never run a server: renting it, naming it, the command, the dashboard, the apps, a first session.
+- **[docs/self-hosting.md](docs/self-hosting.md)** — the same by hand, with the reasons for every step; rebuilding an
+  existing server, restoring a backup, a relay on a machine of its own, and troubleshooting.
+- **[docs/releasing.md](docs/releasing.md)** — publishing a new version of the apps and the server.
+
+To build the apps yourself instead: `scripts\publish-exe.ps1` on Windows (one `Josour.exe`), `scripts/publish-app.sh
+--dmg` on a Mac (`Josour.app` and a `.dmg`).
 
 **Status:** a full session between two machines on different networks has been working since 2026-09-09 (milestone
 M2). Latest report: [docs/status-week7.md](docs/status-week7.md).
@@ -95,8 +115,8 @@ a change to a tool that carries other people's traffic means reading every line 
 egress policy, and I do not have the time to do that properly. Fork it and change it as you like
 ([Apache-2.0](LICENSE)).
 
-**Nobody runs a public relay.** Anyone who wants to use this hosts their own server and relay; the complete guide
-is [docs/self-hosting.md](docs/self-hosting.md).
+**Nobody runs a public relay.** Anyone who wants to use this hosts their own server and relay; the installer above
+sets up both ([docs/install-server.md](docs/install-server.md)).
 
 **macOS is supported in both roles** — host and guest — and so is Windows. What has not been tried yet: a real
 session between a Mac and a Windows machine, which needs two machines; every piece of it is exercised separately.

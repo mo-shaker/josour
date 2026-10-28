@@ -13,6 +13,11 @@ get past the operating system's warning about software nobody paid to sign.
 > **Read [the host's responsibility in the README](../README.md) before you run this for anyone.** You are about to
 > make your home's address the exit for someone else's browsing.
 
+> **The quick way.** [`deploy/install.sh`](../deploy/install.sh) performs parts 2 and 3 of this guide by itself on a
+> fresh Ubuntu or Debian server — asking only for the name, an email and the administrator's password — and running
+> it again updates the server. [install-server.md](install-server.md) ([بالعربية](install-server.ar.md)) walks through
+> it for someone who has never run a server. This guide is the manual equivalent, with the reasons behind each step.
+
 Throughout, `josour.example.com` stands for your server's name and `you@example.com` for your email. Replace both.
 Every server command runs as `root` (on a machine where you log in as another user, run `sudo -i` first).
 
@@ -409,24 +414,17 @@ Both apps are the same program: the same screens, both roles, the same server.
 ### 4.1 Getting a build
 
 The builds come from the repository's **`release-client`** GitHub Actions workflow, which attaches them to a GitHub
-Release:
+Release ([releasing.md](releasing.md) is how to publish one). Download from the repository's **Releases** page
+(`https://github.com/mo-shaker/josour/releases`), or straight from these links, which always give the newest:
 
-- **To produce one:** the repository → **Actions** → **release-client** → **Run workflow**; or push a version tag:
+| File | For |
+|---|---|
+| [`Josour-win-x64.exe`](https://github.com/mo-shaker/josour/releases/latest/download/Josour-win-x64.exe) | Windows 10/11, 64-bit. One self-contained file: nothing else to install |
+| [`Josour-macos-arm64.dmg`](https://github.com/mo-shaker/josour/releases/latest/download/Josour-macos-arm64.dmg) | Macs with Apple silicon (M1 and later) |
+| [`Josour-macos-x64.dmg`](https://github.com/mo-shaker/josour/releases/latest/download/Josour-macos-x64.dmg) | Intel Macs |
 
-  ```bash
-  git tag v2.0.0 && git push origin v2.0.0
-  ```
-
-- **To download:** the repository's **Releases** page (`https://github.com/mo-shaker/josour/releases`) → the newest
-  release:
-
-  | File | For |
-  |---|---|
-  | `Josour-2.0.0-win-x64.exe` | Windows 10/11, 64-bit. One self-contained file: nothing else to install |
-  | `Josour-2.0.0-arm64.dmg` | Macs with Apple silicon (M1 and later) |
-  | `Josour-2.0.0-x64.dmg` | Intel Macs |
-
-  The .NET runtime travels inside each of them.
+Each release also carries the same files under their version (`Josour-2.1.0-win-x64.exe`, …) and a
+`SHA256SUMS.txt`. The .NET runtime travels inside each of them.
 
 To build one yourself instead (needs the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)):
 `powershell -ExecutionPolicy Bypass -File scripts\publish-exe.ps1` on Windows, `scripts/publish-app.sh --dmg` on a Mac
@@ -436,8 +434,8 @@ output for the native libraries a plain publish leaves behind.
 **Verify what you hand to someone else.** The files are unsigned — a decision, not an omission
 ([ADR-0011](decisions/0011-no-code-signing-certificate.md)). A signature proves a file came from someone who bought a
 certificate; **a hash proves it is this exact file**. `Get-FileHash .\Josour-2.0.0-win-x64.exe -Algorithm SHA256`
-(Windows) or `shasum -a 256 Josour-2.0.0-*.dmg` (macOS), and compare it with the sender **over a call or a direct
-message — not the channel the file arrived on**.
+(Windows) or `shasum -a 256 Josour-2.0.0-*.dmg` (macOS), and compare it with the release's `SHA256SUMS.txt`, or with
+the sender **over a call or a direct message — not the channel the file arrived on**.
 
 ### 4.2 Reinstalling over an older app
 
@@ -604,10 +602,21 @@ direct path. In the dashboard, *Sessions* lists the session with its end reason.
 
 ### 7.1 Updating
 
+Servers follow **release tags** ([releasing.md](releasing.md)), not every commit on `main`. The simplest way, whether
+or not the server was installed with it:
+
 ```bash
-cd /opt/josour && git pull
-cd deploy
+sudo bash /opt/josour/deploy/install.sh
+```
+
+It keeps `.env` as it is, takes a backup, checks out the newest release, rebuilds both stacks and waits for them to
+be healthy. By hand, the same:
+
+```bash
+cd /opt/josour/deploy
 docker compose exec backup /usr/local/bin/backup.sh           # a backup before anything changes
+cd /opt/josour && git fetch --tags && git checkout "$(git tag -l 'v*' --sort=-v:refname | head -1)"
+cd deploy
 docker compose up -d --build                                  # rebuilds api; migrations run as it starts
 docker compose -p josour-relay --env-file .env.relay -f docker-compose.relay.yml up -d --build   # if the relay runs here
 docker compose ps && curl -s https://josour.example.com/healthz
