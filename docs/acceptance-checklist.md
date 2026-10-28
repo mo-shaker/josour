@@ -6,7 +6,9 @@ The items' source: section 16 of the product document.
 
 Client 2.0 replaced the work browser with the guest's system proxy
 ([ADR-0015](decisions/0015-system-proxy-instead-of-work-browser.md)), so items 7, 9, 10, 11, 12 and 13 below are
-re-worded for it; the first round underneath stays as it was recorded. Install from
+re-worded for it. The first round underneath keeps its recorded results; the rows that were still open when 2.0
+shipped (10, 12, 13, 15 and 16) are re-worded there too, since a check written for the work browser can no longer pass
+or fail. Install from
 [self-hosting.md](self-hosting.md) and test with two machines on two different networks, one Windows and one Mac if
 you have both. Record each result with its date and the log line that shows it.
 
@@ -73,13 +75,13 @@ acceptance list half of which is guesswork is worse than an empty one.
 | 7 | Launching the work browser | A Chrome window with an independent profile opens on the check page | ✅ **yes** | Three times, the last on 2026-09-10 10:46:12 — **10 milliseconds** between launching the browser and `is fully active` |
 | 8 | The browsing passing through the host | The check page shows the host's IP; the actual browsing leaves from their address | ✅ **yes** | On the "all sites" build: **35,829,636 bytes down and 197,041 up** in 86 seconds. And the project owner's confirmation that the connection works well on both machines |
 | 9 | The host's IP address appearing | The work browser shows the host's IP; the ordinary browser shows the user's IP | ⚠️ **partial** | The first half is verified. **The second half** (the ordinary browser showing the guest's address at the same moment) is undocumented |
-| 10 | The user's other applications being unaffected | Teams/Outlook and the ordinary browser on the user's IP; no change to the system proxy | ⬜ untested | Guaranteed by design (the owning-PID check, and no touching of the system proxy) but **not verified by hand** |
+| 10 | What does and does not go through the host (re-worded for 2.0) | During a session, every program that follows the system proxy (any browser, Teams/Outlook if set to use it) shows the host's address; a program that ignores the system proxy, and UDP (WebRTC), stay on the guest's own | ⬜ untested | Since [ADR-0015](decisions/0015-system-proxy-instead-of-work-browser.md) the change is device-wide by design: the system proxy points at `127.0.0.1:<port>` for the session only, and on Windows the local proxy admits only processes of the same Windows account. The old wording ("other applications unaffected", the owning-PID check) described the 1.x work browser |
 | 11 | Disconnecting from either side | The host's disconnect button closes the user's browser, and the reverse | ✅ **yes** | **Both directions recorded**: `reason=host_ended` twice and `reason=guest_ended` twice |
-| 12 | The session ending automatically when its duration runs out | A 15-minute session ends with `expired` ± 5 seconds and the browser closes | ⬜ untested | No `reason=expired` in any log; every session was ended by hand or by a failure |
-| 13 | Restoring the browser's settings after termination | No proxy in the system settings; ordinary Chrome with no "did not shut down correctly" | ⬜ untested | — |
+| 12 | The session ending automatically when its duration runs out | A 15-minute session ends with `expired` ± 5 seconds and the guest's proxy setting is back to what it was (round 2, item 2.9) | ⬜ untested | No `reason=expired` in any log; every session was ended by hand or by a failure |
+| 13 | Restoring the system proxy after termination (re-worded for 2.0) | After a normal end, a crash and a power cut (round 2, items 2.8, 2.10, 2.11): the proxy settings are exactly as before the session, and `system-proxy.json` is gone from the data folder | ⬜ untested | The restore paths are listed in ADR-0015 point 2; a user's own change made during the session must survive the restore |
 | 14 | Recording the session's basic data | A complete `sessions` row: the times, the reason, the bytes; and `session_domains` when `log_domains` is on | ⚠️ **partial** | The client sent `session.end` with real numbers: `bytes_up=197041 bytes_down=35829636 domains=0` (and `domains=0` is correct because `log_domains=false`). **The database rows were not inspected directly** |
-| 15 | Stopping the user reaching the host's machine or network | From the work browser: `192.168.1.1`, `localhost`, `[::1]` and the host's public IP are all refused | ⬜ not tested by hand | Covered by 59 automated tests in `Josour.Egress.Tests` + `IpRangePolicy`, but **the manual check is required** |
-| 16 | The server cannot read browsing data, and it does not pass through the API container | Two parts, during a video in the work browser: `docker stats api` stays at the heartbeat level, and `docker stats relay` rises with **opaque** traffic — bytes with not one domain name in the relay's log | ⬜ untested | The wording was adopted on 2026-09-09 ([ADR-0009](decisions/0009-relay-default.md)); the measurement has not been made yet |
+| 15 | Stopping the user reaching the host's machine or network | From any browser on the guest during a session: `192.168.1.1`, `localhost`, `[::1]` and the host's public IP are all refused (round 2, item 2.14) | ⬜ not tested by hand | Covered by 59 automated tests in `Josour.Egress.Tests` + `IpRangePolicy`, but **the manual check is required** |
+| 16 | The server cannot read browsing data, and it does not pass through the API container | Two parts, during a video in any browser on the guest during a session: `docker stats api` stays at the heartbeat level, and `docker stats relay` rises with **opaque** traffic — bytes with not one domain name in the relay's log | ⬜ untested | The wording was adopted on 2026-09-09 ([ADR-0009](decisions/0009-relay-default.md)); the measurement has not been made yet |
 | 17 | Native WebSocket persisting throughout | 8 hours; `presence.connected=true`; reconnection after a 30-second cut | ⚠️ **partial** | **Reconnection is verified**: on 2026-09-10 at 11:01:15 the channel dropped, and at 11:01:18 it came back — **2.7 seconds, one attempt** — and during it the network address changed **and** the server answered 4401, so the token was refreshed automatically. **The eight hours were not tested** (the longest documented run is about two hours) |
 | 18 | The system working on a small VPS | Production on 1 vCPU / 2 GB; CPU < 20% and RAM < 60% with 20 clients | ⚠️ **partial** | It actually runs on a VPS of that specification with API + relay + PostgreSQL. **Not measured under 20 clients** |
 
@@ -138,7 +140,7 @@ The TLS handshake, the certificate pinning and `AUTH1`/`AUTH2` run **between the
 stream. The relay pumps the bytes and does not decrypt them: it holds no key, and sees not one domain name. What the
 server's operator sees is ciphertext, traffic sizes and timings.
 
-### How it is measured — two parts, during a video in the work browser
+### How it is measured — two parts, during a video played through a session
 
 | Part | Command | Expected |
 |---|---|---|
@@ -188,13 +190,14 @@ sessions.
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\acceptance-round.ps1 -Phase during
 ```
-Then, in the **work browser**, five tabs: `https://api.ipify.org` (the host's address must appear), then
-`http://192.168.1.1/`, `http://localhost/`, `http://[::1]/` and the host's public address — **all four are refused**.
+Then, in **any browser** (the session points the system proxy at Josour), five tabs: `https://api.ipify.org` (the
+host's address must appear), then `http://192.168.1.1/`, `http://localhost/`, `http://[::1]/` and the host's public
+address — **all four are refused**.
 
-And open Teams or Outlook and confirm they work.
+And open Teams or Outlook and note which address they use: through the host if they follow the system proxy.
 
-> **The one screenshot that closes item 9:** the work browser and your ordinary browser side by side, both on
-> `api.ipify.org`, **with two different numbers**. Two numbers in one picture are stronger than any line in a log.
+> **The one screenshot that closes item 9:** `api.ipify.org` in a browser during the session and again after it ends,
+> **with two different numbers** — the host's, then your own.
 
 ### After the duration ends on its own
 
@@ -202,13 +205,17 @@ And open Teams or Outlook and confirm they work.
 powershell -ExecutionPolicy Bypass -File scripts\acceptance-round.ps1 -Phase after
 ```
 
-It reads the end reason from the log (item 12 closes with `reason=expired`), and checks that the work browser exited
-cleanly (item 13). It remains for you to open the proxy settings in Windows and see them empty.
+It reads the end reason from the log (item 12 closes with `reason=expired`). For item 13, open the proxy settings
+(Windows: *Settings → Network → Proxy*; macOS: *System Settings → Network → (service) → Proxies*) and compare them
+with what the `before` phase recorded: they must be the same, and `system-proxy.json` must be gone from the data folder.
 
 ### What the tool does and the eye cannot
 
-A deliberate connection to the proxy's port **must be refused**: the proxy accepts only the work browser's process
-tree. The refusal here is not a defect but **item 10 succeeding**, and the tool records it as an explicit verdict.
+`during` checks that the system proxy points at Josour and that the script's own request — which follows the system
+proxy as a browser does — leaves from the host's address, not the one `before` recorded. It then asks the local proxy
+for a port other than 80/443, an address literal, `192.168.1.1` and `localhost`, and every one must be refused
+(ADR-0015 point 3). `after` compares the proxy settings with the `before` baseline field by field and checks that
+`system-proxy.json` is gone (item 13).
 
 ## Additional security checks (from section 14 of the document)
 
@@ -217,9 +224,9 @@ tree. The refusal here is not a defect but **item 10 succeeding**, and the tool 
 | The listener accepts nothing but TLS and cuts off without authentication | `nmap -sV` on the host's port during the connect window | ⬜ untested — **and note**: with the relay no listener is opened at all, so the check applies to the direct path alone |
 | Deleting the session keys | `select count(*) from session_keys` = 0 after termination | ⬜ not checked on this deployment |
 | No browsing content in the logs | grep in the server's and the client's logs: no URLs and no headers | ⚠️ The client's logs were checked repeatedly during diagnosis and carried no link; the server's logs were not checked |
-| An enterprise proxy policy | Enabling `ProxySettings` through the registry → the session ends with `browser_not_proxied` | ⬜ untested |
+| An enterprise proxy policy | Windows: `ProxySettingsPerUser=0` under `HKLM\SOFTWARE\Policies\Microsoft\Windows\CurrentVersion\Internet Settings` → the guest's session ends with `system_proxy_failed` (`policy_locked`) before anything is browsed | ⬜ untested |
 | Account lockout and rate limiting | 10 wrong attempts → 423; exceeding the limit → 429 | ⚠️ Observed in practice: four wrong sign-in attempts returned `401 invalid_credentials` as designed |
-| Central termination | `POST /admin/sessions/{id}/terminate` closes the tunnel and the browser within 5 seconds | ⬜ untested |
+| Central termination | `POST /admin/sessions/{id}/terminate` closes the tunnel within 5 seconds and the guest's proxy setting is put back | ⬜ untested |
 | **The relay token appears in no diagnostics and no log** | grep for the token in the client's log | ✅ Covered by an automated test (`TheRelayTokenNeverReachesTheDiagnostics`) and the diagnostic logs were free of it |
 
 ---
@@ -284,5 +291,5 @@ looks right to the eye**. This round needs a human who looks:
 |---|---|---|
 | A session from a Mac guest to a Windows host | The sites see the host's address | ⬜ |
 | A session from a Windows guest to a Mac host | As above | ⬜ |
-| **Criterion 10 on a Mac**: open Safari and Teams during a session | They stay on your own connection, and the `rejected_by_owner` counter rises if one of them tries the proxy | ⬜ |
-| Ending the session | The work browser and all its children close; `ps` shows no remnants | ⬜ |
+| **Criterion 10 on a Mac**: open Safari and Teams during a session | Safari (and Teams if it follows the system proxy) shows the host's address; macOS has no per-account admission, the listener is loopback-only | ⬜ |
+| Ending the session | Every enabled service's web and secure web proxy is back to what it was (*System Settings → Network → Proxies*), and `system-proxy.json` is gone | ⬜ |

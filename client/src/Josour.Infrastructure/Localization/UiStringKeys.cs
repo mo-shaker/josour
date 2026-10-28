@@ -397,6 +397,8 @@ public static class UiStringKeys
 
     public const string OfferResultCancelled = "OfferResultCancelled";
 
+    public const string OfferNoLongerAvailable = "OfferNoLongerAvailable";
+
     public const string OfferErrorGuestUnavailable = "OfferErrorGuestUnavailable";
 
     public const string ErrorNotContact = "ErrorNotContact";

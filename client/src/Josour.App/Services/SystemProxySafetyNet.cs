@@ -30,11 +30,37 @@ public sealed class SystemProxySafetyNet : ISystemProxySafetyNet
 
     private readonly ILogger _logger;
     private readonly string? _executable;
+    private readonly string? _entryAssembly;
 
-    public SystemProxySafetyNet(ILogger<SystemProxySafetyNet>? logger = null, string? executable = null)
+    public SystemProxySafetyNet(ILogger<SystemProxySafetyNet>? logger = null, string? executable = null, string? entryAssembly = null)
     {
         _logger = (ILogger?)logger ?? NullLogger.Instance;
         _executable = executable ?? Environment.ProcessPath;
+        _entryAssembly = entryAssembly ?? System.Reflection.Assembly.GetEntryAssembly()?.Location;
+    }
+
+    /// <summary>Is <paramref name="executable"/> the <c>dotnet</c> host (a <c>dotnet run</c> or <c>dotnet Josour.dll</c>), not Josour itself?</summary>
+    public static bool IsDotnetHost(string executable)
+    {
+        // Both separators on every system, so the answer does not depend on which one this process runs on.
+        var name = executable[(executable.LastIndexOfAny(new[] { '/', '\\' }) + 1)..];
+        return name.Equals("dotnet", StringComparison.OrdinalIgnoreCase) || name.Equals("dotnet.exe", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Why the restore at login must not point at <paramref name="executable"/>, or null when it may: a copy run straight from
+    /// the mounted disk image (gone at the next login), or the <c>dotnet</c> host (which would run the SDK, not Josour).
+    /// </summary>
+    public static string? TransientReason(string executable)
+    {
+        if (string.IsNullOrEmpty(executable)) return "the executable's path is unknown";
+        if (IsDotnetHost(executable)) return "the app runs through the dotnet host";
+        if (OperatingSystem.IsMacOS() && executable.StartsWith("/Volumes/", StringComparison.Ordinal))
+        {
+            return "the app runs from a mounted disk image, which will not be there at the next login";
+        }
+
+        return null;
     }
 
     public static string LaunchAgentPath => Path.Combine(
@@ -50,6 +76,13 @@ public sealed class SystemProxySafetyNet : ISystemProxySafetyNet
         }
 
         StartGuardian(marker);
+        if (TransientReason(_executable!) is { } transient)
+        {
+            // The guardian, the next start and "Repair internet settings" still cover this run.
+            _logger.LogWarning("No restore at the next login for this session: {Reason} ({Path})", transient, _executable);
+            return;
+        }
+
         try
         {
             if (OperatingSystem.IsWindows()) SetRunOnce();
@@ -80,6 +113,18 @@ public sealed class SystemProxySafetyNet : ISystemProxySafetyNet
             UseShellExecute = false,
             CreateNoWindow = true,
         };
+        if (IsDotnetHost(_executable!))
+        {
+            // dotnet run / dotnet Josour.dll: the host needs the app's assembly, or the guardian would be the SDK's help text.
+            if (string.IsNullOrEmpty(_entryAssembly))
+            {
+                _logger.LogWarning("Running through the dotnet host with no entry assembly: no guardian for this session");
+                return;
+            }
+
+            info.ArgumentList.Add(_entryAssembly);
+        }
+
         info.ArgumentList.Add(GuardianSwitch);
         info.ArgumentList.Add(marker.ProcessId.ToString(CultureInfo.InvariantCulture));
         info.ArgumentList.Add(marker.ProcessStartedAt.UtcTicks.ToString(CultureInfo.InvariantCulture));

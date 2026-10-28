@@ -92,6 +92,12 @@ public sealed class MacSystemProxyController : ISystemProxyController
     private readonly ICommandRunner _runner;
     private readonly ILogger _logger;
 
+    /// <summary>
+    /// The services the last capture saved. The change goes to exactly these, so a service enabled between the capture and
+    /// the change cannot end up pointed at us with nothing recorded to put it back.
+    /// </summary>
+    private volatile IReadOnlyList<string>? _captured;
+
     public MacSystemProxyController(ICommandRunner? runner = null, ILogger<MacSystemProxyController>? logger = null)
     {
         _runner = runner ?? SystemCommandRunner.Instance;
@@ -109,6 +115,7 @@ public sealed class MacSystemProxyController : ISystemProxyController
             saved.Add(await ReadServiceAsync(service, ct).ConfigureAwait(false)
                       ?? throw new SystemProxyException("read_failed", $"the proxy settings of \"{service}\" could not be read"));
         }
+        _captured = services;
         return new SystemProxySnapshot(PlatformName, JsonSerializer.Serialize(saved, Json));
     }
 
@@ -118,7 +125,7 @@ public sealed class MacSystemProxyController : ISystemProxyController
         var port = target.Port.ToString(CultureInfo.InvariantCulture);
         var bypass = BypassList(target.ExtraBypass);
         var commands = new List<string[]>();
-        foreach (var service in await EnabledServicesAsync(ct).ConfigureAwait(false))
+        foreach (var service in _captured ?? await EnabledServicesAsync(ct).ConfigureAwait(false))
         {
             // The "authenticated" argument is left out on purpose, here and in the restore: passing it would need the user's
             // proxy password, which we never hold, and leaving it out leaves that setting as it was.
@@ -136,7 +143,7 @@ public sealed class MacSystemProxyController : ISystemProxyController
     public async Task<bool> IsAppliedAsync(SystemProxyTarget target, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(target);
-        var services = await EnabledServicesAsync(ct).ConfigureAwait(false);
+        var services = _captured ?? await EnabledServicesAsync(ct).ConfigureAwait(false);
         foreach (var service in services)
         {
             var now = await ReadServiceAsync(service, ct).ConfigureAwait(false);
@@ -154,13 +161,36 @@ public sealed class MacSystemProxyController : ISystemProxyController
         }
 
         var saved = JsonSerializer.Deserialize<List<ServiceSettings>>(snapshot.Data, Json) ?? new List<ServiceSettings>();
+        var existing = await AllServicesAsync(ct).ConfigureAwait(false);
         var commands = new List<string[]>();
         foreach (var before in saved)
         {
             var now = await ReadServiceAsync(before.Service, ct).ConfigureAwait(false);
-            if (now is null) continue; // the service is gone; nothing of ours is left on it
+            if (now is null)
+            {
+                // Gone (removed, or renamed): nothing of ours is left under this name. Still there but unreadable (networksetup
+                // timing out after a wake) is a failed restore: skipping it would drop the marker with our proxy left on it.
+                if (existing.Contains(before.Service, StringComparer.Ordinal))
+                {
+                    throw new SystemProxyException("restore_failed", $"the proxy settings of \"{before.Service}\" could not be read to put them back");
+                }
+
+                continue;
+            }
+
             commands.AddRange(RestoreCommands(before, now, port));
         }
+
+        // A service the snapshot does not know (enabled after the capture, or renamed) that points at us anyway: there is
+        // nothing recorded to put back, so our proxy is simply turned off on it.
+        var known = new HashSet<string>(saved.Select(s => s.Service), StringComparer.Ordinal);
+        foreach (var service in existing.Where(s => !known.Contains(s)))
+        {
+            if (await ReadServiceAsync(service, ct).ConfigureAwait(false) is not { } now) continue;
+            if (now.Web.IsOurs(port)) commands.Add(new[] { "-setwebproxystate", service, "off" });
+            if (now.Secure.IsOurs(port)) commands.Add(new[] { "-setsecurewebproxystate", service, "off" });
+        }
+
         if (commands.Count == 0) return;
         await RunBatchAsync(commands, "restore_failed", ct).ConfigureAwait(false);
     }
@@ -168,10 +198,25 @@ public sealed class MacSystemProxyController : ISystemProxyController
     /// <summary>
     /// The commands that put one service back, field by field, touching only what still reads as ours: the user may have
     /// changed something during the session, and that change is theirs to keep.
+    /// <para>
+    /// The bypass list, PAC and auto-discovery carry no address of ours, so they are put back only while the web or the secure
+    /// proxy still points at us — a user who set up a proxy of their own mid-session keeps it, rather than finding PAC back on
+    /// over it. They go first, so a batch that fails halfway still finds a proxy of ours on the next attempt and redoes them.
+    /// </para>
     /// </summary>
     public static IEnumerable<string[]> RestoreCommands(ServiceSettings before, ServiceSettings now, int port)
     {
         var service = before.Service;
+        if (now.Web.IsOurs(port) || now.Secure.IsOurs(port))
+        {
+            if (IsOurBypass(now.Bypass) && !before.Bypass.SequenceEqual(now.Bypass))
+            {
+                yield return new[] { "-setproxybypassdomains", service }.Concat(before.Bypass.Count > 0 ? before.Bypass : new[] { "Empty" }).ToArray();
+            }
+            if (before.PacEnabled && !now.PacEnabled) yield return new[] { "-setautoproxystate", service, "on" };
+            if (before.AutoDiscovery && !now.AutoDiscovery) yield return new[] { "-setproxyautodiscovery", service, "on" };
+        }
+
         foreach (var (was, current, set, state) in new[]
                  {
                      (before.Web, now.Web, "-setwebproxy", "-setwebproxystate"),
@@ -186,13 +231,6 @@ public sealed class MacSystemProxyController : ISystemProxyController
             }
             yield return new[] { state, service, was.Enabled ? "on" : "off" };
         }
-
-        if (IsOurBypass(now.Bypass) && !before.Bypass.SequenceEqual(now.Bypass))
-        {
-            yield return new[] { "-setproxybypassdomains", service }.Concat(before.Bypass.Count > 0 ? before.Bypass : new[] { "Empty" }).ToArray();
-        }
-        if (before.PacEnabled && !now.PacEnabled) yield return new[] { "-setautoproxystate", service, "on" };
-        if (before.AutoDiscovery && !now.AutoDiscovery) yield return new[] { "-setproxyautodiscovery", service, "on" };
     }
 
     /// <summary>The bypass list a session applied, recognised by its fixed head (<see cref="BaseBypass"/>): only then is it ours to replace.</summary>
@@ -214,6 +252,26 @@ public sealed class MacSystemProxyController : ISystemProxyController
         }
         return ParseServices(result.Output);
     }
+
+    /// <summary>Every service, enabled or not (the asterisk of a disabled one removed).</summary>
+    private async Task<IReadOnlyList<string>> AllServicesAsync(CancellationToken ct)
+    {
+        var result = await _runner.RunAsync(NetworkSetup, new[] { "-listallnetworkservices" }, CommandTimeout, ct).ConfigureAwait(false);
+        if (!result.Succeeded || result.Output.Contains("** Error", StringComparison.Ordinal))
+        {
+            throw new SystemProxyException("read_failed", "networksetup could not list the network services: " + result.Output.Trim());
+        }
+        return ParseAllServices(result.Output);
+    }
+
+    /// <summary>Every service name in <c>-listallnetworkservices</c>, disabled ones included and without their asterisk.</summary>
+    public static IReadOnlyList<string> ParseAllServices(string output)
+        => output.Split('\n')
+            .Select(l => l.TrimEnd('\r'))
+            .Where(l => l.Length > 0 && !l.StartsWith("An asterisk", StringComparison.Ordinal))
+            .Select(l => l.StartsWith('*') ? l[1..] : l)
+            .Where(l => l.Length > 0)
+            .ToArray();
 
     /// <summary>The enabled services: the first line is a notice, a leading asterisk marks a disabled one.</summary>
     public static IReadOnlyList<string> ParseServices(string output)

@@ -156,7 +156,8 @@ public sealed partial class ContactsViewModel : ObservableObject
     public bool HasStatusMessage => StatusMessage.Length > 0;
 
     /// <summary>A request or an offer could be started now (connected, and nothing else is pending or running).</summary>
-    public bool CanStartSession => IsConnected && !IsWaiting && !HasPendingOffer && _sessions.Phase == SessionPhase.Idle;
+    /// <summary>Idle, or Ended: a finished session's summary does not hold up the next one (it is replaced by it).</summary>
+    public bool CanStartSession => IsConnected && !IsWaiting && !HasPendingOffer && _sessions.Phase is (SessionPhase.Idle or SessionPhase.Ended);
 
     // ---------------------------------------------------------------- invitations
 
@@ -298,6 +299,12 @@ public sealed partial class ContactsViewModel : ObservableObject
         {
             await _sessions.AcceptOfferAsync(offer.OfferId, ct).ConfigureAwait(true);
         }
+        catch (InvalidOperationException ex) when (ex.Message == SessionCoordinator.NotPendingMessage)
+        {
+            // Not sent: this device is not the one the offer is waiting on any more (taken elsewhere, withdrawn, busy here).
+            _logger.LogWarning("Contacts: offer.accept for {OfferId} not sent: the offer is no longer pending here", offer.OfferId);
+            SetStatus(Strings.OfferNoLongerAvailable);
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Contacts: offer.accept failed");
@@ -335,7 +342,7 @@ public sealed partial class ContactsViewModel : ObservableObject
             case OfferIncomingMessage offer:
                 UiThread.Post(() =>
                 {
-                    if (_sessions.Phase is not (SessionPhase.Idle or SessionPhase.RequestPending) || IsWaiting)
+                    if (_sessions.Phase is not (SessionPhase.Idle or SessionPhase.RequestPending or SessionPhase.Ended) || IsWaiting)
                     {
                         return; // busy: the server will expire it, and the offering side is told
                     }

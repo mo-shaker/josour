@@ -931,11 +931,99 @@ public sealed class SessionCoordinatorTests
         await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Idle);
     }
 
+    // ---------- after a session: the next question (finding: Ended used to swallow it) ----------
+
+    [Fact]
+    public async Task Host_AfterASessionEnded_TheNextRequestStartsASession_WithoutTheSummaryBeingDismissed()
+    {
+        await using var rig = await Rig.StartAsync();
+        var first = await rig.CreateSessionAsync(SessionInfo.HostRole);
+        await rig.Connection.NextAsync<SessionEndpointMessage>();
+        await rig.Coordinator.DisconnectAsync();
+        await rig.Connection.NextAsync<SessionEndMessage>();
+        await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Ended);
+
+        // A host in the tray never presses Dismiss: the next request must still be one it can say yes to.
+        var second = await rig.CreateSessionAsync(SessionInfo.HostRole);
+
+        Assert.NotEqual(first, second);
+        var endpoint = await rig.Connection.NextAsync<SessionEndpointMessage>(m => m.SessionId == second);
+        Assert.Equal(second, endpoint.SessionId);
+        await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Preparing);
+        Assert.Equal(2, rig.Tunnels.Requests.Count);
+    }
+
+    [Fact]
+    public async Task Host_DismissingAnOldSummary_DoesNotCancelTheRequestThatReplacedIt()
+    {
+        await using var rig = await Rig.StartAsync();
+        await rig.CreateSessionAsync(SessionInfo.HostRole);
+        await rig.Coordinator.DisconnectAsync();
+        await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.Ended);
+
+        var requestId = Guid.NewGuid();
+        await rig.Connection.SendAsync(new RequestIncomingMessage(
+            requestId, Guid.NewGuid(), Guid.NewGuid(), "Sara Ahmed", "SARA-LAPTOP", 30, 7, rig.ServerNow.AddSeconds(60)));
+        await rig.WaitAsync(() => rig.Coordinator.Phase == SessionPhase.RequestPending);
+
+        rig.Coordinator.Acknowledge();
+
+        Assert.Equal(SessionPhase.RequestPending, rig.Coordinator.Phase);
+        Assert.True(rig.Coordinator.IsAwaitingAnswer(requestId));
+    }
+
+    [Fact]
+    public async Task Host_AnAcceptForARequestThatIsNotPending_IsNotSent()
+    {
+        await using var rig = await Rig.StartAsync();
+        var unknown = Guid.NewGuid();
+
+        Assert.False(rig.Coordinator.IsAwaitingAnswer(unknown));
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => rig.Coordinator.AcceptRequestAsync(unknown, None));
+        Assert.Equal(SessionCoordinator.NotPendingMessage, ex.Message);
+
+        // Busy with a session of its own: a second request is not this device's to accept either.
+        await rig.CreateSessionAsync(SessionInfo.HostRole);
+        var other = Guid.NewGuid();
+        await rig.Connection.SendAsync(new RequestIncomingMessage(
+            other, Guid.NewGuid(), Guid.NewGuid(), "Omar", "OMAR-PC", 30, 7, rig.ServerNow.AddSeconds(60)));
+        await Task.Delay(100);
+        Assert.False(rig.Coordinator.IsAwaitingAnswer(other));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => rig.Coordinator.AcceptRequestAsync(other, None));
+
+        await Task.Delay(100);
+        Assert.DoesNotContain(rig.Connection.Received, m => m is RequestAcceptMessage accept && (accept.RequestId == unknown || accept.RequestId == other));
+    }
+
+    [Fact]
+    public async Task Guest_ARequestGivenUpOnAfterNoReply_IsWithdrawnWhenTheLateReplyComes()
+    {
+        await using var rig = await Rig.StartAsync(requestReplyTimeout: TimeSpan.FromMilliseconds(300));
+
+        var code = await rig.Coordinator.RequestSessionAsync(Guid.NewGuid(), 30, None);
+        Assert.Equal(SessionCoordinator.TimeoutCode, code);
+        Assert.Equal(SessionPhase.Idle, rig.Coordinator.Phase);
+
+        var create = await rig.Connection.NextAsync<RequestCreateMessage>();
+        var requestId = Guid.NewGuid();
+        await rig.Connection.SendAsync(new RequestCreatedMessage(create.Ref, requestId, rig.ServerNow.AddSeconds(60)));
+
+        var cancel = await rig.Connection.NextAsync<RequestCancelMessage>();
+        Assert.Equal(requestId, cancel.RequestId);
+        Assert.Equal(SessionPhase.Idle, rig.Coordinator.Phase);
+
+        // ...so a host that accepts it anyway starts nothing here.
+        await rig.Connection.SendAsync(Created(rig, SessionInfo.GuestRole));
+        await Task.Delay(100);
+        Assert.Null(rig.Coordinator.CurrentSession);
+        Assert.Empty(rig.Tunnels.Requests);
+    }
+
     private sealed class Rig : IAsyncDisposable
     {
         private readonly List<SessionPhase> _phases = new();
 
-        private Rig(FakeControlServer server, TestClock clock, RecordingLogger<SessionCoordinator> logger)
+        private Rig(FakeControlServer server, TestClock clock, RecordingLogger<SessionCoordinator> logger, TimeSpan? requestReplyTimeout = null)
         {
             Server = server;
             Clock = clock;
@@ -962,7 +1050,11 @@ public sealed class SessionCoordinatorTests
                 CheckPage,
                 logger,
                 clock,
-                SessionCoordinatorOptions.Default with { ProbeTimeout = TimeSpan.FromSeconds(10) });
+                SessionCoordinatorOptions.Default with
+                {
+                    ProbeTimeout = TimeSpan.FromSeconds(10),
+                    RequestReplyTimeout = requestReplyTimeout ?? SessionCoordinatorOptions.Default.RequestReplyTimeout,
+                });
             Coordinator.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(SessionCoordinator.Phase))
@@ -1020,7 +1112,8 @@ public sealed class SessionCoordinatorTests
             Action<FakeTunnelSession>? configure = null,
             bool logDomains = false,
             TimeSpan? serverOffset = null,
-            bool enforceAllowlist = false)
+            bool enforceAllowlist = false,
+            TimeSpan? requestReplyTimeout = null)
         {
             var clock = new TestClock();
             var offset = serverOffset ?? TimeSpan.Zero;
@@ -1033,7 +1126,7 @@ public sealed class SessionCoordinatorTests
                     AllowlistVersion: 7),
             };
 
-            var rig = new Rig(server, clock, new RecordingLogger<SessionCoordinator>()) { ServerOffset = offset };
+            var rig = new Rig(server, clock, new RecordingLogger<SessionCoordinator>(), requestReplyTimeout) { ServerOffset = offset };
             rig.Tunnels.Configure = configure;
             await rig.Channel.ConnectAsync("at-1", DeviceId, null, None);
             rig.Connection = await server.NextConnectionAsync();

@@ -291,4 +291,92 @@ public sealed class SessionPhaseTrackerTests
         Assert.Equal(SessionPhase.Idle, tracker.Phase);
         Assert.Equal("session_exists", tracker.LastEndReason);
     }
+
+    private static SessionCreatedMessage CreatedFor(string role) => new(
+        Guid.NewGuid(), role, Convert.ToBase64String(new byte[32]), DateTimeOffset.UtcNow.AddMinutes(30), 1, "203.0.113.10", false,
+        new PeerDto(Guid.NewGuid(), Guid.NewGuid(), "Omar", "OMAR-DESKTOP"));
+
+    private static RequestIncomingMessage Incoming(Guid id) =>
+        new(id, Guid.NewGuid(), Guid.NewGuid(), "Omar", "OMAR-DESKTOP", 30, 1, DateTimeOffset.UtcNow.AddSeconds(60));
+
+    /// <summary>Runs a host session to Ended (its summary on screen, never dismissed).</summary>
+    private static SessionPhaseTracker EndedHost()
+    {
+        var tracker = new SessionPhaseTracker();
+        var first = Guid.NewGuid();
+        Assert.True(tracker.Apply(Incoming(first)));
+        Assert.True(tracker.MarkAgreed(first));
+        Assert.True(tracker.Apply(CreatedFor("host")));
+        Assert.True(tracker.BeginEnding("host_ended"));
+        Assert.True(tracker.MarkEnded());
+        Assert.Equal(SessionPhase.Ended, tracker.Phase);
+        return tracker;
+    }
+
+    [Fact]
+    public void Ended_TakesTheNextIncomingRequest_AndItsSession_WithoutADismiss()
+    {
+        var tracker = EndedHost();
+        var next = Guid.NewGuid();
+
+        Assert.True(tracker.Apply(Incoming(next)));
+        Assert.Equal(SessionPhase.RequestPending, tracker.Phase);
+        Assert.Null(tracker.CurrentSession); // the old summary is replaced
+        Assert.True(tracker.IsAwaitingAnswer(next));
+
+        Assert.True(tracker.MarkAgreed(next));
+        var created = CreatedFor("host");
+        Assert.True(tracker.Apply(created));
+        Assert.Equal(SessionPhase.Preparing, tracker.Phase);
+        Assert.Equal(created.SessionId, tracker.CurrentSession!.SessionId);
+    }
+
+    [Fact]
+    public void Ended_TakesAnOffer_AndANewRequestOfOurOwn()
+    {
+        var offered = EndedHost();
+        var offerId = Guid.NewGuid();
+        Assert.True(offered.Apply(new OfferIncomingMessage(offerId, Guid.NewGuid(), Guid.NewGuid(), "Omar", "OMAR-DESKTOP", 30, 1, DateTimeOffset.UtcNow.AddSeconds(60))));
+        Assert.True(offered.IsAwaitingAnswer(offerId));
+
+        var asking = EndedHost();
+        Assert.True(asking.TrackRequest("r-next"));
+        Assert.Equal(SessionPhase.RequestPending, asking.Phase);
+    }
+
+    [Fact]
+    public void ResetIfEnded_LeavesANewQuestionAlone()
+    {
+        var tracker = EndedHost();
+        Assert.True(tracker.Apply(Incoming(Guid.NewGuid())));
+
+        Assert.False(tracker.ResetIfEnded());
+        Assert.Equal(SessionPhase.RequestPending, tracker.Phase);
+
+        var ended = EndedHost();
+        Assert.True(ended.ResetIfEnded());
+        Assert.Equal(SessionPhase.Idle, ended.Phase);
+    }
+
+    [Fact]
+    public void ARefusedQuestion_CannotBeAgreedTo_AndOnlyItsOwnResultEndsIt()
+    {
+        var tracker = new SessionPhaseTracker();
+        var asked = Guid.NewGuid();
+        Assert.True(tracker.Apply(Incoming(asked)));
+
+        Assert.False(tracker.MarkAgreed(Guid.NewGuid()));
+        Assert.False(tracker.IsAwaitingAnswer(Guid.NewGuid()));
+
+        // A result for some other request does not end this one.
+        Assert.False(tracker.Apply(new RequestExpiredMessage(Guid.NewGuid())));
+        Assert.Equal(SessionPhase.RequestPending, tracker.Phase);
+        Assert.True(tracker.Apply(new RequestExpiredMessage(asked)));
+        Assert.Equal(SessionPhase.Idle, tracker.Phase);
+
+        // Before request.created names it, a guest's own request is ended by nothing but its own error.
+        Assert.True(tracker.TrackRequest("mine"));
+        Assert.False(tracker.Apply(new RequestResultMessage(Guid.NewGuid(), false, "rejected", null)));
+        Assert.Equal(SessionPhase.RequestPending, tracker.Phase);
+    }
 }

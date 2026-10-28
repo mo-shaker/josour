@@ -50,6 +50,16 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
 
     private volatile string? _offerAnswerRef;
 
+    /// <summary>How long a request or offer this side gave up on is remembered, to withdraw it if the server's reply comes late.</summary>
+    private static readonly TimeSpan AbandonedMemory = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// <c>ref</c>s of <c>request.create</c>/<c>offer.create</c> whose reply never came in time. The user was told it failed, so
+    /// a late <c>request.created</c>/<c>offer.created</c> is withdrawn (<c>request.cancel</c>/<c>offer.cancel</c>) instead of
+    /// quietly becoming a request this side would then start a session for.
+    /// </summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> _abandoned = new(StringComparer.Ordinal);
+
     private static readonly IReadOnlyList<int> DefaultAllowedPorts = new[] { 80, 443 };
 
     private readonly IControlChannel _channel;
@@ -195,6 +205,7 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
         catch (Exception ex) when (ex is TimeoutException or InvalidOperationException or ControlChannelClosedException)
         {
             _logger.LogWarning(ex, "request.create failed");
+            Abandon(requestRef);
             _tracker.Reset();
             return ex is TimeoutException ? TimeoutCode : NotConnectedCode;
         }
@@ -223,9 +234,22 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
     /// </summary>
     public Task AcceptRequestAsync(Guid requestId, bool auto, CancellationToken ct)
     {
-        _tracker.MarkAgreed(requestId);
+        if (!_tracker.MarkAgreed(requestId))
+        {
+            // A yes this side would not honour: the session.created that follows would be ignored, and the server would end
+            // it as connect_failed half a minute later. Better not to say yes at all; the request expires on the server.
+            _logger.LogWarning("request.accept for {RequestId} not sent: it is not the request waiting for an answer (phase {Phase})", requestId, _tracker.Phase);
+            return Task.FromException(new InvalidOperationException(NotPendingMessage));
+        }
+
         return _channel.SendAsync(new RequestAcceptMessage(ControlRef.Next(), requestId, auto), ct);
     }
+
+    /// <summary>The message of the <see cref="InvalidOperationException"/> an answer to a question no longer pending fails with.</summary>
+    public const string NotPendingMessage = "That request is no longer waiting for an answer here.";
+
+    /// <summary>Is <paramref name="requestId"/> (a <c>request.incoming</c> or an <c>offer.incoming</c>) the question this side may answer now?</summary>
+    public bool IsAwaitingAnswer(Guid requestId) => _tracker.IsAwaitingAnswer(requestId);
 
     public Task RejectRequestAsync(Guid requestId, CancellationToken ct) =>
         _channel.SendAsync(new RequestRejectMessage(ControlRef.Next(), requestId), ct);
@@ -269,6 +293,7 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
         catch (Exception ex) when (ex is TimeoutException or InvalidOperationException or ControlChannelClosedException)
         {
             _logger.LogWarning(ex, "offer.create failed");
+            Abandon(offerRef);
             _tracker.Reset();
             return ex is TimeoutException ? TimeoutCode : NotConnectedCode;
         }
@@ -291,7 +316,12 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
     /// </summary>
     public Task AcceptOfferAsync(Guid offerId, CancellationToken ct)
     {
-        _tracker.MarkAgreed(offerId);
+        if (!_tracker.MarkAgreed(offerId))
+        {
+            _logger.LogWarning("offer.accept for {OfferId} not sent: it is not the offer waiting for an answer (phase {Phase})", offerId, _tracker.Phase);
+            return Task.FromException(new InvalidOperationException(NotPendingMessage));
+        }
+
         var answerRef = ControlRef.Next();
         _offerAnswerRef = answerRef;
         return _channel.SendAsync(new OfferAcceptMessage(answerRef, offerId), ct);
@@ -343,7 +373,11 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
     /// <summary>The UI dismissed the end-of-session summary: back to Idle.</summary>
     public void Acknowledge()
     {
-        _tracker.Reset();
+        if (!_tracker.ResetIfEnded())
+        {
+            return; // a new request or offer has replaced the summary already
+        }
+
         Publish(() =>
         {
             TimeRemaining = null;
@@ -378,6 +412,11 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
 
     private void OnMessage(ControlMessage message)
     {
+        if (TryWithdrawAbandoned(message))
+        {
+            return;
+        }
+
         // Before the tracker moves to Active: the session made it in time, so the connect watchdog is disarmed here rather
         // than in the (asynchronous) step, which keeps "Active" and "the deadline is gone" a single observable moment.
         if (message is SessionActiveMessage active && CurrentRun is { } running && running.SessionId == active.SessionId)
@@ -1145,7 +1184,8 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
 
     private async Task RestoreSystemProxyAsync(CancellationToken ct)
     {
-        if (_systemProxy.IsApplied && !await _systemProxy.RestoreAsync(ct).ConfigureAwait(false))
+        // False also when an earlier attempt of the same ending restored first; only a change still in force is a failure.
+        if (_systemProxy.IsApplied && !await _systemProxy.RestoreAsync(ct).ConfigureAwait(false) && _systemProxy.IsApplied)
         {
             _logger.LogError("The system proxy could not be put back; the next start or \"Repair internet settings\" will retry");
         }
@@ -1232,6 +1272,42 @@ public sealed class SessionCoordinator : INotifyPropertyChanged, IDisposable
 
         _logger.LogInformation("Allow-list version {Version}: {EntryCount} entries", version, entries.Count);
         return list;
+    }
+
+    // ---------- requests given up on ----------
+
+    private void Abandon(string reference)
+    {
+        var now = _time.GetTimestamp();
+        foreach (var old in _abandoned)
+        {
+            if (_time.GetElapsedTime(old.Value, now) > AbandonedMemory)
+            {
+                _abandoned.TryRemove(old.Key, out _);
+            }
+        }
+
+        _abandoned[reference] = now;
+    }
+
+    /// <summary>A late reply to a request or offer given up on: withdraw it on the server, and keep it away from the tracker.</summary>
+    private bool TryWithdrawAbandoned(ControlMessage message)
+    {
+        switch (message)
+        {
+            case RequestCreatedMessage m when m.Ref is not null && _abandoned.TryRemove(m.Ref, out _):
+                _logger.LogWarning("request.created {RequestId} arrived after this side gave up on it; withdrawing it with request.cancel", m.RequestId);
+                _ = SafeAsync("request.cancel", () => _channel.SendAsync(new RequestCancelMessage(ControlRef.Next(), m.RequestId), CancellationToken.None));
+                return true;
+
+            case OfferCreatedMessage m when m.Ref is not null && _abandoned.TryRemove(m.Ref, out _):
+                _logger.LogWarning("offer.created {OfferId} arrived after this side gave up on it; withdrawing it with offer.cancel", m.OfferId);
+                _ = SafeAsync("offer.cancel", () => _channel.SendAsync(new OfferCancelMessage(ControlRef.Next(), m.OfferId), CancellationToken.None));
+                return true;
+
+            default:
+                return false;
+        }
     }
 
     // ---------- plumbing ----------

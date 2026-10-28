@@ -41,7 +41,8 @@ public static class SystemProxyCommands
             if (markers.Read() is not { } marker) return 0;
             // The app itself may still be running (a restore at login racing a fast auto-start): its own session is not ours to end.
             if (SystemProxyGuardian.IsAlive(marker.ProcessId, marker.ProcessStartedAt)) return 0;
-            return guard.RestoreAsync(CancellationToken.None).GetAwaiter().GetResult() ? 0 : 1;
+            // Only the marker it looked at: an app that started a session since (it took the lock) is not this run's to undo.
+            return guard.RestoreIfAsync(marker, CancellationToken.None).GetAwaiter().GetResult() || !markers.Exists ? 0 : 1;
         }
         catch (Exception ex)
         {
@@ -57,7 +58,9 @@ public static class SystemProxyCommands
             SystemProxyControllers.ForCurrentPlatform(loggers),
             markers,
             new SystemProxySafetyNet(loggers.CreateLogger<SystemProxySafetyNet>()),
-            loggers.CreateLogger<SystemProxyGuard>());
+            loggers.CreateLogger<SystemProxyGuard>(),
+            // These runs have time to wait out the app's own restore — or a macOS password prompt it is showing.
+            lockTimeout: TimeSpan.FromMinutes(5));
         return (guard, markers);
     }
 

@@ -6,9 +6,17 @@ namespace Josour.App.Views;
 /// <summary>About / diagnostics window (one at a time; <see cref="Services.ShellService"/> owns the instance).</summary>
 public partial class AboutWindow : Window
 {
+    // async void because it is an event handler, so nothing may escape it: an exception here would end the process.
     private async void ShowLicenses(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        await new LicensesWindow().ShowDialog(this);
+        try
+        {
+            await new LicensesWindow().ShowDialog(this);
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "The licences window could not be shown");
+        }
     }
 
     public AboutWindow(AboutViewModel viewModel)

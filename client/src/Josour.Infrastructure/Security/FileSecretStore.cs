@@ -95,11 +95,17 @@ public sealed partial class FileSecretStore : ISecretStore
         {
             CreateDirectory();
 
-            // Written to a temp file and moved, so a crash never leaves half a secret. The mode is set on the
-            // temp file BEFORE the bytes go in: creating it world-readable and narrowing afterwards would leave
-            // a window, however short, where the token is readable by anyone on the machine.
+            // Written to a temp file and moved, so a crash never leaves half a secret. A new temp file is created
+            // owner-only (UnixCreateMode), so there is no moment at all when it is readable by others; the mode is
+            // still set before the bytes go in, for a temp file a crash left behind with a wider one.
             var tmp = path + ".tmp";
-            using (var stream = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+            var options = new FileStreamOptions { Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None };
+            if (!OperatingSystem.IsWindows())
+            {
+                options.UnixCreateMode = SecretMode;
+            }
+
+            using (var stream = new FileStream(tmp, options))
             {
                 SetMode(tmp, SecretMode);
                 await stream.WriteAsync(Encoding.UTF8.GetBytes(value), ct).ConfigureAwait(false);

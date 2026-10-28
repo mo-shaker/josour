@@ -198,6 +198,109 @@ public sealed class SystemProxyGuardTests : IDisposable
         Assert.Null(_markers.Read());
     }
 
+    private SystemProxyRunMarker Marker(int pid, int port, DateTimeOffset? written = null, DateTimeOffset? started = null)
+        => new(pid, started ?? DateTimeOffset.UtcNow, port, new SystemProxySnapshot("fake", "m" + port), written ?? DateTimeOffset.UtcNow);
+
+    [Fact]
+    public void MarkerStore_ACorruptMarker_IsMovedAside_RatherThanBlockingEverySession()
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(_markers.FilePath, string.Empty); // what a power cut can leave without the flush
+
+        Assert.Null(_markers.Read());
+        Assert.False(_markers.Exists);
+        Assert.True(File.Exists(_markers.CorruptFilePath));
+    }
+
+    [Fact]
+    public async Task AMarkerThatIsThereButUnreadable_StillCountsAsApplied_AndIsNotDropped()
+    {
+        var unreadable = new UnreadableMarkers();
+        var guard = new SystemProxyGuard(_controller, unreadable, _net);
+
+        Assert.True(guard.IsApplied);
+        Assert.False(await guard.RestoreAsync(CancellationToken.None));
+        Assert.Equal(0, unreadable.Cleared);
+        var ex = await Assert.ThrowsAsync<SystemProxyException>(() => guard.ApplyAsync(50140, Array.Empty<string>(), CancellationToken.None));
+        Assert.Equal("restore_failed", ex.Reason);
+        Assert.DoesNotContain("apply", _controller.Calls);
+    }
+
+    [Fact]
+    public void MarkerStore_ClearIf_LeavesAnotherSessionsMarker()
+    {
+        var mine = Marker(100, 50141);
+        var theirs = Marker(200, 50142);
+        _markers.Write(theirs);
+
+        Assert.False(_markers.ClearIf(mine));
+        Assert.Equal(theirs, _markers.Read());
+        Assert.True(_markers.ClearIf(theirs));
+        Assert.False(_markers.Exists);
+    }
+
+    [Fact]
+    public async Task RestoreIf_AMarkerThatWasReplaced_IsNotRestored()
+    {
+        var guard = Guard();
+        var seen = Marker(int.MaxValue - 7, 50143);
+        _markers.Write(Marker(4343, 50144)); // another process's session since
+
+        Assert.False(await guard.RestoreIfAsync(seen, CancellationToken.None));
+
+        Assert.DoesNotContain(_controller.Calls, c => c.StartsWith("restore", StringComparison.Ordinal));
+        Assert.Equal(50144, _markers.Read()!.Port);
+    }
+
+    [Fact]
+    public async Task Guardian_LeavesWhenItsSessionsMarkerIsReplacedByTheNextSession()
+    {
+        var guard = Guard();
+        using var self = System.Diagnostics.Process.GetCurrentProcess();
+        var started = new DateTimeOffset(self.StartTime.ToUniversalTime(), TimeSpan.Zero);
+        _markers.Write(Marker(Environment.ProcessId, 50145, DateTimeOffset.UtcNow.AddMinutes(-1), started));
+
+        var guardian = SystemProxyGuardian.RunAsync(Environment.ProcessId, started, guard, _markers);
+        await Task.Delay(300);
+        Assert.False(guardian.IsCompleted); // its process lives and its marker is there: it keeps watching
+
+        _markers.Write(Marker(Environment.ProcessId, 50146, DateTimeOffset.UtcNow, started)); // the same app's next session
+        Assert.Equal(0, await guardian.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.DoesNotContain(_controller.Calls, c => c.StartsWith("restore", StringComparison.Ordinal));
+        Assert.Equal(50146, _markers.Read()!.Port);
+    }
+
+    [Fact]
+    public async Task MarkerStore_TheLockIsHeldAgainstASecondHolder_UntilReleased()
+    {
+        var other = new SystemProxyMarkerStore(_markers.FilePath);
+        var first = await _markers.LockAsync(TimeSpan.FromSeconds(1), CancellationToken.None);
+        Assert.NotNull(first);
+
+        Assert.Null(await other.LockAsync(TimeSpan.FromMilliseconds(250), CancellationToken.None));
+
+        first!.Dispose();
+        using var second = await other.LockAsync(TimeSpan.FromSeconds(1), CancellationToken.None);
+        Assert.NotNull(second);
+    }
+
+    [UnixFact]
+    public void MarkerStore_WritesAFileOnlyItsOwnerCanRead()
+    {
+        Assert.True(_markers.Write(Marker(1, 50147)));
+        if (OperatingSystem.IsWindows()) return; // [UnixFact] skips it there; this tells the analyzer too
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(_markers.FilePath));
+    }
+
+    private sealed class UnreadableMarkers : ISystemProxyMarkerStore
+    {
+        public int Cleared { get; private set; }
+        public bool Exists => true;
+        public SystemProxyRunMarker? Read() => null;
+        public bool Write(SystemProxyRunMarker marker) => true;
+        public void Clear() => Cleared++;
+    }
+
     private sealed class FakeController : ISystemProxyController
     {
         public List<string> Calls { get; } = new();

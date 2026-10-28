@@ -986,6 +986,9 @@
   <data name="OfferResultCancelled" xml:space="preserve">
     <value>You withdrew the offer.</value>
   </data>
+  <data name="OfferNoLongerAvailable" xml:space="preserve">
+    <value>This offer is no longer available.</value>
+  </data>
   <data name="OfferErrorGuestUnavailable" xml:space="preserve">
     <value>That contact cannot take an offer right now: they are offline, busy, or on an older version.</value>
   </data>

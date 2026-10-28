@@ -48,4 +48,24 @@ public sealed class SystemProxyStartupTests
         Assert.Contains("<string>--restore-proxy</string>", plist);
         Assert.Contains("<key>RunAtLoad</key>", plist);
     }
+
+    [Theory]
+    [InlineData("/usr/local/share/dotnet/dotnet")]
+    [InlineData(@"C:\Program Files\dotnet\dotnet.exe")]
+    public void The_dotnet_host_is_never_registered_as_the_restore_at_login(string executable)
+    {
+        Assert.True(SystemProxySafetyNet.IsDotnetHost(executable));
+        Assert.NotNull(SystemProxySafetyNet.TransientReason(executable));
+    }
+
+    [Fact]
+    public void An_installed_copy_is_registered_and_a_copy_run_from_the_disk_image_is_not()
+    {
+        Assert.Null(SystemProxySafetyNet.TransientReason("/Applications/Josour.app/Contents/MacOS/Josour"));
+        Assert.Null(SystemProxySafetyNet.TransientReason(@"C:\Users\sara\AppData\Local\Programs\Josour\Josour.exe"));
+        if (OperatingSystem.IsMacOS())
+        {
+            Assert.NotNull(SystemProxySafetyNet.TransientReason("/Volumes/Josour/Josour.app/Contents/MacOS/Josour"));
+        }
+    }
 }

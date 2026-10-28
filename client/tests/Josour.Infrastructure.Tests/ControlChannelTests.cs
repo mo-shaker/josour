@@ -466,6 +466,32 @@ public sealed class ControlChannelTests
         Assert.Equal(1, h.Tokens.RefreshCount);
     }
 
+    [Fact]
+    public async Task Close4401_MidSession_WithARefreshThatFailsForNow_KeepsReconnecting_RatherThanStopping()
+    {
+        // The refresh answered 5xx: still signed in, so this is not "unauthorized for good". Stopping here used to leave a
+        // signed-in app offline until the next network change.
+        await using var h = await Harness.StartAsync();
+        h.Tokens.TransientFailures = 1;
+        h.Server.OnHello = async (connection, hello) =>
+        {
+            if (hello.Token == "at-1")
+            {
+                await connection.CloseAsync(ControlCloseCodes.Unauthorized, "token expired");
+                return;
+            }
+
+            await connection.SendAsync(h.Server.Ack);
+        };
+
+        await h.Connection.CloseAsync(ControlCloseCodes.Unauthorized, "token expired mid-session");
+
+        await h.Messages.NextAsync<HelloAckMessage>(timeout: TimeSpan.FromSeconds(15));
+        Assert.Equal(ControlChannelState.Connected, h.Channel.State);
+        Assert.Equal(2, h.Tokens.RefreshCount);
+        Assert.Empty(h.Closes);
+    }
+
     // ---------- resume / network change (plan 8.5) ----------
 
     [Fact]

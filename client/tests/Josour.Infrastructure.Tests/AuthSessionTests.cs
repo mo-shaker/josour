@@ -443,4 +443,55 @@ public sealed class AuthSessionTests
             Assert.DoesNotContain("PASSWORD", text);
         }
     }
+
+    [Fact]
+    public async Task Refresh_ACallerThatGivesUpMidExchange_StillHasTheRotatedTokenStored()
+    {
+        // The server has already replaced rt-1 with rt-2 when the caller's budget runs out. Dropping the answer would leave
+        // rt-1 on disk, and its next use would make the server revoke the whole chain.
+        using var h = new AuthHarness();
+        await h.SignInFreshAsync();
+        var release = new TaskCompletionSource();
+        h.Http.On(HttpMethod.Post, AuthHarness.RefreshPath, async (_, _) =>
+        {
+            await release.Task;
+            return FakeHttpMessageHandler.Json(HttpStatusCode.OK, AuthHarness.AuthJson("at-2", "rt-2"));
+        });
+
+        using var cts = new CancellationTokenSource();
+        var refreshing = h.Session.RefreshAccessTokenAsync("at-1", cts.Token);
+        await WaitUntilAsync(() => h.Http.CallCount(HttpMethod.Post, AuthHarness.RefreshPath) == 1);
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => refreshing);
+
+        release.SetResult();
+        await WaitUntilAsync(() => h.Session.AccessToken == "at-2");
+        Assert.Equal("rt-2", h.Secrets.Values[AuthSession.RefreshTokenKey]);
+
+        // The gate was released by the exchange itself: the next caller is not stuck behind the one that left.
+        Assert.Equal("at-2", await h.Session.RefreshAccessTokenAsync("at-1", None).WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(1, h.Http.CallCount(HttpMethod.Post, AuthHarness.RefreshPath));
+    }
+
+    [Fact]
+    public async Task Refresh_WhileSignedOut_DoesNotSpendTheStoredToken()
+    {
+        using var h = new AuthHarness();
+        h.Secrets.Values[AuthSession.RefreshTokenKey] = "rt-stored";
+
+        Assert.Null(await h.Session.RefreshAccessTokenAsync(rejectedToken: null, None));
+
+        Assert.Equal(0, h.Http.CallCount(HttpMethod.Post, AuthHarness.RefreshPath));
+        Assert.Equal("rt-stored", h.Secrets.Values[AuthSession.RefreshTokenKey]);
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (!condition())
+        {
+            if (DateTime.UtcNow > deadline) throw new TimeoutException("condition not reached");
+            await Task.Delay(10);
+        }
+    }
 }

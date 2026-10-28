@@ -19,10 +19,22 @@ public sealed class FakeAccessTokenSource : IAccessTokenSource
 
     public List<string?> RejectedTokens { get; } = new();
 
+    /// <summary>
+    /// How many refreshes fail for now (a 5xx): null is returned but the session — <see cref="AccessToken"/> — is kept,
+    /// which is how the real source tells "try again later" from "signed out".
+    /// </summary>
+    public int TransientFailures { get; set; }
+
     public Task<string?> RefreshAccessTokenAsync(string? rejectedToken, CancellationToken ct)
     {
         RefreshCount++;
         RejectedTokens.Add(rejectedToken);
+        if (TransientFailures > 0)
+        {
+            TransientFailures--;
+            return Task.FromResult<string?>(null);
+        }
+
         AccessToken = RefreshedToken;
         return Task.FromResult(RefreshedToken);
     }

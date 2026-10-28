@@ -84,6 +84,95 @@ public sealed class MacSystemProxyControllerTests
     }
 
     [Fact]
+    public async Task Restore_AServiceThatIsThereButCannotBeRead_FailsTheRestore_SoTheMarkerStays()
+    {
+        var ns = new FakeNetworkSetup();
+        ns.Services["Wi-Fi"] = new FakeService();
+        ns.Services["Thunderbolt Bridge"] = new FakeService();
+        var controller = new MacSystemProxyController(ns);
+        var snapshot = await controller.CaptureAsync(CancellationToken.None);
+        await controller.ApplyAsync(new SystemProxyTarget(Port, Array.Empty<string>()), CancellationToken.None);
+
+        ns.WedgedReads.Add("Wi-Fi");
+        var ex = await Assert.ThrowsAsync<SystemProxyException>(() => controller.RestoreAsync(snapshot, Port, CancellationToken.None));
+
+        Assert.Equal("restore_failed", ex.Reason);
+        Assert.Contains("Wi-Fi", ex.Message);
+        Assert.True(ns.Services["Wi-Fi"].WebEnabled); // still ours, and still recorded for the next attempt
+
+        // Once it answers again, the retry puts everything back.
+        ns.WedgedReads.Clear();
+        await controller.RestoreAsync(snapshot, Port, CancellationToken.None);
+        Assert.All(ns.Services.Values, s => Assert.False(s.WebEnabled || s.SecureEnabled));
+    }
+
+    [Fact]
+    public async Task Restore_AServiceThatIsGone_IsSkipped()
+    {
+        var ns = new FakeNetworkSetup();
+        ns.Services["Wi-Fi"] = new FakeService();
+        ns.Services["iPhone USB"] = new FakeService();
+        var controller = new MacSystemProxyController(ns);
+        var snapshot = await controller.CaptureAsync(CancellationToken.None);
+        await controller.ApplyAsync(new SystemProxyTarget(Port, Array.Empty<string>()), CancellationToken.None);
+
+        ns.Services.Remove("iPhone USB"); // unplugged
+        await controller.RestoreAsync(snapshot, Port, CancellationToken.None);
+
+        Assert.False(ns.Services["Wi-Fi"].WebEnabled);
+    }
+
+    [Fact]
+    public async Task AServiceThatAppearsAfterTheCapture_IsNeverPointedAtUs_AndOneThatIsAnywayIsTurnedOff()
+    {
+        var ns = new FakeNetworkSetup();
+        ns.Services["Wi-Fi"] = new FakeService();
+        var controller = new MacSystemProxyController(ns);
+        var snapshot = await controller.CaptureAsync(CancellationToken.None);
+
+        ns.Services["USB LAN"] = new FakeService(); // enabled between the capture and the change
+        await controller.ApplyAsync(new SystemProxyTarget(Port, Array.Empty<string>()), CancellationToken.None);
+        Assert.False(ns.Services["USB LAN"].WebEnabled);
+
+        // A service the snapshot does not know that points at us all the same (renamed mid-session): turned off.
+        ns.Services["Wi-Fi 2"] = ns.Services["Wi-Fi"].Clone();
+        await controller.RestoreAsync(snapshot, Port, CancellationToken.None);
+
+        Assert.False(ns.Services["Wi-Fi"].WebEnabled);
+        Assert.False(ns.Services["Wi-Fi 2"].WebEnabled);
+        Assert.False(ns.Services["Wi-Fi 2"].SecureEnabled);
+    }
+
+    [Fact]
+    public async Task Restore_DoesNotTurnPacBackOn_OverAProxyTheUserSetUpDuringTheSession()
+    {
+        var ns = new FakeNetworkSetup();
+        ns.Services["Wi-Fi"] = new FakeService { Pac = true, Wpad = true, Bypass = { "*.corp" } };
+        var controller = new MacSystemProxyController(ns);
+        var snapshot = await controller.CaptureAsync(CancellationToken.None);
+        await controller.ApplyAsync(new SystemProxyTarget(Port, Array.Empty<string>()), CancellationToken.None);
+
+        var wifi = ns.Services["Wi-Fi"];
+        wifi.WebServer = wifi.SecureServer = "mine.example";
+        wifi.WebPort = wifi.SecurePort = 3128;
+
+        await controller.RestoreAsync(snapshot, Port, CancellationToken.None);
+
+        Assert.False(wifi.Pac);
+        Assert.False(wifi.Wpad);
+        Assert.Equal("mine.example", wifi.WebServer);
+        Assert.True(wifi.WebEnabled && wifi.SecureEnabled);
+    }
+
+    [Fact]
+    public void AllServices_IncludeTheDisabledOnes_WithoutTheirAsterisk()
+    {
+        var services = MacSystemProxyController.ParseAllServices(
+            "An asterisk (*) denotes that a network service is disabled.\nWi-Fi\n*Bluetooth PAN\n");
+        Assert.Equal(new[] { "Wi-Fi", "Bluetooth PAN" }, services);
+    }
+
+    [Fact]
     public async Task WhenNetworksetupNeedsAuthorisation_TheBatchRunsOnceThroughThePasswordPrompt()
     {
         var ns = new FakeNetworkSetup { RequiresAdmin = true };
@@ -125,6 +214,9 @@ public sealed class MacSystemProxyControllerTests
         public bool RequiresAdmin { get; set; }
         public bool PromptCancelled { get; set; }
 
+        /// <summary>Services whose <c>-get…</c> commands time out (networksetup wedged after a wake).</summary>
+        public HashSet<string> WedgedReads { get; } = new(StringComparer.Ordinal);
+
         public FakeNetworkSetup Clone() => new() { Services = Services.ToDictionary(kv => kv.Key, kv => kv.Value.Clone()) };
 
         public string Describe() => string.Join("\n", Services.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => kv.Key + ": " + kv.Value));
@@ -154,6 +246,7 @@ public sealed class MacSystemProxyControllerTests
             if (!Services.TryGetValue(a[1], out var s)) return new CommandResult(4, $"** Error: The parameters were not valid.\n");
             if (verb.StartsWith("-get", StringComparison.Ordinal))
             {
+                if (WedgedReads.Contains(a[1])) return new CommandResult(null, "timed out");
                 return Ok(verb switch
                 {
                     "-getwebproxy" => Proxy(s.WebEnabled, s.WebServer, s.WebPort),

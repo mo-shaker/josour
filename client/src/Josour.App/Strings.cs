@@ -397,6 +397,8 @@ public static class Strings
 
     public static string OfferResultCancelled => LocalizedStrings.Current[UiStringKeys.OfferResultCancelled];
 
+    public static string OfferNoLongerAvailable => LocalizedStrings.Current[UiStringKeys.OfferNoLongerAvailable];
+
     public static string OfferErrorGuestUnavailable => LocalizedStrings.Current[UiStringKeys.OfferErrorGuestUnavailable];
 
     public static string ErrorNotContact => LocalizedStrings.Current[UiStringKeys.ErrorNotContact];

@@ -212,7 +212,8 @@ public sealed partial class MainViewModel : ObservableObject
                 await Sessions.DisconnectAsync();
             }
 
-            repaired = !_systemProxy.IsApplied || await _systemProxy.RestoreAsync(CancellationToken.None);
+            // A false from RestoreAsync is also "someone else put it back first": what counts is whether a change is still in force.
+            repaired = !_systemProxy.IsApplied || await _systemProxy.RestoreAsync(CancellationToken.None) || !_systemProxy.IsApplied;
         }
         catch (Exception ex)
         {

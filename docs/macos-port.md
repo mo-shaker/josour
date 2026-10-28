@@ -112,9 +112,10 @@ An explicit item was added to the [acceptance list](acceptance-checklist.md) for
   socket work.
 - A Windows publish (`-f net8.0-windows10.0.19041.0 -r win-x64`) produces `Josour.exe`.
 
-- A **self-contained single-file** publish for `osx-arm64`: 40 megabytes that run on a Mac with no .NET installed (the
-  log confirms a complete startup), which is what
-  [ADR-0011](decisions/0011-no-code-signing-certificate.md) means by "one file that is copied and hashed".
+- A **self-contained** publish for `osx-arm64` that runs on a Mac with no .NET installed (the log confirms a complete
+  startup). It was first tried as a single file, as on Windows; the deliverable is now a `.app` **bundle** built without
+  `PublishSingleFile` (see *Building a deliverable copy* below for why), so on macOS ADR-0011's "one file that is copied
+  and hashed" is the bundle — or the `.dmg` holding it.
 
 **Not exercised:** a real session between a Mac and a Windows machine — it needs two machines. And the Mac interface
 **has not yet been seen by a human**: all the verification is headless tests and the startup log, because taking a

@@ -75,9 +75,14 @@ public partial class App : Application
             desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnExplicitShutdown;
             desktop.Exit += (_, e) => OnExit(e.ApplicationExitCode);
 
-            // Log-off and shut-down (WM_QUERYENDSESSION on Windows, the quit event on macOS) and a plain SIGTERM do not
-            // go through Tray → Exit: the system proxy is put back right there, while there is still time.
-            desktop.ShutdownRequested += (_, _) => RestoreSystemProxyNow("shutdown requested");
+            // Log-off and shut-down (WM_QUERYENDSESSION on Windows, the quit event on macOS — Cmd+Q, the Dock's Quit) and a
+            // plain SIGTERM do not go through Tray → Exit. A live session is ended there the normal way (session.end with
+            // guest_ended/host_ended, not a dropped socket), and the system proxy is put back, while there is still time.
+            desktop.ShutdownRequested += (_, _) =>
+            {
+                EndSessionNow("shutdown requested");
+                RestoreSystemProxyNow("shutdown requested");
+            };
             AppDomain.CurrentDomain.ProcessExit += (_, _) => RestoreSystemProxyNow("process exit");
 
             // Only a real desktop run starts the app. The headless UI tests build this same class, and starting there
@@ -274,6 +279,30 @@ public partial class App : Application
             logger.LogWarning("Could not remove the old work-browser files: {Message}", ex.Message);
         }
     }
+
+    /// <summary>
+    /// <see cref="SessionCoordinator.ShutdownAsync"/>, synchronous and bounded, for the shutdown paths that do not pass
+    /// through Tray → Exit. Waiting here on the UI thread cannot deadlock: the ending runs on the thread pool
+    /// (<c>Task.Run</c>, <c>ConfigureAwait(false)</c> throughout) and only ever posts to this thread, never waits on it.
+    /// Nothing is cancelled, so an operating-system log-off is never held up beyond the bound.
+    /// </summary>
+    private void EndSessionNow(string why)
+    {
+        var sessions = _host?.Services.GetService<SessionCoordinator>();
+        if (sessions is null || !sessions.HasLiveSession) return;
+        try
+        {
+            Log.Information("Ending the live session before the process goes ({Why})", why);
+            sessions.ShutdownAsync(SessionShutdownBudget).Wait(SessionShutdownBudget + TimeSpan.FromSeconds(1));
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Ending the session failed ({Why})", why);
+        }
+    }
+
+    /// <summary>What a shutdown the operating system started may spend on ending a session properly.</summary>
+    private static readonly TimeSpan SessionShutdownBudget = TimeSpan.FromSeconds(5);
 
     /// <summary>Synchronous and bounded: it runs where the process may be about to go away.</summary>
     private void RestoreSystemProxyNow(string why)

@@ -986,6 +986,9 @@
   <data name="OfferResultCancelled" xml:space="preserve">
     <value>سحبت العرض.</value>
   </data>
+  <data name="OfferNoLongerAvailable" xml:space="preserve">
+    <value>لم يعد هذا العرض متاحًا.</value>
+  </data>
   <data name="OfferErrorGuestUnavailable" xml:space="preserve">
     <value>لا تستطيع جهة الاتصال قبول عرض الآن: غير متصلة أو مشغولة أو تستخدم نسخة أقدم.</value>
   </data>

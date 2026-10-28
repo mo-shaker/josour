@@ -79,13 +79,31 @@ public sealed class SessionPhaseTracker
         }
     }
 
+    /// <summary>
+    /// Is <paramref name="requestId"/> the question this side is being asked right now (a host's <c>request.incoming</c>, a
+    /// guest's <c>offer.incoming</c>)? Only then may it be answered yes.
+    /// </summary>
+    public bool IsAwaitingAnswer(Guid requestId)
+    {
+        lock (_gate)
+        {
+            return _phase == SessionPhase.RequestPending && _pendingRequestRef is null && _pendingRequestId == requestId;
+        }
+    }
+
+    /// <summary>
+    /// Free for a new request or offer: Idle, or Ended — a finished session whose summary is still on screen. The summary
+    /// waits for the user's Dismiss, and the next session must not: a host in the tray never presses it.
+    /// </summary>
+    private bool IsFree => _phase is SessionPhase.Idle or SessionPhase.Ended;
+
     /// <summary>Raised after every phase change with the new phase.</summary>
     public event Action<SessionPhase>? PhaseChanged;
 
     /// <summary>
     /// Guest: call right before sending <c>request.create</c>. Enters <see cref="SessionPhase.RequestPending"/> ("we sent the request and
     /// await <c>request.result</c>") and remembers the <c>ref</c> so an <c>error</c> with that <c>ref</c> returns the tracker to Idle.
-    /// Returns false (and does nothing) unless the tracker is Idle.
+    /// Returns false (and does nothing) unless the tracker is Idle (or Ended, whose summary it replaces).
     /// </summary>
     public bool TrackRequest(string requestRef) => TrackOwn(requestRef, isOffer: false);
 
@@ -100,11 +118,12 @@ public sealed class SessionPhaseTracker
         ArgumentException.ThrowIfNullOrWhiteSpace(requestRef);
         lock (_gate)
         {
-            if (_phase != SessionPhase.Idle)
+            if (!IsFree)
             {
                 return false;
             }
 
+            _session = null;
             _pendingRequestRef = requestRef;
             _pendingRequestId = null;
             _pendingIsOffer = isOffer;
@@ -149,8 +168,10 @@ public sealed class SessionPhaseTracker
                     _pendingRequestId = m.RequestId; // server acknowledged; phase unchanged
                     break;
 
-                case RequestCreatedMessage m when _phase == SessionPhase.Idle && _pendingRequestRef is null:
-                    // request.create was sent without TrackRequest: still track the pending request.
+                case RequestCreatedMessage m when IsFree && _pendingRequestRef is null:
+                    // request.create was sent without TrackRequest: still track the pending request. (A request this side
+                    // gave up on is answered with request.cancel by the coordinator and never reaches here.)
+                    _session = null;
                     _pendingRequestId = m.RequestId;
                     _pendingRequestRef = m.Ref;
                     _pendingIsOffer = false;
@@ -159,7 +180,8 @@ public sealed class SessionPhaseTracker
                     next = SessionPhase.RequestPending;
                     break;
 
-                case RequestIncomingMessage m when _phase == SessionPhase.Idle:
+                case RequestIncomingMessage m when IsFree:
+                    _session = null;
                     _pendingRequestId = m.RequestId;
                     _pendingRequestRef = null;
                     _pendingIsOffer = false;
@@ -172,7 +194,8 @@ public sealed class SessionPhaseTracker
                     _pendingRequestId = m.OfferId; // server acknowledged; phase unchanged
                     break;
 
-                case OfferIncomingMessage m when _phase == SessionPhase.Idle:
+                case OfferIncomingMessage m when IsFree:
+                    _session = null;
                     _pendingRequestId = m.OfferId;
                     _pendingRequestRef = null;
                     _pendingIsOffer = true;
@@ -315,7 +338,30 @@ public sealed class SessionPhaseTracker
         return true;
     }
 
-    private bool MatchesPending(Guid requestId) => _pendingRequestId is null || _pendingRequestId == requestId;
+    /// <summary>Back to Idle only from <see cref="SessionPhase.Ended"/>: dismissing a summary must never cancel what began since.</summary>
+    public bool ResetIfEnded()
+    {
+        lock (_gate)
+        {
+            if (_phase != SessionPhase.Ended)
+            {
+                return false;
+            }
+
+            _session = null;
+            ClearPending();
+            _phase = SessionPhase.Idle;
+        }
+
+        PhaseChanged?.Invoke(SessionPhase.Idle);
+        return true;
+    }
+
+    /// <summary>
+    /// The pending question by its id. Before <c>request.created</c>/<c>offer.created</c> has named it there is no id yet, and
+    /// then nothing matches: a result for some other request must not end this one.
+    /// </summary>
+    private bool MatchesPending(Guid requestId) => _pendingRequestId is not null && _pendingRequestId == requestId;
 
     private bool MatchesSession(Guid sessionId) => _session is not null && _session.SessionId == sessionId;
 

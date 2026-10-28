@@ -289,6 +289,15 @@ public sealed partial class HostViewModel : ObservableObject
     public async Task ReceiveIncomingRequestAsync(RequestIncomingMessage incoming, CancellationToken ct, bool allowAuto = true)
     {
         ArgumentNullException.ThrowIfNull(incoming);
+
+        // The coordinator saw the frame first. If it is not tracking this request (a session of ours is still live, or a
+        // question of our own is pending), a yes could not be honoured: say nothing, and the server expires the request.
+        if (!_sessions.IsAwaitingAnswer(incoming.RequestId))
+        {
+            _logger.LogWarning("Not presenting request {RequestId}: this device is busy with a session or another request", incoming.RequestId);
+            return;
+        }
+
         if (!TryBeginRequest(incoming.RequestId))
         {
             return;

@@ -115,13 +115,26 @@ public sealed class AuthSession : IAuthSession, IAccessTokenSource
         }
     }
 
-    public async Task<bool> TryRestoreAsync(CancellationToken ct)
+    public Task<bool> TryRestoreAsync(CancellationToken ct) => UnderRefreshGateAsync(TryRestoreCoreAsync, ct);
+
+    /// <summary>
+    /// The refresh token is used once: the server answers with its successor and treats any later use of the old one as theft,
+    /// revoking every token of the chain. So from the moment it is sent, the exchange runs to the end — the answer stored —
+    /// whatever happens to the caller's token; and only one exchange runs at a time (the gate).
+    /// </summary>
+    private async Task<bool> TryRestoreCoreAsync()
     {
+        var ct = CancellationToken.None;
         var refreshToken = await _secrets.GetAsync(RefreshTokenKey, ct).ConfigureAwait(false);
         if (string.IsNullOrEmpty(refreshToken))
         {
             _logger.LogInformation("No stored session to restore");
             return false;
+        }
+
+        if (IsSignedIn)
+        {
+            return true; // another caller signed in while this one waited for the gate
         }
 
         try
@@ -192,7 +205,14 @@ public sealed class AuthSession : IAuthSession, IAccessTokenSource
             throw;
         }
 
-        await ApplyAsync(response, ct).ConfigureAwait(false);
+        // Stored under the refresh gate and whatever the caller's token does by now: the server has issued these tokens.
+        await UnderRefreshGateAsync(
+            async () =>
+            {
+                await ApplyAsync(response, CancellationToken.None).ConfigureAwait(false);
+                return true;
+            },
+            CancellationToken.None).ConfigureAwait(false);
         _logger.LogInformation("Signed in as {Email} on device {DeviceId}", response.User.Email, response.Device.Id);
         RaiseChanged();
     }
@@ -264,50 +284,90 @@ public sealed class AuthSession : IAuthSession, IAccessTokenSource
         return await RefreshAccessTokenAsync(token, ct).ConfigureAwait(false);
     }
 
-    public async Task<string?> RefreshAccessTokenAsync(string? rejectedToken, CancellationToken ct)
+    public Task<string?> RefreshAccessTokenAsync(string? rejectedToken, CancellationToken ct)
+        => UnderRefreshGateAsync(() => RefreshCoreAsync(rejectedToken), ct);
+
+    /// <summary>Runs under the gate with no cancellation of its own (see <see cref="TryRestoreCoreAsync"/>).</summary>
+    private async Task<string?> RefreshCoreAsync(string? rejectedToken)
     {
-        await _refreshGate.WaitAsync(ct).ConfigureAwait(false);
+        var ct = CancellationToken.None;
+        var current = AccessToken;
+        if (current is null)
+        {
+            // Not signed in (signed out meanwhile, or a request that went out with no token): nothing to refresh. Restoring
+            // a stored session is TryRestoreAsync's job, and doing it from here raced it with the same token.
+            _logger.LogInformation("No refresh: not signed in");
+            return null;
+        }
+
+        if (!string.Equals(current, rejectedToken, StringComparison.Ordinal))
+        {
+            // Another caller already refreshed while we were waiting for the gate.
+            return current;
+        }
+
+        var refreshToken = await _secrets.GetAsync(RefreshTokenKey, ct).ConfigureAwait(false);
+        if (string.IsNullOrEmpty(refreshToken))
+        {
+            _logger.LogWarning("Cannot refresh: no refresh token stored");
+            await ClearSessionAsync(ApiErrorCodes.Unauthorized, ct).ConfigureAwait(false);
+            return null;
+        }
+
         try
         {
-            var current = AccessToken;
-            if (current is not null && !string.Equals(current, rejectedToken, StringComparison.Ordinal))
-            {
-                // Another caller already refreshed while we were waiting for the gate.
-                return current;
-            }
-
-            var refreshToken = await _secrets.GetAsync(RefreshTokenKey, ct).ConfigureAwait(false);
-            if (string.IsNullOrEmpty(refreshToken))
-            {
-                _logger.LogWarning("Cannot refresh: no refresh token stored");
-                await ClearSessionAsync(ApiErrorCodes.Unauthorized, ct).ConfigureAwait(false);
-                return null;
-            }
-
-            try
-            {
-                var response = await _api.RefreshAsync(refreshToken, ct).ConfigureAwait(false);
-                await ApplyAsync(response, ct).ConfigureAwait(false);
-                _logger.LogInformation("Access token refreshed");
-                RaiseChanged();
-                return response.AccessToken;
-            }
-            catch (ApiException ex) when (ex.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
-            {
-                _logger.LogWarning("Refresh rejected ({Code}); signing out", ex.Code);
-                await ClearSessionAsync(ex.Code, ct).ConfigureAwait(false);
-                return null;
-            }
-            catch (ApiException ex)
-            {
-                _logger.LogWarning("Refresh failed with {Status} {Code}; session kept", (int)ex.StatusCode, ex.Code);
-                return null;
-            }
+            var response = await _api.RefreshAsync(refreshToken, ct).ConfigureAwait(false);
+            await ApplyAsync(response, ct).ConfigureAwait(false);
+            _logger.LogInformation("Access token refreshed");
+            RaiseChanged();
+            return response.AccessToken;
         }
-        finally
+        catch (ApiException ex) when (ex.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        {
+            _logger.LogWarning("Refresh rejected ({Code}); signing out", ex.Code);
+            await ClearSessionAsync(ex.Code, ct).ConfigureAwait(false);
+            return null;
+        }
+        catch (ApiException ex)
+        {
+            _logger.LogWarning("Refresh failed with {Status} {Code}; session kept", (int)ex.StatusCode, ex.Code);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Waits for the gate on the caller's token, then runs <paramref name="work"/> to its end on none. A caller that gives up
+    /// stops waiting (<see cref="Task.WaitAsync(CancellationToken)"/>) but does not stop the exchange, which still stores the
+    /// new refresh token and only then releases the gate.
+    /// </summary>
+    private async Task<T> UnderRefreshGateAsync<T>(Func<Task<T>> work, CancellationToken ct)
+    {
+        await _refreshGate.WaitAsync(ct).ConfigureAwait(false);
+        Task<T> running;
+        try
+        {
+            running = work();
+        }
+        catch
         {
             _refreshGate.Release();
+            throw;
         }
+
+        _ = running.ContinueWith(
+            t =>
+            {
+                _refreshGate.Release();
+                if (t.IsFaulted)
+                {
+                    _ = t.Exception; // observed here too, for a caller that stopped waiting
+                }
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+        return await running.WaitAsync(ct).ConfigureAwait(false);
     }
 
     // ---------- state ----------

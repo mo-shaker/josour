@@ -362,6 +362,13 @@ public sealed class ControlChannel : IControlChannel, IReconnectNow
                 var fresh = await _tokens.RefreshAccessTokenAsync(token, ct).ConfigureAwait(false);
                 if (string.IsNullOrEmpty(fresh))
                 {
+                    if (_tokens.AccessToken is not null)
+                    {
+                        // Still signed in: the refresh itself failed for now (a 5xx, a 429), it was not refused. Stopping for
+                        // good here would leave a signed-in app offline until the next network change; the caller retries.
+                        throw new IOException("The access token could not be refreshed right now; the control channel will try again.");
+                    }
+
                     throw;
                 }
 
