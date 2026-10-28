@@ -68,6 +68,8 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
     private static readonly TimeSpan GoAwayFlushTimeout = TimeSpan.FromSeconds(2);
     /// <summary>After a GOAWAY we wait for the other side to close (or for this timeout) before dropping the transport, so the frame is not lost in the buffers.</summary>
     private static readonly TimeSpan GoAwayDrainTimeout = TimeSpan.FromMilliseconds(500);
+    /// <summary>The longest DisposeAsync waits for the control loop, the liveness loop and the OPEN handlers to observe the cancellation.</summary>
+    private static readonly TimeSpan DisposeDrainTimeout = TimeSpan.FromSeconds(5);
 
     private readonly MultiplexingStream _mx;
     private readonly CountingStream _transport;
@@ -76,12 +78,15 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
     private readonly TunnelRole _role;
     private readonly CancellationTokenSource _cts = new();
     private readonly ConcurrentDictionary<ulong, TaskCompletionSource<long>> _pendingPings = new();
+    /// <summary>The OPEN handlers under way on this side (they use <c>_cts</c>, so DisposeAsync waits for them before disposing it).</summary>
+    private readonly ConcurrentDictionary<Task, byte> _offerTasks = new();
     private readonly SemaphoreSlim _controlWriteGate = new(1, 1);
     private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private long _lastPongMs;
     private int _openStreams;
     private int _closed;
+    private int _disposed;
     private Task _controlLoop = Task.CompletedTask;
     private Task _livenessLoop = Task.CompletedTask;
     private MultiplexingStream.Channel _control = null!;
@@ -294,7 +299,9 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
         {
             return; // closed, or accepted somewhere else
         }
-        _ = Task.Run(() => HandleOfferAsync(channel, e.Name));
+        var task = Task.Run(() => HandleOfferAsync(channel, e.Name));
+        _offerTasks[task] = 0;
+        _ = task.ContinueWith(t => _offerTasks.TryRemove(t, out _), TaskScheduler.Default);
     }
 
     private async Task HandleOfferAsync(MultiplexingStream.Channel channel, string name)
@@ -590,6 +597,25 @@ public sealed class NerdbankMux : IMuxConnection, IMuxAcceptor
     public async ValueTask DisposeAsync()
     {
         await ShutdownAsync(sendGoAway: true, GoAwayReason.SessionEnd).ConfigureAwait(false);
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+
+        // A failure closes the mux without going through ShutdownAsync's full path, so the cancellation is repeated here (it is idempotent),
+        // and the loops and handlers that still hold _cts and _controlWriteGate are given the chance to see it before both are disposed.
+        _cts.Cancel();
+        var pending = new List<Task> { _controlLoop, _livenessLoop };
+        pending.AddRange(_offerTasks.Keys);
+        var drained = false;
+        try
+        {
+            await Task.WhenAll(pending).WaitAsync(DisposeDrainTimeout).ConfigureAwait(false);
+            drained = true;
+        }
+        catch (TimeoutException) { }
+        catch { drained = pending.All(t => t.IsCompleted); /* the tasks observe their own errors */ }
+
+        // Disposing under a task that is still running would turn its next token access into an ObjectDisposedException; a
+        // CancellationTokenSource with no timer and a SemaphoreSlim with no waiters hold nothing the GC cannot reclaim, so they are left.
+        if (!drained) return;
         _cts.Dispose();
         _controlWriteGate.Dispose();
     }

@@ -62,18 +62,20 @@ public sealed class TunnelListener : IAsyncDisposable
     public async Task StopAsync()
     {
         Task? loop;
-        Task[] handlers;
         lock (_gate)
         {
             _cts?.Cancel();
             loop = _acceptLoop;
-            handlers = _handlerTasks.ToArray();
         }
         try { _socket.Close(); } catch { /* ignore */ }
         if (loop is not null)
         {
             try { await loop.ConfigureAwait(false); } catch { /* ignore */ }
         }
+        // The snapshot is taken only once the accept loop has ended: a connection accepted while we were stopping adds its handler
+        // after the cancellation, and it must be waited for too.
+        Task[] handlers;
+        lock (_gate) handlers = _handlerTasks.ToArray();
         try { await Task.WhenAll(handlers).ConfigureAwait(false); } catch { /* the handlers swallow their own errors */ }
     }
 

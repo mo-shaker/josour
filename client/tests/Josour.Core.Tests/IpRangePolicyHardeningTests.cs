@@ -29,6 +29,7 @@ public class IpRangePolicyHardeningTests
         { "172.16.0.0", "172.31.255.255" },
         { "192.0.0.0", "192.0.0.255" },
         { "192.0.2.0", "192.0.2.255" },
+        { "192.88.99.0", "192.88.99.255" },
         { "192.168.0.0", "192.168.255.255" },
         { "198.18.0.0", "198.19.255.255" },
         { "198.51.100.0", "198.51.100.255" },
@@ -70,6 +71,13 @@ public class IpRangePolicyHardeningTests
     [InlineData("::", true)]
     [InlineData("::1", true)]
     [InlineData("::2", true)]                                                  // the deprecated ::/96 -> 0.0.0.2 -> 0.0.0.0/8
+    [InlineData("100::", true)]                                                // 100::/64, the discard prefix (RFC 6666)
+    [InlineData("100::ffff:ffff:ffff:ffff", true)]
+    [InlineData("100:0:0:1::", false)]
+    [InlineData("2001:db7:ffff:ffff:ffff:ffff:ffff:ffff", false)]              // before 2001:db8::/32
+    [InlineData("2001:db8::", true)]                                           // 2001:db8::/32, documentation
+    [InlineData("2001:db8:ffff:ffff:ffff:ffff:ffff:ffff", true)]
+    [InlineData("2001:db9::", false)]
     [InlineData("fbff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", false)]             // before fc00::/7
     [InlineData("fc00::", true)]
     [InlineData("fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", true)]              // the last of fc00::/7
@@ -77,8 +85,8 @@ public class IpRangePolicyHardeningTests
     [InlineData("fe7f:ffff:ffff:ffff:ffff:ffff:ffff:ffff", false)]
     [InlineData("fe80::", true)]
     [InlineData("febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff", true)]              // the last of fe80::/10
-    [InlineData("fec0::", false)]                                              // after fe80::/10
-    [InlineData("feff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", false)]
+    [InlineData("fec0::", true)]                                               // fec0::/10, the deprecated site-local range
+    [InlineData("feff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", true)]              // the last of fec0::/10
     [InlineData("ff00::", true)]
     [InlineData("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", true)]              // the last of ff00::/8
     public void V6RangeBoundaries(string ip, bool blocked)
@@ -317,7 +325,7 @@ public class IpRangePolicyHardeningTests
         {
             ("0.0.0.0", "0.255.255.255"), ("10.0.0.0", "10.255.255.255"), ("100.64.0.0", "100.127.255.255"),
             ("127.0.0.0", "127.255.255.255"), ("169.254.0.0", "169.254.255.255"), ("172.16.0.0", "172.31.255.255"),
-            ("192.0.0.0", "192.0.0.255"), ("192.0.2.0", "192.0.2.255"), ("192.168.0.0", "192.168.255.255"),
+            ("192.0.0.0", "192.0.0.255"), ("192.0.2.0", "192.0.2.255"), ("192.88.99.0", "192.88.99.255"), ("192.168.0.0", "192.168.255.255"),
             ("198.18.0.0", "198.19.255.255"), ("198.51.100.0", "198.51.100.255"), ("203.0.113.0", "203.0.113.255"),
             ("224.0.0.0", "239.255.255.255"), ("240.0.0.0", "255.255.255.255"),
         };

@@ -76,6 +76,13 @@ public sealed class SymmetricConnector
     /// </summary>
     public event Action<string>? StageReached;
 
+    /// <summary>
+    /// Are loopback candidates dialled? Only when our own listener is bound to loopback, which happens in the in-process setups
+    /// (the tests, both sides on one machine) and never in production, where it is bound to <c>[::]</c>. Anywhere else a loopback
+    /// candidate can only be a peer pointing us at our own machine's services.
+    /// </summary>
+    private bool AllowLoopbackCandidates => IPAddress.IsLoopback(_listener.LocalEndPoint.Address);
+
     /// <summary>Called once. When it returns, the listener is stopped and every other attempt is closed.</summary>
     public async Task<SymmetricConnectOutcome> ConnectAsync(PeerEndpointInfo peer, TimeSpan timeout, CancellationToken ct)
     {
@@ -184,6 +191,12 @@ public sealed class SymmetricConnector
         var sw = Stopwatch.StartNew();
         var attempt = new Attempt("dial", candidate.Type, candidate.Ip, candidate.Port) { Stage = "connect" };
         Record(attempt);
+        if (CandidatePolicy.RefusalReason(candidate.Ip, candidate.Port, AllowLoopbackCandidates) is { } refusal)
+        {
+            // The candidates come from the peer: we do not dial loopback, multicast, broadcast or unspecified addresses for it.
+            attempt.Error = $"refused: {refusal}";
+            return;
+        }
         try
         {
             var raw = await _transport.ConnectAsync(candidate, DialTimeout, ct).ConfigureAwait(false);

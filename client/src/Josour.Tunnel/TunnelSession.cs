@@ -216,7 +216,8 @@ public sealed class TunnelSession : ITunnelSession
                 if (_material.Role == TunnelRole.Host)
                 {
                     var egress = _options.HostEgress!(new TunnelEgressContext(
-                        _options.Allowlist, _options.AllowedPorts, _options.Resolver, BlockedLocalAddresses(), mux, window.MaxConcurrentStreams));
+                        _options.Allowlist, _options.AllowedPorts, _options.Resolver, BlockedLocalAddresses(), mux, window.MaxConcurrentStreams,
+                        BlockedLocalNetworks()));
                     egress.Attach(mux);
                     _egress = egress;
                 }
@@ -441,6 +442,14 @@ public sealed class TunnelSession : ITunnelSession
         var list = new List<IPAddress>(_options.LocalAddresses ?? LocalNetwork.GetPolicyLocalAddresses());
         if (IPAddress.TryParse(_options.OurPublicIp, out var ours)) list.Add(ours);
         return list;
+    }
+
+    /// <summary>The on-link networks blocked on the host; empty when the platform reports no prefix lengths (the exact addresses still apply).</summary>
+    private IReadOnlyList<IPNetwork> BlockedLocalNetworks()
+    {
+        var networks = _options.LocalNetworks ?? LocalNetwork.GetPolicyLocalNetworks();
+        Note("blocked_local_networks", networks.Count);
+        return networks;
     }
 
     private TimeSpan MappingLifetime()

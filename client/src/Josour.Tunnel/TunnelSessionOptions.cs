@@ -28,13 +28,18 @@ public interface ICandidateSource : IAsyncDisposable
 /// The concurrent stream limit that goes with the RTT-derived window (docs/protocol.md section 5: 256 at 1 MiB,
 /// 128 at 2 MiB, 64 at 4 MiB). The default is 256 for whoever builds the context by hand with no derivation. The 50 opens/second limit does not change.
 /// </param>
+/// <param name="BlockedLocalNetworks">
+/// The host's on-link networks (its global IPv6 prefixes, and IPv4 subnets narrower than /16), blocked whole so the guest cannot reach
+/// the host's LAN neighbours (docs/protocol.md section 6 rule 6). null or empty = only the exact addresses are blocked.
+/// </param>
 public sealed record TunnelEgressContext(
     IAllowlist Allowlist,
     IReadOnlyList<int> AllowedPorts,
     IHostResolver Resolver,
     IReadOnlyList<IPAddress> BlockedLocalAddresses,
     IMuxAcceptor Acceptor,
-    int MaxConcurrentStreams = MuxWindow.DefaultMaxConcurrentStreams);
+    int MaxConcurrentStreams = MuxWindow.DefaultMaxConcurrentStreams,
+    IReadOnlyList<IPNetwork>? BlockedLocalNetworks = null);
 
 /// <summary>What the local proxy on the guest side needs. <see cref="TunnelSession"/> builds it and passes it to the proxy factory.</summary>
 /// <param name="PeerPublicIp">The host's public IP as the server sees it; it appears on the check page.</param>
@@ -101,8 +106,11 @@ public interface ITunnelProxy : IAsyncDisposable
 /// </summary>
 public sealed record TunnelSessionOptions
 {
-    /// <summary>The site list loaded from the server. The default is an empty list (everything direct on the guest, and everything refused on the host).</summary>
-    public IAllowlist Allowlist { get; init; } = new AllowlistMatcher(0, Array.Empty<AllowlistEntry>());
+    /// <summary>
+    /// The site list loaded from the server. The default, <see cref="DenyAllAllowlist"/>, fails closed on both sides: everything is refused
+    /// on the host, and the guest has no direct path (only an enforced <see cref="AllowlistMatcher"/> opens one).
+    /// </summary>
+    public IAllowlist Allowlist { get; init; } = DenyAllAllowlist.Instance;
 
     /// <summary>allowed_ports from hello.ack.settings.</summary>
     public IReadOnlyList<int> AllowedPorts { get; init; } = new[] { 80, 443 };
@@ -140,6 +148,9 @@ public sealed record TunnelSessionOptions
 
     /// <summary>This machine's addresses, blocked on the host. null = read from the interfaces at PrepareAsync.</summary>
     public IReadOnlyList<IPAddress>? LocalAddresses { get; init; }
+
+    /// <summary>This machine's on-link networks, blocked on the host. null = read from the interfaces at ConnectAsync (<see cref="LocalNetwork.GetPolicyLocalNetworks"/>).</summary>
+    public IReadOnlyList<IPNetwork>? LocalNetworks { get; init; }
 
     public MuxOptions? Mux { get; init; }
 

@@ -54,12 +54,12 @@ public class IpRangePolicyTests
     [InlineData("203.0.112.255")] [InlineData("203.0.114.0")]
     [InlineData("223.255.255.255")]
     [InlineData("2001:4860:4860::8888")] [InlineData("2606:4700::1111")] [InlineData("2a00:1450:4001::1")]
-    [InlineData("2001:db8::1")]
     [InlineData("::ffff:8.8.8.8")]
     [InlineData("64:ff9b::8.8.8.8")]
     [InlineData("2002:0808:0808::1")]
     [InlineData("2001:0:4136:e378:8000:63bf:f7f7:f7f7")]
-    [InlineData("fbff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")] [InlineData("fe00::1")] [InlineData("fec0::1")]
+    [InlineData("fbff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")] [InlineData("fe00::1")]
+    [InlineData("192.88.98.255")] [InlineData("192.88.100.0")]
     public void PublicAddresses_AreNotBlocked(string ip)
     {
         Assert.False(IpRangePolicy.IsBlocked(IPAddress.Parse(ip)), ip);

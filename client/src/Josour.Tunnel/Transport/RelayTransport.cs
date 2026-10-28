@@ -28,15 +28,16 @@ public sealed record RelayTransportOptions
 /// and waits for <see cref="RelayStatus.Paired"/> before handing the stream upwards. Everything after that is opaque bytes: TLS and the authentication run
 /// between the two machines exactly as on the direct path (ADR-0003 item 5: the transport behind <see cref="ITunnelTransport"/> from day one).
 ///
-/// Its effect on the rest of the system when enabled: zero. Just <c>TunnelSessionOptions.Transport = new RelayTransport(...)</c>, and neither
-/// <see cref="SymmetricConnector"/> nor <see cref="Mux.NerdbankMux"/> nor the egress policy changes.
+/// Its effect on the rest of the system: none beyond the transport. <see cref="TunnelSession"/> builds it from <c>session.created.relay</c>
+/// (<see cref="TunnelSessionOptions.Relay"/>) and races it in parallel with the direct candidates (ADR-0009); neither
+/// <see cref="SymmetricConnector"/>'s authentication nor <see cref="Mux.NerdbankMux"/> nor the egress policy changes.
 ///
-/// WEEK 5/6: the relay service itself (token verification, pairing, byte pumping, the limits) is built only if the ADR-0003 gate closes.
-/// The tests today run a fake in-process relay that pairs two sockets.
+/// The relay service itself (token verification, pairing, byte pumping, the limits) lives in <c>relay/</c> at the repository root;
+/// the tests here run a fake in-process relay that pairs two sockets.
 ///
-/// An open point for week 5/6 (it does not touch today's contract): on the direct path the listener is the TLS server, but over the relay both sides are
-/// connectors, so whoever presents the certificate must be pinned down. Most likely: the host is always the TLS server (as it is the authority on acceptance), and the preamble already carries the role
-/// so nothing in this file changes. That is why today's tests check the opaque bytes rather than TLS over the relay.
+/// The TLS roles over the relay are fixed by docs/protocol.md section 3: both sides connect outbound, so the listener rule cannot apply,
+/// and <b>the host is always the TLS server</b> (presenting its certificate) while the guest is the TLS client pinning it. The preamble
+/// already carries the role, so nothing in this file depends on it; <see cref="SymmetricConnector"/> picks the side.
 /// </summary>
 public sealed class RelayTransport : ITunnelTransport
 {

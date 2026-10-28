@@ -41,14 +41,20 @@ public sealed class EgressPolicyOptions
     public IReadOnlyList<IPAddress> LocalAddresses { get; init; } = Array.Empty<IPAddress>();
 
     /// <summary>
-    /// The blocked check for one address. The default is IpRangePolicy.IsBlocked(address, LocalAddresses).
+    /// The host's on-link networks (its global IPv6 prefixes, IPv4 subnets narrower than /16), blocked whole so the guest cannot reach the
+    /// host's LAN neighbours by their global addresses. Empty = only the exact addresses above.
+    /// </summary>
+    public IReadOnlyList<IPNetwork> LocalNetworks { get; init; } = Array.Empty<IPNetwork>();
+
+    /// <summary>
+    /// The blocked check for one address. The default is IpRangePolicy.IsBlocked(address, LocalAddresses, LocalNetworks).
     /// Replaced in the E2E tests only (to permit 127.0.0.1 inside the process).
     /// </summary>
     public Func<IPAddress, bool>? AddressBlocker { get; init; }
 }
 
 /// <summary>
-/// The egress policy on the host per docs/protocol.md section 6, in order: (1) an address literal -> ip_literal, (2) normalisation, (3) the list -> not_allowed,
+/// The egress policy on the host per docs/protocol.md section 6, in order: (1) normalisation, (2) an address literal (before or after it) -> ip_literal, (3) the list -> not_allowed,
 /// (4) the port -> port_not_allowed, (5) DNS once with a 5 s timeout -> dns_failed, (6) any blocked address -> private_ip,
 /// (7) Socket.ConnectAsync(IPAddress[], port) using the checked list only, with a 10 s timeout -> connect_failed.
 /// </summary>
@@ -63,7 +69,8 @@ public sealed class EgressPolicy
         _allowlist = allowlist ?? throw new ArgumentNullException(nameof(allowlist));
         _options = options ?? new EgressPolicyOptions();
         var locals = _options.LocalAddresses;
-        _isBlocked = _options.AddressBlocker ?? (address => IpRangePolicy.IsBlocked(address, locals));
+        var networks = _options.LocalNetworks;
+        _isBlocked = _options.AddressBlocker ?? (address => IpRangePolicy.IsBlocked(address, locals, networks));
     }
 
     public IAllowlist Allowlist => _allowlist;
@@ -79,6 +86,8 @@ public sealed class EgressPolicy
         try { normalized = AllowlistMatcher.NormalizeHost(host); }
         catch (ArgumentException) { return OpenFailReason.NotAllowed; }
         normalizedHost = normalized;
+        // Normalisation can turn a name into a literal: "8.8.8.8." (the trailing dot), fullwidth digits, "0x7f.0.0.1.".
+        if (IpRangePolicy.IsIpLiteral(normalized)) return OpenFailReason.IpLiteral;
         if (port is < 1 or > 65535) return OpenFailReason.PortNotAllowed;
 
         if (_allowlist.IsAllowed(normalized, port, _options.AllowedPorts)) return null;

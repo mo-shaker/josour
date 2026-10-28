@@ -53,9 +53,9 @@ public sealed record RelayPreamble(Guid SessionId, TunnelRole Role, string Token
 /// </code>
 /// The reply (relay -> client), two bytes: <c>u8 version = 1 | u8 status</c> (<see cref="RelayStatus"/>).
 ///
-/// WEEK 5/6: the server side (the relay service that reads the preamble, verifies the token, pairs the two sides and pumps the bytes) is not built
-/// unless the decision gate in ADR-0003 closes (below 85% direct success within 10 seconds on 10 real pairs).
-/// Only the client side is here, with <see cref="ReadPreambleAsync"/> and <see cref="BuildReply"/> so a fake in-process relay can exercise it.
+/// The server side (the relay service that reads the preamble, verifies the token, pairs the two sides and pumps the bytes) is the Python
+/// service in <c>relay/</c> at the repository root (<c>relay/relay/protocol.py</c> mirrors this file). Only the client side is here, with
+/// <see cref="ReadPreambleAsync"/> and <see cref="BuildReply"/> so a fake in-process relay can exercise it.
 /// </summary>
 public static class RelayProtocol
 {
@@ -142,7 +142,7 @@ public static class RelayProtocol
         return true;
     }
 
-    /// <summary>The relay's side (WEEK 5/6) and the tests: it reads the fixed header and then the token at its length.</summary>
+    /// <summary>The relay's side (as the fake in-process relay in the tests plays it): it reads the fixed header and then the token at its length.</summary>
     public static async Task<RelayPreamble> ReadPreambleAsync(Stream stream, TimeSpan? timeout = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(stream);

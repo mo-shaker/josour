@@ -15,7 +15,10 @@ public sealed class ConnectProxyOptions
     public IReadOnlyList<int> AllowedPorts { get; init; } = new[] { 80, 443 };
     /// <summary>The host's public IP as the server sees it; it appears on the check page.</summary>
     public string PeerPublicIp { get; init; } = string.Empty;
-    /// <summary>null = no tunnel (everything direct; the self-hosted mode in the Spike tool).</summary>
+    /// <summary>
+    /// The tunnel to the host. null = no tunnel: a destination that would be tunnelled is refused (502) rather than sent direct, and only
+    /// the direct path (when <see cref="DirectAllowed"/>) works.
+    /// </summary>
     public IMuxConnection? Mux { get; init; }
     public IHostResolver Resolver { get; init; } = DnsHostResolver.Instance;
     /// <summary>Which local processes may use the proxy (ADR-0015 point 4). null = every local connection is accepted.</summary>
@@ -74,7 +77,8 @@ public sealed class ProxyCounters
 ///   CONNECT check.josour:443 -> 502 at once, so a browser that tries https first falls back to the http check page.
 /// - An http:// absolute-URI: check.josour -> the check page; allowed -> through the tunnel (ADR-0015 point 5); otherwise -> direct in enforce
 ///   mode only. One request per connection in origin-form with Connection: close, pumped until the origin closes.
-/// One connection = one request, always; the local replies carry Connection: close.
+/// One connection = one request, always: the local replies carry Connection: close, and so does every origin reply relayed on the direct and
+/// tunnelled http paths (<see cref="HttpResponseRelay"/>), so the browser never reuses the connection for another site.
 /// </summary>
 public sealed class ConnectProxyServer : IAsyncDisposable
 {
@@ -243,8 +247,15 @@ public sealed class ConnectProxyServer : IAsyncDisposable
             return;
         }
 
-        if (route.Kind == RouteKind.Tunnel && _options.Mux is { } mux)
+        if (route.Kind == RouteKind.Tunnel)
         {
+            // A destination meant for the host never falls through to the guest's own connection just because there is no tunnel.
+            if (_options.Mux is not { } mux)
+            {
+                await TryRespondAsync(client, 502, ct).ConfigureAwait(false);
+                return;
+            }
+
             MuxOpenResult open;
             try
             {
@@ -390,8 +401,13 @@ public sealed class ConnectProxyServer : IAsyncDisposable
             return;
         }
 
-        if (route.Kind == RouteKind.Tunnel && _options.Mux is { } mux)
+        if (route.Kind == RouteKind.Tunnel)
         {
+            if (_options.Mux is not { } mux)
+            {
+                await TryRespondAsync(client, 502, ct).ConfigureAwait(false);
+                return;
+            }
             // Plain http goes through the host like everything else (ADR-0015 point 5): a redirect to https would break http-only
             // sites and the certificate checks (OCSP, CRL) once every browser is behind the system proxy. The host can read these bytes;
             // the disclosure says so.
@@ -414,8 +430,9 @@ public sealed class ConnectProxyServer : IAsyncDisposable
                 Counters.SystemProxyUsed();
                 var proxyHead = BuildProxyFormHead(request, route.Host, port, path);
                 await upstream.WriteAsync(proxyHead, ct).ConfigureAwait(false);
-                // The proxy's reply is relayed as it is (407 included): the browser is what holds the credentials.
-                await PumpUntilOriginClosesAsync(client, upstream, request.Remainder, ct).ConfigureAwait(false);
+                // The proxy's reply is relayed as it is (407 included): the browser is what holds the credentials. Reuse of this
+                // connection is safe to leave to the browser: every request on it is in absolute form and the upstream proxy routes each one.
+                await PumpUntilOriginClosesAsync(client, upstream, request.Remainder, forceClose: false, ct).ConfigureAwait(false);
             }
             return;
         }
@@ -433,7 +450,7 @@ public sealed class ConnectProxyServer : IAsyncDisposable
             var head = BuildOriginFormHead(request, path);
             await origin.WriteAsync(head, ct).ConfigureAwait(false);
             // One request per connection: we pump the body if there is one and relay the reply until the origin closes, then close towards the browser.
-            await PumpUntilOriginClosesAsync(client, origin, request.Remainder, ct).ConfigureAwait(false);
+            await PumpUntilOriginClosesAsync(client, origin, request.Remainder, forceClose: true, ct).ConfigureAwait(false);
         }
     }
 
@@ -462,7 +479,7 @@ public sealed class ConnectProxyServer : IAsyncDisposable
         await using var tunnel = open.Stream!;
         Counters.Tunnel();
         await tunnel.WriteAsync(BuildOriginFormHead(request, path), ct).ConfigureAwait(false);
-        await PumpUntilOriginClosesAsync(client, tunnel, request.Remainder, ct).ConfigureAwait(false);
+        await PumpUntilOriginClosesAsync(client, tunnel, request.Remainder, forceClose: true, ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -576,8 +593,12 @@ public sealed class ConnectProxyServer : IAsyncDisposable
         await StreamPump.RunAsync(client, far, ct).ConfigureAwait(false);
     }
 
-    /// <summary>The reply is copied until the origin closes; the request then ends and we do not wait on the browser (it is closed towards after returning).</summary>
-    private static async Task PumpUntilOriginClosesAsync(Stream client, Stream origin, byte[] remainder, CancellationToken ct)
+    /// <summary>
+    /// The reply is copied until the origin closes; the request then ends and we do not wait on the browser (it is closed towards after returning).
+    /// With <paramref name="forceClose"/> the reply head is rewritten to <c>Connection: close</c> (<see cref="HttpResponseRelay"/>), so the
+    /// browser never reuses this connection for a request to another site — which would be pumped raw to this origin.
+    /// </summary>
+    private static async Task PumpUntilOriginClosesAsync(Stream client, Stream origin, byte[] remainder, bool forceClose, CancellationToken ct)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         if (remainder.Length > 0)
@@ -594,7 +615,24 @@ public sealed class ConnectProxyServer : IAsyncDisposable
             }
             catch { /* the browser closed, or it was cancelled */ }
         }, CancellationToken.None);
-        try { await StreamPump.CopyAsync(origin, client, cts.Token).ConfigureAwait(false); }
+        try
+        {
+            var relay = true;
+            if (forceClose)
+            {
+                try
+                {
+                    relay = await HttpResponseRelay.RelayHeadsAsync(origin, client, cts.Token).ConfigureAwait(false);
+                }
+                catch (HttpParseException)
+                {
+                    // Nothing of a malformed head reached the browser, so it still gets a truthful reply instead of bytes we cannot vouch for.
+                    relay = false;
+                    await TryRespondAsync(client, 502, cts.Token).ConfigureAwait(false);
+                }
+            }
+            if (relay) await StreamPump.CopyAsync(origin, client, cts.Token).ConfigureAwait(false);
+        }
         catch { /* the origin dropped the connection, or the browser closed */ }
         cts.Cancel();
         await upload.ConfigureAwait(false);

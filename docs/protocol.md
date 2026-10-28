@@ -27,7 +27,10 @@ Version: 1 (frozen at the end of week 1). Owner: track B. Consumer: track C thro
    IPv6 addresses), `upnp` (the external IP:Port from the router), `public` (the IP the server sees + the local port;
    it works if the port is open or the machine has a public address).
 3. On `session.peer_endpoint` each side connects to all of the other's candidates in parallel with a 5-second timeout
-   per candidate, and keeps accepting inbound connections.
+   per candidate, and keeps accepting inbound connections. The candidates come from the peer, so a candidate that can
+   only point back at this machine or at nobody is not dialled: loopback (unless this side's own listener is bound to
+   loopback, which only the in-process test setups do), unspecified (`0.0.0.0/8`, `::`), multicast and broadcast
+   (`240.0.0.0/4` and `255.255.255.255`). Such a candidate appears in the diagnostics with `error: "refused: <reason>"`.
 4. For every TCP connection: a TLS handshake with a 10-second timeout, then authentication with a 5-second timeout.
 5. The host keeps the **first** connection that passes `AUTH1`, sends `AUTH2` on that one **only**, and closes any
    other connection with no reply. So the user sees only one `AUTH2`, and its choice of "the first authenticated
@@ -159,7 +162,10 @@ Rules:
 
 On `OPEN(host, port)`, in order:
 
-1. If `host` is an IP address (v4 or v6, even in brackets) → `OPEN_FAIL(ip_literal)`.
+1. If `host` is an IP address (v4 or v6, even in brackets) **before or after the normalisation in step 2** →
+   `OPEN_FAIL(ip_literal)`. The second check matters: `8.8.8.8.` (the trailing dot), `0x7f.0.0.1.` and fullwidth digits
+   such as `１２７.０.０.１` are not literals to `IPAddress.TryParse` but become literals once normalised. The guest's
+   router (`ProxyRouter`) applies the same two checks and answers `403`.
 2. Normalisation: lowercase, strip the trailing dot, convert IDN to Punycode.
 3. Matching the list (`AllowlistMatcher`) — **lifted by default since
    [ADR-0010](decisions/0010-route-all-through-host.md)**: every name is allowed unless an administrator turns on
@@ -171,16 +177,30 @@ On `OPEN(host, port)`, in order:
    - An optional `:port` suffix restricts the port; without it the `allowed_ports` ports are permitted.
    - Entries rejected at load time: empty, `*`, or containing `/` or spaces.
    - No match → `OPEN_FAIL(not_allowed)`.
+   - No list supplied at all (`DenyAllAllowlist`, the default in `TunnelSessionOptions`) → everything is refused, and
+     the guest has no direct path. The guest's direct path exists only for an enforced list (`AllowlistMatcher`).
 4. The port is not within `allowed_ports` (80 and 443 by default) and does not match the entry's restriction →
    `OPEN_FAIL(port_not_allowed)`.
 5. DNS resolution once (`Dns.GetHostAddressesAsync`) with a 5-second timeout; failure → `OPEN_FAIL(dns_failed)`.
 6. If **any** resulting address is blocked (`IpRangePolicy`) → `OPEN_FAIL(private_ip)`. The blocked addresses:
    - IPv4: `0.0.0.0/8`, `10.0.0.0/8`, `100.64.0.0/10`, `127.0.0.0/8`, `169.254.0.0/16`, `172.16.0.0/12`,
-     `192.0.0.0/24`, `192.0.2.0/24`, `192.168.0.0/16`, `198.18.0.0/15`, `198.51.100.0/24`, `203.0.113.0/24`,
-     `224.0.0.0/4`, `240.0.0.0/4`, `255.255.255.255/32`.
-   - IPv6: `::/128`, `::1/128`, `::ffff:0:0/96`, `64:ff9b::/96`, `2002::/16` and `2001::/32` (unwrapped, with the
-     embedded v4 checked), `fc00::/7`, `fe80::/10`, `ff00::/8`.
-   - Every address of the host's own interfaces, its default gateways, and its public address as the server sees it.
+     `192.0.0.0/24`, `192.0.2.0/24`, `192.88.99.0/24`, `192.168.0.0/16`, `198.18.0.0/15`, `198.51.100.0/24`,
+     `203.0.113.0/24`, `224.0.0.0/4`, `240.0.0.0/4`, `255.255.255.255/32`.
+   - IPv6: `::/128`, `::1/128`, `100::/64`, `2001:db8::/32`, `fc00::/7`, `fe80::/10`, `fec0::/10`, `ff00::/8`.
+   - IPv6 forms that carry an IPv4 address are unwrapped and the embedded address is checked against everything in
+     this rule: `::ffff:0:0/96` (mapped), `::ffff:0:0:0/96` (SIIT), the deprecated `::/96`, `64:ff9b::/96`,
+     `2002::/16` (bits 16-47) and `2001::/32` (Teredo, XOR). For the local-use NAT64 prefix `64:ff9b:1::/48`
+     (RFC 8215) the translator's prefix length is the operator's choice, so every RFC 6052 position (/96, /64, /56,
+     /48) is read where the address is a valid encoding for it (the u-octet and the suffix are zero), readings in
+     `0.0.0.0/8` are ignored, and the address is blocked if any reading is. A translator that ignores non-zero suffix
+     bits is not covered.
+   - Every address of the host's own interfaces, its default gateways, and its public address as the server sees it
+     (exact addresses; the public address is never widened beyond `/32`).
+   - The host's **on-link networks**, so the guest cannot reach the host's LAN neighbours (the router, a NAS, a
+     printer) by their global addresses: every global unicast IPv6 prefix on the host's interfaces (`2000::/3`, not
+     6to4 or Teredo, prefix length `/48` to `/128`), and IPv4 subnets narrower than `/16` (`/17` to `/31`; a wider one
+     may be a whole organisation's block of ordinary public sites, and the private ranges are already above). When the
+     platform cannot report an interface's prefix length, that interface contributes its exact addresses only.
 7. Connecting with `Socket.ConnectAsync(IPAddress[], port)` using the checked list only, with a 10-second timeout;
    failure → `OPEN_FAIL(connect_failed)`.
 8. `OPEN_OK`, then bidirectional pumping; counting the bytes in both directions; adding `host` to the set of distinct

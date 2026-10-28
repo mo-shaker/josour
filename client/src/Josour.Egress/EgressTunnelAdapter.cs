@@ -36,6 +36,7 @@ public sealed class EgressTunnelAdapter : ITunnelEgress
             AllowedPorts = context.AllowedPorts,
             Resolver = context.Resolver,
             LocalAddresses = context.BlockedLocalAddresses,
+            LocalNetworks = context.BlockedLocalNetworks ?? Array.Empty<IPNetwork>(),
             AddressBlocker = addressBlocker,
         });
         return new EgressTunnelAdapter(new OpenHandler(policy, limiter ?? new StreamLimiter(context.MaxConcurrentStreams)));

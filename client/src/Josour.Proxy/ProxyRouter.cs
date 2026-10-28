@@ -34,6 +34,8 @@ public static class ProxyRouter
         string normalized;
         try { normalized = AllowlistMatcher.NormalizeHost(raw); }
         catch (ArgumentException) { return new RouteDecision(RouteKind.Reject, raw, port, "bad_host"); }
+        // Normalisation can turn a name into a literal: "8.8.8.8." (the trailing dot), fullwidth digits, "0x7f.0.0.1.".
+        if (IpRangePolicy.IsIpLiteral(normalized)) return new RouteDecision(RouteKind.Reject, normalized, port, "ip_literal");
         if (IsLocalName(normalized)) return new RouteDecision(RouteKind.Reject, normalized, port, "local");
 
         if (allowlist.IsAllowed(normalized, port, allowedPorts)) return new RouteDecision(RouteKind.Tunnel, normalized, port, null);
@@ -42,10 +44,12 @@ public static class ProxyRouter
     }
 
     /// <summary>
-    /// Is there a direct path at all? Only when the host enforces a list: with <see cref="AllowAllAllowlist"/> everything the host
-    /// allows is tunnelled and nothing else may leave from the guest's own connection.
+    /// Is there a direct path at all? Only when the host enforces a list (an <see cref="AllowlistMatcher"/> loaded from the server):
+    /// with <see cref="AllowAllAllowlist"/> everything the host allows is tunnelled and nothing else may leave from the guest's own
+    /// connection. The test is positive on purpose, so any other list — <see cref="DenyAllAllowlist"/> (no list supplied) or one this
+    /// code does not know — fails closed.
     /// </summary>
-    public static bool DirectAllowedFor(IAllowlist allowlist) => allowlist is not AllowAllAllowlist;
+    public static bool DirectAllowedFor(IAllowlist allowlist) => allowlist is AllowlistMatcher;
 
     /// <summary>localhost and *.localhost are refused locally (the browser does not usually pass them to the proxy, but defence in depth is required).</summary>
     public static bool IsLocalName(string normalizedHost)
