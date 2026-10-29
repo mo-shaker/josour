@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "josour-backend"
-version = "2.1.0"
+version = "2.1.1"
 description = "Josour control/coordination server (auth, devices, presence, requests, sessions)."
 requires-python = ">=3.12"
 license = "Apache-2.0"

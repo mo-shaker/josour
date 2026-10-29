@@ -6,6 +6,8 @@ Every release of Josour: the apps, the server and the relay share one version nu
 
 ## Unreleased
 
+## 2.1.1 - 2026-10-29
+
 ### Fixed
 - **The Mac app no longer says it is "damaged and can't be opened"** after it is downloaded. The bundle is now signed
   as a whole (ad hoc, still without an Apple developer certificate), so macOS shows its usual first-launch question,
