@@ -19,9 +19,10 @@
 #   scripts/publish-app.sh --arch x64      # for Intel Macs
 #   scripts/publish-app.sh --dmg           # also produce Josour-<version>-<arch>.dmg
 #
-# Gatekeeper: the result is UNSIGNED (ADR-0011). macOS refuses an unsigned app on first launch until the user
-# right-clicks it and chooses Open, once. The script prints that at the end rather than leaving it to be
-# discovered.
+# Gatekeeper: the result has no Developer ID and is not notarized (ADR-0011). macOS refuses it on first launch
+# until the user allows it once (right-click → Open, or Open Anyway in Privacy & Security on macOS 15). The
+# script prints that at the end rather than leaving it to be discovered. It IS signed ad hoc, though — see
+# "signature" below for why that is not optional.
 
 set -euo pipefail
 
@@ -160,6 +161,21 @@ PLIST
 
 plutil -lint "$app/Contents/Info.plist" >/dev/null || { echo "the generated Info.plist is not valid" >&2; exit 1; }
 
+# ---------------------------------------------------------------- signature
+#
+# The SDK signs the apphost ad hoc as a lone binary. Once it sits in a bundle with an Info.plist and resources
+# beside it, that signature claims resources it does not seal, and a downloaded (quarantined) copy is refused
+# as "damaged and can't be opened" with no way past it — which is what v2.1.0 shipped. An ad-hoc signature of
+# the whole bundle turns that into the ordinary "unidentified developer" prompt the user can allow.
+#
+# codesign treats every file in Contents/MacOS as code, the managed .dll files included, so each is signed
+# first and the bundle last. A .dll's signature lives in extended attributes: a .dmg and a Finder copy keep
+# them, a plain zip does not — so the bundle is only ever shipped inside the .dmg.
+find "$app/Contents/MacOS" -type f ! -path "$app/Contents/MacOS/Josour" -print0 |
+    xargs -0 codesign --force --sign - 2>&1 | { grep -v 'replacing existing signature' || true; }
+codesign --force --sign - "$app" 2>&1 | { grep -v 'replacing existing signature' || true; }
+codesign --verify --deep --strict "$app" || { echo "the bundle's signature does not verify" >&2; exit 1; }
+
 # ---------------------------------------------------------------- check what was assembled
 
 # The check that matters is not "how many files" but "can it draw". Avalonia needs these two at run time, and
@@ -201,12 +217,21 @@ if [[ "$make_dmg" == "1" ]]; then
     # The Applications symlink is the whole convention: open the disk image, drag the icon onto the folder.
     ln -s /Applications "$stage/Applications"
     hdiutil create -volname "Josour $version" -srcfolder "$stage" -ov -format UDZO -quiet "$dmg"
+
+    # What the user opens is the copy inside the image, so that is the one whose signature must hold.
+    mnt="$staging/mnt"
+    mkdir -p "$mnt"
+    hdiutil attach -nobrowse -readonly -mountpoint "$mnt" -quiet "$dmg"
+    dmg_ok=1
+    codesign --verify --deep --strict "$mnt/Josour.app" || dmg_ok=0
+    hdiutil detach -quiet "$mnt"
+    [[ "$dmg_ok" == "1" ]] || { echo "the app inside $dmg has a broken signature" >&2; exit 1; }
     echo "dmg    : $dmg ($(du -sh "$dmg" | cut -f1))"
 fi
 
 echo
-echo "UNSIGNED (ADR-0011). On another Mac the first launch must be: right-click the app, choose Open, then"
-echo "confirm. Double-clicking it first will only say it cannot be opened, with no way forward in the dialog."
+echo "Signed ad hoc, not notarized (ADR-0011). On another Mac the first launch must be allowed once: right-click"
+echo "the app, choose Open, then confirm — on macOS 15, System Settings → Privacy & Security → Open Anyway."
 echo
 echo "The icon is generated from a 64x64 source, so it is soft above that size. A 1024x1024 master in"
 echo "client/src/Josour.App/Assets is what fixes it."
