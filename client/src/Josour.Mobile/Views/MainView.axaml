@@ -1,0 +1,146 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:m="using:Josour.Mobile"
+             xmlns:vm="using:Josour.Mobile.ViewModels"
+             x:Class="Josour.Mobile.Views.MainView"
+             x:DataType="vm:MainViewModel"
+             Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+  <Grid>
+    <!-- Starting: the stored sign-in is being restored. -->
+    <StackPanel IsVisible="{Binding IsStarting}" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12">
+      <TextBlock Classes="title" HorizontalAlignment="Center" Text="{m:Tr AppName}" />
+      <ProgressBar IsIndeterminate="True" Width="160" />
+    </StackPanel>
+
+    <!-- Sign-in -->
+    <ScrollViewer IsVisible="{Binding IsSignedOut}">
+      <StackPanel DataContext="{Binding SignIn}" x:DataType="vm:SignInViewModel" Margin="20,32" Spacing="12">
+        <TextBlock Classes="title" Text="{m:Tr LoginHeading}" />
+        <TextBlock Classes="secondary" Text="{m:Tr LoginDescription}" />
+        <TextBlock Text="{m:Tr LoginServerUrlLabel}" Margin="0,8,0,0" />
+        <TextBox Text="{Binding ServerUrl}" Watermark="{m:Tr LoginServerUrlPlaceholder}" FlowDirection="LeftToRight" />
+        <TextBlock Text="{m:Tr LoginEmailLabel}" />
+        <TextBox Text="{Binding Email}" FlowDirection="LeftToRight" />
+        <TextBlock Text="{m:Tr LoginPasswordLabel}" />
+        <TextBox Text="{Binding Password}" PasswordChar="●" FlowDirection="LeftToRight" />
+        <TextBlock Classes="error" Text="{Binding ErrorText}" IsVisible="{Binding HasError}" />
+        <Button Classes="accent" HorizontalAlignment="Stretch" Command="{Binding SignInCommand}" Content="{m:Tr LoginSignIn}" />
+        <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- The host page -->
+    <ScrollViewer IsVisible="{Binding IsSignedIn}">
+      <StackPanel DataContext="{Binding Host}" x:DataType="vm:HostViewModel" Margin="16,24" Spacing="14">
+        <TextBlock Classes="title" Text="{m:Tr MobileHostHeading}" />
+        <TextBlock Classes="secondary" Text="{Binding SignedInText}" />
+
+        <Border Classes="card">
+          <StackPanel Spacing="10">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="heading" VerticalAlignment="Center" Text="{m:Tr HostAvailableToggle}" />
+              <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsAvailable}" OnContent="" OffContent="" />
+            </Grid>
+            <TextBlock Classes="body" Text="{Binding StatusText}" />
+            <TextBlock Classes="secondary" Text="{m:Tr MobileHostDescription}" />
+          </StackPanel>
+        </Border>
+
+        <!-- The live session -->
+        <Border Classes="card" IsVisible="{Binding HasSession}">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="heading" Text="{m:Tr MobileSessionHeading}" />
+            <TextBlock Classes="body" Text="{Binding SessionGuestText}" />
+            <TextBlock Classes="secondary" Text="{Binding SessionPhaseText}" />
+            <TextBlock Classes="body" Text="{Binding SessionTimeText}" />
+            <TextBlock Classes="secondary" Text="{Binding SessionDataText}" />
+            <TextBlock Classes="body" Text="{Binding SessionEndedText}" IsVisible="{Binding IsSessionEnded}" />
+            <Button Classes="accent" HorizontalAlignment="Stretch" IsVisible="{Binding CanEndSession}"
+                    Command="{Binding EndSessionCommand}" Content="{m:Tr MobileEndSessionNow}" />
+            <Button HorizontalAlignment="Stretch" IsVisible="{Binding IsSessionEnded}"
+                    Command="{Binding DismissSessionCommand}" Content="{m:Tr SessionDismiss}" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel Spacing="6">
+            <TextBlock Classes="body" Text="{Binding NetworkText}" />
+            <TextBlock Classes="secondary" Text="{Binding ConnectionText}" />
+            <TextBlock Classes="secondary" Text="{Binding PublicIpText}" />
+            <TextBlock Classes="warning" Text="{m:Tr MobileCellularDataNote}" IsVisible="{Binding IsCellular}" />
+            <TextBlock Classes="warning" Text="{m:Tr MobileVpnWarning}" IsVisible="{Binding IsVpn}" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card" IsVisible="{Binding ShowNotificationsHint}">
+          <StackPanel Spacing="10">
+            <TextBlock Classes="body" Text="{m:Tr MobileNotificationsHint}" />
+            <Button HorizontalAlignment="Stretch" Command="{Binding AllowNotificationsCommand}" Content="{m:Tr MobileNotificationsAllow}" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card" IsVisible="{Binding ShowBatteryHint}">
+          <StackPanel Spacing="10">
+            <TextBlock Classes="body" Text="{m:Tr MobileBatteryHint}" />
+            <Button HorizontalAlignment="Stretch" Command="{Binding AllowBackgroundCommand}" Content="{m:Tr MobileBatteryAllow}" />
+          </StackPanel>
+        </Border>
+
+        <TextBlock Classes="secondary" Text="{m:Tr MobileGuestRoleNote}" />
+        <Button HorizontalAlignment="Stretch" Command="{Binding $parent[UserControl].DataContext.SignOutCommand}"
+                Content="{m:Tr TraySignOut}" />
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- The incoming request covers everything until it is answered. -->
+    <Border IsVisible="{Binding Host.HasIncoming}" Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+      <ScrollViewer>
+        <StackPanel DataContext="{Binding Host.Incoming}" x:DataType="vm:IncomingRequestViewModel" Margin="16,24" Spacing="12">
+          <TextBlock Classes="title" Text="{Binding Heading}" />
+          <Border Classes="card">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="12">
+              <TextBlock Classes="secondary" Text="{m:Tr IncomingRequestRequesterLabel}" />
+              <TextBlock Grid.Column="1" Classes="body" Text="{Binding GuestName}" />
+              <TextBlock Grid.Row="1" Classes="secondary" Text="{m:Tr IncomingRequestDeviceLabel}" />
+              <TextBlock Grid.Row="1" Grid.Column="1" Classes="body" Text="{Binding GuestDevice}" />
+              <TextBlock Grid.Row="2" Classes="secondary" Text="{m:Tr IncomingRequestDurationLabel}" />
+              <TextBlock Grid.Row="2" Grid.Column="1" Classes="body" Text="{Binding DurationText}" />
+            </Grid>
+          </Border>
+          <Border Classes="card">
+            <StackPanel Spacing="6">
+              <TextBlock Classes="heading" Text="{Binding ScopeLabel}" />
+              <TextBlock Classes="secondary" Text="{Binding ScopeNote}" IsVisible="{Binding HasScopeNote}" />
+              <TextBlock Classes="body" Text="{Binding SitesMessage}" IsVisible="{Binding HasSitesMessage}" />
+              <ItemsControl ItemsSource="{Binding Sites}" IsVisible="{Binding HasSites}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <TextBlock Classes="body" Text="{Binding}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+          <Border Classes="card">
+            <StackPanel Spacing="6">
+              <TextBlock Classes="heading" Text="{m:Tr IncomingRequestWarningTitle}" />
+              <TextBlock Classes="body" Text="{m:Tr IncomingRequestWarning}" />
+              <TextBlock Classes="secondary" Text="{m:Tr IncomingRequestDisconnectHint}" />
+            </StackPanel>
+          </Border>
+          <StackPanel Spacing="4" IsVisible="{Binding CanTrust}">
+            <CheckBox IsChecked="{Binding TrustThisGuest}">
+              <TextBlock Classes="body" Text="{m:Tr IncomingRequestTrustThisGuest}" />
+            </CheckBox>
+            <TextBlock Classes="secondary" Text="{m:Tr IncomingRequestTrustHint}" />
+          </StackPanel>
+          <TextBlock Classes="secondary" Text="{Binding CountdownText}" />
+          <Grid ColumnDefinitions="*,12,*">
+            <Button Classes="accent" HorizontalAlignment="Stretch" Command="{Binding AcceptCommand}" Content="{m:Tr Accept}" />
+            <Button Grid.Column="2" HorizontalAlignment="Stretch" Command="{Binding RejectCommand}" Content="{m:Tr Reject}" />
+          </Grid>
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
+  </Grid>
+</UserControl>

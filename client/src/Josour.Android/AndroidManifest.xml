@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:installLocation="internalOnly">
+  <!-- The control channel, the relay and the guest's sites. -->
+  <uses-permission android:name="android.permission.INTERNET" />
+  <!-- Wi-Fi or mobile data, the addresses and gateways the egress policy blocks. -->
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+  <!-- Staying available and keeping a session alive with the screen off. -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+  <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+  <!-- Incoming requests while the app is in the background (asked for at run time on Android 13+). -->
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+  <application android:label="Josour" android:icon="@drawable/ic_josour" android:allowBackup="false"
+               android:supportsRtl="true" android:usesCleartextTraffic="false">
+    <service android:name="com.mohamedshaker.josour.HostingService"
+             android:exported="false"
+             android:foregroundServiceType="specialUse">
+      <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps a user-enabled connection-sharing session (Josour host) reachable: a persistent WebSocket to the user's own server, and the encrypted tunnel of a session the user accepted." />
+    </service>
+  </application>
+</manifest>

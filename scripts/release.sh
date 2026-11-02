@@ -5,7 +5,7 @@
 #
 # What it does, in order:
 #   1. refuses unless the working tree is clean and the version is newer than the current one;
-#   2. writes the version into the four files scripts/check-versions.sh reads;
+#   2. writes the version into the five files scripts/check-versions.sh reads;
 #   3. turns "## Unreleased" in CHANGELOG.md into "## 2.1.0 - <today>" (it must have entries);
 #   4. commits "release: v2.1.0" and creates the tag v2.1.0.
 # Pushing the tag starts .github/workflows/release-client.yml, which builds Josour-2.1.0-win-x64.exe
@@ -33,6 +33,7 @@ replace() { # replace FILE SED-EXPRESSION
   sed "$2" "$1" >"$tmp" && cat "$tmp" >"$1" && rm -f "$tmp"
 }
 replace client/src/Josour.App/Josour.App.csproj "s:<Version>$current</Version>:<Version>$new</Version>:"
+replace client/src/Josour.Android/Josour.Android.csproj "s:<Version>$current</Version>:<Version>$new</Version>:"
 replace backend/pyproject.toml "s/^version = \"$current\"$/version = \"$new\"/"
 replace relay/pyproject.toml "s/^version = \"$current\"$/version = \"$new\"/"
 replace relay/relay/__init__.py "s/^__version__ = \"$current\"$/__version__ = \"$new\"/"
@@ -42,7 +43,7 @@ replace CHANGELOG.md "s/^## Unreleased.*$/## Unreleased\\
 
 [[ "$(scripts/check-versions.sh)" == "$new" ]] || { echo "the version did not change everywhere; see git diff" >&2; exit 1; }
 
-git add client/src/Josour.App/Josour.App.csproj backend/pyproject.toml relay/pyproject.toml relay/relay/__init__.py CHANGELOG.md
+git add client/src/Josour.App/Josour.App.csproj client/src/Josour.Android/Josour.Android.csproj backend/pyproject.toml relay/pyproject.toml relay/relay/__init__.py CHANGELOG.md
 git commit -q -m "release: v$new"
 git tag "v$new"
 echo "Version $new committed and tagged. Publish it with:"

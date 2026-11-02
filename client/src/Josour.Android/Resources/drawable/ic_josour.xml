@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A bridge: the app icon and the notifications' small icon (one colour, so Android can tint it). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+        android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+  <path android:fillColor="#FF0E7490"
+        android:pathData="M2,15h20v2H2zM4,17h2v4H4zM18,17h2v4h-2zM3,14c2,-5 5,-7 9,-7s7,2 9,7h-2.2c-1.6,-3.5 -3.9,-5 -6.8,-5s-5.2,1.5 -6.8,5zM8,10.3h2v4.7H8zM14,10.3h2v4.7h-2z" />
+</vector>

@@ -9,9 +9,10 @@ Josour has **one version number** for the apps, the server and the relay, in the
 | Something new, and older apps still work with the new server | a new screen, a new server setting | `2.1.1` → `2.2.0` |
 | Older apps stop working, or people must do something by hand | a protocol change behind `min_client_version` | `2.2.0` → `3.0.0` |
 
-The number lives in four files, and [`scripts/check-versions.sh`](../scripts/check-versions.sh) fails if they
-disagree: `client/src/Josour.App/Josour.App.csproj` (`<Version>`), `backend/pyproject.toml`, `relay/pyproject.toml`
-and `relay/relay/__init__.py`. It is what the exe reports under *Properties → Details*, what the Mac app reports in
+The number lives in five files, and [`scripts/check-versions.sh`](../scripts/check-versions.sh) fails if they
+disagree: `client/src/Josour.App/Josour.App.csproj` (`<Version>`), `client/src/Josour.Android/Josour.Android.csproj`
+(`<Version>`; the Android version code is computed from it), `backend/pyproject.toml`, `relay/pyproject.toml` and
+`relay/relay/__init__.py`. It is what the exe reports under *Properties → Details*, what the Mac app reports in
 *Get Info*, what `/healthz` answers, and what the app sends in its `User-Agent` (which `min_client_version` compares).
 
 ## The steps
@@ -27,7 +28,7 @@ and `relay/relay/__init__.py`. It is what the exe reports under *Properties → 
    git push origin main v2.1.1
    ```
 
-   The script writes the version into the four files, renames `## Unreleased` to `## 2.1.1 - <today>`, commits
+   The script writes the version into the five files, renames `## Unreleased` to `## 2.1.1 - <today>`, commits
    `release: v2.1.1` and tags it `v2.1.1`. It refuses a version that is not newer, a dirty tree, or an empty
    *Unreleased* section.
 4. **Wait for the `release-client` workflow** (about 10 minutes). It builds on GitHub's machines and publishes the

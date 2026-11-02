@@ -1091,4 +1091,82 @@
   <data name="SettingsCheckPageHint" xml:space="preserve">
     <value>As a guest, Josour points this computer's proxy settings at the host for as long as a session lasts, so any browser goes through it, and puts them back afterwards. The check page shows the address sites will see.</value>
   </data>
+  <data name="MobileHostHeading" xml:space="preserve">
+    <value>Share this phone's connection</value>
+  </data>
+  <data name="MobileHostDescription" xml:space="preserve">
+    <value>While “Available” is on, your contacts can ask to browse through this phone's connection, and sites see the phone's public address — on Wi-Fi or on mobile data. Josour stays connected in the background, with a notification, for as long as you are available.</value>
+  </data>
+  <data name="MobileNetworkWifi" xml:space="preserve">
+    <value>Network: Wi-Fi</value>
+  </data>
+  <data name="MobileNetworkCellular" xml:space="preserve">
+    <value>Network: mobile data</value>
+  </data>
+  <data name="MobileNetworkEthernet" xml:space="preserve">
+    <value>Network: Ethernet</value>
+  </data>
+  <data name="MobileNetworkOther" xml:space="preserve">
+    <value>Network: connected</value>
+  </data>
+  <data name="MobileNetworkNone" xml:space="preserve">
+    <value>No internet connection</value>
+  </data>
+  <data name="MobilePublicIpFormat" xml:space="preserve">
+    <value>Address sites will see: {0}</value>
+  </data>
+  <data name="MobileCellularDataNote" xml:space="preserve">
+    <value>You are on mobile data: what the guest browses counts against your data plan.</value>
+  </data>
+  <data name="MobileVpnWarning" xml:space="preserve">
+    <value>A VPN is running on this phone, so sites will see its address, not yours. Turn it off to share your own address.</value>
+  </data>
+  <data name="MobileBatteryHint" xml:space="preserve">
+    <value>To stay available with the screen off, let Josour run in the background without battery restrictions.</value>
+  </data>
+  <data name="MobileBatteryAllow" xml:space="preserve">
+    <value>Allow background use</value>
+  </data>
+  <data name="MobileNotificationsHint" xml:space="preserve">
+    <value>Allow Josour's notifications so you hear about incoming requests while the app is in the background.</value>
+  </data>
+  <data name="MobileNotificationsAllow" xml:space="preserve">
+    <value>Allow notifications</value>
+  </data>
+  <data name="MobileServiceChannelName" xml:space="preserve">
+    <value>Hosting</value>
+  </data>
+  <data name="MobileRequestsChannelName" xml:space="preserve">
+    <value>Incoming requests</value>
+  </data>
+  <data name="MobileServiceAvailableTitle" xml:space="preserve">
+    <value>Josour is available for requests</value>
+  </data>
+  <data name="MobileServiceAvailableText" xml:space="preserve">
+    <value>Staying connected to receive your contacts' requests.</value>
+  </data>
+  <data name="MobileServiceSessionTitleFormat" xml:space="preserve">
+    <value>{0} is browsing through your connection</value>
+  </data>
+  <data name="MobileStopHosting" xml:space="preserve">
+    <value>Stop hosting</value>
+  </data>
+  <data name="MobileEndSessionNow" xml:space="preserve">
+    <value>End the session now</value>
+  </data>
+  <data name="MobileSessionHeading" xml:space="preserve">
+    <value>Active session</value>
+  </data>
+  <data name="MobileSessionGuestFormat" xml:space="preserve">
+    <value>Guest: {0}</value>
+  </data>
+  <data name="MobileRequestTapToAnswer" xml:space="preserve">
+    <value>Open Josour to answer.</value>
+  </data>
+  <data name="MobileSignedInAsFormat" xml:space="preserve">
+    <value>Signed in as {0}</value>
+  </data>
+  <data name="MobileGuestRoleNote" xml:space="preserve">
+    <value>This version makes the phone a host only. To borrow someone else's connection, use Josour on Windows or macOS.</value>
+  </data>
 </root>

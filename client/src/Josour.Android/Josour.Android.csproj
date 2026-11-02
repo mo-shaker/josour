@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Android head (docs/android-app-proposal.ar.md). This first version is the HOST role only: the phone shares its own
+    connection (Wi-Fi or mobile data) with a contact on Windows, macOS or another phone. Everything that decides what a
+    guest may reach is the same code the desktop runs (Josour.Egress, Josour.Tunnel); this project only adds what Android
+    owns: the activity, the foreground service that keeps the control channel alive, notifications, and the platform facts
+    (device name, network state).
+
+    It is not part of Josour.sln: building it needs the .NET 10 SDK with the android workload, a JDK and the Android SDK,
+    which scripts/android-toolchain.sh installs under ~/.josour-android. Build with scripts/android-build.sh.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
+    <RootNamespace>Josour.Droid</RootNamespace>
+    <AssemblyName>Josour.Android</AssemblyName>
+    <ApplicationId>com.mohamedshaker.josour</ApplicationId>
+    <ApplicationTitle>Josour</ApplicationTitle>
+    <Version>2.1.1</Version>
+    <ApplicationDisplayVersion>$(Version)</ApplicationDisplayVersion>
+    <!-- major*10000 + minor*100 + patch: always increasing with the one version (scripts/check-versions.sh, release.sh). -->
+    <ApplicationVersion>$([MSBuild]::Add($([MSBuild]::Add($([MSBuild]::Multiply($([System.Version]::Parse('$(Version)').Major), 10000)), $([MSBuild]::Multiply($([System.Version]::Parse('$(Version)').Minor), 100)))), $([System.Version]::Parse('$(Version)').Build)))</ApplicationVersion>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <!--
+      Every APK carries its assemblies, Debug included. Without this a Debug build relies on "fast deployment" (the
+      assemblies pushed separately by an IDE) and an APK installed on its own aborts at start with "No assemblies found".
+    -->
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+    <AndroidEnableMultiDex>true</AndroidEnableMultiDex>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+    <Nullable>enable</Nullable>
+    <!-- arm64 for real phones, x64 for the emulator; 32-bit phones are not targeted. -->
+    <RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <AndroidLinkMode>SdkOnly</AndroidLinkMode>
+    <RunAOTCompilation>false</RunAOTCompilation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Android" Version="11.3.22" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Josour.Mobile/Josour.Mobile.csproj" />
+  </ItemGroup>
+
+</Project>

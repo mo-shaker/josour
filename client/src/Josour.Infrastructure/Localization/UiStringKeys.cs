@@ -466,4 +466,58 @@ public static class UiStringKeys
     public const string SettingsCheckPageLabel = "SettingsCheckPageLabel";
 
     public const string SettingsCheckPageHint = "SettingsCheckPageHint";
+
+    // ---- mobile (Josour.Mobile / Josour.Android: the phone as a host) ----
+
+    public const string MobileHostHeading = "MobileHostHeading";
+
+    public const string MobileHostDescription = "MobileHostDescription";
+
+    public const string MobileNetworkWifi = "MobileNetworkWifi";
+
+    public const string MobileNetworkCellular = "MobileNetworkCellular";
+
+    public const string MobileNetworkEthernet = "MobileNetworkEthernet";
+
+    public const string MobileNetworkOther = "MobileNetworkOther";
+
+    public const string MobileNetworkNone = "MobileNetworkNone";
+
+    public const string MobilePublicIpFormat = "MobilePublicIpFormat";
+
+    public const string MobileCellularDataNote = "MobileCellularDataNote";
+
+    public const string MobileVpnWarning = "MobileVpnWarning";
+
+    public const string MobileBatteryHint = "MobileBatteryHint";
+
+    public const string MobileBatteryAllow = "MobileBatteryAllow";
+
+    public const string MobileNotificationsHint = "MobileNotificationsHint";
+
+    public const string MobileNotificationsAllow = "MobileNotificationsAllow";
+
+    public const string MobileServiceChannelName = "MobileServiceChannelName";
+
+    public const string MobileRequestsChannelName = "MobileRequestsChannelName";
+
+    public const string MobileServiceAvailableTitle = "MobileServiceAvailableTitle";
+
+    public const string MobileServiceAvailableText = "MobileServiceAvailableText";
+
+    public const string MobileServiceSessionTitleFormat = "MobileServiceSessionTitleFormat";
+
+    public const string MobileStopHosting = "MobileStopHosting";
+
+    public const string MobileEndSessionNow = "MobileEndSessionNow";
+
+    public const string MobileSessionHeading = "MobileSessionHeading";
+
+    public const string MobileSessionGuestFormat = "MobileSessionGuestFormat";
+
+    public const string MobileRequestTapToAnswer = "MobileRequestTapToAnswer";
+
+    public const string MobileSignedInAsFormat = "MobileSignedInAsFormat";
+
+    public const string MobileGuestRoleNote = "MobileGuestRoleNote";
 }

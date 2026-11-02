@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The phone's interface and its composition, as a plain net8.0 library so it builds and is tested on the desktop like
+    every other project (the headless Avalonia tests render its views with no phone and no Android SDK). Android-only
+    behaviour reaches it through the interfaces in Platform/, implemented by Josour.Android.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Josour.Mobile</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Josour.Core/Josour.Core.csproj" />
+    <ProjectReference Include="../Josour.Infrastructure/Josour.Infrastructure.csproj" />
+    <ProjectReference Include="../Josour.Tunnel/Josour.Tunnel.csproj" />
+    <ProjectReference Include="../Josour.Proxy/Josour.Proxy.csproj" />
+    <ProjectReference Include="../Josour.Egress/Josour.Egress.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Josour.Mobile.Tests" />
+  </ItemGroup>
+
+</Project>

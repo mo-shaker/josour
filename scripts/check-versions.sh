@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Josour has one version number, written in four files. Print it, or fail if they disagree.
+# Josour has one version number, written in five files. Print it, or fail if they disagree.
 #
 #   scripts/check-versions.sh            # prints e.g. 2.0.1
 #
-# scripts/release.sh changes all four together; the release workflow runs this before it builds.
+# scripts/release.sh changes all five together; the release workflow runs this before it builds.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -18,7 +18,7 @@ read_version() {
 primary=client/src/Josour.App/Josour.App.csproj
 version="$(read_version "$primary")"
 status=0
-for file in backend/pyproject.toml relay/pyproject.toml relay/relay/__init__.py; do
+for file in client/src/Josour.Android/Josour.Android.csproj backend/pyproject.toml relay/pyproject.toml relay/relay/__init__.py; do
   found="$(read_version "$file")"
   if [[ -z $found ]]; then
     echo "no version found in $file" >&2

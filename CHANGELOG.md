@@ -6,6 +6,22 @@ Every release of Josour: the apps, the server and the relay share one version nu
 
 ## Unreleased
 
+### Android (first version: the phone as a host)
+- **An Android phone can share its connection.** Signed in with the same account as on a computer, the phone turns
+  "Available" on and contacts on Windows or macOS can ask to browse through it; the sites they visit see the phone's
+  public address. It works the same on Wi-Fi and on mobile data, and moving from one to the other reconnects at once.
+  The phone answers with the same consent screen as the desktop (who, which device, how long, what they may reach),
+  accepts a trusted contact without asking, and shows the time left and the data used, with "End the session now".
+- A foreground service with a permanent notification keeps the phone reachable with the screen off; a request arrives
+  as a notification that opens the consent screen (it has no Accept button of its own). On mobile data the app says the
+  guest's browsing counts against the data plan, and it warns when a VPN would hide the phone's own address.
+- The guest's traffic is held to the same egress policy as on the desktop (the same code), and the phone's Wi-Fi router
+  and its other networks are blocked using what Android reports, since .NET cannot read the routing table there.
+- The phone is a host only in this version: it does not take offers and cannot borrow a connection.
+- The device secret and refresh token are encrypted with a key held in the Android Keystore.
+- Build with `scripts/android-toolchain.sh` (once) and `scripts/android-build.sh`; the APK is
+  `client/publish/Josour-android.apk`. The desktop control channel now takes its `hello.capabilities` from its options.
+
 ## 2.1.1 - 2026-10-29
 
 ### Fixed

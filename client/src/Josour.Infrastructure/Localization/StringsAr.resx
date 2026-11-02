@@ -1091,4 +1091,82 @@
   <data name="SettingsCheckPageHint" xml:space="preserve">
     <value>عندما تكون ضيفًا، يوجّه جسور إعدادات البروكسي في هذا الجهاز إلى المضيف طوال الجلسة، فيمر أي متصفح عبره، ثم يعيدها كما كانت. وتعرض صفحة الفحص العنوان الذي ستراه المواقع.</value>
   </data>
+  <data name="MobileHostHeading" xml:space="preserve">
+    <value>شارك اتصال هذا الهاتف</value>
+  </data>
+  <data name="MobileHostDescription" xml:space="preserve">
+    <value>عند تفعيل «متاح»، تستطيع جهات اتصالك طلب التصفح عبر اتصال هذا الهاتف، فترى المواقع عنوان الهاتف العام، سواء كان على Wi-Fi أو على بيانات الجوال. يبقى جسور متصلًا في الخلفية بإشعار دائم ما دمت متاحًا.</value>
+  </data>
+  <data name="MobileNetworkWifi" xml:space="preserve">
+    <value>الشبكة: Wi-Fi</value>
+  </data>
+  <data name="MobileNetworkCellular" xml:space="preserve">
+    <value>الشبكة: بيانات الجوال</value>
+  </data>
+  <data name="MobileNetworkEthernet" xml:space="preserve">
+    <value>الشبكة: إيثرنت</value>
+  </data>
+  <data name="MobileNetworkOther" xml:space="preserve">
+    <value>الشبكة: متصل</value>
+  </data>
+  <data name="MobileNetworkNone" xml:space="preserve">
+    <value>لا يوجد اتصال بالإنترنت</value>
+  </data>
+  <data name="MobilePublicIpFormat" xml:space="preserve">
+    <value>العنوان الذي ستراه المواقع: {0}</value>
+  </data>
+  <data name="MobileCellularDataNote" xml:space="preserve">
+    <value>أنت على بيانات الجوال: ما يتصفحه الضيف يُحتسب من باقتك.</value>
+  </data>
+  <data name="MobileVpnWarning" xml:space="preserve">
+    <value>يعمل VPN على هذا الهاتف، فستظهر للمواقع عنوانه لا عنوانك. أوقفه إن أردت أن تشارك عنوانك أنت.</value>
+  </data>
+  <data name="MobileBatteryHint" xml:space="preserve">
+    <value>ليبقى الهاتف متاحًا والشاشة مطفأة، اسمح لجسور بالعمل في الخلفية دون قيود البطارية.</value>
+  </data>
+  <data name="MobileBatteryAllow" xml:space="preserve">
+    <value>السماح بالعمل في الخلفية</value>
+  </data>
+  <data name="MobileNotificationsHint" xml:space="preserve">
+    <value>اسمح لجسور بالإشعارات حتى تعرف بالطلبات الواردة والتطبيق في الخلفية.</value>
+  </data>
+  <data name="MobileNotificationsAllow" xml:space="preserve">
+    <value>السماح بالإشعارات</value>
+  </data>
+  <data name="MobileServiceChannelName" xml:space="preserve">
+    <value>الاستضافة</value>
+  </data>
+  <data name="MobileRequestsChannelName" xml:space="preserve">
+    <value>الطلبات الواردة</value>
+  </data>
+  <data name="MobileServiceAvailableTitle" xml:space="preserve">
+    <value>جسور متاح لاستقبال الطلبات</value>
+  </data>
+  <data name="MobileServiceAvailableText" xml:space="preserve">
+    <value>يبقى متصلًا ليستقبل طلبات جهات اتصالك.</value>
+  </data>
+  <data name="MobileServiceSessionTitleFormat" xml:space="preserve">
+    <value>{0} يتصفح عبر اتصالك</value>
+  </data>
+  <data name="MobileStopHosting" xml:space="preserve">
+    <value>إيقاف الاستضافة</value>
+  </data>
+  <data name="MobileEndSessionNow" xml:space="preserve">
+    <value>إنهاء الجلسة الآن</value>
+  </data>
+  <data name="MobileSessionHeading" xml:space="preserve">
+    <value>جلسة نشطة</value>
+  </data>
+  <data name="MobileSessionGuestFormat" xml:space="preserve">
+    <value>الضيف: {0}</value>
+  </data>
+  <data name="MobileRequestTapToAnswer" xml:space="preserve">
+    <value>افتح جسور للرد على الطلب.</value>
+  </data>
+  <data name="MobileSignedInAsFormat" xml:space="preserve">
+    <value>مسجّل الدخول باسم {0}</value>
+  </data>
+  <data name="MobileGuestRoleNote" xml:space="preserve">
+    <value>هذه النسخة تجعل الهاتف مضيفًا فقط. لاستعارة اتصال غيرك استخدم برنامج جسور على ويندوز أو ماك.</value>
+  </data>
 </root>

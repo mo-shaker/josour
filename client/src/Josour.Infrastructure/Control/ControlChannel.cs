@@ -326,7 +326,7 @@ public sealed class ControlChannel : IControlChannel, IReconnectNow
                     }
                 }
 
-                await SendFrameAsync(socket, new HelloMessage(token, _deviceId, _device.AppVersion, _diagnostics, ClientCapabilities.Current), ct).ConfigureAwait(false);
+                await SendFrameAsync(socket, new HelloMessage(token, _deviceId, _device.AppVersion, _diagnostics, _options.Capabilities), ct).ConfigureAwait(false);
                 var ack = await AwaitHelloAckAsync(socket, ct).ConfigureAwait(false);
 
                 var opened = socket;

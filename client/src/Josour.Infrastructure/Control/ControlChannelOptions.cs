@@ -12,6 +12,12 @@ public sealed record ControlChannelOptions
 {
     public static ControlChannelOptions Default { get; } = new();
 
+    /// <summary>
+    /// <c>hello.capabilities</c> (docs/ws-protocol.md section 10). The desktop declares every role it can take; the phone,
+    /// which only hosts, leaves out <c>offers</c> and <c>system_proxy</c> so the server never rings it as a guest.
+    /// </summary>
+    public IReadOnlyList<string> Capabilities { get; init; } = Josour.Core.Control.ClientCapabilities.Current;
+
     /// <summary>Path appended to the server base URL (with its optional path prefix): <c>https://host/rb/</c> → <c>wss://host/rb/ws</c>.</summary>
     public string Path { get; init; } = "ws";
 
