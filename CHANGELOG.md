@@ -6,6 +6,8 @@ Every release of Josour: the apps, the server and the relay share one version nu
 
 ## Unreleased
 
+## 2.2.0 - 2026-11-02
+
 ### Android (first version: the phone as a host)
 - **An Android phone can share its connection.** Signed in with the same account as on a computer, the phone turns
   "Available" on and contacts on Windows or macOS can ask to browse through it; the sites they visit see the phone's

@@ -18,7 +18,7 @@
     <AssemblyName>Josour.Android</AssemblyName>
     <ApplicationId>com.mohamedshaker.josour</ApplicationId>
     <ApplicationTitle>Josour</ApplicationTitle>
-    <Version>2.1.1</Version>
+    <Version>2.2.0</Version>
     <ApplicationDisplayVersion>$(Version)</ApplicationDisplayVersion>
     <!-- major*10000 + minor*100 + patch: always increasing with the one version (scripts/check-versions.sh, release.sh). -->
     <ApplicationVersion>$([MSBuild]::Add($([MSBuild]::Add($([MSBuild]::Multiply($([System.Version]::Parse('$(Version)').Major), 10000)), $([MSBuild]::Multiply($([System.Version]::Parse('$(Version)').Minor), 100)))), $([System.Version]::Parse('$(Version)').Build)))</ApplicationVersion>
