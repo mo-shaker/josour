@@ -8,8 +8,9 @@
 #   2. writes the version into the five files scripts/check-versions.sh reads;
 #   3. turns "## Unreleased" in CHANGELOG.md into "## 2.1.0 - <today>" (it must have entries);
 #   4. commits "release: v2.1.0" and creates the tag v2.1.0.
-# Pushing the tag starts .github/workflows/release-client.yml, which builds Josour-2.1.0-win-x64.exe
-# and the two macOS disk images and publishes them as the GitHub Release v2.1.0 (docs/releasing.md).
+# Pushing the tag starts .github/workflows/release-client.yml, which builds Josour-2.1.0-win-x64.exe,
+# the two macOS disk images and the signed Android APK and publishes them as the GitHub Release v2.1.0
+# (docs/releasing.md).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
