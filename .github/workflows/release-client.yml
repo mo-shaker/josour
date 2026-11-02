@@ -37,7 +37,7 @@ jobs:
     outputs:
       version: ${{ steps.read.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: read
         run: |
           version="$(scripts/check-versions.sh)"
@@ -56,8 +56,8 @@ jobs:
     needs: version
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "8.0.x"
       - name: Publish Josour.exe
@@ -72,7 +72,7 @@ jobs:
           if (-not "$shown".StartsWith("${{ needs.version.outputs.version }}")) {
             Write-Output "::warning::Josour-win-x64.exe reports version '$shown', not ${{ needs.version.outputs.version }}"
           }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows
           path: Josour-*win-x64.exe
@@ -81,8 +81,8 @@ jobs:
     needs: version
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "8.0.x"
       - name: Build the disk images
@@ -93,7 +93,7 @@ jobs:
           cp "client/publish/mac/Josour-$v-arm64.dmg" "client/publish/mac/Josour-$v-x64.dmg" .
           cp "Josour-$v-arm64.dmg" Josour-macos-arm64.dmg
           cp "Josour-$v-x64.dmg" Josour-macos-x64.dmg
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos
           path: Josour-*.dmg
@@ -102,11 +102,11 @@ jobs:
     needs: version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "10.0.x"
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: microsoft
           java-version: "21"
@@ -127,7 +127,8 @@ jobs:
           keystore="$RUNNER_TEMP/josour-release.keystore"
           printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$keystore"
           project=client/src/Josour.Android/Josour.Android.csproj
-          sdk=(-f net10.0-android -p:AndroidSdkDirectory="$ANDROID_HOME" -p:JavaSdkDirectory="$JAVA_HOME")
+          # The runner image's Android SDK when it has one; otherwise the build installs what it needs here.
+          sdk=(-f net10.0-android -p:AndroidSdkDirectory="${ANDROID_HOME:-$RUNNER_TEMP/android-sdk}" -p:JavaSdkDirectory="$JAVA_HOME")
           dotnet build "$project" -t:InstallAndroidDependencies "${sdk[@]}" -p:AcceptAndroidSdkLicenses=True
           dotnet build "$project" -c Release "${sdk[@]}" \
             -p:AndroidKeyStore=true -p:AndroidSigningKeyStore="$keystore" -p:AndroidSigningKeyAlias="$KEY_ALIAS" \
@@ -137,7 +138,7 @@ jobs:
           [ -n "$apk" ] || { echo "::error::the build produced no signed APK"; exit 1; }
           cp "$apk" "Josour-$VERSION-android.apk"
           cp "$apk" Josour-android.apk
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: android
           path: Josour-*android.apk
@@ -146,8 +147,8 @@ jobs:
     needs: [version, windows, macos, android]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           path: assets
           merge-multiple: true
