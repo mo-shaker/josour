@@ -39,6 +39,7 @@ disagree: `client/src/Josour.App/Josour.App.csproj` (`<Version>`), `client/src/J
    | `Josour-2.1.1-win-x64.exe` and `Josour-win-x64.exe` | Windows 10/11 — one self-contained file |
    | `Josour-2.1.1-arm64.dmg` and `Josour-macos-arm64.dmg` | Macs with Apple silicon |
    | `Josour-2.1.1-x64.dmg` and `Josour-macos-x64.dmg` | Intel Macs |
+   | `Josour-2.1.1-android.apk` and `Josour-android.apk` | Android 8 and later, signed with the release key |
    | `SHA256SUMS.txt` | The SHA-256 of every file, to check a copy against |
 
    The release notes are this version's section of the changelog, followed by download and first-launch notes.
@@ -58,9 +59,37 @@ disagree: `client/src/Josour.App/Josour.App.csproj` (`<Version>`), `client/src/J
   anything else it stops and asks for a new version. People compare the SHA-256 of what they were sent, so one
   version must always mean one set of bytes.
 - The Windows exe is checked for the release's version (a mismatch is flagged on the run).
+- The APK is signed with the release key from the repository secrets; without them the release fails.
+
+## The Android signing key
+
+Android installs an update only over an app signed with **the same key**, so the APK is signed with one key for as
+long as the app exists. Lose it and every phone has to uninstall Josour (and sign in again) to take the next version.
+Make it once, on your own machine, with the `keytool` that `scripts/android-toolchain.sh` installed:
+
+```bash
+~/.josour-android/jdk/bin/keytool -genkeypair -v -keystore josour-release.keystore -alias josour \
+  -keyalg RSA -keysize 4096 -validity 36500 -dname "CN=Josour"
+```
+
+It asks for a password (use the same one for the key when asked). Then give it to the release workflow as four
+repository secrets (*Settings → Secrets and variables → Actions*, or with `gh`):
+
+```bash
+base64 -i josour-release.keystore | gh secret set ANDROID_KEYSTORE_BASE64
+gh secret set ANDROID_KEY_ALIAS --body josour
+gh secret set ANDROID_STORE_PASSWORD     # paste the password
+gh secret set ANDROID_KEY_PASSWORD       # the same password
+```
+
+Keep `josour-release.keystore` and its password somewhere safe **outside** GitHub as well (a password manager), and
+never commit it. To sign a build on your own machine with it: `JOSOUR_ANDROID_KEYSTORE=josour-release.keystore
+JOSOUR_ANDROID_KEY_ALIAS=josour JOSOUR_ANDROID_STORE_PASS=… JOSOUR_ANDROID_KEY_PASS=… bash scripts/android-build.sh Release`.
 
 ## Without the workflow
 
 To build on your own machine (needs the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)):
 `powershell -ExecutionPolicy Bypass -File scripts\publish-exe.ps1` on Windows, `scripts/publish-app.sh --dmg` on a Mac
-(`--arch x64` for an Intel build). They produce the same files the workflow does, but nothing is published.
+(`--arch x64` for an Intel build). The Android app needs its own toolchain: `bash scripts/android-toolchain.sh`
+once, then `bash scripts/android-build.sh Release`. They produce the same files the workflow does, but nothing is
+published.

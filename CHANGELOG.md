@@ -19,6 +19,9 @@ Every release of Josour: the apps, the server and the relay share one version nu
   and its other networks are blocked using what Android reports, since .NET cannot read the routing table there.
 - The phone is a host only in this version: it does not take offers and cannot borrow a connection.
 - The device secret and refresh token are encrypted with a key held in the Android Keystore.
+- **Download link:** `releases/latest/download/Josour-android.apk`, in the README with the other apps. Each release
+  now carries the APK, signed with one release key kept in the repository secrets
+  ([docs/releasing.md](docs/releasing.md#the-android-signing-key)).
 - Build with `scripts/android-toolchain.sh` (once) and `scripts/android-build.sh`; the APK is
   `client/publish/Josour-android.apk`. The desktop control channel now takes its `hello.capabilities` from its options.
 

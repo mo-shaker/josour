@@ -67,9 +67,9 @@ See [licensing and distribution](docs/licensing.md) for details and an Arabic su
 
 ## Download the app
 
-| Windows 10/11 | Mac with Apple silicon (M1 and later) | Mac with an Intel processor |
-|---|---|---|
-| **[Josour-win-x64.exe](https://github.com/mo-shaker/josour/releases/latest/download/Josour-win-x64.exe)** | **[Josour-macos-arm64.dmg](https://github.com/mo-shaker/josour/releases/latest/download/Josour-macos-arm64.dmg)** | **[Josour-macos-x64.dmg](https://github.com/mo-shaker/josour/releases/latest/download/Josour-macos-x64.dmg)** |
+| Windows 10/11 | Mac with Apple silicon (M1 and later) | Mac with an Intel processor | Android 8 and later |
+|---|---|---|---|
+| **[Josour-win-x64.exe](https://github.com/mo-shaker/josour/releases/latest/download/Josour-win-x64.exe)** | **[Josour-macos-arm64.dmg](https://github.com/mo-shaker/josour/releases/latest/download/Josour-macos-arm64.dmg)** | **[Josour-macos-x64.dmg](https://github.com/mo-shaker/josour/releases/latest/download/Josour-macos-x64.dmg)** | **[Josour-android.apk](https://github.com/mo-shaker/josour/releases/latest/download/Josour-android.apk)** |
 
 These links always give the newest release; every version, its notes and a `SHA256SUMS.txt` to check the files
 against are on the [Releases page](https://github.com/mo-shaker/josour/releases), and what changed is in
@@ -77,9 +77,13 @@ against are on the [Releases page](https://github.com/mo-shaker/josour/releases)
 application — one codebase, one interface, both roles (host and guest) on both systems
 ([ADR-0013](docs/decisions/0013-avalonia-and-macos.md)).
 
-Both are unsigned by decision ([ADR-0011](docs/decisions/0011-no-code-signing-certificate.md)), so the first launch,
+The desktop apps are unsigned by decision ([ADR-0011](docs/decisions/0011-no-code-signing-certificate.md)), so the first launch,
 once per machine, needs one extra click: on Windows, SmartScreen → **More info → Run anyway**; on a Mac,
 **right-click → Open → Open** (macOS 15: System Settings → Privacy & Security → **Open Anyway**).
+
+**Android** is a host only for now: the phone shares its own connection, on Wi-Fi or on mobile data, with contacts on
+Windows or macOS; it cannot borrow one. The APK is installed from the link above rather than from Google Play: open the
+downloaded file and allow **Install unknown apps** for your browser when Android asks, once.
 
 The app needs a Josour server to sign in to. Nobody runs a public one: you install your own, below.
 

@@ -179,11 +179,12 @@ Then, once:
 Each person — the one who shares a connection (the **host**) and the one who uses it (the **guest**) — installs the
 app. Download it:
 
-| Computer | Download |
+| Device | Download |
 |---|---|
 | **Windows** 10/11 | [Josour-win-x64.exe](https://github.com/mo-shaker/josour/releases/latest/download/Josour-win-x64.exe) |
 | **Mac** with Apple silicon (M1, M2, M3, M4…) | [Josour-macos-arm64.dmg](https://github.com/mo-shaker/josour/releases/latest/download/Josour-macos-arm64.dmg) |
 | **Mac** with an Intel processor (older Macs) | [Josour-macos-x64.dmg](https://github.com/mo-shaker/josour/releases/latest/download/Josour-macos-x64.dmg) |
+| **Android** 8 and later (shares the phone's connection; it cannot borrow one yet) | [Josour-android.apk](https://github.com/mo-shaker/josour/releases/latest/download/Josour-android.apk) |
 
 (Which Mac? Apple menu → *About This Mac*: "Chip: Apple M…" is Apple silicon; "Processor: Intel…" is Intel.)
 All versions are on the [Releases page](https://github.com/mo-shaker/josour/releases).

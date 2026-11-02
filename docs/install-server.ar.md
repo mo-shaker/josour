@@ -195,11 +195,12 @@ scp root@203.0.113.10:/opt/josour/deploy/.env josour-settings-backup.txt
 
 كل شخص يثبّت التطبيق: من يشارك اتصاله (**المضيف**) ومن يستخدمه (**الضيف**). نزّله من هنا:
 
-| الحاسوب | التنزيل |
+| الجهاز | التنزيل |
 |---|---|
 | **Windows** 10/11 | [Josour-win-x64.exe](https://github.com/mo-shaker/josour/releases/latest/download/Josour-win-x64.exe) |
 | **Mac** بمعالج Apple (M1 أو M2 أو M3 أو M4…) | [Josour-macos-arm64.dmg](https://github.com/mo-shaker/josour/releases/latest/download/Josour-macos-arm64.dmg) |
 | **Mac** بمعالج Intel (أجهزة Mac الأقدم) | [Josour-macos-x64.dmg](https://github.com/mo-shaker/josour/releases/latest/download/Josour-macos-x64.dmg) |
+| **Android** 8 أو أحدث (يشارك اتصال الهاتف؛ لا يستعير اتصال غيره بعد) | [Josour-android.apk](https://github.com/mo-shaker/josour/releases/latest/download/Josour-android.apk) |
 
 (أي Mac لديك؟ من قائمة Apple اختر *About This Mac*: إن ظهر "Chip: Apple M…" فهو معالج Apple، وإن ظهر "Processor: Intel…"
 فهو Intel.) وكل الإصدارات موجودة في [صفحة الإصدارات](https://github.com/mo-shaker/josour/releases).

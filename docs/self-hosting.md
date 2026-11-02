@@ -422,6 +422,7 @@ Release ([releasing.md](releasing.md) is how to publish one). Download from the 
 | [`Josour-win-x64.exe`](https://github.com/mo-shaker/josour/releases/latest/download/Josour-win-x64.exe) | Windows 10/11, 64-bit. One self-contained file: nothing else to install |
 | [`Josour-macos-arm64.dmg`](https://github.com/mo-shaker/josour/releases/latest/download/Josour-macos-arm64.dmg) | Macs with Apple silicon (M1 and later) |
 | [`Josour-macos-x64.dmg`](https://github.com/mo-shaker/josour/releases/latest/download/Josour-macos-x64.dmg) | Intel Macs |
+| [`Josour-android.apk`](https://github.com/mo-shaker/josour/releases/latest/download/Josour-android.apk) | Android 8 and later; host only (shares the phone's connection on Wi-Fi or mobile data) |
 
 Each release also carries the same files under their version (`Josour-2.1.0-win-x64.exe`, …) and a
 `SHA256SUMS.txt`. The .NET runtime travels inside each of them.

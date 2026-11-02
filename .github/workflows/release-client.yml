@@ -8,11 +8,16 @@ name: release-client
 #   Josour-<version>-win-x64.exe   and  Josour-win-x64.exe        Windows 10/11, one self-contained file
 #   Josour-<version>-arm64.dmg     and  Josour-macos-arm64.dmg    Apple silicon
 #   Josour-<version>-x64.dmg       and  Josour-macos-x64.dmg      Intel Macs
+#   Josour-<version>-android.apk   and  Josour-android.apk        Android 8+, signed with the release key
 #   SHA256SUMS.txt                                                the SHA-256 of each file above
 #
 # Started by pushing a tag v<version>, or by hand from the Actions tab (it then releases the version in the
 # project files as v<version>). A version that has been released from one commit is never rebuilt from another:
 # a run for an existing tag that points elsewhere fails and asks for a new version.
+#
+# The APK is signed with one key for its whole life: Android installs an update only over an app signed with the same
+# key. The key lives in four repository secrets (docs/releasing.md, "The Android signing key"); without them the
+# release fails rather than publishing a README link that leads nowhere.
 
 on:
   push:
@@ -93,8 +98,52 @@ jobs:
           name: macos
           path: Josour-*.dmg
 
+  android:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: "21"
+      - name: Install the android workload
+        run: dotnet workload install android
+      - name: Build the signed APK
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          JOSOUR_ANDROID_STORE_PASS: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          JOSOUR_ANDROID_KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEY_ALIAS" ] || [ -z "$JOSOUR_ANDROID_STORE_PASS" ] || [ -z "$JOSOUR_ANDROID_KEY_PASS" ]; then
+            echo "::error::The Android signing key is not set up: see \"The Android signing key\" in docs/releasing.md"
+            exit 1
+          fi
+          keystore="$RUNNER_TEMP/josour-release.keystore"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$keystore"
+          project=client/src/Josour.Android/Josour.Android.csproj
+          sdk=(-f net10.0-android -p:AndroidSdkDirectory="$ANDROID_HOME" -p:JavaSdkDirectory="$JAVA_HOME")
+          dotnet build "$project" -t:InstallAndroidDependencies "${sdk[@]}" -p:AcceptAndroidSdkLicenses=True
+          dotnet build "$project" -c Release "${sdk[@]}" \
+            -p:AndroidKeyStore=true -p:AndroidSigningKeyStore="$keystore" -p:AndroidSigningKeyAlias="$KEY_ALIAS" \
+            -p:AndroidSigningStorePass=env:JOSOUR_ANDROID_STORE_PASS -p:AndroidSigningKeyPass=env:JOSOUR_ANDROID_KEY_PASS
+          rm -f "$keystore"
+          apk="$(find client/src/Josour.Android/bin/Release/net10.0-android -name '*-Signed.apk' -print | head -1)"
+          [ -n "$apk" ] || { echo "::error::the build produced no signed APK"; exit 1; }
+          cp "$apk" "Josour-$VERSION-android.apk"
+          cp "$apk" Josour-android.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: Josour-*android.apk
+
   release:
-    needs: [version, windows, macos]
+    needs: [version, windows, macos, android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -120,9 +169,11 @@ jobs:
           | Windows 10/11 (64-bit) | [Josour-$VERSION-win-x64.exe]($repo/releases/download/v$VERSION/Josour-$VERSION-win-x64.exe) |
           | Mac with Apple silicon (M1 and later) | [Josour-$VERSION-arm64.dmg]($repo/releases/download/v$VERSION/Josour-$VERSION-arm64.dmg) |
           | Mac with an Intel processor | [Josour-$VERSION-x64.dmg]($repo/releases/download/v$VERSION/Josour-$VERSION-x64.dmg) |
+          | Android 8 and later (host only) | [Josour-$VERSION-android.apk]($repo/releases/download/v$VERSION/Josour-$VERSION-android.apk) |
 
           The builds are unsigned (ADR-0011). Windows: "Windows protected your PC" → **More info** → **Run anyway**.
           macOS: right-click the app → **Open** the first time (macOS 15: System Settings → Privacy & Security → **Open Anyway**).
+          Android: open the downloaded APK and allow **Install unknown apps** for your browser when Android asks.
           Check a file against \`SHA256SUMS.txt\` before you pass it on.
 
           Server: a new server installs with one command, and \`sudo bash /opt/josour/deploy/install.sh\` updates an
