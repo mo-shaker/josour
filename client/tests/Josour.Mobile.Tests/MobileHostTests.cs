@@ -143,6 +143,26 @@ public class MobileHostTests
         }
     }
 
+    [AvaloniaFact]
+    public async Task Available_without_a_connection_says_requests_cannot_arrive_until_it_reconnects()
+    {
+        using var phone = new TestPhone();
+        var host = phone.Get<HostViewModel>();
+
+        host.IsAvailable = true;
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(host.IsUnreachable);
+        Assert.False(host.IsReady);
+
+        await phone.Channel.ConnectAsync("token", Guid.NewGuid(), null, CancellationToken.None);
+        await WaitUntil(() => host.IsConnected);
+        Assert.False(host.IsUnreachable);
+        Assert.False(host.IsReady); // connected, but the server has not confirmed the phone yet
+
+        host.IsAnnounced = true; // host.state
+        Assert.True(host.IsReady);
+    }
+
     [Fact]
     public void A_phone_starts_in_English_until_Arabic_is_chosen()
     {

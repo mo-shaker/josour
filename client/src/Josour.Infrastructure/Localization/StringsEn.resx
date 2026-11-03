@@ -1169,4 +1169,34 @@
   <data name="MobileGuestRoleNote" xml:space="preserve">
     <value>This version makes the phone a host only. To borrow someone else's connection, use Josour on Windows or macOS.</value>
   </data>
+  <data name="MobileTabShare" xml:space="preserve">
+    <value>Share</value>
+  </data>
+  <data name="MobileContactsDescription" xml:space="preserve">
+    <value>The people who can ask to use your connection. When someone invites you, the invitation waits here for your answer.</value>
+  </data>
+  <data name="MobileInvitationTitle" xml:space="preserve">
+    <value>New contact invitation</value>
+  </data>
+  <data name="MobileInvitationsWaitingFormat" xml:space="preserve">
+    <value>Invitations waiting for your answer: {0}</value>
+  </data>
+  <data name="MobileInvitationsShow" xml:space="preserve">
+    <value>Answer</value>
+  </data>
+  <data name="MobileReadyText" xml:space="preserve">
+    <value>Ready: your contacts can ask to use your connection now.</value>
+  </data>
+  <data name="MobileUnreachableText" xml:space="preserve">
+    <value>Requests cannot reach this phone until it is connected to the server again.</value>
+  </data>
+  <data name="MobileReconnectNow" xml:space="preserve">
+    <value>Reconnect now</value>
+  </data>
+  <data name="MobileNotificationsOffWarning" xml:space="preserve">
+    <value>Notifications are off: a request only shows while Josour is open on the screen.</value>
+  </data>
+  <data name="MobileContactCancel" xml:space="preserve">
+    <value>Keep</value>
+  </data>
 </root>

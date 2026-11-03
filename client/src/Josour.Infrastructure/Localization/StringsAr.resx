@@ -1169,4 +1169,34 @@
   <data name="MobileGuestRoleNote" xml:space="preserve">
     <value>هذه النسخة تجعل الهاتف مضيفًا فقط. لاستعارة اتصال غيرك استخدم برنامج جسور على ويندوز أو ماك.</value>
   </data>
+  <data name="MobileTabShare" xml:space="preserve">
+    <value>المشاركة</value>
+  </data>
+  <data name="MobileContactsDescription" xml:space="preserve">
+    <value>الأشخاص الذين يمكنهم طلب استخدام اتصالك. عندما يدعوك أحد تنتظر دعوته هنا حتى ترد عليها.</value>
+  </data>
+  <data name="MobileInvitationTitle" xml:space="preserve">
+    <value>دعوة إضافة جديدة</value>
+  </data>
+  <data name="MobileInvitationsWaitingFormat" xml:space="preserve">
+    <value>دعوات بانتظار ردك: {0}</value>
+  </data>
+  <data name="MobileInvitationsShow" xml:space="preserve">
+    <value>الرد</value>
+  </data>
+  <data name="MobileReadyText" xml:space="preserve">
+    <value>جاهز: يمكن لجهات اتصالك الآن طلب استخدام اتصالك.</value>
+  </data>
+  <data name="MobileUnreachableText" xml:space="preserve">
+    <value>لن تصل الطلبات إلى هذا الهاتف حتى يعود اتصاله بالخادم.</value>
+  </data>
+  <data name="MobileReconnectNow" xml:space="preserve">
+    <value>أعد الاتصال الآن</value>
+  </data>
+  <data name="MobileNotificationsOffWarning" xml:space="preserve">
+    <value>الإشعارات متوقفة: لن يظهر الطلب إلا وجسور مفتوح على الشاشة.</value>
+  </data>
+  <data name="MobileContactCancel" xml:space="preserve">
+    <value>إبقاء</value>
+  </data>
 </root>

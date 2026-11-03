@@ -160,20 +160,71 @@ async def create(
     )
     await notify.send_to_device(
         host.device.id,
-        RequestIncoming(
-            request_id=request.id,
-            guest_user_id=guest.user.id,
-            guest_device_id=guest.device.id,
-            guest_name=guest.user.display_name,
-            guest_device=guest.device.name,
-            duration_min=duration_min,
-            allowlist_version=allowlist_version,
-            expires_at=expires_at,
-            trusted=trusted,
-        ),
+        _incoming(request, guest, allowlist_version=allowlist_version, trusted=trusted),
     )
     _schedule_expiry(request.id, expires_at)
     return request
+
+
+def _incoming(
+    request: ConnectionRequest, guest: Party, *, allowlist_version: int, trusted: bool
+) -> RequestIncoming:
+    expires_at = ensure_utc(request.expires_at)
+    assert expires_at is not None
+    return RequestIncoming(
+        request_id=request.id,
+        guest_user_id=guest.user.id,
+        guest_device_id=guest.device.id,
+        guest_name=guest.user.display_name,
+        guest_device=guest.device.name,
+        duration_min=request.requested_minutes,
+        allowlist_version=allowlist_version,
+        expires_at=expires_at,
+        trusted=trusted,
+    )
+
+
+async def replay_incoming(db: AsyncSession, host_device_id: uuid.UUID) -> int:
+    """Rings a host that has just (re)connected again for every request still waiting on it.
+
+    ``request.incoming`` is sent once, to whichever socket the device has at that instant. A
+    phone whose connection is being replaced - a socket that died quietly, a move from Wi-Fi to
+    mobile data - can miss it while the request stays pending, and while it is pending the host
+    cannot be asked again (``_resolve_host``). The new connection supersedes the old one without
+    the old one's teardown, so nothing cancels it either: only this replay lets the host answer.
+    A host that already showed the request treats the repeat as the same request (same id).
+    """
+    now = utcnow()
+    pending = (
+        await db.scalars(
+            select(ConnectionRequest).where(
+                ConnectionRequest.host_device_id == host_device_id,
+                ConnectionRequest.status == RequestStatus.PENDING,
+                ConnectionRequest.initiator == RequestInitiator.GUEST,
+            )
+        )
+    ).all()
+    sent = 0
+    for request in pending:
+        expires_at = ensure_utc(request.expires_at)
+        if expires_at is None or expires_at <= now:
+            continue  # the expiry timer settles it
+        guest = await load_party(db, request.guest_user_id, request.guest_device_id)
+        trusted = await contact_service.trusts(db, request.host_user_id, request.guest_user_id)
+        message = _incoming(
+            request,
+            guest,
+            allowlist_version=await allowlist.current_version(db),
+            trusted=trusted,
+        )
+        if await notify.send_to_device(host_device_id, message):
+            sent += 1
+    if sent:
+        log.info(
+            "pending requests replayed to a reconnected host",
+            extra={"device_id": str(host_device_id), "requests": sent},
+        )
+    return sent
 
 
 async def _assert_guest_is_free(db: AsyncSession, guest: Party, *, ref: str) -> None:

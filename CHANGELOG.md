@@ -6,6 +6,22 @@ Every release of Josour: the apps, the server and the relay share one version nu
 
 ## Unreleased
 
+### Android
+- **Contact invitations reach the phone.** A new Contacts page (beside "Share", at the bottom of the screen) lists the
+  invitations waiting for an answer, with Accept and Decline, then the contacts themselves (online or not, "can use my
+  connection without asking", Remove), inviting someone by email and the invitations you sent. A new invitation also
+  arrives as a notification that opens that page, and the host page and the Contacts tab show how many are waiting.
+- **Requests no longer get lost on a connection that died quietly.** Opening the app, a network change or the new
+  "Reconnect now" button now checks the connection with a ping and reconnects within seconds when nothing answers,
+  instead of waiting up to a minute. The host page says plainly whether a request can reach the phone right now
+  ("Ready…", or why not), and warns when notifications are off.
+
+### Server
+- **A request rings its host again when the host reconnects.** A request was sent once, to whatever connection the
+  host's device had at that moment; one lost on a connection that had just died stayed pending until it expired, and
+  blocked new requests to that host meanwhile. The server now sends every request still waiting on a device to its new
+  connection. Servers need this release (`deploy/install.sh`) for it.
+
 ## 2.3.0 - 2026-11-03
 
 ### Android

@@ -9,7 +9,7 @@ using Josour.Mobile.Platform;
 namespace Josour.Droid.Platform;
 
 /// <summary>
-/// The notification channels and the two kinds of notification besides the service's own. An incoming request opens the
+/// The notification channels and the three kinds of notification besides the service's own (requests, invitations, notes). An incoming request opens the
 /// consent screen; it has no Accept button, because accepting means answering for someone else's browsing and that should
 /// not be one tap on a locked phone in anybody's hand.
 /// </summary>
@@ -72,8 +72,28 @@ internal sealed class AndroidNotifier : IMobileNotifier
         Notify(Interlocked.Increment(ref _nextInfoId), notification);
     }
 
-    internal PendingIntent OpenApp(int requestCode) =>
-        PendingIntent.GetActivity(_context, requestCode, MainActivity.OpenIntent(_context), PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent)!;
+    public void ShowInvitation(Guid inviteId, string title, string body)
+    {
+        var notification = new NotificationCompat.Builder(_context, InfoChannel)
+            .SetSmallIcon(Resource.Drawable.ic_josour)
+            .SetContentTitle(title)
+            .SetContentText(body)
+            .SetStyle(new NotificationCompat.BigTextStyle().BigText(body))
+            .SetCategory(NotificationCompat.CategorySocial)
+            .SetAutoCancel(true)
+            .SetContentIntent(OpenApp(InviteIdFor(inviteId), MainActivity.ContactsPage))
+            .Build()!;
+        Notify(InviteIdFor(inviteId), notification);
+    }
+
+    public void CancelInvitation(Guid inviteId)
+    {
+        try { NotificationManagerCompat.From(_context).Cancel(InviteIdFor(inviteId)); }
+        catch (Exception) { }
+    }
+
+    internal PendingIntent OpenApp(int requestCode, string? page = null) =>
+        PendingIntent.GetActivity(_context, requestCode, MainActivity.OpenIntent(_context, page), PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent)!;
 
     private void Notify(int id, Notification notification)
     {
@@ -88,4 +108,6 @@ internal sealed class AndroidNotifier : IMobileNotifier
     }
 
     private static int IdFor(Guid requestId) => 2000 + (requestId.GetHashCode() & 0x3FF);
+
+    private static int InviteIdFor(Guid inviteId) => 4000 + (inviteId.GetHashCode() & 0x3FF);
 }

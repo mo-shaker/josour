@@ -42,10 +42,20 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
     private RequestIncomingMessage? _autoAccepted;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsReady))]
+    [NotifyPropertyChangedFor(nameof(IsUnreachable))]
     private bool _isAvailable;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsReady))]
+    [NotifyPropertyChangedFor(nameof(IsUnreachable))]
     private bool _isAnnounced;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsReady))]
+    [NotifyPropertyChangedFor(nameof(IsUnreachable))]
+    [NotifyPropertyChangedFor(nameof(IsDisconnected))]
+    private bool _isConnected;
 
     [ObservableProperty]
     private string _statusText = string.Empty;
@@ -69,6 +79,7 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
     private bool _showBatteryHint;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowNotificationsOffWarning))]
     private bool _showNotificationsHint;
 
     [ObservableProperty]
@@ -131,6 +142,7 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
         _platform.Network.Changed += OnNetworkChanged;
         _platform.Permissions.Changed += OnPermissionsChanged;
 
+        IsConnected = _channel.State == ControlChannelState.Connected;
         UpdateStatusText();
         UpdateConnectionText();
         ApplyNetwork(_platform.Network.Current);
@@ -139,6 +151,18 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
     }
 
     public bool HasIncoming => Incoming is not null;
+
+    /// <summary>Available, connected and confirmed by the server: a request can reach this phone right now.</summary>
+    public bool IsReady => IsAvailable && IsConnected && IsAnnounced;
+
+    /// <summary>The user wants requests, but the phone has no working connection to the server: say so, offer a retry.</summary>
+    public bool IsUnreachable => IsAvailable && !IsConnected;
+
+    /// <summary>Not connected to the server, whether or not available; the connection card offers a retry.</summary>
+    public bool IsDisconnected => !IsConnected;
+
+    /// <summary>Available, but a request arriving with the app in the background would show nothing.</summary>
+    public bool ShowNotificationsOffWarning => IsAvailable && ShowNotificationsHint;
 
     public string SignedInText => Tr.Format(UiStringKeys.MobileSignedInAsFormat, Tr.Ltr(_auth.CurrentUser?.Email ?? string.Empty));
 
@@ -181,6 +205,40 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
         Incoming = null;
         UpdateForegroundService();
     }
+
+    /// <summary>
+    /// "Reconnect now", and the app coming to the front: a channel that believes it is connected pings at once (a socket that
+    /// died quietly is replaced instead of waiting for the next heart-beat), one that is backing off retries now, and one
+    /// that gave up connects again. A connected, available phone also announces itself again, so the server's view of it
+    /// is the phone's own.
+    /// </summary>
+    public async Task WakeAsync(string reason)
+    {
+        _logger.LogInformation("Waking the control channel ({Reason}); it is {State}", reason, _channel.State);
+        if (_channel is IReconnectNow wakeable)
+        {
+            wakeable.ReconnectNow(reason);
+        }
+
+        try
+        {
+            if (_channel.State == ControlChannelState.Disconnected)
+            {
+                await _connector.ConnectAsync(CancellationToken.None);
+            }
+            else if (_channel.State == ControlChannelState.Connected && IsAvailable)
+            {
+                await PublishAvailabilityAsync(true);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Reconnecting the control channel failed");
+        }
+    }
+
+    [RelayCommand]
+    private Task ReconnectNowAsync() => WakeAsync("the user asked");
 
     partial void OnIsAvailableChanged(bool value)
     {
@@ -269,6 +327,7 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
 
     private void OnChannelStateChanged(ControlChannelState state) => Dispatcher.UIThread.Post(() =>
     {
+        IsConnected = state == ControlChannelState.Connected;
         UpdateConnectionText();
         if (state != ControlChannelState.Connected)
         {
@@ -343,6 +402,13 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
         if (!_sessions.IsAwaitingAnswer(request.RequestId))
         {
             _logger.LogWarning("Not presenting request {RequestId}: this phone is busy with a session or another request", request.RequestId);
+            return;
+        }
+
+        if (Incoming?.RequestId == request.RequestId)
+        {
+            // The server rings a host again after it reconnects; the question is already on screen.
+            _logger.LogInformation("Request {RequestId} arrived again after a reconnect; it is already on screen", request.RequestId);
             return;
         }
 

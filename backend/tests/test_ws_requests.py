@@ -350,6 +350,40 @@ async def test_guest_disconnect_cancels_the_pending_request(
     assert row is not None and row.status == RequestStatus.CANCELLED
 
 
+async def test_a_host_that_reconnects_is_rung_again_and_can_answer(
+    ws_connect: WsFactory, make_actor: ActorFactory, db: AsyncSession
+) -> None:
+    # The phone's socket is replaced before the server notices the old one died: the request
+    # rung on the old socket is still pending, and only a replay lets the host answer it.
+    pair = await _pair(ws_connect, make_actor)
+    request_id, first = await _open_request(pair)
+
+    replacement = await ws_connect(pair.host, client=("198.51.100.9", 51001))
+    replayed = await replacement.expect("request.incoming")
+    assert replayed["request_id"] == request_id
+    assert replayed["expires_at"] == first["expires_at"]
+    assert replayed["guest_name"] == "Guest"
+    assert replayed["duration_min"] == 30
+
+    await replacement.send({"type": "host.available", "available": True})
+    await replacement.send({"type": "request.accept", "ref": "h1", "request_id": request_id})
+    result = await pair.guest_ws.expect("request.result")
+    assert (result["request_id"], result["accepted"]) == (request_id, True)
+
+
+async def test_a_reconnect_replays_nothing_once_the_request_is_settled(
+    ws_connect: WsFactory, make_actor: ActorFactory
+) -> None:
+    pair = await _pair(ws_connect, make_actor)
+    request_id, _ = await _open_request(pair)
+    await pair.host_ws.send({"type": "request.reject", "ref": "h1", "request_id": request_id})
+    await pair.guest_ws.expect("request.result")
+
+    replacement = await ws_connect(pair.host, client=("198.51.100.9", 51001))
+    frames = await replacement.drain(timeout=0.3)
+    assert all(frame.get("type") != "request.incoming" for frame in frames)
+
+
 async def test_host_disconnect_tells_the_waiting_guest(
     ws_connect: WsFactory, make_actor: ActorFactory
 ) -> None:

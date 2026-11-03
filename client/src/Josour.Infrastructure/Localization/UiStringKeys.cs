@@ -520,4 +520,24 @@ public static class UiStringKeys
     public const string MobileSignedInAsFormat = "MobileSignedInAsFormat";
 
     public const string MobileGuestRoleNote = "MobileGuestRoleNote";
+
+    public const string MobileTabShare = "MobileTabShare";
+
+    public const string MobileContactsDescription = "MobileContactsDescription";
+
+    public const string MobileInvitationTitle = "MobileInvitationTitle";
+
+    public const string MobileInvitationsWaitingFormat = "MobileInvitationsWaitingFormat";
+
+    public const string MobileInvitationsShow = "MobileInvitationsShow";
+
+    public const string MobileReadyText = "MobileReadyText";
+
+    public const string MobileUnreachableText = "MobileUnreachableText";
+
+    public const string MobileReconnectNow = "MobileReconnectNow";
+
+    public const string MobileNotificationsOffWarning = "MobileNotificationsOffWarning";
+
+    public const string MobileContactCancel = "MobileContactCancel";
 }

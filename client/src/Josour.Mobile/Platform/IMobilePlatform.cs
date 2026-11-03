@@ -58,6 +58,12 @@ public interface IMobileNotifier
 
     void ShowInfo(string title, string body);
 
+    /// <summary>Someone invited this user to be a contact: a notification that opens the app on the contacts page.</summary>
+    void ShowInvitation(Guid inviteId, string title, string body);
+
+    /// <summary>The invitation was answered (here or on another device), withdrawn or expired.</summary>
+    void CancelInvitation(Guid inviteId);
+
     /// <summary>Renames the notification channels (shown in the phone's settings) after the interface language changed.</summary>
     void RefreshChannelNames();
 }

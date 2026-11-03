@@ -11,7 +11,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Josour.Mobile.ViewModels;
 
-/// <summary>The one screen of the phone: sign-in until there is an account, then the host page.</summary>
+/// <summary>
+/// The phone's screen: sign-in until there is an account, then two pages - sharing the connection (the host page) and the
+/// contacts, with invitations to answer - switched from the bar at the bottom.
+/// </summary>
 public sealed partial class MainViewModel : ObservableObject
 {
     private readonly IAuthSession _auth;
@@ -28,6 +31,10 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _isStarting = true;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsHostPage))]
+    private bool _isContactsPage;
+
     public MainViewModel(
         IAuthSession auth,
         MobileChannelConnector connector,
@@ -36,6 +43,7 @@ public sealed partial class MainViewModel : ObservableObject
         IAppSettingsStore settings,
         SignInViewModel signIn,
         HostViewModel host,
+        ContactsViewModel contactsPage,
         ILogger<MainViewModel> logger)
     {
         _auth = auth;
@@ -46,6 +54,7 @@ public sealed partial class MainViewModel : ObservableObject
         _logger = logger;
         SignIn = signIn;
         Host = host;
+        Contacts = contactsPage;
         SignIn.SignedIn += () => _ = OnSignedInAsync();
         _auth.SignedOut += (_, e) => Dispatcher.UIThread.Post(() => _ = HandleSignedOutAsync(e.Reason));
     }
@@ -53,6 +62,27 @@ public sealed partial class MainViewModel : ObservableObject
     public SignInViewModel SignIn { get; }
 
     public HostViewModel Host { get; }
+
+    public ContactsViewModel Contacts { get; }
+
+    public bool IsHostPage => !IsContactsPage;
+
+    [RelayCommand]
+    public void ShowHost() => IsContactsPage = false;
+
+    [RelayCommand]
+    public void ShowContacts() => IsContactsPage = true;
+
+    /// <summary>
+    /// The app came to the front (Android's onResume). Requests that could not reach a phone with a dead socket, and
+    /// invitations sent meanwhile, are what the user opens the app to see: check the connection now and read the lists again.
+    /// </summary>
+    public void OnAppResumed()
+    {
+        if (!IsSignedIn) return;
+        _ = Host.WakeAsync("the app was opened");
+        _ = _contacts.RefreshAsync(CancellationToken.None);
+    }
 
     public bool IsSignedOut => !IsSignedIn && !IsStarting;
 
@@ -107,6 +137,7 @@ public sealed partial class MainViewModel : ObservableObject
             _logger.LogWarning(ex, "Could not load the contact list");
         }
 
+        Contacts.StartAnnouncing();
         Host.RestoreAvailability();
     }
 
@@ -120,6 +151,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         SignIn.ErrorText = null; // written in the old language
         Host.RefreshTexts();
+        Contacts.RefreshTexts();
         _notifier.RefreshChannelNames();
         OnPropertyChanged(nameof(SwitchLanguageText));
         LanguageChanged?.Invoke();
@@ -145,6 +177,7 @@ public sealed partial class MainViewModel : ObservableObject
     private async Task SignOutAsync()
     {
         Host.StopForSignOut();
+        Contacts.Reset();
         await _connector.DisconnectAsync();
         await _auth.SignOutAsync(CancellationToken.None); // raises SignedOut
     }
@@ -153,6 +186,9 @@ public sealed partial class MainViewModel : ObservableObject
     {
         _logger.LogInformation("Signed out ({Reason})", reason);
         Host.StopForSignOut();
+        Contacts.Reset();
+        _contacts.Clear();
+        IsContactsPage = false;
         await _connector.DisconnectAsync();
         IsSignedIn = false;
 

@@ -618,6 +618,7 @@ public sealed class ControlChannel : IControlChannel, IReconnectNow
         {
             while (!ct.IsCancellationRequested)
             {
+                var woken = false;
                 // A wake (resume / network change) ends the wait early: ping now, so a socket that did not survive the
                 // sleep fails here instead of at the end of the interval. Each wait links to the token taken when the
                 // previous one ended (the first, to the one taken when the socket began opening), so a wake that lands
@@ -631,6 +632,7 @@ public sealed class ControlChannel : IControlChannel, IReconnectNow
                     catch (OperationCanceledException) when (!ct.IsCancellationRequested)
                     {
                         _logger.LogDebug("Heart-beat woken early: sending ping now");
+                        woken = true;
                     }
                 }
 
@@ -650,7 +652,23 @@ public sealed class ControlChannel : IControlChannel, IReconnectNow
                     return;
                 }
 
+                var sentAt = _time.GetUtcNow();
                 await SendFrameAsync(socket, new PingMessage(), ct).ConfigureAwait(false);
+
+                if (woken)
+                {
+                    // Whatever woke us suspects this socket: an answer, or any frame, proves it alive; silence does not.
+                    await Task.Delay(_options.WakeProbeTimeout, _time, ct).ConfigureAwait(false);
+                    if (LastTrafficAt < sentAt)
+                    {
+                        dead.Value = true;
+                        _logger.LogWarning(
+                            "No answer to the wake-up ping within {Timeout:0.#} s: treating the control channel as dead",
+                            _options.WakeProbeTimeout.TotalSeconds);
+                        connection.Cancel();
+                        return;
+                    }
+                }
             }
         }
         catch (OperationCanceledException)

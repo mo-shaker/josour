@@ -530,6 +530,43 @@ public sealed class ControlChannelTests
     }
 
     [Fact]
+    public async Task ReconnectNow_OnASocketThatNoLongerAnswers_ReconnectsWithoutWaitingForTheDeadInterval()
+    {
+        // A mobile network dropped the socket without a close: nothing comes back. The wake's ping proves it at once,
+        // long before the 40 s dead interval (5 minutes here) would.
+        await using var h = await Harness.StartAsync(o => o with
+        {
+            PingInterval = TimeSpan.FromMinutes(5),
+            DeadInterval = TimeSpan.FromMinutes(5),
+            WakeProbeTimeout = TimeSpan.FromMilliseconds(200),
+        });
+        h.Server.AutoPong = false;
+
+        h.Channel.ReconnectNow("the app was opened");
+
+        var second = await h.Server.NextConnectionAsync(TimeSpan.FromSeconds(5));
+        await second.NextAsync<HelloMessage>();
+        Assert.Contains(ControlChannelState.Reconnecting, h.States);
+    }
+
+    [Fact]
+    public async Task ReconnectNow_OnAHealthySocket_KeepsIt()
+    {
+        await using var h = await Harness.StartAsync(o => o with
+        {
+            PingInterval = TimeSpan.FromMinutes(5),
+            WakeProbeTimeout = TimeSpan.FromMilliseconds(200),
+        });
+
+        h.Channel.ReconnectNow("the app was opened");
+        await h.Connection.NextAsync<PingMessage>(timeout: TimeSpan.FromSeconds(5));
+        await Task.Delay(500);
+
+        Assert.Equal(ControlChannelState.Connected, h.Channel.State);
+        Assert.DoesNotContain(ControlChannelState.Reconnecting, h.States);
+    }
+
+    [Fact]
     public void ReconnectNow_WhileNothingIsRunning_IsHarmless()
     {
         var channel = new ControlChannel(

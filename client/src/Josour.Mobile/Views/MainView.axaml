@@ -33,8 +33,11 @@
       </StackPanel>
     </ScrollViewer>
 
+    <!-- Signed in: the host page or the contacts page, and the bar that switches between them. -->
+    <Grid IsVisible="{Binding IsSignedIn}" RowDefinitions="*,Auto">
+
     <!-- The host page -->
-    <ScrollViewer IsVisible="{Binding IsSignedIn}">
+    <ScrollViewer IsVisible="{Binding IsHostPage}">
       <StackPanel DataContext="{Binding Host}" x:DataType="vm:HostViewModel" Margin="16,24" Spacing="14">
         <Button Classes="language" HorizontalAlignment="Right"
                 Command="{Binding $parent[UserControl].DataContext.SwitchLanguageCommand}"
@@ -42,13 +45,35 @@
         <TextBlock Classes="title" Text="{m:Tr MobileHostHeading}" />
         <TextBlock Classes="secondary" Text="{Binding SignedInText}" />
 
+        <!-- Invitations waiting: the way to them, from the page the phone opens on. -->
+        <Border Classes="card attention" IsVisible="{Binding $parent[UserControl].DataContext.Contacts.HasIncomingInvites}">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <TextBlock Classes="body" VerticalAlignment="Center"
+                       Text="{Binding $parent[UserControl].DataContext.Contacts.WaitingText}" />
+            <Button Grid.Column="1" Classes="accent" Content="{m:Tr MobileInvitationsShow}"
+                    Command="{Binding $parent[UserControl].DataContext.ShowContactsCommand}" />
+          </Grid>
+        </Border>
+
         <Border Classes="card">
           <StackPanel Spacing="10">
             <Grid ColumnDefinitions="*,Auto">
               <TextBlock Classes="heading" VerticalAlignment="Center" Text="{m:Tr HostAvailableToggle}" />
               <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsAvailable}" OnContent="" OffContent="" />
             </Grid>
-            <TextBlock Classes="body" Text="{Binding StatusText}" />
+            <TextBlock Classes="body" Text="{Binding StatusText}" IsVisible="{Binding !IsReady}" />
+            <!-- Ready, or why not: the one thing that decides whether a request can arrive. -->
+            <Border Classes="ready" IsVisible="{Binding IsReady}">
+              <TextBlock Classes="body" Text="{m:Tr MobileReadyText}" />
+            </Border>
+            <Border Classes="problem" IsVisible="{Binding IsUnreachable}">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="body" Text="{m:Tr MobileUnreachableText}" />
+                <TextBlock Classes="secondary" Text="{Binding ConnectionText}" />
+                <Button HorizontalAlignment="Stretch" Command="{Binding ReconnectNowCommand}" Content="{m:Tr MobileReconnectNow}" />
+              </StackPanel>
+            </Border>
+            <TextBlock Classes="warning" Text="{m:Tr MobileNotificationsOffWarning}" IsVisible="{Binding ShowNotificationsOffWarning}" />
             <TextBlock Classes="secondary" Text="{m:Tr MobileHostDescription}" />
           </StackPanel>
         </Border>
@@ -73,6 +98,8 @@
           <StackPanel Spacing="6">
             <TextBlock Classes="body" Text="{Binding NetworkText}" />
             <TextBlock Classes="secondary" Text="{Binding ConnectionText}" />
+            <Button HorizontalAlignment="Stretch" Command="{Binding ReconnectNowCommand}" Content="{m:Tr MobileReconnectNow}"
+                    IsVisible="{Binding IsDisconnected}" />
             <TextBlock Classes="secondary" Text="{Binding PublicIpText}" />
             <TextBlock Classes="warning" Text="{m:Tr MobileCellularDataNote}" IsVisible="{Binding IsCellular}" />
             <TextBlock Classes="warning" Text="{m:Tr MobileVpnWarning}" IsVisible="{Binding IsVpn}" />
@@ -98,6 +125,114 @@
                 Content="{m:Tr TraySignOut}" />
       </StackPanel>
     </ScrollViewer>
+
+    <!-- The contacts page: invitations to answer first, then the contacts, then inviting someone. -->
+    <ScrollViewer IsVisible="{Binding IsContactsPage}">
+      <StackPanel DataContext="{Binding Contacts}" x:DataType="vm:ContactsViewModel" Margin="16,24" Spacing="14">
+        <TextBlock Classes="title" Text="{m:Tr ContactsPageTitle}" />
+        <TextBlock Classes="secondary" Text="{m:Tr MobileContactsDescription}" />
+        <TextBlock Classes="body" Text="{Binding StatusMessage}" IsVisible="{Binding HasStatusMessage}" />
+        <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
+
+        <StackPanel Spacing="10" IsVisible="{Binding HasIncomingInvites}">
+          <TextBlock Classes="heading" Text="{m:Tr ContactsIncomingTitle}" />
+          <ItemsControl ItemsSource="{Binding IncomingInvites}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:IncomingInviteItem">
+                <Border Classes="card attention" Margin="0,0,0,10">
+                  <StackPanel Spacing="8">
+                    <TextBlock Classes="body" FontWeight="SemiBold" Text="{Binding Title}" />
+                    <TextBlock Classes="secondary" Text="{Binding EmailText}" />
+                    <Grid ColumnDefinitions="*,12,*">
+                      <Button Classes="accent" HorizontalAlignment="Stretch" Command="{Binding AcceptCommand}" Content="{m:Tr ContactsAccept}" />
+                      <Button Grid.Column="2" HorizontalAlignment="Stretch" Command="{Binding DeclineCommand}" Content="{m:Tr ContactsDecline}" />
+                    </Grid>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <Border Classes="card" IsVisible="{Binding !HasContacts}">
+          <StackPanel Spacing="6">
+            <TextBlock Classes="heading" Text="{m:Tr ContactsEmptyTitle}" />
+            <TextBlock Classes="secondary" Text="{m:Tr ContactsEmptyText}" />
+          </StackPanel>
+        </Border>
+
+        <ItemsControl ItemsSource="{Binding Contacts}" IsVisible="{Binding HasContacts}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ContactItem">
+              <Border Classes="card" Margin="0,0,0,10">
+                <StackPanel Spacing="8">
+                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                    <Ellipse Classes="presence" Classes.online="{Binding IsOnline}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Classes="heading" VerticalAlignment="Center" Text="{Binding DisplayName}" />
+                    <TextBlock Grid.Column="2" Classes="secondary" VerticalAlignment="Center" Text="{Binding PresenceText}" />
+                  </Grid>
+                  <TextBlock Classes="secondary" Text="{Binding EmailText}" />
+                  <CheckBox IsChecked="{Binding AllowWithoutAsking}">
+                    <TextBlock Classes="body" Text="{m:Tr ContactAllowAlways}" />
+                  </CheckBox>
+                  <Button HorizontalAlignment="Stretch" Command="{Binding RemoveCommand}" Content="{m:Tr ContactRemove}"
+                          IsVisible="{Binding !IsConfirmingRemove}" />
+                  <StackPanel Spacing="8" IsVisible="{Binding IsConfirmingRemove}">
+                    <TextBlock Classes="warning" Text="{m:Tr ContactRemoveConfirm}" />
+                    <Grid ColumnDefinitions="*,12,*">
+                      <Button HorizontalAlignment="Stretch" Command="{Binding RemoveCommand}" Content="{m:Tr ContactRemove}" />
+                      <Button Grid.Column="2" HorizontalAlignment="Stretch" Command="{Binding KeepContactCommand}" Content="{m:Tr MobileContactCancel}" />
+                    </Grid>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Border Classes="card">
+          <StackPanel Spacing="10">
+            <TextBox Text="{Binding InviteEmail}" Watermark="{m:Tr ContactsInvitePlaceholder}" FlowDirection="LeftToRight" />
+            <Button Classes="accent" HorizontalAlignment="Stretch" Command="{Binding InviteCommand}" Content="{m:Tr ContactsInviteButton}" />
+          </StackPanel>
+        </Border>
+
+        <StackPanel Spacing="8" IsVisible="{Binding HasOutgoingInvites}">
+          <TextBlock Classes="heading" Text="{m:Tr ContactsOutgoingTitle}" />
+          <ItemsControl ItemsSource="{Binding OutgoingInvites}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:OutgoingInviteItem">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,0,0,8">
+                  <StackPanel VerticalAlignment="Center">
+                    <TextBlock Classes="body" Text="{Binding EmailText}" />
+                    <TextBlock Classes="secondary" Text="{Binding StatusText}" />
+                  </StackPanel>
+                  <Button Grid.Column="1" Command="{Binding WithdrawCommand}" Content="{m:Tr ContactsWithdraw}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- The two pages, at thumb height. -->
+    <Border Grid.Row="1" Classes="tabbar">
+      <Grid ColumnDefinitions="*,*">
+        <Button Classes="tab" Classes.selected="{Binding IsHostPage}" HorizontalAlignment="Stretch"
+                Command="{Binding ShowHostCommand}" Content="{m:Tr MobileTabShare}" />
+        <Button Grid.Column="1" Classes="tab" Classes.selected="{Binding IsContactsPage}" HorizontalAlignment="Stretch"
+                Command="{Binding ShowContactsCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+            <TextBlock VerticalAlignment="Center" Text="{m:Tr ContactsPageTitle}" />
+            <Border Classes="badge" IsVisible="{Binding Contacts.HasIncomingInvites}">
+              <TextBlock Text="{Binding Contacts.IncomingCount}" />
+            </Border>
+          </StackPanel>
+        </Button>
+      </Grid>
+    </Border>
+    </Grid>
 
     <!-- The incoming request covers everything until it is answered. -->
     <Border IsVisible="{Binding Host.HasIncoming}" Background="{DynamicResource SystemControlBackgroundAltHighBrush}">

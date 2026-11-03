@@ -142,6 +142,7 @@ public static class MobileRuntime
 
         services.AddSingleton<SignInViewModel>();
         services.AddSingleton<HostViewModel>();
+        services.AddSingleton<ContactsViewModel>();
         services.AddSingleton<MainViewModel>();
     }
 

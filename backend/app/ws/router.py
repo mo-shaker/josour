@@ -233,6 +233,8 @@ async def _handshake(websocket: WebSocket) -> Connection | None:
             if first_device:
                 await notify.announce_presence(db, user.id, online=True)
             await notify.broadcast_hosts_update(db)
+            # A request rung on the socket this one replaced may never have arrived.
+            await requests.replay_incoming(db, device.id)
     except _HandshakeRejected as exc:
         log.info("ws handshake rejected", extra={"code": int(exc.code), "reason": exc.reason})
         await _close(websocket, exc.code)

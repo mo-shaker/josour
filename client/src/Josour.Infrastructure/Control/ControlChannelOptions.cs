@@ -33,6 +33,14 @@ public sealed record ControlChannelOptions
     /// <summary>No frame at all from the server for this long ⇒ the connection is dead (contract: two missed beats, 40 s).</summary>
     public TimeSpan DeadInterval { get; init; } = TimeSpan.FromSeconds(40);
 
+    /// <summary>
+    /// After a wake (<c>IReconnectNow</c>: resume, network change, the app opened) the heart-beat pings at once and expects
+    /// some frame back within this long; none means the socket died quietly, and the channel reconnects now instead of
+    /// after <see cref="DeadInterval"/>. That difference matters most to a phone: a request waits 60 s for its host, and a
+    /// mobile network can drop a socket without either side seeing it close.
+    /// </summary>
+    public TimeSpan WakeProbeTimeout { get; init; } = TimeSpan.FromSeconds(6);
+
     /// <summary>Reconnect delays; the last one repeats forever.</summary>
     public IReadOnlyList<TimeSpan> BackoffSteps { get; init; } = new[]
     {
