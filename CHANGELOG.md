@@ -6,6 +6,8 @@ Every release of Josour: the apps, the server and the relay share one version nu
 
 ## Unreleased
 
+## 2.3.0 - 2026-11-03
+
 ### Android
 - **Arabic is readable on the phone.** Every Arabic letter was drawn as an empty box, because the app did not reach the
   phone's own Arabic fonts. The app now carries its own Arabic font (Noto Naskh Arabic UI, SIL Open Font License) and
