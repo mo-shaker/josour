@@ -30,7 +30,7 @@ class AvailableHost:
     device_name: str
     reachable: bool | None
     public_ip: str | None = None
-    """Never sent: only compared with a viewer's own address (``same_public_ip`` in the host list)."""
+    """Never sent: only compared with a viewer's address (the host list's ``same_public_ip``)."""
 
     def same_public_ip_as(self, viewer_ip: str | None) -> bool:
         return viewer_ip is not None and self.public_ip == viewer_ip

@@ -16,7 +16,7 @@ HOSTS = "/api/v1/hosts"
 
 def _without_address_comparison(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """``same_public_ip`` compares each list with its own caller's address; the test client's REST
-    calls and its WebSocket connections come from different addresses, so it legitimately differs."""
+    calls and its WebSocket connections come from different addresses, so it differs by design."""
     return [{k: v for k, v in row.items() if k != "same_public_ip"} for row in rows]
 
 
