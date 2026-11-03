@@ -87,7 +87,7 @@ All times are ISO-8601 in UTC with a `Z` suffix. Identifiers are UUID strings.
 | Type | Fields | To whom |
 |---|---|---|
 | `hello.ack` | `server_time`, `public_ip` (as the server sees it), `settings` (`max_session_minutes`, `request_timeout_seconds`, `allowed_ports`, `log_domains`, `enforce_allowlist`), `allowlist_version` | The client, after `hello` |
-| `hosts.snapshot` | `hosts`: an array of `{device_id, user_display_name, device_name, reachable (true/false/null)}` | After `hello.ack` |
+| `hosts.snapshot` | `hosts`: an array of `{device_id, user_id, user_display_name, device_name, reachable (true/false/null), same_public_ip}` | After `hello.ack` |
 | `hosts.update` | `hosts` (the complete new array) | Every client, on any change |
 | `request.created` | `ref`, `request_id`, `expires_at` | The user |
 | `request.incoming` | `request_id`, `guest_user_id`, `guest_device_id`, `guest_name`, `guest_device`, `duration_min`, `allowlist_version`, `expires_at` | The host |
@@ -249,6 +249,10 @@ on the second, not the first, and separating them lets the server explain a sess
 - **`X-Forwarded-For`** is honoured only if the peer is a private or loopback address (that is, our own proxy in
   front), so a direct client cannot forge `public_ip`, which is the target of the reachability probe.
 - **The reachability probe** is only run against a public address; otherwise `reachable` stays `null` (unknown).
+- **`same_public_ip`** in each host-list entry (and in `GET /hosts`) is `true` when that device has the recipient's own
+  public address — the same network, or the same carrier NAT — so sites would see the recipient's own address through
+  it. It is computed per recipient; neither address is sent. A client warns before a session with such a host, and
+  `session.created.same_public_ip` says the same once a session exists. Older clients ignore the field.
 - **Requests settled by a disconnection** are stored with the state `cancelled` and a `responded_at`, while the reason
   on the wire is `host_unavailable` for the user and `request.expired` for the host.
 - **Deregistering a device** closes its channel at once with code `4403` and clears its presence.

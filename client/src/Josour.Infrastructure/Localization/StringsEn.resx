@@ -1199,4 +1199,10 @@
   <data name="MobileContactCancel" xml:space="preserve">
     <value>Keep</value>
   </data>
+  <data name="ContactSameNetworkNote" xml:space="preserve">
+    <value>On your network: through this device, sites would still see your own address.</value>
+  </data>
+  <data name="SessionSameNetworkWarning" xml:space="preserve">
+    <value>This device is on the same network as you, so sites see your own address, not a new one. To appear from somewhere else, use the device of a contact who is in that place.</value>
+  </data>
 </root>

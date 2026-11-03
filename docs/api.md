@@ -107,7 +107,7 @@ Only contacts can see each other's hosts and ask for or offer a connection.
 - `GET /me` → `{ id, email, display_name, role }`
 - `GET /me/devices` → `[{ id, name, os_version, status, last_seen_at, created_at }]`
 - `DELETE /me/devices/{id}` → `204` (deregistration; revokes the device's refresh tokens)
-- `GET /hosts` → `[{ device_id, user_id, user_display_name, device_name, reachable }]` — the same shape as
+- `GET /hosts` → `[{ device_id, user_id, user_display_name, device_name, reachable, same_public_ip }]` — the same shape as
   `hosts.snapshot` and exactly the same filtering (connected, "available" enabled, with no unfinished session, **and
   excluding the user's own devices**; pinned in week 3). Since 2026-10-13 only the hosts of the caller's **contacts**
   are listed, and each entry carries `user_id`.

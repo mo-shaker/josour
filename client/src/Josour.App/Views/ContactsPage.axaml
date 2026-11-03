@@ -99,6 +99,8 @@
                                         <Button Command="{Binding OfferConnectionCommand}"
                                                 Content="{x:Static app:Strings.ContactOfferConnection}" />
                                     </StackPanel>
+                                    <c:InfoBar IsClosable="False" Severity="Warning" IsOpen="{Binding IsOnSameNetwork, Mode=OneWay}"
+                                               Message="{x:Static app:Strings.ContactSameNetworkNote}" />
                                     <CheckBox IsChecked="{Binding AllowWithoutAsking, Mode=TwoWay}"
                                               Content="{x:Static app:Strings.ContactAllowAlways}" />
                                     <TextBlock Classes="caption tertiary" IsVisible="{Binding TrustsMe}"

@@ -365,6 +365,8 @@ public static class Strings
 
     public static string ContactSharing => LocalizedStrings.Current[UiStringKeys.ContactSharing];
 
+    public static string ContactSameNetworkNote => LocalizedStrings.Current[UiStringKeys.ContactSameNetworkNote];
+
     public static string ContactUseConnection => LocalizedStrings.Current[UiStringKeys.ContactUseConnection];
 
     public static string ContactOfferConnection => LocalizedStrings.Current[UiStringKeys.ContactOfferConnection];
@@ -446,6 +448,8 @@ public static class Strings
     public static string SessionOpenCheckPage => LocalizedStrings.Current[UiStringKeys.SessionOpenCheckPage];
 
     public static string SessionGuestProxyNote => LocalizedStrings.Current[UiStringKeys.SessionGuestProxyNote];
+
+    public static string SessionSameNetworkWarning => LocalizedStrings.Current[UiStringKeys.SessionSameNetworkWarning];
 
     public static string CheckPageNotConfirmed => LocalizedStrings.Current[UiStringKeys.CheckPageNotConfirmed];
 

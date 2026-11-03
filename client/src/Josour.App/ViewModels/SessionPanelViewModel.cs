@@ -58,6 +58,10 @@ public sealed partial class SessionPanelViewModel : ObservableObject, IDisposabl
     [ObservableProperty]
     private bool _isGuestActive;
 
+    /// <summary>A guest whose host has the same public address: the session works, but the address sites see does not change.</summary>
+    [ObservableProperty]
+    private bool _isSameNetworkGuest;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(DisconnectCommand))]
     private bool _canDisconnect;
@@ -113,6 +117,7 @@ public sealed partial class SessionPanelViewModel : ObservableObject, IDisposabl
 
         CanOpenCheckPage = _sessions.CanOpenCheckPage;
         IsGuestActive = IsActive && session is { IsHost: false } && _sessions.ProbeUrl is not null;
+        IsSameNetworkGuest = session is { IsHost: false, SamePublicIp: true } && phase is SessionPhase.Preparing or SessionPhase.Connecting or SessionPhase.Active;
 
         var notice = DescribeNotice(_sessions.SystemProxyFailure, _sessions.CheckPageConfirmed);
         HasNoticeMessage = notice is not null;

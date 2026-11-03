@@ -1199,4 +1199,10 @@
   <data name="MobileContactCancel" xml:space="preserve">
     <value>إبقاء</value>
   </data>
+  <data name="ContactSameNetworkNote" xml:space="preserve">
+    <value>على نفس شبكتك: عبر هذا الجهاز ستظل المواقع ترى عنوانك أنت.</value>
+  </data>
+  <data name="SessionSameNetworkWarning" xml:space="preserve">
+    <value>هذا الجهاز على نفس شبكتك، لذلك ترى المواقع عنوانك أنت وليس عنوانًا جديدًا. لتظهر من مكان آخر استخدم جهاز جهة اتصال موجودة في ذلك المكان.</value>
+  </data>
 </root>

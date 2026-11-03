@@ -15,6 +15,7 @@ class HostOut(BaseModel):
                     "user_display_name": "Alice",
                     "device_name": "LAPTOP-01",
                     "reachable": True,
+                    "same_public_ip": False,
                 }
             ]
         }
@@ -26,4 +27,9 @@ class HostOut(BaseModel):
     device_name: str
     reachable: bool | None = Field(
         description="Result of the last reachability probe; null when it has not been probed."
+    )
+    same_public_ip: bool = Field(
+        default=False,
+        description="The device has the caller's own public address (the same network): sites "
+        "would see the caller's address through it. Only the comparison is returned.",
     )

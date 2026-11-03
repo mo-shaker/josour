@@ -203,7 +203,8 @@ public sealed partial class ContactsViewModel : ObservableObject
 
     internal async Task UseConnectionAsync(ContactItemViewModel contact)
     {
-        var host = _store.HostsOf(contact.UserId).FirstOrDefault();
+        // A device on this machine's own network would not change the address sites see: any other one first.
+        var host = _store.HostsOf(contact.UserId).OrderBy(h => h.SamePublicIp).FirstOrDefault();
         if (host is null || !CanStartSession)
         {
             return;
@@ -559,6 +560,9 @@ public sealed partial class ContactItemViewModel : ObservableObject
     /// <summary>One of the contact's devices is offering its connection right now.</summary>
     public bool IsSharing => _store.HostsOf(UserId).Count > 0;
 
+    /// <summary>Every device the contact is sharing is on this machine's network: using it would not change the address.</summary>
+    public bool IsOnSameNetwork => _store.HostsOf(UserId) is { Count: > 0 } hosts && hosts.All(h => h.SamePublicIp);
+
     /// <summary>For the dot: green while online, grey (unknown) while offline - offline is not an error.</summary>
     public bool? PresenceDot => IsOnline ? true : null;
 
@@ -575,6 +579,7 @@ public sealed partial class ContactItemViewModel : ObservableObject
         OnPropertyChanged(nameof(IsOnline));
         OnPropertyChanged(nameof(PresenceDot));
         OnPropertyChanged(nameof(IsSharing));
+        OnPropertyChanged(nameof(IsOnSameNetwork));
         OnPropertyChanged(nameof(PresenceText));
         OnPropertyChanged(nameof(CanUseConnection));
         OnPropertyChanged(nameof(CanOfferConnection));

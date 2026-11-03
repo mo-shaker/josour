@@ -14,6 +14,12 @@ from tests.conftest import Actor, ActorFactory, WsFactory
 HOSTS = "/api/v1/hosts"
 
 
+def _without_address_comparison(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """``same_public_ip`` compares each list with its own caller's address; the test client's REST
+    calls and its WebSocket connections come from different addresses, so it legitimately differs."""
+    return [{k: v for k, v in row.items() if k != "same_public_ip"} for row in rows]
+
+
 def _headers(actor: Actor) -> dict[str, str]:
     return {"Authorization": f"Bearer {actor.token}"}
 
@@ -39,18 +45,41 @@ async def test_host_available_broadcasts_hosts_update_and_rest_agrees(
                 "user_display_name": "Hosty",
                 "device_name": "OFFICE-PC",
                 "reachable": None,
+                "same_public_ip": True,  # both test connections come from the same address
             }
         ],
     }
     # The REST list is the same query, so it must return exactly the same rows.
     rest = await client.get(HOSTS, headers=_headers(guest))
-    assert rest.json() == update["hosts"]
+    assert _without_address_comparison(rest.json()) == _without_address_comparison(update["hosts"])
 
     # ... and the host never sees its own device: its list did not change, so it is not sent
     # one (each connection is told only when its own list changes).
     await host_ws.send({"type": "ping"})
     assert (await host_ws.receive())["type"] == "pong"
     assert (await client.get(HOSTS, headers=_headers(host))).json() == []
+
+
+async def test_the_host_list_says_which_devices_share_the_viewers_address(
+    ws_connect: WsFactory, make_actor: ActorFactory
+) -> None:
+    # A host on the guest's own network: sites would see the guest's address through it.
+    guest = await make_actor("viewer@example.com")
+    near = await make_actor("near@example.com", device_name="HOME-PHONE")
+    far = await make_actor("far@example.com", device_name="RIYADH-PC")
+    guest_ws = await ws_connect(guest, client=("154.178.216.249", 50000))
+    near_ws = await ws_connect(near, client=("154.178.216.249", 50001))
+    far_ws = await ws_connect(far, client=("176.204.4.48", 50002))
+    await guest_ws.drain()
+
+    await near_ws.send({"type": "host.available", "available": True})
+    await guest_ws.expect("hosts.update", skip=frozenset())
+    await far_ws.send({"type": "host.available", "available": True})
+    hosts = (await guest_ws.expect("hosts.update", skip=frozenset()))["hosts"]
+
+    same = {row["device_name"]: row["same_public_ip"] for row in hosts}
+    assert same == {"HOME-PHONE": True, "RIYADH-PC": False}
+    assert all("public_ip" not in row for row in hosts)  # only the comparison leaves the server
 
 
 async def test_withdrawing_availability_empties_the_list(
@@ -170,7 +199,8 @@ async def test_hosts_exclude_your_own_devices(
     assert ws.snapshot == {"type": "hosts.snapshot", "hosts": []}
     listed = (await client.get(HOSTS, headers=_headers(other))).json()
     assert [row["device_name"] for row in listed] == ["LAPTOP"]
-    assert (await other_ws.expect("hosts.update", skip=frozenset()))["hosts"] == listed
+    update = await other_ws.expect("hosts.update", skip=frozenset())
+    assert _without_address_comparison(update["hosts"]) == _without_address_comparison(listed)
     assert second_device.id != actor.device.id
 
 

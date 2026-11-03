@@ -142,6 +142,23 @@ public sealed class ControlMessageSerializerTests
     }
 
     [Fact]
+    public void Deserialize_HostsUpdate_ReadsWhichDevicesShareThisClientsAddress()
+    {
+        const string json = """
+            {"type":"hosts.update","hosts":[
+             {"device_id":"dddddddd-0000-4000-8000-000000000001","user_id":"dddddddd-0000-4000-8000-000000000002",
+              "user_display_name":"user01","device_name":"A16","reachable":null,"same_public_ip":true},
+             {"device_id":"dddddddd-0000-4000-8000-000000000003","user_id":"dddddddd-0000-4000-8000-000000000004",
+              "user_display_name":"Yasser","device_name":"MAWTIN","reachable":null}]}
+            """;
+
+        var hosts = Assert.IsType<HostsMessage>(ControlMessageSerializer.Deserialize(json)).Hosts;
+
+        Assert.True(hosts[0].SamePublicIp);
+        Assert.False(hosts[1].SamePublicIp); // a server that predates the field
+    }
+
+    [Fact]
     public void Deserialize_HostsSnapshot_AndUpdate_ShareOneRecord_KeepingTheWireType()
     {
         const string snapshot = """{"type":"hosts.snapshot","hosts":[{"device_id":"11111111-1111-4111-8111-111111111111","user_display_name":"Omar","device_name":"OMAR-DESKTOP","reachable":null}]}""";

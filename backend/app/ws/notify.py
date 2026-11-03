@@ -40,7 +40,7 @@ from app.ws.protocol import (
 
 log = logging.getLogger(__name__)
 
-type HostSignature = tuple[tuple[str, str, str, str, bool | None], ...]
+type HostSignature = tuple[tuple[str, str, str, str, bool | None, bool], ...]
 
 
 def reset_broadcast_state() -> None:
@@ -51,19 +51,27 @@ def reset_broadcast_state() -> None:
         connection.last_hosts_signature = None
 
 
-def _entry(row: host_service.AvailableHost) -> HostEntry:
+def _entry(row: host_service.AvailableHost, viewer_ip: str | None) -> HostEntry:
     return HostEntry(
         device_id=row.device_id,
         user_id=row.user_id,
         user_display_name=row.user_display_name,
         device_name=row.device_name,
         reachable=row.reachable,
+        same_public_ip=row.same_public_ip_as(viewer_ip),
     )
 
 
-def _signature(rows: list[host_service.AvailableHost]) -> HostSignature:
+def _signature(rows: list[host_service.AvailableHost], viewer_ip: str | None) -> HostSignature:
     return tuple(
-        (str(r.device_id), str(r.user_id), r.user_display_name, r.device_name, r.reachable)
+        (
+            str(r.device_id),
+            str(r.user_id),
+            r.user_display_name,
+            r.device_name,
+            r.reachable,
+            r.same_public_ip_as(viewer_ip),
+        )
         for r in rows
     )
 
@@ -71,8 +79,8 @@ def _signature(rows: list[host_service.AvailableHost]) -> HostSignature:
 async def send_hosts_snapshot(db: AsyncSession, connection: Connection) -> None:
     """Sent once, right after ``hello.ack`` (docs/ws-protocol.md section 4)."""
     rows = await host_service.list_available(db, visible_to=connection.user_id)
-    await connection.send(HostsSnapshot(hosts=[_entry(row) for row in rows]))
-    connection.last_hosts_signature = _signature(rows)
+    await connection.send(HostsSnapshot(hosts=[_entry(row, connection.public_ip) for row in rows]))
+    connection.last_hosts_signature = _signature(rows, connection.public_ip)
 
 
 async def broadcast_hosts_update(db: AsyncSession) -> int:
@@ -93,12 +101,12 @@ async def broadcast_hosts_update(db: AsyncSession) -> int:
     for connection in connections:
         visible_owners = links.get(connection.user_id, set())
         mine = [r for r in rows if r.user_id in visible_owners and r.user_id != connection.user_id]
-        signature = _signature(mine)
+        signature = _signature(mine, connection.public_ip)
         if signature == connection.last_hosts_signature:
             continue
         body = rendered.get(signature)
         if body is None:
-            body = HostsUpdate(hosts=[_entry(r) for r in mine]).to_json()
+            body = HostsUpdate(hosts=[_entry(r, connection.public_ip) for r in mine]).to_json()
             rendered[signature] = body
         if await connection.send_text(body):
             connection.last_hosts_signature = signature

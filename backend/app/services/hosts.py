@@ -29,14 +29,20 @@ class AvailableHost:
     user_display_name: str
     device_name: str
     reachable: bool | None
+    public_ip: str | None = None
+    """Never sent: only compared with a viewer's own address (``same_public_ip`` in the host list)."""
 
-    def to_out(self) -> HostOut:
+    def same_public_ip_as(self, viewer_ip: str | None) -> bool:
+        return viewer_ip is not None and self.public_ip == viewer_ip
+
+    def to_out(self, viewer_ip: str | None = None) -> HostOut:
         return HostOut(
             device_id=self.device_id,
             user_id=self.user_id,
             user_display_name=self.user_display_name,
             device_name=self.device_name,
             reachable=self.reachable,
+            same_public_ip=self.same_public_ip_as(viewer_ip),
         )
 
 
@@ -53,7 +59,14 @@ def _available_query(visible_to: uuid.UUID | None) -> Any:
         .exists()
     )
     stmt = (
-        select(Device.id, Device.user_id, User.display_name, Device.name, Presence.reachable)
+        select(
+            Device.id,
+            Device.user_id,
+            User.display_name,
+            Device.name,
+            Presence.reachable,
+            Presence.public_ip,
+        )
         .select_from(Presence)
         .join(Device, Device.id == Presence.device_id)
         .join(User, User.id == Device.user_id)
@@ -84,10 +97,10 @@ async def list_available(
 
 
 async def list_available_hosts(
-    db: AsyncSession, *, visible_to: uuid.UUID | None = None
+    db: AsyncSession, *, visible_to: uuid.UUID | None = None, viewer_ip: str | None = None
 ) -> list[HostOut]:
     """``GET /hosts``, ``hosts.snapshot`` and ``hosts.update`` all render this list."""
-    return [host.to_out() for host in await list_available(db, visible_to=visible_to)]
+    return [host.to_out(viewer_ip) for host in await list_available(db, visible_to=visible_to)]
 
 
 async def get_available_host(

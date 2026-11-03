@@ -540,4 +540,8 @@ public static class UiStringKeys
     public const string MobileNotificationsOffWarning = "MobileNotificationsOffWarning";
 
     public const string MobileContactCancel = "MobileContactCancel";
+
+    public const string ContactSameNetworkNote = "ContactSameNetworkNote";
+
+    public const string SessionSameNetworkWarning = "SessionSameNetworkWarning";
 }

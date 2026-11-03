@@ -6,6 +6,16 @@ Every release of Josour: the apps, the server and the relay share one version nu
 
 ## Unreleased
 
+### Windows and macOS
+- **A warning when the host is on your own network.** Browsing through a device that has your own public address (the
+  same Wi-Fi, or the same mobile carrier's shared address) works, but sites still see your address, which looks like
+  "the IP did not change". The session panel now says so while such a session runs, the Contacts tab marks a contact
+  whose shared device is on your network, and "Use their connection" picks one of the contact's other devices first.
+
+### Server
+- Each entry of the host list (`hosts.snapshot`, `hosts.update`, `GET /hosts`) carries `same_public_ip`, computed for
+  the device that receives the list; neither address is sent. Older apps ignore it.
+
 ## 2.4.0 - 2026-11-03
 
 ### Android

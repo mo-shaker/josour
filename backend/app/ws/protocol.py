@@ -454,6 +454,9 @@ class HostEntry(BaseModel):
     user_display_name: str
     device_name: str
     reachable: bool | None
+    same_public_ip: bool = False
+    """The device has the recipient's own public address (the same network, or the same carrier
+    NAT): sites would see the recipient's address through it. Only the comparison is sent."""
 
 
 class HostState(ServerMessage):

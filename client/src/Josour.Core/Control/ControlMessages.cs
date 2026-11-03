@@ -127,7 +127,12 @@ public sealed record HostInfoDto(
     [property: JsonPropertyName("device_name")] string DeviceName,
     [property: JsonPropertyName("reachable")] bool? Reachable,
     /// <summary>The contact the device belongs to; <see cref="Guid.Empty"/> from a server that predates contacts.</summary>
-    [property: JsonPropertyName("user_id")] Guid UserId = default);
+    [property: JsonPropertyName("user_id")] Guid UserId = default,
+    /// <summary>
+    /// The device has this client's own public address (the same network): sites would see this client's address through
+    /// it. False from a server that predates the field.
+    /// </summary>
+    [property: JsonPropertyName("same_public_ip")] bool SamePublicIp = false);
 
 /// <summary><c>host.state</c>: what the server recorded about this device's availability (a host never sees itself in the host list).</summary>
 public sealed record HostStateMessage(

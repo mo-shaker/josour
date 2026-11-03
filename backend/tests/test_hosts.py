@@ -62,6 +62,7 @@ async def test_hosts_lists_available_and_excludes_busy(
             "user_display_name": "Hosty",
             "device_name": "OFFICE-PC",
             "reachable": True,
+            "same_public_ip": False,
         }
     ]
 
