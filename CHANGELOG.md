@@ -6,6 +6,8 @@ Every release of Josour: the apps, the server and the relay share one version nu
 
 ## Unreleased
 
+## 2.5.0 - 2026-11-03
+
 ### Windows and macOS
 - **A warning when the host is on your own network.** Browsing through a device that has your own public address (the
   same Wi-Fi, or the same mobile carrier's shared address) works, but sites still see your address, which looks like
