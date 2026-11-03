@@ -6,6 +6,8 @@ Every release of Josour: the apps, the server and the relay share one version nu
 
 ## Unreleased
 
+## 2.4.0 - 2026-11-03
+
 ### Android
 - **Contact invitations reach the phone.** A new Contacts page (beside "Share", at the bottom of the screen) lists the
   invitations waiting for an answer, with Accept and Decline, then the contacts themselves (online or not, "can use my
