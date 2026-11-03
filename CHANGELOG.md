@@ -6,6 +6,14 @@ Every release of Josour: the apps, the server and the relay share one version nu
 
 ## Unreleased
 
+### Android
+- **Arabic is readable on the phone.** Every Arabic letter was drawn as an empty box, because the app did not reach the
+  phone's own Arabic fonts. The app now carries its own Arabic font (Noto Naskh Arabic UI, SIL Open Font License) and
+  uses it for any letter the default font lacks.
+- **The phone starts in English**, whatever language the phone itself is set to, and a button at the top of the sign-in
+  and host pages switches to Arabic (or back) at once. The choice is saved as the `language` setting and kept across
+  restarts. The desktop apps are unchanged.
+
 ## 2.2.0 - 2026-11-02
 
 ### Android (first version: the phone as a host)

@@ -40,6 +40,10 @@
       <Setter Property="MinHeight" Value="44" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
     </Style>
+    <Style Selector="Button.language">
+      <Setter Property="MinWidth" Value="96" />
+      <Setter Property="Padding" Value="14,6" />
+    </Style>
     <Style Selector="TextBox">
       <Setter Property="MinHeight" Value="44" />
     </Style>

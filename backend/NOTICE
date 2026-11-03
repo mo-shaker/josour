@@ -37,6 +37,15 @@ Fluent System Icons
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 
+Noto Naskh Arabic UI, version 1.08 (Regular and Bold)
+    Copyright 2013 Google Inc. All Rights Reserved.
+    Licensed under the SIL Open Font License, Version 1.1
+    https://openfontlicense.org
+
+    The two font files are bundled unmodified in
+    client/src/Josour.Mobile/Assets/Fonts/ so the Android app can draw Arabic.
+    The full licence text is beside them in OFL.txt.
+
 --------------------------------------------------------------------------------
 
 Third-party dependencies retain their own licences. Published applications and

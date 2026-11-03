@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using Josour.Infrastructure.Api;
 using Josour.Infrastructure.Contacts;
 using Josour.Infrastructure.Localization;
+using Josour.Infrastructure.Settings;
 using Josour.Mobile.Platform;
 using Josour.Mobile.Services;
 using Microsoft.Extensions.Logging;
@@ -17,6 +18,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly MobileChannelConnector _connector;
     private readonly IContactsStore _contacts;
     private readonly IMobileNotifier _notifier;
+    private readonly IAppSettingsStore _settings;
     private readonly ILogger<MainViewModel> _logger;
 
     [ObservableProperty]
@@ -31,6 +33,7 @@ public sealed partial class MainViewModel : ObservableObject
         MobileChannelConnector connector,
         IContactsStore contacts,
         IMobileNotifier notifier,
+        IAppSettingsStore settings,
         SignInViewModel signIn,
         HostViewModel host,
         ILogger<MainViewModel> logger)
@@ -39,6 +42,7 @@ public sealed partial class MainViewModel : ObservableObject
         _connector = connector;
         _contacts = contacts;
         _notifier = notifier;
+        _settings = settings;
         _logger = logger;
         SignIn = signIn;
         Host = host;
@@ -51,6 +55,12 @@ public sealed partial class MainViewModel : ObservableObject
     public HostViewModel Host { get; }
 
     public bool IsSignedOut => !IsSignedIn && !IsStarting;
+
+    /// <summary>The switch's label: the other language, named in itself ("العربية" in English, "English" in Arabic).</summary>
+    public string SwitchLanguageText => OtherLanguageName(LocalizedStrings.Current.Language);
+
+    /// <summary>Raised on the UI thread after the language changed; the app builds the view again (its strings load once).</summary>
+    public event Action? LanguageChanged;
 
     partial void OnIsStartingChanged(bool value) => OnPropertyChanged(nameof(IsSignedOut));
 
@@ -98,6 +108,37 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         Host.RestoreAvailability();
+    }
+
+    /// <summary>English ↔ Arabic, at once and for the next start (the <c>language</c> setting).</summary>
+    [RelayCommand]
+    private async Task SwitchLanguageAsync()
+    {
+        var language = MobileLanguage.Other(LocalizedStrings.Current.Language);
+        MobileLanguage.Apply(language);
+        _logger.LogInformation("Interface language switched to {Language}", language.ToCode());
+
+        SignIn.ErrorText = null; // written in the old language
+        Host.RefreshTexts();
+        _notifier.RefreshChannelNames();
+        OnPropertyChanged(nameof(SwitchLanguageText));
+        LanguageChanged?.Invoke();
+
+        try
+        {
+            await _settings.SaveAsync(_settings.Current with { Language = language.ToCode() }, CancellationToken.None);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // This run is switched; only the next start falls back to the default.
+            _logger.LogWarning(ex, "Could not save the interface language");
+        }
+    }
+
+    private static string OtherLanguageName(UiLanguage current)
+    {
+        var other = MobileLanguage.Other(current);
+        return LocalizedStrings.For(other)[other == UiLanguage.Arabic ? UiStringKeys.SettingsLanguageArabic : UiStringKeys.SettingsLanguageEnglish];
     }
 
     [RelayCommand]

@@ -1,7 +1,8 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using Josour.Infrastructure.Localization;
+using Avalonia.Media;
+using Avalonia.Media.Fonts;
 using Josour.Mobile.Platform;
 using Josour.Mobile.ViewModels;
 using Josour.Mobile.Views;
@@ -15,8 +16,31 @@ namespace Josour.Mobile;
 /// </summary>
 public sealed class MobileApp : Application
 {
+    /// <summary>The bundled Arabic font, by its family name inside <see cref="FontsKey"/>.</summary>
+    public const string ArabicFontFamily = "fonts:Josour#Noto Naskh Arabic UI";
+
+    private static readonly Uri FontsKey = new("fonts:Josour", UriKind.Absolute);
+    private static readonly Uri FontsSource = new("avares://Josour.Mobile/Assets/Fonts", UriKind.Absolute);
+
+    private static ISingleViewApplicationLifetime? _view;
+
     /// <summary>Set by the Android head before Avalonia initialises.</summary>
     public static MobilePlatform? Platform { get; set; }
+
+    /// <summary>
+    /// Registers the bundled Arabic font and makes it the fallback for any character the default font lacks.
+    /// <para>
+    /// Without it every Arabic letter is an empty box on Android: Avalonia's default family there has no Arabic, and its
+    /// per-character fallback does not reach the phone's own Arabic fonts (they are unnamed "und-Arab" fallbacks in
+    /// <c>/system/etc/fonts.xml</c>, and vary by manufacturer). Bundling Regular and Bold covers every weight the views use.
+    /// </para>
+    /// </summary>
+    public static AppBuilder UseFonts(AppBuilder builder) => builder
+        .ConfigureFonts(fonts => fonts.AddFontCollection(new EmbeddedFontCollection(FontsKey, FontsSource)))
+        .With(new FontManagerOptions
+        {
+            FontFallbacks = [new FontFallback { FontFamily = new FontFamily(ArabicFontFamily) }],
+        });
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
@@ -24,23 +48,25 @@ public sealed class MobileApp : Application
     {
         if (ApplicationLifetime is ISingleViewApplicationLifetime single && Platform is { } platform)
         {
-            // Arabic or English as the phone itself is set; Arabic, the default, for any other language.
-            ApplyLanguage();
+            // The language is already applied: the Android head does it before the platform exists (MobileLanguage).
             var services = MobileRuntime.Start(platform);
-            single.MainView = new MainView { DataContext = services.GetRequiredService<MainViewModel>() };
+            var main = services.GetRequiredService<MainViewModel>();
+            _view = single;
+            single.MainView = new MainView { DataContext = main };
+
+            // The strings and the reading direction are read when a view loads, so a new language is a new view.
+            main.LanguageChanged -= RebuildView;
+            main.LanguageChanged += RebuildView;
         }
 
         base.OnFrameworkInitializationCompleted();
     }
 
-    private static void ApplyLanguage()
+    private static void RebuildView()
     {
-        var system = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
-        var language = !UiLanguages.TryParse(system, out var parsed)
-            ? UiLanguages.Default
-            : parsed;
-        var pack = LocalizedStrings.UseLanguage(language);
-        System.Globalization.CultureInfo.DefaultThreadCurrentCulture = pack.Culture;
-        System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = pack.Culture;
+        if (_view is { } view && MobileRuntime.IsStarted)
+        {
+            view.MainView = new MainView { DataContext = MobileRuntime.Services.GetRequiredService<MainViewModel>() };
+        }
     }
 }

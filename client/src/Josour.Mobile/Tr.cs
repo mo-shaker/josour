@@ -6,7 +6,8 @@ namespace Josour.Mobile;
 
 /// <summary>
 /// <c>{m:Tr KeyName}</c>: one of the shared strings (<see cref="UiStringKeys"/>, the same <c>StringsAr.resx</c> and
-/// <c>StringsEn.resx</c> the desktop reads), resolved once when the view loads. The language never changes while the app runs.
+/// <c>StringsEn.resx</c> the desktop reads), resolved once when the view loads. Switching the language (<see cref="MobileLanguage"/>)
+/// therefore builds the view again.
 /// </summary>
 public sealed class Tr : MarkupExtension
 {

@@ -28,6 +28,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The Arabic fallback font (MobileApp.UseFonts) and its licence; see Assets/Fonts/OFL.txt. -->
+    <AvaloniaResource Include="Assets/Fonts/*.ttf" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Josour.Mobile.Tests" />
   </ItemGroup>
 

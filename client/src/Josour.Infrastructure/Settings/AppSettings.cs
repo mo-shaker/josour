@@ -20,7 +20,8 @@ public sealed record AppSettings
     /// <summary>
     /// Interface language: <c>ar</c> (the default) or <c>en</c>. Empty — the shipped state — means Arabic, so an existing
     /// settings file needs no migration. Anything unrecognised also falls back to Arabic, and the <c>--lang</c> switch
-    /// wins over this value for a single run (see <c>Localization.UiLanguages.TryParse</c>).
+    /// wins over this value for a single run (see <c>Localization.UiLanguages.TryParse</c>). The phone reads empty as English
+    /// instead, and writes this value from the switch on its screen (<c>Josour.Mobile.MobileLanguage</c>).
     /// </summary>
     public string Language { get; init; } = string.Empty;
 }

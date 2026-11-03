@@ -53,6 +53,7 @@ internal sealed class FakeNotifier : IMobileNotifier
     public void ShowIncomingRequest(Guid requestId, string title, string body) => Events.Enqueue("request:" + requestId);
     public void CancelIncomingRequest(Guid requestId) => Events.Enqueue("cancel:" + requestId);
     public void ShowInfo(string title, string body) => Events.Enqueue("info:" + title);
+    public void RefreshChannelNames() => Events.Enqueue("channels");
 }
 
 internal sealed class FakePermissions : IMobilePermissions

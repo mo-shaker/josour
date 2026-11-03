@@ -13,8 +13,9 @@ namespace Josour.Mobile.Tests;
 /// </summary>
 public static class TestAppBuilder
 {
-    static TestAppBuilder() => LocalizedStrings.UseLanguage(UiLanguages.Default);
+    static TestAppBuilder() => LocalizedStrings.UseLanguage(MobileLanguage.Default);
 
+    /// <summary>Through <see cref="MobileApp.UseFonts"/>, as the Android head builds it.</summary>
     public static AppBuilder BuildAvaloniaApp() =>
-        AppBuilder.Configure<MobileApp>().UseHeadless(new AvaloniaHeadlessPlatformOptions());
+        MobileApp.UseFonts(AppBuilder.Configure<MobileApp>()).UseHeadless(new AvaloniaHeadlessPlatformOptions());
 }

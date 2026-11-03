@@ -57,6 +57,9 @@ public interface IMobileNotifier
     void CancelIncomingRequest(Guid requestId);
 
     void ShowInfo(string title, string body);
+
+    /// <summary>Renames the notification channels (shown in the phone's settings) after the interface language changed.</summary>
+    void RefreshChannelNames();
 }
 
 /// <summary>The two system permissions a host needs to stay reachable in the background.</summary>

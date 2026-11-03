@@ -21,7 +21,7 @@ public sealed class MainActivity : AvaloniaMainActivity<MobileApp>
     /// <summary>The activity on screen, for the permission prompts; null while none is.</summary>
     internal static MainActivity? Current { get; private set; }
 
-    protected override AppBuilder CustomizeAppBuilder(AppBuilder builder) => base.CustomizeAppBuilder(builder);
+    protected override AppBuilder CustomizeAppBuilder(AppBuilder builder) => MobileApp.UseFonts(base.CustomizeAppBuilder(builder));
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {

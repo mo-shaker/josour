@@ -15,6 +15,10 @@
     <!-- Sign-in -->
     <ScrollViewer IsVisible="{Binding IsSignedOut}">
       <StackPanel DataContext="{Binding SignIn}" x:DataType="vm:SignInViewModel" Margin="20,32" Spacing="12">
+        <!-- English or Arabic: the other language, named in itself. -->
+        <Button Classes="language" HorizontalAlignment="Right"
+                Command="{Binding $parent[UserControl].DataContext.SwitchLanguageCommand}"
+                Content="{Binding $parent[UserControl].DataContext.SwitchLanguageText}" />
         <TextBlock Classes="title" Text="{m:Tr LoginHeading}" />
         <TextBlock Classes="secondary" Text="{m:Tr LoginDescription}" />
         <TextBlock Text="{m:Tr LoginServerUrlLabel}" Margin="0,8,0,0" />
@@ -32,6 +36,9 @@
     <!-- The host page -->
     <ScrollViewer IsVisible="{Binding IsSignedIn}">
       <StackPanel DataContext="{Binding Host}" x:DataType="vm:HostViewModel" Margin="16,24" Spacing="14">
+        <Button Classes="language" HorizontalAlignment="Right"
+                Command="{Binding $parent[UserControl].DataContext.SwitchLanguageCommand}"
+                Content="{Binding $parent[UserControl].DataContext.SwitchLanguageText}" />
         <TextBlock Classes="title" Text="{m:Tr MobileHostHeading}" />
         <TextBlock Classes="secondary" Text="{Binding SignedInText}" />
 

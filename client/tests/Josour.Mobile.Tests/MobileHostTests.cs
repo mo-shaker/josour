@@ -1,9 +1,12 @@
 using System.Net;
 using Avalonia.Headless.XUnit;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using Josour.Core.Allowlist;
 using Josour.Core.Control;
 using Josour.Core.Tunnel;
+using Josour.Infrastructure.Localization;
+using Josour.Infrastructure.Settings;
 using Josour.Infrastructure.Session;
 using Josour.Mobile.Platform;
 using Josour.Mobile.Services;
@@ -137,6 +140,75 @@ public class MobileHostTests
             if (DateTime.UtcNow > deadline) throw new TimeoutException("The condition did not become true.");
             Dispatcher.UIThread.RunJobs();
             await Task.Delay(20);
+        }
+    }
+
+    [Fact]
+    public void A_phone_starts_in_English_until_Arabic_is_chosen()
+    {
+        Assert.Equal(UiLanguage.English, MobileLanguage.FromSettings(AppSettings.Default));
+        Assert.Equal(UiLanguage.English, MobileLanguage.FromSettings(AppSettings.Default with { Language = "fr" }));
+        Assert.Equal(UiLanguage.Arabic, MobileLanguage.FromSettings(AppSettings.Default with { Language = "ar" }));
+    }
+
+    [AvaloniaFact]
+    public async Task The_language_switch_changes_the_texts_at_once_and_is_saved()
+    {
+        using var phone = new TestPhone();
+        var main = phone.Get<MainViewModel>();
+        var host = phone.Get<HostViewModel>();
+        var rebuilt = 0;
+        main.LanguageChanged += () => rebuilt++;
+        try
+        {
+            Assert.Equal("العربية", main.SwitchLanguageText);
+            Assert.Equal(LocalizedStrings.For(UiLanguage.English)[UiStringKeys.HostStatusNotAvailable], host.StatusText);
+
+            await main.SwitchLanguageCommand.ExecuteAsync(null);
+
+            Assert.Equal(UiLanguage.Arabic, LocalizedStrings.Current.Language);
+            Assert.Equal("English", main.SwitchLanguageText);
+            Assert.Equal(LocalizedStrings.For(UiLanguage.Arabic)[UiStringKeys.HostStatusNotAvailable], host.StatusText);
+            Assert.Equal("ar", phone.Get<IAppSettingsStore>().Current.Language);
+            Assert.Equal(1, rebuilt);
+            Assert.Contains("channels", phone.Notifier.Events);
+
+            await main.SwitchLanguageCommand.ExecuteAsync(null);
+            Assert.Equal(UiLanguage.English, LocalizedStrings.Current.Language);
+            Assert.Equal("en", phone.Get<IAppSettingsStore>().Current.Language);
+        }
+        finally
+        {
+            MobileLanguage.Apply(MobileLanguage.Default);
+        }
+    }
+
+    [AvaloniaFact]
+    public void The_arabic_view_loads_right_to_left()
+    {
+        using var phone = new TestPhone();
+        try
+        {
+            MobileLanguage.Apply(UiLanguage.Arabic);
+            var view = new MainView { DataContext = phone.Get<MainViewModel>() };
+            Assert.Equal(Avalonia.Media.FlowDirection.RightToLeft, view.FlowDirection);
+        }
+        finally
+        {
+            MobileLanguage.Apply(MobileLanguage.Default);
+        }
+    }
+
+    /// <summary>
+    /// The fallback's files are in the app at the address <see cref="MobileApp.UseFonts"/> reads. Whether they draw is a
+    /// question for a real renderer: the headless platform's font manager is a stub that loads no font.
+    /// </summary>
+    [AvaloniaFact]
+    public void The_bundled_arabic_font_is_in_the_app_in_both_weights()
+    {
+        foreach (var file in new[] { "NotoNaskhArabicUI-Regular.ttf", "NotoNaskhArabicUI-Bold.ttf" })
+        {
+            Assert.True(AssetLoader.Exists(new Uri("avares://Josour.Mobile/Assets/Fonts/" + file)), file);
         }
     }
 }

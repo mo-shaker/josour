@@ -142,6 +142,16 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
 
     public string SignedInText => Tr.Format(UiStringKeys.MobileSignedInAsFormat, Tr.Ltr(_auth.CurrentUser?.Email ?? string.Empty));
 
+    /// <summary>Every text this page computes, again in the language just switched to; a failed announcement reads as "announcing".</summary>
+    public void RefreshTexts()
+    {
+        OnPropertyChanged(nameof(SignedInText));
+        UpdateStatusText();
+        UpdateConnectionText();
+        ApplyNetwork(_platform.Network.Current);
+        RefreshSession(); // also the foreground notification
+    }
+
     /// <summary>After sign-in or a restored start: come back available if the user left the phone that way.</summary>
     public void RestoreAvailability()
     {

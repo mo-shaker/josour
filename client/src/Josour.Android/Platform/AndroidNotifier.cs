@@ -24,7 +24,13 @@ internal sealed class AndroidNotifier : IMobileNotifier
     public AndroidNotifier(Context context)
     {
         _context = context;
-        if (Build.VERSION.SdkInt >= BuildVersionCodes.O && context.GetSystemService(Context.NotificationService) is NotificationManager manager)
+        RefreshChannelNames();
+    }
+
+    /// <summary>Creating a channel that exists only renames it; its importance and the user's choices are kept.</summary>
+    public void RefreshChannelNames()
+    {
+        if (Build.VERSION.SdkInt >= BuildVersionCodes.O && _context.GetSystemService(Context.NotificationService) is NotificationManager manager)
         {
             manager.CreateNotificationChannel(new NotificationChannel(HostingChannel, Tr.Get(UiStringKeys.MobileServiceChannelName), NotificationImportance.Low));
             manager.CreateNotificationChannel(new NotificationChannel(RequestsChannel, Tr.Get(UiStringKeys.MobileRequestsChannelName), NotificationImportance.High));
