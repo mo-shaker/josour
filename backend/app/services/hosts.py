@@ -8,6 +8,7 @@ contacts. ``visible_to`` is the single place that rule is written; ``hosts.updat
 same rule in memory for a whole fan-out with ``app.services.contacts.adjacency``.
 """
 
+import ipaddress
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -18,6 +19,32 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import Contact, Device, Presence, Session, User
 from app.models.enums import NON_ENDED_SESSION_STATUSES, DeviceStatus
 from app.schemas.hosts import HostOut
+
+IPV6_NETWORK_PREFIX = 64
+"""An IPv6 network gives each of its devices its own address inside one /64."""
+
+
+def _public_address(value: str | None) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    try:
+        address = ipaddress.ip_address(value or "")
+    except ValueError:
+        return None
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+        return address.ipv4_mapped  # an IPv4 client seen through a dual-stack socket
+    return address
+
+
+def same_network(first: str | None, second: str | None) -> bool:
+    """Two devices behind one public network, as far as their addresses tell: the same IPv4
+    address (one NAT), or IPv6 addresses in the same /64. A device seen over IPv4 and another
+    seen over IPv6 cannot be compared from one address each, so they count as different."""
+    a, b = _public_address(first), _public_address(second)
+    if a is None or b is None or a.version != b.version:
+        return False
+    if isinstance(a, ipaddress.IPv4Address):
+        return a == b
+    network = ipaddress.ip_network((a, IPV6_NETWORK_PREFIX), strict=False)
+    return b in network
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,7 +60,7 @@ class AvailableHost:
     """Never sent: only compared with a viewer's address (the host list's ``same_public_ip``)."""
 
     def same_public_ip_as(self, viewer_ip: str | None) -> bool:
-        return viewer_ip is not None and self.public_ip == viewer_ip
+        return same_network(self.public_ip, viewer_ip)
 
     def to_out(self, viewer_ip: str | None = None) -> HostOut:
         return HostOut(

@@ -2,12 +2,14 @@ import uuid
 from datetime import timedelta
 from typing import Any
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clock import utcnow
 from app.models import ConnectionRequest, Contact, Device, Presence, Session, User
 from app.models.enums import RequestStatus, SessionStatus
+from app.services.hosts import same_network
 from app.services.users import create_user
 
 HOSTS = "/api/v1/hosts"
@@ -115,3 +117,23 @@ async def test_hosts_only_lists_contacts(
     await db.commit()
     listed = (await client.get(HOSTS, headers=auth_headers)).json()
     assert [h["device_id"] for h in listed] == [str(device.id)]
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "expected"),
+    [
+        ("154.178.216.249", "154.178.216.249", True),  # one NAT
+        ("154.178.216.249", "154.178.216.250", False),
+        ("::ffff:154.178.216.249", "154.178.216.249", True),  # IPv4 through a dual-stack socket
+        ("2a02:908:1a2b:3c4d::1", "2a02:908:1a2b:3c4d:9f3c::7", True),  # one IPv6 /64
+        ("2A02:908:1A2B:3C4D::1", "2a02:908:1a2b:3c4d::1", True),  # spelling does not matter
+        ("2a02:908:1a2b:3c4d::1", "2a02:908:1a2b:3c4e::1", False),  # the next /64
+        ("154.178.216.249", "2a02:908:1a2b:3c4d::1", False),  # one address each cannot tell
+        (None, "154.178.216.249", False),
+        (None, None, False),
+        ("not-an-address", "not-an-address", False),
+    ],
+)
+def test_same_network(first: str | None, second: str | None, expected: bool) -> None:
+    assert same_network(first, second) is expected
+    assert same_network(second, first) is expected

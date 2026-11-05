@@ -500,7 +500,7 @@ async def announce_session(
     initiator: RequestInitiator,
 ) -> None:
     """``session.created`` to both parties, the host list, and the session's two deadlines."""
-    same_public_ip = guest.public_ip is not None and guest.public_ip == host.public_ip
+    same_public_ip = host_service.same_network(guest.public_ip, host.public_ip)
     for me, peer, role in (
         (guest, host, SessionRole.GUEST),
         (host, guest, SessionRole.HOST),

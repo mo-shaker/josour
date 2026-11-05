@@ -6,6 +6,12 @@ Every release of Josour: the apps, the server and the relay share one version nu
 
 ## Unreleased
 
+### Server
+- **The same-network warning now works over IPv6.** Each device on an IPv6 network has its own address, so
+  `same_public_ip` (in the host list and in `session.created`) now compares the `/64` network instead of the exact
+  address; an IPv4 address seen through a dual-stack socket (`::ffff:…`) is compared as plain IPv4. A device that
+  reaches the server over IPv4 and another over IPv6 still cannot be compared and count as different.
+
 ## 2.5.0 - 2026-11-03
 
 ### Windows and macOS

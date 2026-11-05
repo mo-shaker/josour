@@ -82,6 +82,27 @@ async def test_the_host_list_says_which_devices_share_the_viewers_address(
     assert all("public_ip" not in row for row in hosts)  # only the comparison leaves the server
 
 
+async def test_over_ipv6_the_host_list_compares_networks_not_addresses(
+    ws_connect: WsFactory, make_actor: ActorFactory
+) -> None:
+    # Every device on an IPv6 network has its own address; the network is the /64 they share.
+    guest = await make_actor("viewer@example.com")
+    near = await make_actor("near@example.com", device_name="HOME-LAPTOP")
+    far = await make_actor("far@example.com", device_name="OFFICE-PC")
+    guest_ws = await ws_connect(guest, client=("2a02:908:1a2b:3c4d::1", 50000))
+    near_ws = await ws_connect(near, client=("2a02:908:1a2b:3c4d:9f3c::7", 50001))
+    far_ws = await ws_connect(far, client=("2a02:908:1a2b:3c4e::1", 50002))
+    await guest_ws.drain()
+
+    await near_ws.send({"type": "host.available", "available": True})
+    await guest_ws.expect("hosts.update", skip=frozenset())
+    await far_ws.send({"type": "host.available", "available": True})
+    hosts = (await guest_ws.expect("hosts.update", skip=frozenset()))["hosts"]
+
+    same = {row["device_name"]: row["same_public_ip"] for row in hosts}
+    assert same == {"HOME-LAPTOP": True, "OFFICE-PC": False}
+
+
 async def test_withdrawing_availability_empties_the_list(
     ws_connect: WsFactory, make_actor: ActorFactory, client: AsyncClient, db: AsyncSession
 ) -> None:

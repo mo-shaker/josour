@@ -30,6 +30,7 @@ class HostOut(BaseModel):
     )
     same_public_ip: bool = Field(
         default=False,
-        description="The device has the caller's own public address (the same network): sites "
-        "would see the caller's address through it. Only the comparison is returned.",
+        description="The device is on the caller's own public network (the same IPv4 address, or "
+        "the same IPv6 /64): sites would see the caller's network through it. Only the comparison "
+        "is returned.",
     )
