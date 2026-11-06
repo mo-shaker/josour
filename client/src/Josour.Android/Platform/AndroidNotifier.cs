@@ -41,7 +41,8 @@ internal sealed class AndroidNotifier : IMobileNotifier
     public void ShowIncomingRequest(Guid requestId, string title, string body)
     {
         var notification = new NotificationCompat.Builder(_context, RequestsChannel)
-            .SetSmallIcon(Resource.Drawable.ic_josour)
+            .SetSmallIcon(Resource.Drawable.ic_stat_josour)
+            .SetColor(BrandTeal(_context))
             .SetContentTitle(title)
             .SetContentText(body)
             .SetStyle(new NotificationCompat.BigTextStyle().BigText(body + "\n" + Tr.Get(UiStringKeys.MobileRequestTapToAnswer)))
@@ -62,7 +63,8 @@ internal sealed class AndroidNotifier : IMobileNotifier
     public void ShowInfo(string title, string body)
     {
         var notification = new NotificationCompat.Builder(_context, InfoChannel)
-            .SetSmallIcon(Resource.Drawable.ic_josour)
+            .SetSmallIcon(Resource.Drawable.ic_stat_josour)
+            .SetColor(BrandTeal(_context))
             .SetContentTitle(title)
             .SetContentText(body)
             .SetStyle(new NotificationCompat.BigTextStyle().BigText(body))
@@ -75,7 +77,8 @@ internal sealed class AndroidNotifier : IMobileNotifier
     public void ShowInvitation(Guid inviteId, string title, string body)
     {
         var notification = new NotificationCompat.Builder(_context, InfoChannel)
-            .SetSmallIcon(Resource.Drawable.ic_josour)
+            .SetSmallIcon(Resource.Drawable.ic_stat_josour)
+            .SetColor(BrandTeal(_context))
             .SetContentTitle(title)
             .SetContentText(body)
             .SetStyle(new NotificationCompat.BigTextStyle().BigText(body))
@@ -91,6 +94,9 @@ internal sealed class AndroidNotifier : IMobileNotifier
         try { NotificationManagerCompat.From(_context).Cancel(InviteIdFor(inviteId)); }
         catch (Exception) { }
     }
+
+    /// <summary>The brand teal the small icon and the actions take (colors.xml, generated from the tokens).</summary>
+    internal static int BrandTeal(Context context) => AndroidX.Core.Content.ContextCompat.GetColor(context, Resource.Color.josour_brand_teal);
 
     internal PendingIntent OpenApp(int requestCode, string? page = null) =>
         PendingIntent.GetActivity(_context, requestCode, MainActivity.OpenIntent(_context, page), PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent)!;

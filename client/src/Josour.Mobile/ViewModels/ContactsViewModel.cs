@@ -34,8 +34,28 @@ public sealed partial class ContactsViewModel : ObservableObject
     private bool _isBusy;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasStatusMessage))]
+    [NotifyPropertyChangedFor(nameof(HasStatusMessage), nameof(HasErrorMessage), nameof(HasSuccessMessage), nameof(HasPageError), nameof(HasInviteError), nameof(HasInviteSuccess))]
     private string _statusMessage = string.Empty;
+
+    /// <summary>The last action failed: its message shows as a problem, not as news.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasErrorMessage), nameof(HasSuccessMessage), nameof(HasPageError), nameof(HasInviteError), nameof(HasInviteSuccess))]
+    private bool _statusIsError;
+
+    /// <summary>The message is about inviting: it shows in the invite card instead of at the top of the page.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPageError), nameof(HasInviteError), nameof(HasInviteSuccess))]
+    private bool _statusFromInvite;
+
+    /// <summary>The first list after sign-in has arrived: until then the page shows placeholders, never "No contacts yet".</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsEmpty), nameof(IsLoading))]
+    private bool _isLoaded;
+
+    /// <summary>The contact whose "without asking" is waiting for the confirmation sheet.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasTrustCandidate))]
+    private ContactItem? _trustCandidate;
 
     public ContactsViewModel(IApiClient api, IContactsStore store, IMobileNotifier notifier, ILogger<ContactsViewModel> logger)
     {
@@ -43,7 +63,11 @@ public sealed partial class ContactsViewModel : ObservableObject
         _store = store;
         _notifier = notifier;
         _logger = logger;
-        Contacts.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasContacts));
+        Contacts.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasContacts));
+            OnPropertyChanged(nameof(ShowsEmpty));
+        };
         OutgoingInvites.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasOutgoingInvites));
         IncomingInvites.CollectionChanged += (_, _) =>
         {
@@ -69,6 +93,22 @@ public sealed partial class ContactsViewModel : ObservableObject
 
     public bool HasStatusMessage => StatusMessage.Length > 0;
 
+    public bool HasErrorMessage => HasStatusMessage && StatusIsError;
+
+    public bool HasSuccessMessage => HasStatusMessage && !StatusIsError;
+
+    public bool HasPageError => HasErrorMessage && !StatusFromInvite;
+
+    public bool HasInviteError => HasErrorMessage && StatusFromInvite;
+
+    public bool HasInviteSuccess => HasSuccessMessage && StatusFromInvite;
+
+    public bool IsLoading => !IsLoaded;
+
+    public bool ShowsEmpty => IsLoaded && !HasContacts;
+
+    public bool HasTrustCandidate => TrustCandidate is not null;
+
     /// <summary>For the badge on the contacts tab.</summary>
     public int IncomingCount => IncomingInvites.Count;
 
@@ -87,6 +127,8 @@ public sealed partial class ContactsViewModel : ObservableObject
             _knownInvites.UnionWith(_store.Invites.Incoming.Select(i => i.Id));
             _announcing = true;
         }
+
+        IsLoaded = true;
     }
 
     /// <summary>Sign-out: nothing is announced until the next sign-in has its first list.</summary>
@@ -101,6 +143,8 @@ public sealed partial class ContactsViewModel : ObservableObject
 
         StatusMessage = string.Empty;
         InviteEmail = string.Empty;
+        TrustCandidate = null;
+        IsLoaded = false;
     }
 
     /// <summary>The texts again, in the language just switched to.</summary>
@@ -115,6 +159,7 @@ public sealed partial class ContactsViewModel : ObservableObject
     {
         var invites = _store.Invites;
         AnnounceNewInvitations(invites.Incoming);
+        TrustCandidate = null; // its item is about to be replaced
 
         Replace(IncomingInvites, invites.Incoming.Select(i => new IncomingInviteItem(this, i)));
         Replace(OutgoingInvites, invites.Outgoing.Select(i => new OutgoingInviteItem(this, i)));
@@ -164,33 +209,50 @@ public sealed partial class ContactsViewModel : ObservableObject
     private async Task InviteAsync()
     {
         var email = InviteEmail.Trim();
+        StatusFromInvite = true;
         if (await RunAsync(() => _api.InviteAsync(email, CancellationToken.None), UiStringKeys.ContactsInviteFailedFormat))
         {
             InviteEmail = string.Empty;
+            StatusIsError = false;
             StatusMessage = Tr.Format(UiStringKeys.ContactsInviteSentFormat, Tr.Ltr(email));
         }
     }
 
     internal Task AcceptAsync(IncomingInviteDto invite) =>
-        RunAsync(() => _api.AcceptInviteAsync(invite.Id, CancellationToken.None));
+        RunOnPageAsync(() => _api.AcceptInviteAsync(invite.Id, CancellationToken.None));
 
     internal Task DeclineAsync(IncomingInviteDto invite) =>
-        RunAsync(() => _api.DeclineInviteAsync(invite.Id, CancellationToken.None));
+        RunOnPageAsync(() => _api.DeclineInviteAsync(invite.Id, CancellationToken.None));
 
     internal Task WithdrawAsync(OutgoingInviteDto invite) =>
-        RunAsync(() => _api.CancelInviteAsync(invite.Id, CancellationToken.None));
+        RunOnPageAsync(() => _api.CancelInviteAsync(invite.Id, CancellationToken.None));
+
+    /// <summary>Turning "without asking" on waits for the sheet; <see cref="ContactItem.ConfirmTrustCommand"/> answers it.</summary>
+    internal void AskTrust(ContactItem item) => TrustCandidate = item;
+
+    internal void TrustAnswered(ContactItem item)
+    {
+        if (ReferenceEquals(TrustCandidate, item)) TrustCandidate = null;
+    }
 
     internal Task SetTrustAsync(ContactDto contact, bool allow) =>
-        RunAsync(() => _api.SetTrustAsync(contact.UserId, allow, CancellationToken.None), onFailure: Rebuild);
+        RunOnPageAsync(() => _api.SetTrustAsync(contact.UserId, allow, CancellationToken.None), onFailure: Rebuild);
 
     internal Task RemoveAsync(ContactDto contact) =>
-        RunAsync(() => _api.RemoveContactAsync(contact.UserId, CancellationToken.None));
+        RunOnPageAsync(() => _api.RemoveContactAsync(contact.UserId, CancellationToken.None));
+
+    private Task<bool> RunOnPageAsync(Func<Task> action, string failureFormat = UiStringKeys.ContactActionFailedFormat, Action? onFailure = null)
+    {
+        StatusFromInvite = false;
+        return RunAsync(action, failureFormat, onFailure);
+    }
 
     /// <summary>One call, then the lists from the server; a failure is shown on the page, never thrown.</summary>
     private async Task<bool> RunAsync(Func<Task> action, string failureFormat = UiStringKeys.ContactActionFailedFormat, Action? onFailure = null)
     {
         IsBusy = true;
         StatusMessage = string.Empty;
+        StatusIsError = false;
         try
         {
             await action();
@@ -200,6 +262,7 @@ public sealed partial class ContactsViewModel : ObservableObject
         catch (ApiException ex)
         {
             _logger.LogWarning("Contacts: {Code} {Message}", ex.Code, ex.Message);
+            StatusIsError = true;
             StatusMessage = Tr.Format(failureFormat, ex.Message);
             onFailure?.Invoke();
             return false;
@@ -207,6 +270,7 @@ public sealed partial class ContactsViewModel : ObservableObject
         catch (ApiUnavailableException ex)
         {
             _logger.LogWarning("Contacts: server unavailable: {Message}", ex.Message);
+            StatusIsError = true;
             StatusMessage = Tr.Get(UiStringKeys.GuestErrorNotConnected);
             onFailure?.Invoke();
             return false;
@@ -227,6 +291,8 @@ public sealed partial class IncomingInviteItem(ContactsViewModel owner, Incoming
 
     public string EmailText => Tr.Ltr(invite.FromEmail);
 
+    public string Initial => ContactItem.InitialOf(invite.FromDisplayName);
+
     [RelayCommand]
     private Task AcceptAsync() => owner.AcceptAsync(invite);
 
@@ -245,41 +311,91 @@ public sealed partial class OutgoingInviteItem(ContactsViewModel owner, Outgoing
     private Task WithdrawAsync() => owner.WithdrawAsync(invite);
 }
 
-/// <summary>A contact: online or not, "may use my connection without asking", and removing them (asked twice).</summary>
+/// <summary>
+/// A contact: online or not, "may use my connection without asking", and removing them (asked twice). Turning "without
+/// asking" on is a standing consent, so it waits for the confirmation sheet; turning it off takes effect at once.
+/// </summary>
 public sealed partial class ContactItem : ObservableObject
 {
     private readonly ContactsViewModel _owner;
-    private readonly bool _loading;
+    private bool _quiet;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TrustHelpText))]
     private bool _allowWithoutAsking;
 
     [ObservableProperty]
     private bool _isConfirmingRemove;
+
+    [ObservableProperty]
+    private bool _isConfirmingTrust;
 
     public ContactItem(ContactsViewModel owner, ContactDto contact, bool online)
     {
         _owner = owner;
         Contact = contact;
         IsOnline = online;
-        _loading = true;
+        _quiet = true;
         AllowWithoutAsking = contact.ITrust;
-        _loading = false;
+        _quiet = false;
     }
 
     public ContactDto Contact { get; }
 
     public string DisplayName => Contact.DisplayName;
 
+    public string Initial => InitialOf(Contact.DisplayName);
+
     public string EmailText => Tr.Ltr(Contact.Email);
 
     public bool IsOnline { get; }
 
+    public bool IsOffline => !IsOnline;
+
     public string PresenceText => Tr.Get(IsOnline ? UiStringKeys.ContactOnline : UiStringKeys.ContactOffline);
+
+    public string TrustHelpText => Tr.Get(AllowWithoutAsking ? UiStringKeys.MobileTrustOnHelp : UiStringKeys.MobileTrustOffHelp);
+
+    public string TrustConfirmTitle => Tr.Format(UiStringKeys.MobileTrustConfirmTitleFormat, DisplayName);
+
+    public string RemoveConfirmText => Tr.Format(UiStringKeys.MobileRemoveConfirmFormat, DisplayName);
+
+    /// <summary>The first letter of a name, as a whole grapheme (an Arabic letter with its marks), for the avatar.</summary>
+    public static string InitialOf(string? name)
+    {
+        var trimmed = (name ?? string.Empty).Trim();
+        return trimmed.Length == 0 ? "?" : System.Globalization.StringInfo.GetNextTextElement(trimmed, 0).ToUpperInvariant();
+    }
 
     partial void OnAllowWithoutAskingChanged(bool value)
     {
-        if (!_loading) _ = _owner.SetTrustAsync(Contact, value);
+        if (_quiet) return;
+        if (value)
+        {
+            IsConfirmingTrust = true;
+            _owner.AskTrust(this);
+            return;
+        }
+
+        _ = _owner.SetTrustAsync(Contact, false);
+    }
+
+    [RelayCommand]
+    private Task ConfirmTrustAsync()
+    {
+        IsConfirmingTrust = false;
+        _owner.TrustAnswered(this);
+        return _owner.SetTrustAsync(Contact, true);
+    }
+
+    [RelayCommand]
+    private void CancelTrust()
+    {
+        IsConfirmingTrust = false;
+        _owner.TrustAnswered(this);
+        _quiet = true;
+        AllowWithoutAsking = false;
+        _quiet = false;
     }
 
     [RelayCommand]

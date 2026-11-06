@@ -1,0 +1,212 @@
+<!--
+  The phone's control themes, built only from the tokens (Theme/Tokens.axaml): buttons, the "Available" switch, the check
+  box and the banner. They replace Fluent's look for these controls; everything else keeps Fluent with the brand accent.
+-->
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:c="using:Josour.Mobile.Controls">
+
+  <SolidColorBrush x:Key="Josour.Brush.Scrim" Color="#80060B0E" />
+
+  <!-- Buttons: secondary by default; .primary, .danger, .text and .tab on top. 48 dp tall at least, 12 dp corners. -->
+  <ControlTheme x:Key="{x:Type Button}" TargetType="Button">
+    <Setter Property="Background" Value="{DynamicResource Josour.Brush.Surface}" />
+    <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.Text}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.BorderStrong}" />
+    <Setter Property="BorderThickness" Value="1.5" />
+    <Setter Property="CornerRadius" Value="{DynamicResource Josour.Radius.Md}" />
+    <Setter Property="Padding" Value="16,12" />
+    <Setter Property="MinHeight" Value="{DynamicResource Josour.Size.ButtonHeight}" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="FontSize" Value="{DynamicResource Josour.FontSize.Label}" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <ContentPresenter Name="PART_ContentPresenter"
+                          Background="{TemplateBinding Background}"
+                          BorderBrush="{TemplateBinding BorderBrush}"
+                          BorderThickness="{TemplateBinding BorderThickness}"
+                          CornerRadius="{TemplateBinding CornerRadius}"
+                          Padding="{TemplateBinding Padding}"
+                          Content="{TemplateBinding Content}"
+                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                          HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                          VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                          TextWrapping="Wrap"
+                          RecognizesAccessKey="False" />
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pressed">
+      <Setter Property="Opacity" Value="0.82" />
+    </Style>
+    <Style Selector="^:disabled">
+      <Setter Property="Opacity" Value="0.45" />
+    </Style>
+    <Style Selector="^:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.Focus}" />
+      <Setter Property="BorderThickness" Value="3" />
+    </Style>
+    <Style Selector="^.primary">
+      <Setter Property="Background" Value="{DynamicResource Josour.Brush.Primary}" />
+      <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.OnPrimary}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.Primary}" />
+    </Style>
+    <Style Selector="^.danger">
+      <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.DangerFg}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.DangerBorder}" />
+    </Style>
+    <Style Selector="^.text">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.Primary}" />
+      <Setter Property="Padding" Value="8,12" />
+    </Style>
+    <Style Selector="^.text.danger">
+      <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.DangerFg}" />
+    </Style>
+    <Style Selector="^.chip">
+      <Setter Property="CornerRadius" Value="{DynamicResource Josour.Radius.Full}" />
+      <Setter Property="Padding" Value="14,8" />
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="FontSize" Value="{DynamicResource Josour.FontSize.Caption}" />
+    </Style>
+    <Style Selector="^.row">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="FontWeight" Value="Normal" />
+    </Style>
+    <Style Selector="^.tab">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="Padding" Value="4,8" />
+      <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.TextSecondary}" />
+      <Setter Property="FontSize" Value="{DynamicResource Josour.FontSize.Micro}" />
+      <Setter Property="MinHeight" Value="64" />
+    </Style>
+    <Style Selector="^.tab.selected">
+      <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.Text}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+  </ControlTheme>
+
+  <!--
+    The "Available" switch and the per-contact "without asking" switch: the label and the track are one 48 dp target, so the
+    whole row toggles. The track mirrors with the layout (on = the knob at the end of the reading direction).
+  -->
+  <ControlTheme x:Key="Josour.Switch" TargetType="ToggleButton">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.Text}" />
+    <Setter Property="MinHeight" Value="{DynamicResource Josour.Size.TouchTarget}" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="FontSize" Value="{DynamicResource Josour.FontSize.Label}" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14" Background="{TemplateBinding Background}">
+          <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center" TextWrapping="Wrap"
+                            LineHeight="{DynamicResource Josour.LineHeight.Label}" />
+          <Border Name="Track" Grid.Column="1" Width="52" Height="32" CornerRadius="16" BorderThickness="2" VerticalAlignment="Center"
+                  Background="{DynamicResource Josour.Brush.SurfaceSunken}" BorderBrush="{DynamicResource Josour.Brush.BorderStrong}">
+            <Ellipse Name="Knob" Width="16" Height="16" Margin="6,0" HorizontalAlignment="Left" VerticalAlignment="Center"
+                     Fill="{DynamicResource Josour.Brush.TextTertiary}" />
+          </Border>
+        </Grid>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:checked /template/ Border#Track">
+      <Setter Property="Background" Value="{DynamicResource Josour.Brush.Primary}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.Primary}" />
+    </Style>
+    <Style Selector="^:checked /template/ Ellipse#Knob">
+      <Setter Property="Width" Value="24" />
+      <Setter Property="Height" Value="24" />
+      <Setter Property="Margin" Value="2,0" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="Fill" Value="{DynamicResource Josour.Brush.OnPrimary}" />
+    </Style>
+    <Style Selector="^:disabled">
+      <Setter Property="Opacity" Value="0.45" />
+    </Style>
+  </ControlTheme>
+
+  <!-- The request's "always allow" box: never ticked by default; the label and its hint are one 48 dp target. -->
+  <ControlTheme x:Key="{x:Type CheckBox}" TargetType="CheckBox">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.Text}" />
+    <Setter Property="MinHeight" Value="{DynamicResource Josour.Size.TouchTarget}" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="FontSize" Value="{DynamicResource Josour.FontSize.Body}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" Background="{TemplateBinding Background}">
+          <Border Name="Box" Width="24" Height="24" CornerRadius="6" BorderThickness="2" VerticalAlignment="Top" Margin="0,2,0,0"
+                  Background="{DynamicResource Josour.Brush.Surface}" BorderBrush="{DynamicResource Josour.Brush.BorderStrong}">
+            <c:Icon Name="Mark" Kind="Ok" Width="18" Height="18" IsVisible="False" Foreground="{DynamicResource Josour.Brush.OnPrimary}" />
+          </Border>
+          <ContentPresenter Grid.Column="1" Content="{TemplateBinding Content}" VerticalAlignment="Center" />
+        </Grid>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:checked /template/ Border#Box">
+      <Setter Property="Background" Value="{DynamicResource Josour.Brush.Primary}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.Primary}" />
+    </Style>
+    <Style Selector="^:checked /template/ c|Icon#Mark">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="^:disabled">
+      <Setter Property="Opacity" Value="0.45" />
+    </Style>
+  </ControlTheme>
+
+  <!-- Banner: icon shape + colour + words. -->
+  <ControlTheme x:Key="{x:Type c:Banner}" TargetType="c:Banner">
+    <Setter Property="Background" Value="{DynamicResource Josour.Brush.InfoContainer}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.InfoBorder}" />
+    <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.Text}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource Josour.Radius.Md}" />
+    <Setter Property="Padding" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource Josour.FontSize.Caption}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}">
+          <Grid ColumnDefinitions="24,*" ColumnSpacing="10">
+            <c:Icon Name="PART_Icon" Kind="Info" VerticalAlignment="Top" Foreground="{DynamicResource Josour.Brush.InfoFg}" />
+            <ContentPresenter Grid.Column="1" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" VerticalAlignment="Center" />
+          </Grid>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^[Kind=Warning]">
+      <Setter Property="Background" Value="{DynamicResource Josour.Brush.WarningContainer}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.WarningBorder}" />
+    </Style>
+    <Style Selector="^[Kind=Warning] /template/ c|Icon#PART_Icon">
+      <Setter Property="Kind" Value="Warning" />
+      <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.WarningFg}" />
+    </Style>
+    <Style Selector="^[Kind=Danger]">
+      <Setter Property="Background" Value="{DynamicResource Josour.Brush.DangerContainer}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.DangerBorder}" />
+    </Style>
+    <Style Selector="^[Kind=Danger] /template/ c|Icon#PART_Icon">
+      <Setter Property="Kind" Value="Danger" />
+      <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.DangerFg}" />
+    </Style>
+    <Style Selector="^[Kind=Success]">
+      <Setter Property="Background" Value="{DynamicResource Josour.Brush.SuccessContainer}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.SuccessBorder}" />
+    </Style>
+    <Style Selector="^[Kind=Success] /template/ c|Icon#PART_Icon">
+      <Setter Property="Kind" Value="Check" />
+      <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.SuccessFg}" />
+    </Style>
+  </ControlTheme>
+</ResourceDictionary>

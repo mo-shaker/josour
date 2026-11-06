@@ -28,7 +28,16 @@ public sealed partial class SignInViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SignInCommand))]
+    [NotifyPropertyChangedFor(nameof(SignInButtonText), nameof(IsIdle))]
     private bool _isBusy;
+
+    /// <summary>Why the server signed this phone out (session expired, device removed, account disabled), kept on screen.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNotice))]
+    private string? _noticeText;
+
+    [ObservableProperty]
+    private bool _isPasswordRevealed;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasError))]
@@ -43,6 +52,13 @@ public sealed partial class SignInViewModel : ObservableObject
     }
 
     public bool HasError => !string.IsNullOrEmpty(ErrorText);
+
+    public bool HasNotice => !string.IsNullOrEmpty(NoticeText);
+
+    public bool IsIdle => !IsBusy;
+
+    /// <summary>The button says what is happening while it works.</summary>
+    public string SignInButtonText => Tr.Get(IsBusy ? UiStringKeys.MobileSigningIn : UiStringKeys.LoginSignIn);
 
     /// <summary>Raised on the UI thread once the account is signed in.</summary>
     public event Action? SignedIn;
@@ -61,6 +77,7 @@ public sealed partial class SignInViewModel : ObservableObject
         }
 
         IsBusy = true;
+        NoticeText = null;
         try
         {
             var normalized = baseUri.ToString().TrimEnd('/');

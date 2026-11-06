@@ -219,14 +219,11 @@ public class MobileHostTests
         }
     }
 
-    /// <summary>
-    /// The fallback's files are in the app at the address <see cref="MobileApp.UseFonts"/> reads. Whether they draw is a
-    /// question for a real renderer: the headless platform's font manager is a stub that loads no font.
-    /// </summary>
+    /// <summary>The bundled typeface (Readex Pro, Arabic and Latin) is in the app at the address <see cref="MobileApp.UseFonts"/> reads.</summary>
     [AvaloniaFact]
-    public void The_bundled_arabic_font_is_in_the_app_in_both_weights()
+    public void The_bundled_font_is_in_the_app_in_every_weight_the_views_use()
     {
-        foreach (var file in new[] { "NotoNaskhArabicUI-Regular.ttf", "NotoNaskhArabicUI-Bold.ttf" })
+        foreach (var file in new[] { "ReadexPro-Regular.ttf", "ReadexPro-Medium.ttf", "ReadexPro-SemiBold.ttf", "ReadexPro-Bold.ttf", "OFL.txt" })
         {
             Assert.True(AssetLoader.Exists(new Uri("avares://Josour.Mobile/Assets/Fonts/" + file)), file);
         }

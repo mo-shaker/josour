@@ -35,6 +35,11 @@ public sealed partial class MainViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsHostPage))]
     private bool _isContactsPage;
 
+    /// <summary>The sign-out sheet is open: signing out stops availability and any live session, so it asks first.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SignOutConfirmText))]
+    private bool _isConfirmingSignOut;
+
     public MainViewModel(
         IAuthSession auth,
         MobileChannelConnector connector,
@@ -150,6 +155,7 @@ public sealed partial class MainViewModel : ObservableObject
         _logger.LogInformation("Interface language switched to {Language}", language.ToCode());
 
         SignIn.ErrorText = null; // written in the old language
+        SignIn.NoticeText = null;
         Host.RefreshTexts();
         Contacts.RefreshTexts();
         _notifier.RefreshChannelNames();
@@ -173,9 +179,21 @@ public sealed partial class MainViewModel : ObservableObject
         return LocalizedStrings.For(other)[other == UiLanguage.Arabic ? UiStringKeys.SettingsLanguageArabic : UiStringKeys.SettingsLanguageEnglish];
     }
 
+    /// <summary>What signing out stops, named: the live session with its guest, or availability.</summary>
+    public string SignOutConfirmText => Host.CanEndSession && Host.SessionGuestName is { Length: > 0 } guest
+        ? Tr.Format(UiStringKeys.MobileSignOutConfirmSessionFormat, guest)
+        : Tr.Get(UiStringKeys.MobileSignOutConfirmText);
+
+    [RelayCommand]
+    private void AskSignOut() => IsConfirmingSignOut = true;
+
+    [RelayCommand]
+    private void CancelSignOut() => IsConfirmingSignOut = false;
+
     [RelayCommand]
     private async Task SignOutAsync()
     {
+        IsConfirmingSignOut = false;
         Host.StopForSignOut();
         Contacts.Reset();
         await _connector.DisconnectAsync();
@@ -201,6 +219,8 @@ public sealed partial class MainViewModel : ObservableObject
         };
         if (notice is not null)
         {
+            // On screen as well: with notifications off, the notification alone would leave the user guessing.
+            SignIn.NoticeText = Tr.Get(UiStringKeys.SignedOutTitle) + "\n" + notice;
             _notifier.ShowInfo(Tr.Get(UiStringKeys.SignedOutTitle), notice);
         }
     }

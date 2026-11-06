@@ -16,8 +16,8 @@ namespace Josour.Mobile;
 /// </summary>
 public sealed class MobileApp : Application
 {
-    /// <summary>The bundled Arabic font, by its family name inside <see cref="FontsKey"/>.</summary>
-    public const string ArabicFontFamily = "fonts:Josour#Noto Naskh Arabic UI";
+    /// <summary>The bundled typeface, by its family name inside <see cref="FontsKey"/>: Readex Pro, the wordmark's own.</summary>
+    public const string UiFontFamily = "fonts:Josour#Readex Pro";
 
     private static readonly Uri FontsKey = new("fonts:Josour", UriKind.Absolute);
     private static readonly Uri FontsSource = new("avares://Josour.Mobile/Assets/Fonts", UriKind.Absolute);
@@ -28,19 +28,31 @@ public sealed class MobileApp : Application
     public static MobilePlatform? Platform { get; set; }
 
     /// <summary>
-    /// Registers the bundled Arabic font and makes it the fallback for any character the default font lacks.
+    /// Registers the bundled Readex Pro (Regular, Medium, SemiBold, Bold; Arabic and Latin in one family), which the views
+    /// use by name, and makes it the fallback for any character drawn outside them.
     /// <para>
     /// Without it every Arabic letter is an empty box on Android: Avalonia's default family there has no Arabic, and its
     /// per-character fallback does not reach the phone's own Arabic fonts (they are unnamed "und-Arab" fallbacks in
-    /// <c>/system/etc/fonts.xml</c>, and vary by manufacturer). Bundling Regular and Bold covers every weight the views use.
+    /// <c>/system/etc/fonts.xml</c>, and vary by manufacturer).
     /// </para>
     /// </summary>
     public static AppBuilder UseFonts(AppBuilder builder) => builder
         .ConfigureFonts(fonts => fonts.AddFontCollection(new EmbeddedFontCollection(FontsKey, FontsSource)))
         .With(new FontManagerOptions
         {
-            FontFallbacks = [new FontFallback { FontFamily = new FontFamily(ArabicFontFamily) }],
+            // Not DefaultFamilyName: on Android that is resolved among the system fonts only, and fails. The views name
+            // the family themselves (MainView's FontFamily), and the fallback catches anything drawn outside them.
+            FontFallbacks = [new FontFallback { FontFamily = new FontFamily(UiFontFamily) }],
         });
+
+    /// <summary>The phone's font size setting changed while the app runs: build the view again at the new size.</summary>
+    public static void ApplyFontScale(double scale)
+    {
+        if (MobileTheme.SetFontScale(scale))
+        {
+            RebuildView();
+        }
+    }
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
@@ -62,7 +74,7 @@ public sealed class MobileApp : Application
         base.OnFrameworkInitializationCompleted();
     }
 
-    private static void RebuildView()
+    internal static void RebuildView()
     {
         if (_view is { } view && MobileRuntime.IsStarted)
         {

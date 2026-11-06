@@ -12,7 +12,7 @@
   <!-- Incoming requests while the app is in the background (asked for at run time on Android 13+). -->
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-  <application android:label="Josour" android:icon="@drawable/ic_josour" android:allowBackup="false"
+  <application android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="false"
                android:supportsRtl="true" android:usesCleartextTraffic="false">
     <service android:name="com.mohamedshaker.josour.HostingService"
              android:exported="false"

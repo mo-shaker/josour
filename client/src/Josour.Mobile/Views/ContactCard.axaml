@@ -1,0 +1,38 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:m="using:Josour.Mobile"
+             xmlns:c="using:Josour.Mobile.Controls"
+             xmlns:vm="using:Josour.Mobile.ViewModels"
+             x:Class="Josour.Mobile.Views.ContactCard"
+             x:DataType="vm:ContactItem">
+  <!-- One contact: who, online or not (shape and word), "without asking" with its consequence, and Remove asked twice. -->
+  <Border Classes="card">
+    <StackPanel Spacing="8">
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+        <Border Classes="avatar"><TextBlock Text="{Binding Initial}" /></Border>
+        <StackPanel Grid.Column="1" Spacing="2">
+          <TextBlock Classes="heading" Text="{Binding DisplayName}" />
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <Ellipse Classes="presence" Classes.offline="{Binding IsOffline}" />
+            <TextBlock Classes="caption muted" Text="{Binding PresenceText}" />
+          </StackPanel>
+          <TextBlock Classes="caption muted" Text="{Binding EmailText}" />
+        </StackPanel>
+      </Grid>
+      <Rectangle Classes="divider" />
+      <ToggleButton Theme="{StaticResource Josour.Switch}" IsChecked="{Binding AllowWithoutAsking}" FontWeight="Normal"
+                    Content="{m:Tr ContactAllowAlways}" AutomationProperties.Name="{m:Tr ContactAllowAlways}" />
+      <TextBlock Classes="caption muted" Text="{Binding TrustHelpText}" />
+
+      <Button Classes="text danger" HorizontalAlignment="Right" Margin="0,-4,0,-8" Command="{Binding RemoveCommand}"
+              Content="{m:Tr ContactRemove}" IsVisible="{Binding !IsConfirmingRemove}" />
+      <StackPanel Spacing="10" IsVisible="{Binding IsConfirmingRemove}">
+        <c:Banner Kind="Danger"><TextBlock Text="{Binding RemoveConfirmText}" /></c:Banner>
+        <Grid ColumnDefinitions="*,10,*">
+          <Button HorizontalAlignment="Stretch" Command="{Binding KeepContactCommand}" Content="{m:Tr MobileContactCancel}" />
+          <Button Grid.Column="2" Classes="danger" HorizontalAlignment="Stretch" Command="{Binding RemoveCommand}" Content="{m:Tr ContactRemove}" />
+        </Grid>
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</UserControl>

@@ -1,0 +1,195 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:m="using:Josour.Mobile"
+             xmlns:c="using:Josour.Mobile.Controls"
+             xmlns:v="using:Josour.Mobile.Views"
+             xmlns:vm="using:Josour.Mobile.ViewModels"
+             x:Class="Josour.Mobile.Views.SharePage"
+             x:DataType="vm:HostViewModel">
+  <!--
+    The Share tab answers one question first: can a request reach me right now, and if not, what do I do? The status hero
+    (HostViewModel.Status) says it with the arch, a title, a sentence and the one button that fixes it; everything else is below.
+  -->
+  <ScrollViewer>
+    <StackPanel Margin="16,8,16,24" Spacing="12">
+      <TextBlock Classes="title" Text="{m:Tr MobileHostHeading}" />
+
+      <!-- ===== the status hero ===== -->
+      <Border Classes="card hero" AutomationProperties.LiveSetting="Polite">
+        <StackPanel Spacing="10">
+          <c:Motif Width="96" Height="96" HorizontalAlignment="Center" State="{Binding HeroMotif}" />
+          <!-- The title with the state's icon at its reading start (a grid, so the layout mirrors it in Arabic). -->
+          <Grid ColumnDefinitions="Auto,*" HorizontalAlignment="Center">
+            <c:Icon Kind="{Binding HeroIcon}" IsVisible="{Binding HasHeroIcon}" Width="28" Height="28" Margin="0,6,8,0" VerticalAlignment="Top"
+                    Classes.warning="{Binding IsStatusProblem}" Classes.success="{Binding IsStatusReady}" />
+            <TextBlock Grid.Column="1" Classes="center" Classes.display="{Binding ShowsAvailabilityInHero}" Classes.title="{Binding !ShowsAvailabilityInHero}"
+                       Text="{Binding HeroTitle}" />
+          </Grid>
+          <TextBlock Classes="body muted center" Text="{Binding HeroText}" IsVisible="{Binding HeroText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+          <!-- unreachable: what the connection is doing now -->
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" IsVisible="{Binding IsStatusUnreachable}">
+            <Ellipse Classes="presence offline" />
+            <TextBlock Classes="caption muted" Text="{Binding ConnectionText}" />
+          </StackPanel>
+
+          <!-- the session itself -->
+          <StackPanel Spacing="10" IsVisible="{Binding IsStatusInSession}">
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+              <Ellipse Classes="presence" />
+              <TextBlock Classes="caption muted" Text="{Binding SessionPhaseLine}" />
+            </StackPanel>
+            <StackPanel Spacing="2" HorizontalAlignment="Center" IsVisible="{Binding SessionTimeLeftText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+              <TextBlock Classes="caption muted center" Text="{m:Tr MobileSessionTimeLeftLabel}" />
+              <TextBlock Classes="countdown center" Text="{Binding SessionTimeLeftText}" />
+              <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                <c:Icon Kind="Data" Classes="small muted" />
+                <TextBlock Classes="caption muted" Text="{Binding SessionDataUsedText}" />
+              </StackPanel>
+            </StackPanel>
+            <c:Banner Kind="Info" IsVisible="{Binding SessionStartedAutomatically}">
+              <TextBlock Text="{Binding SessionAutoNoteText}" />
+            </c:Banner>
+            <Button Classes="primary" HorizontalAlignment="Stretch" Command="{Binding EndSessionCommand}" IsVisible="{Binding CanEndSession}"
+                    AutomationProperties.Name="{m:Tr MobileEndSessionNow}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <c:Icon Kind="Stop" />
+                <TextBlock Text="{m:Tr MobileEndSessionNow}" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+
+          <!-- the one button that fixes it -->
+          <Button Classes="primary" HorizontalAlignment="Stretch" Command="{Binding ReconnectNowCommand}" IsVisible="{Binding IsStatusUnreachable}"
+                  Content="{m:Tr MobileReconnectNow}" />
+          <Button Classes="primary" HorizontalAlignment="Stretch" Command="{Binding AllowNotificationsCommand}" IsVisible="{Binding IsStatusNeedsNotifications}"
+                  Content="{m:Tr MobileNotificationsAllow}" />
+          <Button Classes="primary" HorizontalAlignment="Stretch" Command="{Binding AllowBackgroundCommand}" IsVisible="{Binding IsStatusNeedsBackground}"
+                  Content="{m:Tr MobileBatteryAllow}" />
+          <Button HorizontalAlignment="Stretch" Command="{Binding DismissSessionCommand}" IsVisible="{Binding IsStatusSessionEnded}"
+                  Content="{m:Tr SessionDismiss}" />
+
+          <StackPanel Spacing="10" IsVisible="{Binding ShowsAvailabilityInHero}">
+            <Rectangle Classes="divider" Margin="0,4,0,0" />
+            <ToggleButton Theme="{StaticResource Josour.Switch}" IsChecked="{Binding IsAvailable}" Content="{m:Tr HostAvailableToggle}"
+                          AutomationProperties.Name="{m:Tr HostAvailableToggle}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- during a session the switch steps out of the hero: turning it off does not end the session -->
+      <Border Classes="card" Padding="16,4" IsVisible="{Binding !ShowsAvailabilityInHero}">
+        <ToggleButton Theme="{StaticResource Josour.Switch}" IsChecked="{Binding IsAvailable}" Content="{m:Tr HostAvailableToggle}"
+                      AutomationProperties.Name="{m:Tr HostAvailableToggle}" />
+      </Border>
+
+      <!-- off, with permissions still missing -->
+      <Border Classes="card" IsVisible="{Binding ShowBeforeYouStart}">
+        <StackPanel Spacing="10">
+          <TextBlock Classes="heading" Text="{m:Tr MobileBeforeYouStart}" />
+          <StackPanel Spacing="10" IsVisible="{Binding ShowNotificationsHint}">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+              <c:Icon Kind="NotificationsOff" Classes="muted" VerticalAlignment="Top" />
+              <TextBlock Grid.Column="1" Classes="body" Text="{m:Tr MobileNotificationsHint}" />
+            </Grid>
+            <Button HorizontalAlignment="Stretch" Command="{Binding AllowNotificationsCommand}" Content="{m:Tr MobileNotificationsAllow}" />
+          </StackPanel>
+          <Rectangle Classes="divider" IsVisible="{Binding ShowBatteryHint}" />
+          <StackPanel Spacing="10" IsVisible="{Binding ShowBatteryHint}">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+              <c:Icon Kind="Battery" Classes="muted" VerticalAlignment="Top" />
+              <TextBlock Grid.Column="1" Classes="body" Text="{m:Tr MobileBatteryHint}" />
+            </Grid>
+            <Button HorizontalAlignment="Stretch" Command="{Binding AllowBackgroundCommand}" Content="{m:Tr MobileBatteryAllow}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- invitations waiting (also the badge on the Contacts tab) -->
+      <c:Banner Kind="Info" IsVisible="{CompiledBinding $parent[v:MainView].((vm:MainViewModel)DataContext).Contacts.HasIncomingInvites}">
+        <StackPanel Spacing="2">
+          <TextBlock Text="{CompiledBinding $parent[v:MainView].((vm:MainViewModel)DataContext).Contacts.WaitingText}" />
+          <Button Classes="text" HorizontalAlignment="Left" Padding="0,8" MinHeight="40"
+                  Command="{CompiledBinding $parent[v:MainView].((vm:MainViewModel)DataContext).ShowContactsCommand}" Content="{m:Tr MobileInvitationsShow}" />
+        </StackPanel>
+      </c:Banner>
+
+      <!-- your connection -->
+      <Border Classes="card">
+        <StackPanel Spacing="6">
+          <TextBlock Classes="heading" Text="{m:Tr MobileYourConnection}" Margin="0,0,0,4" />
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" MinHeight="40">
+            <c:Icon Kind="{Binding NetworkIcon}" Classes="muted" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Classes="body" VerticalAlignment="Center" Text="{Binding NetworkText}" />
+          </Grid>
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" MinHeight="40">
+            <c:Icon Kind="Server" Classes="muted" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Classes="body" VerticalAlignment="Center" Text="{Binding ServerStatusText}" />
+          </Grid>
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" MinHeight="40"
+                IsVisible="{Binding PublicIpText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <c:Icon Kind="Pin" Classes="muted" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Classes="body" VerticalAlignment="Center" Text="{Binding PublicIpText}" />
+          </Grid>
+          <c:Banner Kind="Warning" IsVisible="{Binding IsCellular}" Margin="0,4,0,0">
+            <TextBlock Text="{m:Tr MobileCellularDataNote}" />
+          </c:Banner>
+          <c:Banner Kind="Warning" IsVisible="{Binding IsVpn}" Margin="0,4,0,0">
+            <TextBlock Text="{m:Tr MobileVpnWarning}" />
+          </c:Banner>
+        </StackPanel>
+      </Border>
+
+      <!-- how sharing works, on demand -->
+      <Border Classes="card" Padding="16,4">
+        <StackPanel>
+          <Button Classes="row" HorizontalAlignment="Stretch" Command="{Binding ToggleHowItWorksCommand}" MinHeight="48"
+                  AutomationProperties.Name="{m:Tr MobileHowItWorks}">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+              <c:Icon Kind="Info" Classes="muted" />
+              <TextBlock Grid.Column="1" Classes="body" VerticalAlignment="Center" Foreground="{DynamicResource Josour.Brush.Text}" Text="{m:Tr MobileHowItWorks}" />
+              <c:Icon Grid.Column="2" Kind="ChevronDown" Classes="muted" />
+            </Grid>
+          </Button>
+          <TextBlock Classes="caption muted" Margin="0,0,0,12" IsVisible="{Binding IsHowItWorksOpen}" Text="{m:Tr MobileHostDescription}" />
+        </StackPanel>
+      </Border>
+
+      <!-- the guest role, announced here until the phone can be a guest (a third tab then) -->
+      <Border Classes="card">
+        <StackPanel Spacing="6">
+          <TextBlock Classes="heading" Text="{m:Tr MobileGuestRoleTitle}" />
+          <TextBlock Classes="caption muted" Text="{m:Tr MobileGuestRoleNote}" />
+        </StackPanel>
+      </Border>
+
+      <!-- account -->
+      <Border Classes="card" Padding="16,12">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="heading" Text="{m:Tr AboutSignedInLabel}" Margin="0,0,0,6" />
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" MinHeight="44">
+            <c:Icon Kind="User" Classes="muted" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Classes="body" VerticalAlignment="Center" Text="{Binding SignedInText}" />
+          </Grid>
+          <Button Classes="row" HorizontalAlignment="Stretch" Command="{CompiledBinding $parent[v:MainView].((vm:MainViewModel)DataContext).SwitchLanguageCommand}"
+                  AutomationProperties.Name="{m:Tr SettingsLanguageLabel}">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" MinHeight="44">
+              <c:Icon Kind="Language" Classes="muted" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Classes="body" VerticalAlignment="Center" Foreground="{DynamicResource Josour.Brush.Text}" Text="{m:Tr SettingsLanguageLabel}" />
+              <Border Grid.Column="2" Classes="pill" Padding="12,4" MinHeight="32" VerticalAlignment="Center">
+                <TextBlock Classes="caption" TextWrapping="NoWrap" Text="{CompiledBinding $parent[v:MainView].((vm:MainViewModel)DataContext).SwitchLanguageText}" />
+              </Border>
+            </Grid>
+          </Button>
+          <Button Classes="row" HorizontalAlignment="Stretch" Command="{CompiledBinding $parent[v:MainView].((vm:MainViewModel)DataContext).AskSignOutCommand}"
+                  AutomationProperties.Name="{m:Tr TraySignOut}">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" MinHeight="44">
+              <c:Icon Kind="SignOut" Classes="danger" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Classes="body danger" VerticalAlignment="Center" Text="{m:Tr TraySignOut}" />
+            </Grid>
+          </Button>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

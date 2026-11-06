@@ -41,8 +41,11 @@ public interface INetworkFacts : IConnectivitySignals
 /// </summary>
 public interface IHostingService
 {
-    /// <summary>Starts it, or updates its notification when it already runs.</summary>
-    void Show(string title, string text, bool sessionActive);
+    /// <summary>
+    /// Starts it, or updates its notification when it already runs. <paramref name="endsAt"/> (a live session's end, on this
+    /// device's clock) lets the notification count down by itself.
+    /// </summary>
+    void Show(string title, string text, bool sessionActive, DateTimeOffset? endsAt = null);
 
     /// <summary>Stops it (idempotent).</summary>
     void Stop();

@@ -33,10 +33,13 @@ internal sealed class FakeHosting : IHostingService
     public bool Running { get; private set; }
     public bool LastSessionActive { get; private set; }
 
-    public void Show(string title, string text, bool sessionActive)
+    public DateTimeOffset? LastEndsAt { get; private set; }
+
+    public void Show(string title, string text, bool sessionActive, DateTimeOffset? endsAt = null)
     {
         Running = true;
         LastSessionActive = sessionActive;
+        LastEndsAt = endsAt;
         Calls.Add("show:" + title);
     }
 

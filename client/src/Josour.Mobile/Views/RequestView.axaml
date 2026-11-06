@@ -1,0 +1,120 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:m="using:Josour.Mobile"
+             xmlns:c="using:Josour.Mobile.Controls"
+             xmlns:vm="using:Josour.Mobile.ViewModels"
+             x:Class="Josour.Mobile.Views.RequestView"
+             x:DataType="vm:IncomingRequestViewModel"
+             Background="{DynamicResource Josour.Brush.Canvas}">
+  <!--
+    The incoming request, over everything until it is answered. The countdown is pinned and calm; who, which device, how
+    long and which sites come first; the consequence sits directly above two equal buttons, so they are reached only past
+    it. Trust is never ticked by default. An expired request stays, saying so, until it is closed.
+  -->
+  <Grid RowDefinitions="Auto,*">
+    <Border BorderBrush="{DynamicResource Josour.Brush.Border}" BorderThickness="0,0,0,1" Padding="16,8">
+      <Border Classes="pill" Classes.expired="{Binding IsExpired}" HorizontalAlignment="Right" Padding="14,8,14,0">
+        <StackPanel Spacing="6">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Kind="Clock" Classes="small muted" />
+            <TextBlock Classes="caption" FontWeight="Medium" TextWrapping="NoWrap" Text="{Binding CountdownText}" />
+          </StackPanel>
+          <ProgressBar Minimum="0" Maximum="1" Value="{Binding CountdownFraction}" Height="3" MinHeight="3" CornerRadius="0" Margin="-14,0" />
+        </StackPanel>
+      </Border>
+    </Border>
+
+    <ScrollViewer Grid.Row="1">
+      <StackPanel Margin="16,8,16,28" Spacing="12" Classes.expired="{Binding IsExpired}">
+        <StackPanel Spacing="6" HorizontalAlignment="Center">
+          <c:Motif State="Offer" Width="64" Height="64" HorizontalAlignment="Center" />
+          <TextBlock Classes="title center" Text="{Binding Heading}" AutomationProperties.LiveSetting="Assertive" />
+        </StackPanel>
+
+        <c:Banner Kind="Info" IsVisible="{Binding IsExpired}">
+          <StackPanel Spacing="8">
+            <TextBlock Text="{Binding ExpiredText}" />
+            <Button HorizontalAlignment="Stretch" Command="{Binding CloseCommand}" Content="{m:Tr SessionDismiss}" />
+          </StackPanel>
+        </c:Banner>
+
+        <Border Classes="card" Padding="16,8">
+          <StackPanel>
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" MinHeight="44">
+              <c:Icon Kind="User" Classes="muted" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Classes="body" VerticalAlignment="Center">
+                <Run Text="{m:Tr IncomingRequestRequesterLabel}" Foreground="{DynamicResource Josour.Brush.TextSecondary}" /><Run Text=" · " /><Run Text="{Binding GuestName}" />
+              </TextBlock>
+            </Grid>
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" MinHeight="44">
+              <c:Icon Kind="Laptop" Classes="muted" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Classes="body" VerticalAlignment="Center">
+                <Run Text="{m:Tr IncomingRequestDeviceLabel}" Foreground="{DynamicResource Josour.Brush.TextSecondary}" /><Run Text=" · " /><Run Text="{Binding GuestDevice}" />
+              </TextBlock>
+            </Grid>
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" MinHeight="44">
+              <c:Icon Kind="Clock" Classes="muted" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Classes="body" VerticalAlignment="Center">
+                <Run Text="{m:Tr IncomingRequestDurationLabel}" Foreground="{DynamicResource Josour.Brush.TextSecondary}" /><Run Text=" · " /><Run Text="{Binding DurationText}" />
+              </TextBlock>
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="heading" Text="{Binding ScopeLabel}" />
+            <TextBlock Classes="caption muted" Text="{Binding ScopeNote}" IsVisible="{Binding HasScopeNote}" />
+            <TextBlock Classes="body" Text="{Binding SitesMessage}" IsVisible="{Binding SitesMessageIsPlain}" />
+            <c:Banner Kind="Warning" IsVisible="{Binding SitesMessageIsWarning}"><TextBlock Text="{Binding SitesMessage}" /></c:Banner>
+            <ItemsControl ItemsSource="{Binding Sites}" IsVisible="{Binding HasSites}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,3">
+                    <c:Icon Kind="Link" Classes="small muted" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Classes="body" Text="{Binding}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="consequence">
+          <Grid ColumnDefinitions="24,*" ColumnSpacing="12">
+            <c:Icon Kind="Info" Classes="info" VerticalAlignment="Top" />
+            <StackPanel Grid.Column="1" Spacing="6">
+              <TextBlock Classes="heading" Text="{m:Tr MobileConsequenceTitle}" />
+              <TextBlock Classes="body" Text="{m:Tr MobileConsequence}" />
+              <TextBlock Classes="caption muted" Text="{m:Tr MobileEndAnytimeHint}" />
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <CheckBox IsChecked="{Binding TrustThisGuest}" IsVisible="{Binding CanTrust}" IsEnabled="{Binding !IsExpired}"
+                  AutomationProperties.Name="{m:Tr IncomingRequestTrustThisGuest}">
+          <StackPanel Spacing="4">
+            <TextBlock Classes="body" Text="{m:Tr IncomingRequestTrustThisGuest}" />
+            <TextBlock Classes="caption muted" Text="{m:Tr IncomingRequestTrustHint}" />
+          </StackPanel>
+        </CheckBox>
+
+        <!-- equal size, equal weight -->
+        <Grid ColumnDefinitions="*,12,*" Margin="0,4,0,0">
+          <Button HorizontalAlignment="Stretch" Command="{Binding RejectCommand}" AutomationProperties.Name="{m:Tr Reject}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <c:Icon Kind="Close" />
+              <TextBlock Text="{m:Tr Reject}" />
+            </StackPanel>
+          </Button>
+          <Button Grid.Column="2" HorizontalAlignment="Stretch" Command="{Binding AcceptCommand}" AutomationProperties.Name="{m:Tr Accept}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <c:Icon Kind="Ok" />
+              <TextBlock Text="{m:Tr Accept}" />
+            </StackPanel>
+          </Button>
+        </Grid>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

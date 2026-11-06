@@ -1,0 +1,116 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:m="using:Josour.Mobile"
+             xmlns:c="using:Josour.Mobile.Controls"
+             xmlns:v="using:Josour.Mobile.Views"
+             xmlns:vm="using:Josour.Mobile.ViewModels"
+             x:Class="Josour.Mobile.Views.ContactsPage"
+             x:DataType="vm:ContactsViewModel">
+  <!-- Invitations to answer first, then the contacts, then inviting someone and the invitations sent. -->
+  <ScrollViewer>
+    <StackPanel Margin="16,8,16,24" Spacing="12">
+      <TextBlock Classes="title" Text="{m:Tr ContactsPageTitle}" />
+      <TextBlock Classes="caption muted" Text="{m:Tr MobileContactsDescription}" />
+      <c:Banner Kind="Danger" IsVisible="{Binding HasPageError}" AutomationProperties.LiveSetting="Polite">
+        <TextBlock Text="{Binding StatusMessage}" />
+      </c:Banner>
+
+      <!-- loading: placeholders, never the empty state -->
+      <StackPanel Spacing="12" IsVisible="{Binding IsLoading}" AutomationProperties.Name="{m:Tr MobileContactsLoading}">
+        <ProgressBar IsIndeterminate="True" />
+        <Border Classes="card" Height="88" Background="{DynamicResource Josour.Brush.SurfaceSunken}" BoxShadow="0 0 0 0 Transparent" />
+        <Border Classes="card" Height="88" Background="{DynamicResource Josour.Brush.SurfaceSunken}" BoxShadow="0 0 0 0 Transparent" />
+      </StackPanel>
+
+      <!-- invitations to you -->
+      <StackPanel Spacing="10" IsVisible="{Binding HasIncomingInvites}">
+        <TextBlock Classes="heading" Text="{m:Tr ContactsIncomingTitle}" Margin="0,6,0,0" />
+        <ItemsControl ItemsSource="{Binding IncomingInvites}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:IncomingInviteItem">
+              <Border Classes="card attention" Margin="0,0,0,10">
+                <StackPanel Spacing="12">
+                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                    <Border Classes="avatar"><TextBlock Text="{Binding Initial}" /></Border>
+                    <StackPanel Grid.Column="1" Spacing="2">
+                      <TextBlock Classes="body strong" Text="{Binding Title}" />
+                      <TextBlock Classes="caption muted" Text="{Binding EmailText}" />
+                    </StackPanel>
+                  </Grid>
+                  <Grid ColumnDefinitions="*,10,*">
+                    <Button HorizontalAlignment="Stretch" Command="{Binding DeclineCommand}" Content="{m:Tr ContactsDecline}" />
+                    <Button Grid.Column="2" HorizontalAlignment="Stretch" Command="{Binding AcceptCommand}" Content="{m:Tr ContactsAccept}" />
+                  </Grid>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
+      <!-- the contacts -->
+      <TextBlock Classes="heading" Text="{m:Tr ContactsPageTitle}" Margin="0,6,0,0" IsVisible="{Binding HasContacts}" />
+      <ItemsControl ItemsSource="{Binding Contacts}" IsVisible="{Binding HasContacts}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:ContactItem">
+            <v:ContactCard Margin="0,0,0,12" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <!-- nobody yet -->
+      <StackPanel Spacing="8" Margin="12,16,12,8" IsVisible="{Binding ShowsEmpty}">
+        <c:Motif State="Empty" Width="72" Height="72" HorizontalAlignment="Center" />
+        <TextBlock Classes="heading center" Text="{m:Tr ContactsEmptyTitle}" />
+        <TextBlock Classes="body muted center" Text="{m:Tr ContactsEmptyText}" />
+      </StackPanel>
+
+      <!-- invite someone -->
+      <Border Classes="card">
+        <StackPanel Spacing="10">
+          <TextBlock Classes="heading" Text="{m:Tr MobileInviteHeading}" />
+          <StackPanel Spacing="6">
+            <TextBlock Name="InviteLabel" Classes="label" Text="{m:Tr ContactsInvitePlaceholder}" />
+            <TextBox Classes="ltr" Classes.error="{Binding HasInviteError}" Text="{Binding InviteEmail}"
+                     TextInputOptions.ContentType="Email" AutomationProperties.LabeledBy="{Binding #InviteLabel}" />
+            <TextBlock Classes="caption muted" Text="{m:Tr MobileInviteHelp}" />
+          </StackPanel>
+          <Button Classes="primary" HorizontalAlignment="Stretch" Command="{Binding InviteCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <c:Icon Kind="PersonAdd" />
+              <TextBlock Text="{m:Tr ContactsInviteButton}" />
+            </StackPanel>
+          </Button>
+          <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
+          <c:Banner Kind="Success" IsVisible="{Binding HasInviteSuccess}" AutomationProperties.LiveSetting="Polite">
+            <TextBlock Text="{Binding StatusMessage}" />
+          </c:Banner>
+          <c:Banner Kind="Danger" IsVisible="{Binding HasInviteError}" AutomationProperties.LiveSetting="Polite">
+            <TextBlock Text="{Binding StatusMessage}" />
+          </c:Banner>
+        </StackPanel>
+      </Border>
+
+      <!-- invitations sent -->
+      <StackPanel Spacing="10" IsVisible="{Binding HasOutgoingInvites}">
+        <TextBlock Classes="heading" Text="{m:Tr ContactsOutgoingTitle}" Margin="0,6,0,0" />
+        <Border Classes="card" Padding="16,6">
+          <ItemsControl ItemsSource="{Binding OutgoingInvites}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:OutgoingInviteItem">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" MinHeight="56">
+                  <c:Icon Kind="Mail" Classes="muted" VerticalAlignment="Center" />
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Classes="body" Text="{Binding EmailText}" />
+                    <TextBlock Classes="caption muted" Text="{Binding StatusText}" />
+                  </StackPanel>
+                  <Button Grid.Column="2" Classes="text" VerticalAlignment="Center" Command="{Binding WithdrawCommand}" Content="{m:Tr ContactsWithdraw}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Border>
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

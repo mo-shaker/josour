@@ -27,6 +27,7 @@ public sealed class HostingService : Service
     internal const string ExtraTitle = "title";
     internal const string ExtraText = "text";
     internal const string ExtraSession = "session";
+    internal const string ExtraEndsAt = "ends_at";
     private const string ActionStopHosting = "com.mohamedshaker.josour.STOP_HOSTING";
     private const string ActionEndSession = "com.mohamedshaker.josour.END_SESSION";
 
@@ -73,14 +74,16 @@ public sealed class HostingService : Service
             intent.GetStringExtra(ExtraTitle) ?? Tr.Get(UiStringKeys.MobileServiceAvailableTitle),
             intent.GetStringExtra(ExtraText) ?? string.Empty,
             intent.GetBooleanExtra(ExtraSession, false),
+            intent.GetLongExtra(ExtraEndsAt, 0) is var ends and > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(ends) : null,
             foreground: true);
         return StartCommandResult.NotSticky;
     }
 
-    internal void Update(string title, string text, bool session, bool foreground = false)
+    internal void Update(string title, string text, bool session, DateTimeOffset? endsAt, bool foreground = false)
     {
         var builder = new NotificationCompat.Builder(this, AndroidNotifier.HostingChannel)
-            .SetSmallIcon(Resource.Drawable.ic_josour)
+            .SetSmallIcon(Resource.Drawable.ic_stat_josour)
+            .SetColor(AndroidNotifier.BrandTeal(this))
             .SetContentTitle(title)
             .SetOngoing(true)
             .SetOnlyAlertOnce(true)
@@ -89,6 +92,12 @@ public sealed class HostingService : Service
             .SetContentIntent(PendingIntent.GetActivity(this, 0, MainActivity.OpenIntent(this), PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent))
             .AddAction(0, Tr.Get(session ? UiStringKeys.MobileEndSessionNow : UiStringKeys.MobileStopHosting), SelfIntent(session ? ActionEndSession : ActionStopHosting));
         if (text.Length > 0) builder.SetContentText(text);
+        if (session && endsAt is { } end)
+        {
+            // Time left, counted down by Android itself: the notification is not re-posted every second.
+            builder.SetWhen(end.ToUnixTimeMilliseconds()).SetShowWhen(true).SetUsesChronometer(true).SetChronometerCountDown(true);
+        }
+
         var notification = builder.Build()!;
 
         if (foreground)
@@ -160,9 +169,9 @@ internal sealed class AndroidHosting : IHostingService
 
     public AndroidHosting(Context context, AndroidNotifier _) => _context = context;
 
-    public void Show(string title, string text, bool sessionActive)
+    public void Show(string title, string text, bool sessionActive, DateTimeOffset? endsAt = null)
     {
-        var key = $"{title}\n{text}\n{sessionActive}";
+        var key = $"{title}\n{text}\n{sessionActive}\n{endsAt?.ToUnixTimeSeconds()}";
         if (key == _last && HostingService.Running is not null) return;
         _last = key;
 
@@ -170,14 +179,15 @@ internal sealed class AndroidHosting : IHostingService
         {
             // Already in the foreground: only the notification changes. A second startForegroundService from the
             // background is what Android 12+ refuses, so it is not used for updates.
-            running.Update(title, text, sessionActive);
+            running.Update(title, text, sessionActive, endsAt);
             return;
         }
 
         var intent = new Intent(_context, typeof(HostingService))
             .PutExtra(HostingService.ExtraTitle, title)
             .PutExtra(HostingService.ExtraText, text)
-            .PutExtra(HostingService.ExtraSession, sessionActive);
+            .PutExtra(HostingService.ExtraSession, sessionActive)
+            .PutExtra(HostingService.ExtraEndsAt, endsAt?.ToUnixTimeMilliseconds() ?? 0);
         try
         {
             if (Build.VERSION.SdkInt >= BuildVersionCodes.O) _context.StartForegroundService(intent);

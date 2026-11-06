@@ -1,9 +1,13 @@
-Noto Naskh Arabic UI (NotoNaskhArabicUI-Regular.ttf, NotoNaskhArabicUI-Bold.ttf), version 1.08
-Copyright 2013 Google Inc. All Rights Reserved.
+Readex Pro (ReadexPro-Regular.ttf, ReadexPro-Medium.ttf, ReadexPro-SemiBold.ttf, ReadexPro-Bold.ttf), version 1.205
+Static instances (wght 400, 500, 600, 700; HEXP 0) cut with fontTools varLib.instancer from ReadexPro[HEXP,wght].ttf
+(github.com/google/fonts, ofl/readexpro), with the family name set to "Readex Pro" in every file. No glyph was changed.
+
+Copyright 2018 The Readex Pro Project Authors (https://github.com/ThomasJockin/readexpro), with Reserved Font Name “RevReading Lexend”.
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:
-https://openfontlicense.org
+https://scripts.sil.org/OFL
+
 
 -----------------------------------------------------------
 SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
@@ -18,7 +22,7 @@ with others.
 
 The OFL allows the licensed fonts to be used, studied, modified and
 redistributed freely as long as they are not sold by themselves. The
-fonts, including any derivative works, can be bundled, embedded,
+fonts, including any derivative works, can be bundled, embedded, 
 redistributed and/or sold with any software provided that any reserved
 names are not used by derivative works. The fonts and derivatives,
 however, cannot be released under any other type of license. The

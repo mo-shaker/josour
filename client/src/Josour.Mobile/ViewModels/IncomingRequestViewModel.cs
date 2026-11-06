@@ -21,6 +21,8 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
     private readonly DispatcherTimer _timer;
     private readonly RequestCountdown _countdown;
     private readonly TaskCompletionSource<RequestAnswer> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _closed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly int _initialSeconds;
 
     [ObservableProperty]
     private string _countdownText = string.Empty;
@@ -31,6 +33,14 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
 
     [ObservableProperty]
     private bool _trustThisGuest;
+
+    /// <summary>The time left to answer, from 1 down to 0, for the bar under the countdown.</summary>
+    [ObservableProperty]
+    private double _countdownFraction = 1;
+
+    /// <summary>It ran out before an answer: the screen says so until it is closed (<see cref="Closed"/>).</summary>
+    [ObservableProperty]
+    private bool _isExpired;
 
     public IncomingRequestViewModel(RequestIncomingMessage request, AllowlistDisclosure allowlist, Func<DateTimeOffset> serverNow)
     {
@@ -46,9 +56,13 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
         DurationText = Tr.Format(UiStringKeys.DurationMinutesFormat, request.DurationMin);
         ScopeLabel = DisclosureText.Label(allowlist);
         ScopeNote = DisclosureText.Note(allowlist);
-        SitesMessage = DisclosureText.Message(allowlist);
+        // The phone says the unrestricted scope in plainer words, with the same breadth (MobileScopeUnrestricted).
+        SitesMessage = allowlist.Unrestricted ? Tr.Get(UiStringKeys.MobileScopeUnrestricted) : DisclosureText.Message(allowlist);
+        SitesMessageIsWarning = !allowlist.Unrestricted && (!allowlist.Loaded || allowlist.IsEmpty);
         Sites = allowlist.Sites.Select(Tr.Ltr).ToArray();
         CanTrust = request.GuestUserId != Guid.Empty;
+        ExpiredText = Tr.Format(UiStringKeys.MobileRequestExpiredFormat, request.GuestName);
+        _initialSeconds = Math.Max(1, _countdown.SecondsRemaining());
 
         _timer = new DispatcherTimer(DispatcherPriority.Normal) { Interval = TimeSpan.FromMilliseconds(250) };
         _timer.Tick += (_, _) => Tick();
@@ -78,6 +92,16 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
 
     public bool HasSitesMessage => SitesMessage.Length > 0;
 
+    /// <summary>The list could not be loaded, or allows nothing: said in a warning, never as a plain sentence.</summary>
+    public bool SitesMessageIsWarning { get; }
+
+    public bool SitesMessageIsPlain => HasSitesMessage && !SitesMessageIsWarning;
+
+    public string ExpiredText { get; }
+
+    /// <summary>Completes when an expired request is closed, by the user or because the screen is torn down.</summary>
+    public Task Closed => _closed.Task;
+
     public IReadOnlyList<string> Sites { get; }
 
     public bool HasSites => Sites.Count > 0;
@@ -97,9 +121,14 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
 
     public void Expire() => Complete(RequestDecision.TimedOut);
 
+    [RelayCommand]
+    public void Close() => _closed.TrySetResult();
+
     private void Tick()
     {
-        CountdownText = Tr.Format(UiStringKeys.CountdownFormat, _countdown.SecondsRemaining());
+        var seconds = _countdown.SecondsRemaining();
+        CountdownText = Tr.Format(UiStringKeys.CountdownFormat, seconds);
+        CountdownFraction = Math.Clamp(seconds / (double)_initialSeconds, 0, 1);
         if (_countdown.HasRunOut())
         {
             Complete(RequestDecision.TimedOut);
@@ -124,6 +153,8 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
         if (decision == RequestDecision.TimedOut)
         {
             CountdownText = Tr.Get(UiStringKeys.RequestExpired);
+            CountdownFraction = 0;
+            IsExpired = true;
         }
 
         // Trust only ever rides along with an acceptance.
@@ -134,5 +165,6 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
     {
         _timer.Stop();
         Complete(RequestDecision.Dismissed);
+        _closed.TrySetResult();
     }
 }

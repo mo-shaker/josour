@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Josour Mobile Mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300..700&display=swap" rel="stylesheet">
+<style>
+/* Plan: the approved Phase 1 tokens drive both the page and the phone frames. Frames are 360×800 dp, drawn at
+   true size and scaled for viewing; Arabic first, then English; light beside dark. */
+:root{
+  --canvas:#F6FAFA;
+  --surface:#FFFFFF;
+  --sunken:#ECF3F3;
+  --raised:#FFFFFF;
+  --border:#D0D9DD;
+  --border-strong:#7A8990;
+  --text:#14232B;
+  --text-2:#54636B;
+  --text-3:#707E86;
+  --primary:#0E7490;
+  --on-primary:#FFFFFF;
+  --primary-con:#D6F2FC;
+  --on-primary-con:#09485A;
+  --focus:#0689AA;
+  --motif-idle:#C3CCD2;
+  --success-fg:#107550;
+  --success-con:#DCF8E9;
+  --success-bd:#95CCB0;
+  --warning-fg:#8B570F;
+  --warning-con:#FFF0E0;
+  --warning-bd:#EFB87C;
+  --danger-fg:#AD301C;
+  --danger-con:#FFEBE7;
+  --danger-bd:#EDAB9E;
+  --info-fg:#2F62AC;
+  --info-con:#E9F2FF;
+  --info-bd:#ACC6EC;
+  --font-ui:"Readex Pro","Noto Sans Arabic",system-ui,sans-serif;
+  --font-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --s:.6;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --canvas:#091114;
+  --surface:#111B20;
+  --sunken:#060B0E;
+  --raised:#19252A;
+  --border:#29353A;
+  --border-strong:#66747B;
+  --text:#E9F0F2;
+  --text-2:#B0BDC2;
+  --text-3:#94A1A8;
+  --primary:#5ECCE4;
+  --on-primary:#051920;
+  --primary-con:#003C4B;
+  --on-primary-con:#CBEFF9;
+  --focus:#6FD5EC;
+  --motif-idle:#3C4C54;
+  --success-fg:#6ED6A6;
+  --success-con:#163527;
+  --success-bd:#356A51;
+  --warning-fg:#FEBB71;
+  --warning-con:#412B12;
+  --warning-bd:#815A2D;
+  --danger-fg:#FD9884;
+  --danger-con:#47211A;
+  --danger-bd:#8D4638;
+  --info-fg:#9AC0F8;
+  --info-con:#1E2E47;
+  --info-bd:#415E8A;
+  color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --canvas:#091114;
+  --surface:#111B20;
+  --sunken:#060B0E;
+  --raised:#19252A;
+  --border:#29353A;
+  --border-strong:#66747B;
+  --text:#E9F0F2;
+  --text-2:#B0BDC2;
+  --text-3:#94A1A8;
+  --primary:#5ECCE4;
+  --on-primary:#051920;
+  --primary-con:#003C4B;
+  --on-primary-con:#CBEFF9;
+  --focus:#6FD5EC;
+  --motif-idle:#3C4C54;
+  --success-fg:#6ED6A6;
+  --success-con:#163527;
+  --success-bd:#356A51;
+  --warning-fg:#FEBB71;
+  --warning-con:#412B12;
+  --warning-bd:#815A2D;
+  --danger-fg:#FD9884;
+  --danger-con:#47211A;
+  --danger-bd:#8D4638;
+  --info-fg:#9AC0F8;
+  --info-con:#1E2E47;
+  --info-bd:#415E8A;
+  color-scheme:dark;}
+.tl{
+  --canvas:#F6FAFA;
+  --surface:#FFFFFF;
+  --sunken:#ECF3F3;
+  --raised:#FFFFFF;
+  --border:#D0D9DD;
+  --border-strong:#7A8990;
+  --text:#14232B;
+  --text-2:#54636B;
+  --text-3:#707E86;
+  --primary:#0E7490;
+  --on-primary:#FFFFFF;
+  --primary-con:#D6F2FC;
+  --on-primary-con:#09485A;
+  --focus:#0689AA;
+  --motif-idle:#C3CCD2;
+  --success-fg:#107550;
+  --success-con:#DCF8E9;
+  --success-bd:#95CCB0;
+  --warning-fg:#8B570F;
+  --warning-con:#FFF0E0;
+  --warning-bd:#EFB87C;
+  --danger-fg:#AD301C;
+  --danger-con:#FFEBE7;
+  --danger-bd:#EDAB9E;
+  --info-fg:#2F62AC;
+  --info-con:#E9F2FF;
+  --info-bd:#ACC6EC;
+  color-scheme:light;}
+.td{
+  --canvas:#091114;
+  --surface:#111B20;
+  --sunken:#060B0E;
+  --raised:#19252A;
+  --border:#29353A;
+  --border-strong:#66747B;
+  --text:#E9F0F2;
+  --text-2:#B0BDC2;
+  --text-3:#94A1A8;
+  --primary:#5ECCE4;
+  --on-primary:#051920;
+  --primary-con:#003C4B;
+  --on-primary-con:#CBEFF9;
+  --focus:#6FD5EC;
+  --motif-idle:#3C4C54;
+  --success-fg:#6ED6A6;
+  --success-con:#163527;
+  --success-bd:#356A51;
+  --warning-fg:#FEBB71;
+  --warning-con:#412B12;
+  --warning-bd:#815A2D;
+  --danger-fg:#FD9884;
+  --danger-con:#47211A;
+  --danger-bd:#8D4638;
+  --info-fg:#9AC0F8;
+  --info-con:#1E2E47;
+  --info-bd:#415E8A;
+  color-scheme:dark;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--canvas);color:var(--text);font-family:var(--font-ui);font-size:16px;line-height:1.55}
+a{color:var(--primary)}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+code{font-family:var(--font-mono);font-size:.86em}
+h1,h2,h3,h4{text-wrap:balance;font-weight:600;line-height:1.25;margin:0}
+.page h1{font-size:34px}.page h2{font-size:26px;margin-bottom:6px}.page h3{font-size:19px;margin:26px 0 10px}
+p{margin:0 0 12px;max-width:74ch}
+.wrap{max-width:1560px;margin:0 auto;padding:0 20px}
+.narrow{max-width:1120px}
+header.top{background:var(--surface);border-bottom:1px solid var(--border)}
+header.top .wrap{display:grid;gap:14px;padding-top:26px;padding-bottom:22px}
+.eyebrow{font-size:13px;font-weight:500;color:var(--text-2)}
+.lede{font-size:17px;color:var(--text-2);max-width:78ch}
+nav.toc{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--canvas) 94%,transparent);backdrop-filter:blur(6px);border-bottom:1px solid var(--border)}
+nav.toc .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;padding-top:8px;padding-bottom:8px;font-size:14px}
+nav.toc a{text-decoration:none;color:var(--text-2);min-height:32px;display:inline-flex;align-items:center}
+nav.toc a:hover{color:var(--primary)}
+.ctl{display:flex;flex-wrap:wrap;gap:10px;margin-inline-start:auto}
+.seg{display:inline-flex;border:1px solid var(--border-strong);border-radius:10px;overflow:hidden}
+.seg button{font:inherit;font-size:13px;background:var(--surface);color:var(--text);border:0;padding:6px 11px;min-height:34px;cursor:pointer}
+.seg button+button{border-inline-start:1px solid var(--border)}
+.seg button[aria-pressed="true"]{background:var(--primary);color:var(--on-primary)}
+section.sec{padding:40px 0 6px}
+.intro{color:var(--text-2)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:20px}
+.grid{display:grid;gap:16px}.g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr))}.g3{grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}
+.note{font-size:14px;color:var(--text-2)}
+ul.note,ol.note{margin:0;padding-inline-start:20px;display:grid;gap:5px}
+.decide{background:var(--primary-con);color:var(--on-primary-con);border-radius:18px;padding:16px 20px}
+.decide ol{margin:6px 0 0;padding-inline-start:22px;display:grid;gap:5px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:start;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-weight:600;color:var(--text-2);font-size:12.5px;background:var(--sunken)}
+.tbl{overflow-x:auto;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.pill{display:inline-block;font-size:12px;font-weight:500;border-radius:999px;padding:2px 9px;border:1px solid var(--border);white-space:nowrap}
+.p-new{background:var(--info-con);color:var(--info-fg);border-color:var(--info-bd)}
+.p-em{background:var(--success-con);color:var(--success-fg);border-color:var(--success-bd)}
+.p-es{background:var(--warning-con);color:var(--warning-fg);border-color:var(--warning-bd)}
+.p-later{background:var(--sunken);color:var(--text-2)}
+.arv{direction:rtl;text-align:right;font-size:15px}
+pre.code{background:var(--sunken);border:1px solid var(--border);border-radius:12px;padding:14px;overflow:auto;font-size:12.5px;line-height:1.5;margin:0}
+/* IA */
+.ia{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr))}
+.ia .box{border:1.5px solid var(--border-strong);border-radius:14px;padding:14px;background:var(--surface)}
+.ia .box h4{font-size:15px;margin-bottom:6px}
+.ia .box.main{border-color:var(--primary);border-width:2px}
+.ia .box.later{border-style:dashed;opacity:.8}
+.ia ul{margin:0;padding-inline-start:18px;font-size:14px;display:grid;gap:3px}
+/* flow */
+.flow{display:flex;gap:6px;overflow-x:auto;padding:8px 2px 14px;align-items:flex-start}
+.step{flex:none;display:grid;gap:6px;width:calc(360px * .32);font-size:12.5px;color:var(--text-2)}
+.step b{color:var(--text);font-weight:600}
+.arrow{flex:none;align-self:center;color:var(--text-3);font-size:20px;padding-top:0}
+.step .fw{--s:.32}
+/* frames */
+.group{padding-top:30px}
+.group>h3{font-size:22px;margin:0 0 4px}
+.srow{margin:20px 0 4px}
+.srow h4{font-size:15.5px;margin-bottom:10px}
+.srow h4 span{font-weight:400;color:var(--text-2)}
+.frames{display:flex;flex-wrap:wrap;gap:18px 18px}
+.fw{margin:0;position:relative;width:calc(374px * var(--s));height:calc(814px * var(--s) + 26px);direction:ltr;flex:none}
+.fw>.ph{position:absolute;top:0;left:0;transform:scale(var(--s));transform-origin:0 0;margin:calc(7px * var(--s))}
+.fw>figcaption{position:absolute;bottom:0;left:0;font-size:12px;color:var(--text-2)}
+body[data-l="ar"] .fw[data-lang="en"],body[data-l="en"] .fw[data-lang="ar"],body[data-t="light"] .fw[data-theme="dark"],body[data-t="dark"] .fw[data-theme="light"]{display:none}
+
+/* ---------------------------------------------------------------- the phone */
+.ph{width:360px;height:800px;position:relative;display:flex;flex-direction:column;overflow:hidden;background:var(--canvas);color:var(--text);font-family:var(--font-ui);border-radius:30px;box-shadow:0 0 0 7px #10181c,0 12px 28px rgba(0,0,0,.22);text-align:start;font-size:16px;line-height:1.5}
+.ph p{margin:0;max-width:none}
+.ph h1,.ph h2,.ph h3{margin:0}
+.ph .ic{width:24px;height:24px;flex:none}
+.ph .ic.s,.ph .ic.tiny{width:16px;height:16px}
+.ph .ic.tiny{vertical-align:-3px}
+.sb{height:28px;flex:none;display:flex;align-items:center;gap:6px;padding:0 22px;font-size:13px;font-weight:500;color:var(--text);position:relative;z-index:3;background:var(--canvas)}
+.sb .sp{flex:1}.sbi{width:14px;height:14px;color:var(--text)}
+.bd{flex:1;overflow:hidden;position:relative}
+.scw{will-change:transform}
+.pad{padding:6px 16px 24px;display:flex;flex-direction:column;gap:12px}
+.t-display{font-size:calc(var(--fs)*28px);line-height:calc(var(--fs)*36px);font-weight:600}
+.t-title{font-size:calc(var(--fs)*22px);line-height:calc(var(--fs)*28px);font-weight:600}
+.t-heading{font-size:calc(var(--fs)*18px);line-height:calc(var(--fs)*24px);font-weight:600}
+.t-body{font-size:calc(var(--fs)*16px);line-height:calc(var(--fs)*24px);font-weight:400}
+.t-label{font-size:calc(var(--fs)*16px);line-height:calc(var(--fs)*20px);font-weight:500}
+.t-label-s{font-size:calc(var(--fs)*14px);line-height:calc(var(--fs)*20px);font-weight:500}
+.t-caption,.t-caption-b{font-size:calc(var(--fs)*14px);line-height:calc(var(--fs)*20px)}
+.t-micro-n{font-size:calc(var(--fs)*13px);line-height:calc(var(--fs)*18px)}
+.ph[lang="ar"] .t-display{line-height:calc(var(--fs)*46px)}
+.ph[lang="ar"] .t-title{line-height:calc(var(--fs)*36px)}
+.ph[lang="ar"] .t-heading{line-height:calc(var(--fs)*30px)}
+.ph[lang="ar"] .t-body{line-height:calc(var(--fs)*28px)}
+.ph[lang="ar"] .t-label{line-height:calc(var(--fs)*24px)}
+.ph[lang="ar"] .t-label-s,.ph[lang="ar"] .t-caption,.ph[lang="ar"] .t-caption-b{line-height:calc(var(--fs)*24px)}
+.ph[lang="ar"] .t-micro-n{line-height:calc(var(--fs)*22px)}
+.ph .muted{color:var(--text-2)}
+.ph b{font-weight:600}
+.ph hr{border:0;border-top:1px solid var(--border);margin:2px 0;width:100%}
+.ah{padding-top:6px}
+.hero{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:20px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px}
+.tl .hero,.tl .cd{box-shadow:0 1px 2px rgba(20,35,43,.06),0 1px 1px rgba(20,35,43,.04)}
+.ht{display:block;text-align:center}
+.ht .ic{width:28px;height:28px;display:inline-block;vertical-align:-5px;margin-inline-end:8px}
+.t-title.ht .ic{width:24px;height:24px;vertical-align:-4px}
+.hi-warn{color:var(--warning-fg)}.hi-ok{color:var(--success-fg)}
+.trow{align-self:stretch;display:flex;align-items:center;justify-content:space-between;gap:14px;border-top:1px solid var(--border);padding-top:14px;margin-top:4px;text-align:start;min-height:48px}
+.cd .trow:first-child{border:0;padding-top:0;margin-top:0}
+.trow.nb{border:0;padding-top:0;margin:0}
+.sw{width:52px;height:32px;border-radius:16px;position:relative;flex:none;background:var(--sunken);border:2px solid var(--border-strong)}
+.sw::after{content:"";position:absolute;top:50%;inset-inline-start:5px;width:16px;height:16px;border-radius:50%;background:var(--text-3);transform:translateY(-50%)}
+.sw.on{background:var(--primary);border-color:var(--primary)}
+.sw.on::after{inset-inline-start:auto;inset-inline-end:2px;width:24px;height:24px;background:var(--on-primary)}
+.b{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:12px 16px;border-radius:12px;font-size:calc(var(--fs)*16px);line-height:calc(var(--fs)*20px);font-weight:500;border:1.5px solid transparent;text-align:center}
+.b.full{align-self:stretch;width:100%}
+.b-p{background:var(--primary);color:var(--on-primary)}
+.b-s{background:var(--surface);color:var(--text);border-color:var(--border-strong)}
+.b-d{background:var(--surface);color:var(--danger-fg);border-color:var(--danger-bd)}
+.b.busy::before{content:"";width:18px;height:18px;border-radius:50%;border:2.5px solid currentColor;border-top-color:transparent;animation:spin 1s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.b2{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-self:stretch}
+.b2 .b{width:100%}
+.tb{color:var(--primary);font-weight:500;font-size:calc(var(--fs)*15px);padding:12px 4px;white-space:nowrap;min-height:48px;display:inline-flex;align-items:center}
+.tb.danger{color:var(--danger-fg)}
+.bn{display:grid;grid-template-columns:24px 1fr;gap:10px;padding:12px;border-radius:12px;border:1px solid;text-align:start;align-self:stretch}
+.bn-info{background:var(--info-con);border-color:var(--info-bd)}.bn-info>.ic{color:var(--info-fg)}
+.bn-warning{background:var(--warning-con);border-color:var(--warning-bd)}.bn-warning>.ic{color:var(--warning-fg)}
+.bn-danger{background:var(--danger-con);border-color:var(--danger-bd)}.bn-danger>.ic{color:var(--danger-fg)}
+.bn-success{background:var(--success-con);border-color:var(--success-bd)}.bn-success>.ic{color:var(--success-fg)}
+.bn-a{margin-top:2px}
+.cd{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.cd.attn{border:2px solid var(--primary)}
+.lr{display:flex;align-items:center;gap:12px;min-height:44px}
+.lr-i{color:var(--text-2)}
+.lr-t{flex:1;min-width:0}
+.danger-row,.danger-row .lr-i{color:var(--danger-fg)}
+[dir="rtl"] .mir{transform:scaleX(-1)}
+.chev{color:var(--text-2);transform:rotate(180deg)}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--border-strong);border-radius:999px;padding:6px 14px;font-size:calc(var(--fs)*14px);font-weight:500;min-height:40px;white-space:nowrap}
+.si-top{display:flex;justify-content:flex-end}
+.lock{width:230px;height:auto;margin:4px 0 2px;align-self:flex-start}
+.fd{display:flex;flex-direction:column;gap:6px}
+.in{display:flex;align-items:center;gap:8px;min-height:52px;border:1.5px solid var(--border-strong);border-radius:12px;padding:0 6px 0 14px;background:var(--surface)}
+[dir="rtl"] .in{padding:0 14px 0 6px}
+.val,.ph-t{flex:1;font-size:calc(var(--fs)*16px);line-height:calc(var(--fs)*22px);padding:12px 0;text-align:left;overflow-wrap:anywhere}
+[dir="rtl"] .val,[dir="rtl"] .ph-t{text-align:right}
+.ph-t{color:var(--text-3)}
+.fd.err .in{border-color:var(--danger-fg);border-width:2px}
+.fd.dis{opacity:.55}
+.eye{color:var(--text-2);display:grid;place-items:center;width:44px;height:44px}
+.center{position:absolute;inset:0;display:grid;place-items:center}
+.start-t{position:absolute;top:calc(50% + 84px);inset-inline:0;display:grid;gap:12px;justify-items:center}
+.bar{width:120px;height:4px;border-radius:2px;background:var(--sunken);overflow:hidden}
+.bar i{display:block;width:40%;height:100%;background:var(--primary);border-radius:2px;animation:ind 1.6s ease-in-out infinite}
+@keyframes ind{0%{transform:translateX(-100%)}100%{transform:translateX(260%)}}
+.tabbar{flex:none;height:72px;display:grid;background:var(--surface);border-top:1px solid var(--border);position:relative;z-index:2}
+.tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:calc(var(--fs)*13px);line-height:1.2;font-weight:500;color:var(--text-2);text-align:center;padding:0 4px}
+.ind{position:relative;width:60px;height:32px;border-radius:16px;display:grid;place-items:center}
+.tab.on{color:var(--text);font-weight:600}
+.tab.on .ind{background:var(--primary-con);color:var(--on-primary-con)}
+.badge{position:absolute;top:-5px;inset-inline-end:4px;min-width:22px;height:22px;border-radius:11px;background:var(--primary);color:var(--on-primary);font-size:12px;font-weight:600;display:grid;place-items:center;padding:0 5px;border:2px solid var(--surface)}
+.tab.later{opacity:.6;border:1.5px dashed var(--border-strong);border-radius:14px;margin:6px 4px}
+.gb{height:20px;flex:none;display:grid;place-items:center;position:relative;z-index:2}
+.gb i{display:block;width:108px;height:4px;border-radius:2px;background:var(--text);opacity:.35}
+.tabbar+.gb{background:var(--surface)}
+.phase{display:inline-flex;align-items:center;gap:8px;color:var(--text-2)}
+.pd{width:9px;height:9px;border-radius:50%;background:var(--primary);flex:none}
+.pd.pend{background:none;border:2px solid var(--text-3)}
+.tl-block{display:grid;gap:2px;justify-items:center;padding:4px 0}
+.big{font-size:calc(var(--fs)*44px);line-height:1.15;font-weight:600;font-variant-numeric:tabular-nums}
+.ov{position:absolute;inset:0;z-index:10}
+.scrim{position:absolute;inset:0;background:rgba(6,11,14,.5)}
+.sheet{position:absolute;inset-inline:0;bottom:0;background:var(--raised);border-radius:24px 24px 0 0;padding:12px 16px 32px;display:flex;flex-direction:column;gap:12px;box-shadow:0 -8px 30px rgba(0,0,0,.18)}
+.handle{align-self:center;width:36px;height:4px;border-radius:2px;background:var(--border-strong)}
+.av{width:40px;height:40px;border-radius:50%;background:var(--primary-con);color:var(--on-primary-con);display:grid;place-items:center;font-weight:600;font-size:calc(var(--fs)*16px);flex:none}
+.pres{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.presence{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block}
+.presence.on{background:var(--primary)}
+.presence.off{border:2px solid var(--text-3)}
+.end-row{display:flex;justify-content:flex-end;margin:-6px 0 -10px}
+.confirm{display:flex;flex-direction:column;gap:10px}
+.sec{margin:6px 0 -2px}
+.intro{margin:-4px 0 2px}
+.skel .sk{display:grid;grid-template-columns:40px 1fr;gap:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:16px;margin-bottom:12px}
+.sk .a{grid-row:span 2;width:40px;height:40px;border-radius:50%;background:var(--sunken)}
+.sk .l1{height:14px;width:55%;border-radius:7px;background:var(--sunken)}
+.sk .l2{height:12px;width:80%;border-radius:6px;background:var(--sunken)}
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:18px 12px 8px}
+.m .arc-idle{stroke:var(--motif-idle)}.m .arc-on{stroke:var(--primary)}
+.m .dot-on{fill:var(--primary)}.m .dot-idle{fill:var(--motif-idle)}
+.m .dot-off{fill:none;stroke:var(--text-3);stroke-width:1.2}
+.m .dashed{stroke-dasharray:2.2 1.6}
+.m .travel{stroke:var(--surface);stroke-opacity:.55}
+@keyframes draw{0%{stroke-dashoffset:23.56}60%,100%{stroke-dashoffset:0}}
+@keyframes travel{0%{stroke-dashoffset:26}100%{stroke-dashoffset:-26}}
+.m .drawing{stroke-dasharray:23.56;animation:draw 2.2s ease-in-out infinite}
+.m .traveling{stroke-dasharray:3 30;animation:travel 3.2s linear infinite}
+.rq{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden}
+.rq-top{flex:none;display:flex;justify-content:flex-end;padding:8px 16px;position:relative;z-index:2;background:var(--canvas);border-bottom:1px solid var(--border)}
+.rq-body{flex:none}
+.cd-pill{position:relative;display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;background:var(--surface);border:1px solid var(--border);font-size:calc(var(--fs)*14px);line-height:1.3;font-weight:500;overflow:hidden;min-height:40px}
+.cd-pill i{position:absolute;inset-inline-start:0;bottom:0;height:3px;width:calc(var(--p) * 100%);background:var(--primary)}
+.cd-pill.exp{color:var(--text-2);background:var(--sunken)}
+.rq-h{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:6px 8px 2px}
+.facts .lr{min-height:40px}
+.sites{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.sites li{display:flex;gap:8px;align-items:center;font-size:calc(var(--fs)*15px);color:var(--text)}
+.sites li .ic{color:var(--text-2)}
+.conseq{display:grid;grid-template-columns:24px 1fr;gap:12px;background:var(--info-con);border:1px solid var(--info-bd);border-radius:18px;padding:16px}
+.conseq>.ic{color:var(--info-fg)}
+.conseq h3{margin-bottom:4px}
+.conseq p{margin-bottom:6px}
+.cb{display:flex;gap:12px;align-items:flex-start;padding:4px 0;min-height:48px}
+.box{width:24px;height:24px;border-radius:6px;border:2px solid var(--border-strong);flex:none;margin-top:2px;background:var(--surface)}
+.cb .d{display:block;margin-top:4px}
+.rq.expired .facts,.rq.expired .conseq,.rq.expired .cb,.rq.expired .rq-b,.rq.expired .rq-body>.cd{opacity:.4}
+.home,.lock-s{position:absolute;inset:0;display:flex;flex-direction:column}
+.home{background:linear-gradient(170deg,#e3ece9,#b9cdd4);padding:70px 18px 18px}
+.home.dk{background:linear-gradient(170deg,#1c2a30,#0b1418)}
+.clock{font-size:64px;font-weight:300;color:#14232B;text-align:center;font-variant-numeric:tabular-nums}
+.home.dk .clock{color:#fff}
+.apps{display:grid;grid-template-columns:repeat(4,1fr);gap:22px 6px;margin-top:auto}
+.app{margin:0;display:grid;justify-items:center;gap:6px}
+.app svg{width:56px;height:56px}
+.app figcaption{font-size:12.5px;color:#14232B;min-height:1em}
+.home.dk .app figcaption{color:#fff}
+.dock{display:grid;grid-template-columns:repeat(4,1fr);margin-top:26px;background:rgba(255,255,255,.4);border-radius:30px;padding:12px 6px}
+.home.dk .dock{background:rgba(255,255,255,.08)}
+.shade{position:absolute;inset:0;background:var(--sunken);padding:10px 12px;display:flex;flex-direction:column;gap:10px}
+.qs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:6px}
+.qt{height:52px;border-radius:26px;background:var(--surface);display:grid;place-items:center;color:var(--text-2)}
+.qt.on{background:var(--primary-con);color:var(--on-primary-con)}
+.nt{background:var(--surface);border-radius:22px;padding:12px 16px;display:flex;flex-direction:column;gap:3px;text-align:start}
+.nt-h{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2)}
+.nt-h svg{width:16px;height:16px;color:var(--primary);flex:none}
+.chrono{margin-inline-start:auto;display:inline-flex;gap:4px;align-items:center;color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+.nt-t{font-weight:600;font-size:calc(var(--fs)*15px);line-height:1.4}
+.nt-b{font-size:calc(var(--fs)*14px);line-height:1.45;color:var(--text-2)}
+.nt-a{display:flex;gap:18px;margin-top:8px;color:var(--primary);font-weight:600;font-size:calc(var(--fs)*14px)}
+.lock-s{background:linear-gradient(170deg,#3a5560,#0b1418);padding:70px 12px;gap:40px}
+.lk-c{font-size:76px;font-weight:300;color:#fff;text-align:center}
+@media (prefers-reduced-motion: reduce){.m .drawing,.m .traveling,.bar i,.b.busy::before{animation:none}.m .drawing{stroke-dashoffset:8}}
+footer{padding:40px 0 60px;color:var(--text-2);font-size:13px}
+</style>
+</head>
+<body data-l="all" data-t="all">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+ <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><circle cx="12" cy="7.75" r="1.25" fill="currentColor" stroke="none"/></symbol>
+ <symbol id="i-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 21.5 20h-19z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.25" r="1.25" fill="currentColor" stroke="none"/></symbol>
+ <symbol id="i-danger" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 3h7L21 8.5v7L15.5 21h-7L3 15.5v-7z"/><path d="M12 7.5v6"/><circle cx="12" cy="16.75" r="1.25" fill="currentColor" stroke="none"/></symbol>
+ <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="m8.25 12.25 2.5 2.5 5-5"/></symbol>
+ <symbol id="i-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+ <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+ <symbol id="i-wifi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 9.5a12 12 0 0 1 17 0"/><path d="M6.75 12.75a7.5 7.5 0 0 1 10.5 0"/><circle cx="12" cy="17.25" r="2.25" fill="currentColor" stroke="none"/></symbol>
+ <symbol id="i-cell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19v-3M9.67 19v-6M14.33 19v-9M19 19V6"/></symbol>
+ <symbol id="i-nonet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 9.5a12 12 0 0 1 9.4-3.47M17.6 7.5a12 12 0 0 1 2.9 2"/><path d="M6.75 12.75a7.5 7.5 0 0 1 4-2.1"/><circle cx="12" cy="17.25" r="2.25" fill="currentColor" stroke="none"/><path d="m4 4 16 16"/></symbol>
+ <symbol id="i-belloff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.2 5.6A4.5 4.5 0 0 1 16.5 8.5v4l2 3.5H9"/><path d="M7.5 9.5v3l-2 3.5h3"/><path d="M10 19a2 2 0 0 0 4 0"/><path d="m4 4 16 16"/></symbol>
+ <symbol id="i-battery" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7.5" width="15.5" height="9" rx="2"/><path d="M21 10.75v2.5"/><path d="M6.5 11v2"/></symbol>
+ <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+ <symbol id="i-person" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8.5" r="3.5"/><path d="M3.5 19.5a6.5 6.5 0 0 1 13 0"/><path d="M19 8.5v6M16 11.5h6"/></symbol>
+ <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="3.75"/><path d="M5 20a7 7 0 0 1 14 0"/></symbol>
+ <symbol id="i-stop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor"/></symbol>
+ <symbol id="i-signout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 4H18a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4.5"/><path d="m8.5 8-4 4 4 4"/><path d="M4.5 12h10"/></symbol>
+ <symbol id="i-data" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4v15M4.5 15.5 8 19l3.5-3.5"/><path d="M16 20V5M12.5 8.5 16 5l3.5 3.5"/></symbol>
+ <symbol id="i-share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 15a7.5 7.5 0 0 1 15 0"/><circle cx="4.5" cy="19.5" r="1.75" fill="currentColor" stroke="none"/><circle cx="19.5" cy="19.5" r="1.75" fill="currentColor" stroke="none"/></symbol>
+ <symbol id="i-people" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.25"/><path d="M3 19a6 6 0 0 1 12 0"/><path d="M15.5 5.6a3.25 3.25 0 0 1 0 5.8M18 14.2A6 6 0 0 1 21 19"/></symbol>
+ <symbol id="i-swap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h14M15 5l3 3-3 3"/><path d="M20 16H6M9 13l-3 3 3 3"/></symbol>
+ <symbol id="i-chevd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9.5 6 6 6-6"/></symbol>
+ <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.75"/></symbol>
+ <symbol id="i-server" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><circle cx="8" cy="7.5" r="1" fill="currentColor"/><circle cx="8" cy="16.5" r="1" fill="currentColor"/></symbol>
+ <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.25" fill="currentColor" stroke="none"/></symbol>
+ <symbol id="i-lang" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6h9M8 4v2c0 4-2.2 7.5-4.5 9"/><path d="M5.5 10.5c1.4 2 3.4 3.4 6 4"/><path d="m12.5 20 4-9 4 9M14 17h5"/></symbol>
+ <symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></symbol>
+ <symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></symbol>
+ <symbol id="i-laptop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="10" rx="1.5"/><path d="M2.5 19h19"/></symbol>
+</defs></svg>
+
+<div class="page">
+<header class="top"><div class="wrap narrow">
+ <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NzQgMjAwIiB3aWR0aD0iNjc0IiBoZWlnaHQ9IjIwMCI+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMjcuMDAsMzUuMDUpIHNjYWxlKDQuMzMzMykiPjxwYXRoIGQ9Ik0zLDE1QTksOSAwIDAgMSAyMSwxNUwxOCwxNUE2LDYgMCAwIDAgNiwxNVpNMi4yNSwyMC4yNWEyLjI1LDIuMjUgMCAxLDEgNC41LDBhMi4yNSwyLjI1IDAgMSwxIC00LjUsMFpNMTcuMjUsMjAuMjVhMi4yNSwyLjI1IDAgMSwxIDQuNSwwYTIuMjUsMi4yNSAwIDEsMSAtNC41LDBaIiBmaWxsPSIjMEU3NDkwIi8+PC9nPjxwYXRoIGQ9Ik0xNjMuNDMyMDAwMDAwMDAwMDIgMTIwLjcyUTE2MC45MTIwMDAwMDAwMDAwMyAxMjAuNzIgMTU4LjYwODAwMDAwMDAwMDAzIDEyMC4wNzJRMTU2LjMwNDAwMDAwMDAwMDAzIDExOS40MjQgMTU0LjM2IDExOC4yMzZRMTUyLjQxNjAwMDAwMDAwMDAzIDExNy4wNDggMTUwLjg2ODAwMDAwMDAwMDAyIDExNS4zNTZRMTQ5LjMyMDAwMDAwMDAwMDAyIDExMy42NjQgMTQ4LjI0IDExMS41NzZMMTUzLjg1NjAwMDAwMDAwMDAyIDEwNS43NDRRMTU1LjcyOCAxMDguMjY0IDE1Ny4xNjggMTA5LjYzMlExNTguNjA4MDAwMDAwMDAwMDMgMTExLjAgMTU5Ljk3NjAwMDAwMDAwMDAzIDExMS41MDM5OTk5OTk5OTk5OVExNjEuMzQ0MDAwMDAwMDAwMDIgMTEyLjAwOCAxNjMuMDAwMDAwMDAwMDAwMDMgMTEyLjAwOFExNjUuMzA0MDAwMDAwMDAwMDMgMTEyLjAwOCAxNjcuMDY4MDAwMDAwMDAwMDQgMTEwLjkyOFExNjguODMyMDAwMDAwMDAwMDIgMTA5Ljg0OCAxNjkuNzY4MDAwMDAwMDAwMDMgMTA3Ljk3NlExNzAuNzA0IDEwNi4xMDQgMTcwLjcwNCAxMDMuNzI4MDAwMDAwMDAwMDFWNzcuOTUySDE2MS40ODgwMDAwMDAwMDAwM1Y2OS42SDE4Ny42OTYwMDAwMDAwMDAwM1Y3Ny45NTJIMTc5LjkyMDAwMDAwMDAwMDAyVjEwNC42NjRRMTc5LjkyMDAwMDAwMDAwMDAyIDEwOC4xOTIwMDAwMDAwMDAwMSAxNzguNjk2MDAwMDAwMDAwMDMgMTExLjEwOFExNzcuNDcyMDAwMDAwMDAwMDQgMTE0LjAyNCAxNzUuMjc2IDExNi4xODRRMTczLjA4IDExOC4zNDQgMTcwLjA1NiAxMTkuNTMyUTE2Ny4wMzIgMTIwLjcyIDE2My40MzIwMDAwMDAwMDAwMiAxMjAuNzJaTTIxMC41MiAxMjAuNzJRMjA0LjgzMjAwMDAwMDAwMDAyIDEyMC43MiAyMDAuMzY4IDExOC4xNjRRMTk1LjkwNCAxMTUuNjA4IDE5My4zNDggMTExLjE0NFExOTAuNzkyIDEwNi42OCAxOTAuNzkyIDEwMC45OTJRMTkwLjc5MiA5NS4zMDQgMTkzLjM0OCA5MC44NFExOTUuOTA0IDg2LjM3NiAyMDAuMzY4IDgzLjgyMDAwMDAwMDAwMDAxUTIwNC44MzIwMDAwMDAwMDAwMiA4MS4yNjQwMDAwMDAwMDAwMSAyMTAuNTIgODEuMjY0MDAwMDAwMDAwMDFRMjE2LjEzNjAwMDAwMDAwMDAyIDgxLjI2NDAwMDAwMDAwMDAxIDIyMC42MDAwMDAwMDAwMDAwMiA4My44MjAwMDAwMDAwMDAwMVEyMjUuMDY0MDAwMDAwMDAwMDIgODYuMzc2IDIyNy42MiA5MC44NFEyMzAuMTc2MDAwMDAwMDAwMDIgOTUuMzA0IDIzMC4xNzYwMDAwMDAwMDAwMiAxMDAuOTkyUTIzMC4xNzYwMDAwMDAwMDAwMiAxMDYuNjggMjI3LjYyIDExMS4xNDRRMjI1LjA2NDAwMDAwMDAwMDAyIDExNS42MDggMjIwLjYwMDAwMDAwMDAwMDAyIDExOC4xNjRRMjE2LjEzNjAwMDAwMDAwMDAyIDEyMC43MiAyMTAuNTIgMTIwLjcyWk0yMTAuNTIgMTEyLjg3MlEyMTMuNjE2IDExMi44NzIgMjE2LjA2NDAwMDAwMDAwMDAyIDExMS4zMjRRMjE4LjUxMiAxMDkuNzc2IDIxOS45MTYgMTA3LjA3NlEyMjEuMzIgMTA0LjM3NiAyMjEuMjQ4MDAwMDAwMDAwMDIgMTAwLjk5MlEyMjEuMzIgOTcuNTM2IDIxOS45MTYgOTQuODM2UTIxOC41MTIgOTIuMTM2IDIxNi4wNjQwMDAwMDAwMDAwMiA5MC42MjRRMjEzLjYxNiA4OS4xMTIgMjEwLjUyIDg5LjExMlEyMDcuNDI0IDg5LjExMiAyMDQuOTQgOTAuNjZRMjAyLjQ1NjAwMDAwMDAwMDAyIDkyLjIwOCAyMDEuMDg4MDAwMDAwMDAwMDIgOTQuOTA4UTE5OS43MiA5Ny42MDggMTk5LjcyIDEwMC45OTJRMTk5LjcyIDEwNC4zNzYgMjAxLjA4ODAwMDAwMDAwMDAyIDEwNy4wNzZRMjAyLjQ1NjAwMDAwMDAwMDAyIDEwOS43NzYgMjA0Ljk0IDExMS4zMjRRMjA3LjQyNCAxMTIuODcyIDIxMC41MiAxMTIuODcyWk0yNTAuNzY4MDAwMDAwMDAwMDMgMTIwLjcyUTI0NS44MDAwMDAwMDAwMDAwNCAxMjAuNzIgMjQxLjgwNDAwMDAwMDAwMDAzIDExOS4wMjc5OTk5OTk5OTk5OVEyMzcuODA4MDAwMDAwMDAwMDIgMTE3LjMzNiAyMzUuMjg4MDAwMDAwMDAwMDQgMTE0LjE2OEwyNDAuOTc2MDAwMDAwMDAwMDMgMTA5LjI3MlEyNDMuMTM2MDAwMDAwMDAwMDIgMTExLjY0OCAyNDUuOCAxMTIuNzY0UTI0OC40NjQwMDAwMDAwMDAwMyAxMTMuODggMjUxLjQxNjAwMDAwMDAwMDAzIDExMy44OFEyNTIuNjQwMDAwMDAwMDAwMDQgMTEzLjg4IDI1My42MTIwMDAwMDAwMDAwMiAxMTMuNTkyUTI1NC41ODQwMDAwMDAwMDAwMyAxMTMuMzA0IDI1NS4zMDQwMDAwMDAwMDAwMyAxMTIuNzI4MDAwMDAwMDAwMDFRMjU2LjAyNDAwMDAwMDAwMDA2IDExMi4xNTIgMjU2LjQyMDAwMDAwMDAwMDEgMTExLjM2UTI1Ni44MTYwMDAwMDAwMDAwMyAxMTAuNTY4IDI1Ni44MTYwMDAwMDAwMDAwMyAxMDkuNjMyUTI1Ni44MTYwMDAwMDAwMDAwMyAxMDcuOTA0IDI1NS41MjAwMDAwMDAwMDAwNCAxMDYuODk2UTI1NC44MDAwMDAwMDAwMDAwNCAxMDYuNDY0IDI1My4yODgwMDAwMDAwMDAwNCAxMDUuODUyUTI1MS43NzYwMDAwMDAwMDAwNCAxMDUuMjQwMDAwMDAwMDAwMDEgMjQ5LjMyODAwMDAwMDAwMDAzIDEwNC42NjRRMjQ1LjQ0MDAwMDAwMDAwMDAzIDEwMy42NTYgMjQyLjgxMiAxMDIuMzI0MDAwMDAwMDAwMDFRMjQwLjE4NDAwMDAwMDAwMDAzIDEwMC45OTIgMjM4Ljc0NDAwMDAwMDAwMDAzIDk5LjMzNlEyMzcuNTIwMDAwMDAwMDAwMDQgOTcuODk2IDIzNi45NDQwMDAwMDAwMDAwMiA5Ni4yMDQwMDAwMDAwMDAwMVEyMzYuMzY4MDAwMDAwMDAwMDIgOTQuNTEyIDIzNi4zNjgwMDAwMDAwMDAwMiA5Mi40MjRRMjM2LjM2ODAwMDAwMDAwMDAyIDg5LjE4NCAyMzguMjc2IDg2LjY2NFEyNDAuMTg0MDAwMDAwMDAwMDMgODQuMTQ0IDI0My4zNTIwMDAwMDAwMDAwMyA4Mi43MDQwMDAwMDAwMDAwMVEyNDYuNTIwMDAwMDAwMDAwMDQgODEuMjY0MDAwMDAwMDAwMDEgMjUwLjQwODAwMDAwMDAwMDA0IDgxLjI2NDAwMDAwMDAwMDAxUTI1My4yODgwMDAwMDAwMDAwNCA4MS4yNjQwMDAwMDAwMDAwMSAyNTUuOTg4MDAwMDAwMDAwMDYgODEuOTg0MDAwMDAwMDAwMDFRMjU4LjY4ODAwMDAwMDAwMDA1IDgyLjcwNDAwMDAwMDAwMDAxIDI2MC45OTIwMDAwMDAwMDAxIDg0LjAzNlEyNjMuMjk2MDAwMDAwMDAwMDUgODUuMzY4IDI2NC45NTIwMDAwMDAwMDAwNiA4Ny4yNDAwMDAwMDAwMDAwMUwyNjAuMDU2MDAwMDAwMDAwMDQgOTIuNjRRMjU4Ljc2MDAwMDAwMDAwMDA1IDkxLjM0NCAyNTcuMTQwMDAwMDAwMDAwMDQgOTAuM1EyNTUuNTIwMDAwMDAwMDAwMDQgODkuMjU2IDI1My44NjQwMDAwMDAwMDAwMyA4OC42OFEyNTIuMjA4MDAwMDAwMDAwMDMgODguMTA0IDI1MC43NjgwMDAwMDAwMDAwMyA4OC4xMDRRMjQ5LjQwMDAwMDAwMDAwMDAzIDg4LjEwNCAyNDguMzIwMDAwMDAwMDAwMDUgODguMzU2UTI0Ny4yNDAwMDAwMDAwMDAwNCA4OC42MDggMjQ2LjUyMDAwMDAwMDAwMDA0IDg5LjExMlEyNDUuODAwMDAwMDAwMDAwMDQgODkuNjE2IDI0NS40MDQwMDAwMDAwMDAwNSA5MC4zNzJRMjQ1LjAwODAwMDAwMDAwMDA0IDkxLjEyOCAyNDUuMDA4MDAwMDAwMDAwMDQgOTIuMDY0MDAwMDAwMDAwMDFRMjQ1LjA4MDAwMDAwMDAwMDA0IDkzLjAgMjQ1LjQ3NjAwMDAwMDAwMDA2IDkzLjc1NlEyNDUuODcyMDAwMDAwMDAwMDQgOTQuNTEyIDI0Ni41OTIwMDAwMDAwMDAwNCA5NS4wMTZRMjQ3LjMxMjAwMDAwMDAwMDA0IDk1LjUyMDAwMDAwMDAwMDAxIDI0OC44OTYwMDAwMDAwMDAwMiA5Ni4xNjhRMjUwLjQ4MDAwMDAwMDAwMDAyIDk2LjgxNiAyNTMuMDAwMDAwMDAwMDAwMDMgOTcuMzkyUTI1Ni41MjggOTguMzI4IDI1OC45MDQgOTkuNDhRMjYxLjI4MDAwMDAwMDAwMDAzIDEwMC42MzIgMjYyLjY0OCAxMDIuMTQ0UTI2NC4wMTYgMTAzLjQ0IDI2NC41OTIgMTA1LjE2OFEyNjUuMTY4IDEwNi44OTYgMjY1LjE2OCAxMDkuMDU2UTI2NS4xNjggMTEyLjQ0IDI2My4yNiAxMTUuMDY4UTI2MS4zNTIwMDAwMDAwMDAwMyAxMTcuNjk2IDI1OC4xMTIgMTE5LjIwOFEyNTQuODcyMDAwMDAwMDAwMDQgMTIwLjcyIDI1MC43NjgwMDAwMDAwMDAwMyAxMjAuNzJaTTI5MC4yMjQgMTIwLjcyUTI4NC41MzYgMTIwLjcyIDI4MC4wNzIgMTE4LjE2NFEyNzUuNjA4IDExNS42MDggMjczLjA1MiAxMTEuMTQ0UTI3MC40OTYgMTA2LjY4IDI3MC40OTYgMTAwLjk5MlEyNzAuNDk2IDk1LjMwNCAyNzMuMDUyIDkwLjg0UTI3NS42MDggODYuMzc2IDI4MC4wNzIgODMuODIwMDAwMDAwMDAwMDFRMjg0LjUzNiA4MS4yNjQwMDAwMDAwMDAwMSAyOTAuMjI0IDgxLjI2NDAwMDAwMDAwMDAxUTI5NS44NCA4MS4yNjQwMDAwMDAwMDAwMSAzMDAuMzA0IDgzLjgyMDAwMDAwMDAwMDAxUTMwNC43NjggODYuMzc2IDMwNy4zMjM5OTk5OTk5OTk5NiA5MC44NFEzMDkuODggOTUuMzA0IDMwOS44OCAxMDAuOTkyUTMwOS44OCAxMDYuNjggMzA3LjMyMzk5OTk5OTk5OTk2IDExMS4xNDRRMzA0Ljc2OCAxMTUuNjA4IDMwMC4zMDQgMTE4LjE2NFEyOTUuODQgMTIwLjcyIDI5MC4yMjQgMTIwLjcyWk0yOTAuMjI0IDExMi44NzJRMjkzLjMyIDExMi44NzIgMjk1Ljc2ODAwMDAwMDAwMDAzIDExMS4zMjRRMjk4LjIxNiAxMDkuNzc2IDI5OS42MiAxMDcuMDc2UTMwMS4wMjQgMTA0LjM3NiAzMDAuOTUyIDEwMC45OTJRMzAxLjAyNCA5Ny41MzYgMjk5LjYyIDk0LjgzNlEyOTguMjE2IDkyLjEzNiAyOTUuNzY4MDAwMDAwMDAwMDMgOTAuNjI0UTI5My4zMiA4OS4xMTIgMjkwLjIyNCA4OS4xMTJRMjg3LjEyOCA4OS4xMTIgMjg0LjY0NCA5MC42NlEyODIuMTU5OTk5OTk5OTk5OTcgOTIuMjA4IDI4MC43OTIgOTQuOTA4UTI3OS40MjQgOTcuNjA4IDI3OS40MjQgMTAwLjk5MlEyNzkuNDI0IDEwNC4zNzYgMjgwLjc5MiAxMDcuMDc2UTI4Mi4xNTk5OTk5OTk5OTk5NyAxMDkuNzc2IDI4NC42NDQgMTExLjMyNFEyODcuMTI4IDExMi44NzIgMjkwLjIyNCAxMTIuODcyWk0zMzAuOTc2IDEyMC43MlEzMjYuODcxOTk5OTk5OTk5OTYgMTIwLjcyIDMyMy44ODM5OTk5OTk5OTk5NiAxMTguODQ4UTMyMC44OTU5OTk5OTk5OTk5NiAxMTYuOTc2IDMxOS4yNzU5OTk5OTk5OTk5NSAxMTMuNTkyUTMxNy42NTYgMTEwLjIwOCAzMTcuNjU2IDEwNS40NTZWODIuMDU2MDAwMDAwMDAwMDFIMzI2LjQ0VjEwMy41ODRRMzI2LjQ0IDEwOC4wNDggMzI4LjU2Mzk5OTk5OTk5OTk2IDExMC42NFEzMzAuNjg4IDExMy4yMzIgMzM0LjUwMzk5OTk5OTk5OTk2IDExMy4yMzJRMzM2LjM3NiAxMTMuMjMyIDMzNy45MjQgMTEyLjYyUTMzOS40NzIgMTEyLjAwOCAzNDAuNjIzOTk5OTk5OTk5OTcgMTEwLjg5MlEzNDEuNzc1OTk5OTk5OTk5OTUgMTA5Ljc3NiAzNDIuNDI0IDEwOC4xOTIwMDAwMDAwMDAwMVEzNDMuMDcyIDEwNi42MDggMzQzLjA3MiAxMDQuODA4VjgyLjA1NjAwMDAwMDAwMDAxSDM1MS44NTZWMTIwLjBIMzQzLjI4OEwzNDMuMTQ0IDExMi4wOEwzNDQuNzI3OTk5OTk5OTk5OTUgMTExLjIxNjAwMDAwMDAwMDAxUTM0My44NjQgMTEzLjg4IDM0MS44MTIgMTE2LjAzOTk5OTk5OTk5OTk5UTMzOS43NiAxMTguMiAzMzYuOTUyIDExOS40NjAwMDAwMDAwMDAwMVEzMzQuMTQ0IDEyMC43MiAzMzAuOTc2IDEyMC43MlpNMzYyLjI5NiAxMjAuMFY4Mi4wNTYwMDAwMDAwMDAwMUgzNzAuOTM2TDM3MS4wOCA5NC4xNTJMMzY5LjkyNzk5OTk5OTk5OTk0IDkxLjQxNlEzNzAuNzE5OTk5OTk5OTk5OTcgODguNTM2IDM3Mi42NjQgODYuMjMyUTM3NC42MDc5OTk5OTk5OTk5NSA4My45MjggMzc3LjE2NCA4Mi41OTZRMzc5LjcxOTk5OTk5OTk5OTk3IDgxLjI2NDAwMDAwMDAwMDAxIDM4Mi40NTU5OTk5OTk5OTk5NiA4MS4yNjQwMDAwMDAwMDAwMVEzODMuNjc5OTk5OTk5OTk5OTUgODEuMjY0MDAwMDAwMDAwMDEgMzg0Ljc5NTk5OTk5OTk5OTk0IDgxLjQ4UTM4NS45MTIgODEuNjk2IDM4Ni42MzE5OTk5OTk5OTk5NSA4MS45ODQwMDAwMDAwMDAwMUwzODQuMzI4IDkxLjYzMlEzODMuNDYzOTk5OTk5OTk5OTQgOTEuMiAzODIuMzQ3OTk5OTk5OTk5OTYgOTAuOTQ4MDAwMDAwMDAwMDFRMzgxLjIzMTk5OTk5OTk5OTk3IDkwLjY5NiAzODAuMDggOTAuNjk2UTM3OC4yMDc5OTk5OTk5OTk5NyA5MC42OTYgMzc2LjU4Nzk5OTk5OTk5OTk3IDkxLjM4UTM3NC45Njc5OTk5OTk5OTk5NiA5Mi4wNjQwMDAwMDAwMDAwMSAzNzMuNzggOTMuMjg4MDAwMDAwMDAwMDFRMzcyLjU5MiA5NC41MTIgMzcxLjg3MTk5OTk5OTk5OTk2IDk2LjEzMlEzNzEuMTUyIDk3Ljc1MjAwMDAwMDAwMDAxIDM3MS4xNTIgOTkuNjk2VjEyMC4wWiIgZmlsbD0iIzE0MjMyQiIvPjxwYXRoIGQ9Ik00MzcuNTYxOTIgMTM4Ljk3MzQ0UTQzNC4xNDA0Nzk5OTk5OTk5NyAxMzguOTczNDQgNDMwLjE3NDcyIDEzNy42OTA0UTQyNi4yMDg5NTk5OTk5OTk5MyAxMzYuNDA3MzYgNDIyLjYzMTk5OTk5OTk5OTk1IDEzMy4zNzQ3Mkw0MjYuMDUzNDM5OTk5OTk5OTcgMTI2LjY4NzM2UTQyOC42MTk1MTk5OTk5OTk5NyAxMjcuNjk4MjQgNDMxLjE0NjcxOTk5OTk5OTk2IDEyOC4yNDI1NlE0MzMuNjczOTE5OTk5OTk5OTUgMTI4Ljc4Njg4IDQzNS42OTU2OCAxMjguNzg2ODhRNDQwLjI4MzUxOTk5OTk5OTk1IDEyOC43ODY4OCA0NDMuNTg4MzE5OTk5OTk5OTUgMTI2Ljk1OTUyUTQ0Ni44OTMxMTk5OTk5OTk5NSAxMjUuMTMyMTYgNDQ4Ljc1OTM1OTk5OTk5OTk2IDEyMS44NjYyNFE0NTAuNjI1NTk5OTk5OTk5OTYgMTE4LjYwMDMyIDQ1MC42MjU1OTk5OTk5OTk5NiAxMTQuMTY4UTQ1MC42MjU1OTk5OTk5OTk5NiAxMTIuMDY4NDggNDQ5LjY5MjQ3OTk5OTk5OTkzIDEwOS44OTEyUTQ0OC43NTkzNTk5OTk5OTk5NiAxMDcuNzEzOTIgNDQ2LjU0MzE5OTk5OTk5OTk2IDEwNC41NjQ2NFE0NDQuMzI3MDM5OTk5OTk5OTUgMTAxLjQxNTM1OTk5OTk5OTk5IDQ0MC4zNjEyNzk5OTk5OTk5NyA5Ni42NzJMNDQ4LjM3MDU1OTk5OTk5OTk1IDg2Ljc5NjQ4UTQ1Mi40OTE4Mzk5OTk5OTk5NyA5Mi4zOTUxOTk5OTk5OTk5OSA0NTUuMDE5MDM5OTk5OTk5OTYgOTYuOTQ0MTZRNDU3LjU0NjIzOTk5OTk5OTk1IDEwMS40OTMxMiA0NTguNzUxNTE5OTk5OTk5OTcgMTA1LjUzNjY0UTQ1OS45NTY4IDEwOS41ODAxNiA0NTkuOTU2OCAxMTMuNzAxNDRRNDU5Ljk1NjggMTE2LjczNDA4IDQ1OS4xNzkyIDEyMC4xOTQ0UTQ1OC40MDE2IDEyMy42NTQ3MiA0NTYuNzY4NjQgMTI2Ljk1OTUyUTQ1NS4xMzU2OCAxMzAuMjY0MzIgNDUyLjQ5MTgzOTk5OTk5OTk3IDEzMi45ODU5MlE0NDkuODQ3OTk5OTk5OTk5OTYgMTM1LjcwNzUyIDQ0Ni4xMTU1MTk5OTk5OTk5NSAxMzcuMzQwNDhRNDQyLjM4MzAzOTk5OTk5OTk0IDEzOC45NzM0NCA0MzcuNTYxOTIgMTM4Ljk3MzQ0Wk00NzkuNTUyMzE5OTk5OTk5OTUgMTM3Ljg4NDhRNDc1Ljg5NzU5OTk5OTk5OTk1IDEzNy44ODQ4IDQ3MS44MTUxOTk5OTk5OTk5NSAxMzYuNjAxNzZRNDY3LjczMjc5OTk5OTk5OTk0IDEzNS4zMTg3MiA0NjQuMTU1ODM5OTk5OTk5OTYgMTMyLjI4NjA4TDQ2Ny41NzcyOCAxMjUuNDQzMlE0NzAuMDY1NTk5OTk5OTk5OTYgMTI2LjI5ODU2IDQ3Mi43MDk0NCAxMjYuODQyODgwMDAwMDAwMDFRNDc1LjM1MzI4IDEyNy4zODcyIDQ3Ny42MDgzMTk5OTk5OTk5NCAxMjcuMzg3MlE0ODIuNTg0OTU5OTk5OTk5OTcgMTI3LjM4NzIgNDg1LjkyODY0IDEyNS40MDQzMjAwMDAwMDAwMVE0ODkuMjcyMzIgMTIzLjQyMTQ0IDQ5MC45MDUyNzk5OTk5OTk5NSAxMjAuMEg0ODUuOTI4NjRRNDgxLjEwNzUxOTk5OTk5OTk3IDEyMC4wIDQ3Ny43NjM4Mzk5OTk5OTk5NiAxMTkuMDI3OTk5OTk5OTk5OTlRNDc0LjQyMDE1OTk5OTk5OTk1IDExOC4wNTYgNDcyLjM1OTUyIDExNi4zMDY0UTQ3MC4yOTg4Nzk5OTk5OTk5NCAxMTQuNTU2OCA0NjkuMzY1NzU5OTk5OTk5OSAxMTIuMTg1MTJRNDY4LjQzMjYzOTk5OTk5OTk0IDEwOS44MTM0NCA0NjguNDMyNjM5OTk5OTk5OTQgMTA3LjAxNDA3OTk5OTk5OTk5UTQ2OC40MzI2Mzk5OTk5OTk5NCAxMDIuODE1MDQgNDY5Ljc1NDU1OTk5OTk5OTk3IDk5LjI3Njk2UTQ3MS4wNzY0Nzk5OTk5OTk5NSA5NS43Mzg4OCA0NzMuMzcwMzk5OTk5OTk5OTYgOTMuMTMzOTE5OTk5OTk5OTlRNDc1LjY2NDMyIDkwLjUyODk2IDQ3OC42MTkyIDg5LjEyOTI4UTQ4MS41NzQwOCA4Ny43Mjk2IDQ4NC43NjIyMzk5OTk5OTk5NiA4Ny43Mjk2UTQ4OS41MDU1OTk5OTk5OTk5NiA4Ny43Mjk2IDQ5Mi44ODgxNTk5OTk5OTk5NyA5MC4wNjI0UTQ5Ni4yNzA3MiA5Mi4zOTUxOTk5OTk5OTk5OSA0OTguMzcwMjM5OTk5OTk5OTcgOTYuNTE2NDhRNTAwLjQ2OTc1OTk5OTk5OTk1IDEwMC42Mzc3NiA1MDEuMTY5NTk5OTk5OTk5OTUgMTA2LjA4MDk2UTUwMS4zMjUxMTk5OTk5OTk5NyAxMDYuOTM2MzIgNTAxLjQ0MTc1OTk5OTk5OTkzIDEwNy44Njk0NFE1MDEuNTU4Mzk5OTk5OTk5OTUgMTA4LjgwMjU2IDUwMS41NTgzOTk5OTk5OTk5NSAxMDkuODEzNDRINTA2LjE0NjI0VjEyMC4wSDUwMC42MjUyOFE0OTkuNjkyMTU5OTk5OTk5OTQgMTIzLjE4ODE2IDQ5OC4wMjAzMTk5OTk5OTk5NyAxMjYuMzM3NDM5OTk5OTk5OTlRNDk2LjM0ODQ3OTk5OTk5OTk0IDEyOS40ODY3MiA0OTMuNzgyMzk5OTk5OTk5OTQgMTMyLjEzMDU2UTQ5MS4yMTYzMTk5OTk5OTk5NCAxMzQuNzc0NCA0ODcuNjc4MjM5OTk5OTk5OTYgMTM2LjMyOTYwMDAwMDAwMDAzUTQ4NC4xNDAxNiAxMzcuODg0OCA0NzkuNTUyMzE5OTk5OTk5OTUgMTM3Ljg4NDhaTTQ4NS45Mjg2NCAxMDkuODEzNDRINDkyLjA3MTY3OTk5OTk5OTk2UTQ5MS45OTM5MTk5OTk5OTk5NSAxMDkuMTEzNTk5OTk5OTk5OTkgNDkxLjkxNjE2IDEwOC40OTE1MlE0OTEuODM4NCAxMDcuODY5NDQgNDkxLjc2MDYzOTk5OTk5OTk3IDEwNy4zMjUxMlE0OTEuMjk0MDc5OTk5OTk5OTUgMTA0LjY4MTI4IDQ5MC4xNjY1NTk5OTk5OTk5NSAxMDIuNTQyODhRNDg5LjAzOTAzOTk5OTk5OTk0IDEwMC40MDQ0Nzk5OTk5OTk5OSA0ODcuNTIyNzE5OTk5OTk5OTQgOTkuMTYwMzE5OTk5OTk5OThRNDg2LjAwNjQgOTcuOTE2MTU5OTk5OTk5OTkgNDg0LjE0MDE2IDk3LjkxNjE1OTk5OTk5OTk5UTQ4Mi40Mjk0Mzk5OTk5OTk5NCA5Ny45MTYxNTk5OTk5OTk5OSA0ODEuMDI5NzU5OTk5OTk5OTUgOTguOTI3MDM5OTk5OTk5OTlRNDc5LjYzMDA3OTk5OTk5OTk2IDk5LjkzNzkxOTk5OTk5OTk5IDQ3OC44MTM1OTk5OTk5OTk5NSAxMDEuNjA5NzZRNDc3Ljk5NzExOTk5OTk5OTk0IDEwMy4yODE2IDQ3Ny45OTcxMTk5OTk5OTk5NCAxMDUuMjI1NlE0NzcuOTk3MTE5OTk5OTk5OTQgMTA2LjU0NzUxOTk5OTk5OTk5IDQ3OC42OTY5NiAxMDcuNTU4Mzk5OTk5OTk5OTlRNDc5LjM5NjggMTA4LjU2OTI3OTk5OTk5OTk5IDQ4MS4xMDc1MTk5OTk5OTk5NyAxMDkuMTkxMzZRNDgyLjgxODIzOTk5OTk5OTk1IDEwOS44MTM0NCA0ODUuOTI4NjQgMTA5LjgxMzQ0Wk01NTguMDEyMTYgMTIwLjBRNTUzLjE5MTAzOTk5OTk5OTkgMTIwLjAgNTQ5LjczMDcyIDExOS4wNjY4OFE1NDYuMjcwNCAxMTguMTMzNzYgNTQzLjgyMDk2IDExNi44MTE4Mzk5OTk5OTk5OVE1NDEuMzcxNTIgMTE1LjQ4OTkyIDUzOS40Mjc1MiAxMTQuMjQ1NzZMNTQ0Ljk0ODQ4IDEwNy42MzYxNlE1NDguOTkyIDEwOS44MTM0NCA1NTUuMzY4MzIgMTA5LjgxMzQ0SDU2NS4yNDM4NFE1NjQuNjk5NTIgMTA3LjQwMjg4IDU2NC4wMzg1NiAxMDUuMzgxMTJRNTYzLjM3NzYgMTAzLjM1OTM2IDU2Mi41MjIyNCAxMDEuMTgyMDc5OTk5OTk5OThRNTYxLjY2Njg4IDk5LjAwNDc5OTk5OTk5OTk5IDU2MC4zNDQ5NiA5Ni4yMDU0NEw1NzIuMjQyMjQgODguMTk2MTU5OTk5OTk5OTlRNTcyLjk0MjA4IDkzLjAxNzI4IDU3My4zNjk3NiA5OC4xNDk0NFE1NzMuNzk3NDM5OTk5OTk5OSAxMDMuMjgxNiA1NzMuNDA4NjM5OTk5OTk5OSAxMDguNzI0OFE1NzMuMDE5ODM5OTk5OTk5OSAxMTQuMTY4IDU3MS4yMzEzNiAxMjAuMFpNNTA2LjE0NjI0IDEyMC4wVjEwOS44MTM0NEg1MTQuOTMzMTJRNTE1LjQ3NzQ0IDEwOC4yNTgyNCA1MTUuOTA1MTIgMTA2LjE1ODcyUTUxNi4zMzI4IDEwNC4wNTkyIDUxNi40ODgzMTk5OTk5OTk5IDEwMS43MjY0UTUxNi42NDM4NCA5OS4zOTM1OTk5OTk5OTk5OSA1MTYuNTY2MDc5OTk5OTk5OSA5Ny4wNjA4TDUyOC44NTIxNiA5Mi43ODM5OTk5OTk5OTk5OVE1MjcuOTE5MDQgOTcuNjA1MTIgNTI2Ljk0NzA0IDEwMS4yMjA5NTk5OTk5OTk5OVE1MjUuOTc1MDQgMTA0LjgzNjggNTI0Ljc2OTc2IDEwNy44Njk0NFE1MjMuNTY0NDggMTEwLjkwMjA4IDUyMS45NzAzOTk5OTk5OTk5IDExMy43NzkyUTUyMC4zNzYzMiAxMTYuNjU2MzIgNTE4LjEyMTI4IDEyMC4wWk01MzEuNTczNzYgMTIwLjBRNTI2LjUxOTM2IDEyMC4wIDUyMi44MjU3NiAxMTkuMDY2ODhRNTE5LjEzMjE2IDExOC4xMzM3NiA1MTYuNzIxNiAxMTYuODUwNzJRNTE0LjMxMTAzOTk5OTk5OTkgMTE1LjU2NzY4IDUxMi45MTEzNiAxMTQuNTU2OEw1MTcuMzQzNjggMTA3LjI0NzM2UTUxOS40NDMxOTk5OTk5OTk5IDEwOC40MTM3NiA1MjIuMzIwMzIgMTA5LjExMzU5OTk5OTk5OTk5UTUyNS4xOTc0NCAxMDkuODEzNDQgNTI4LjYxODg4IDEwOS44MTM0NEg1MzYuNTUwNFE1MzcuMDk0NzE5OTk5OTk5OSAxMDguNDkxNTIgNTM3LjUyMjQgMTA2LjM1MzExOTk5OTk5OTk5UTUzNy45NTAwOCAxMDQuMjE0NzIgNTM4LjE0NDQ3OTk5OTk5OTkgMTAxLjgwNDE2UTUzOC4zMzg4OCA5OS4zOTM1OTk5OTk5OTk5OSA1MzguMjYxMTIgOTcuMDYwOEw1NTAuNTQ3MiA5Mi43ODM5OTk5OTk5OTk5OVE1NDkuNTM2MzE5OTk5OTk5OSA5Ny42MDUxMiA1NDguNTY0MzIgMTAxLjIyMDk1OTk5OTk5OTk5UTU0Ny41OTIzMiAxMDQuODM2OCA1NDYuNDI1OTE5OTk5OTk5OSAxMDcuODY5NDRRNTQ1LjI1OTUyIDExMC45MDIwOCA1NDMuNjI2NTU5OTk5OTk5OSAxMTMuNzc5MlE1NDEuOTkzNiAxMTYuNjU2MzIgNTM5LjgxNjMyIDEyMC4wWk01ODAuNjQwMzIgMTIwLjBRNTc2LjkwNzg0IDEyMC4wIDU3My45MTQwOCAxMTkuMzc3OTJRNTcwLjkyMDMyIDExOC43NTU4NCA1NjguNjI2NCAxMTcuNzgzODRRNTY2LjMzMjQ4IDExNi44MTE4NCA1NjQuNTQ0IDExNS44MDA5Nkw1NjguNTg3NTIgMTA4LjAyNDk2UTU2OS41MjA2NCAxMDguNDkxNTIgNTcwLjY0ODE2IDEwOC44MDI1NlE1NzEuNzc1NjggMTA5LjExMzU5OTk5OTk5OTk5IDU3Mi45ODA5NiAxMDkuMzQ2ODhRNTc0LjE4NjI0IDEwOS41ODAxNiA1NzUuNTA4MTYgMTA5LjY5NjhRNTc2LjgzMDA4IDEwOS44MTM0NCA1NzguMjI5NzU5OTk5OTk5OSAxMDkuODEzNDRINTgxLjE4NDY0VjEyMC4wWk01MDYuMTQ2MjQgMTA5LjgxMzQ0SDUwNi45MjM4NFYxMjAuMEg1MDYuMTQ2MjRRNTAzLjgxMzQzOTk5OTk5OTk2IDEyMC4wIDUwMy44MTM0Mzk5OTk5OTk5NiAxMTQuODY3ODRRNTAzLjgxMzQzOTk5OTk5OTk2IDEwOS44MTM0NCA1MDYuMTQ2MjQgMTA5LjgxMzQ0Wk01ODEuMTg0NjQgMTIwLjBWMTA5LjgxMzQ0SDU4My4yMDYzOTk5OTk5OTk5UTU5MC4zNjAzMiAxMDkuODEzNDQgNTk1LjM3NTgzOTk5OTk5OTkgMTA5LjM4NTc2UTYwMC4zOTEzNiAxMDguOTU4MDggNjAzLjkyOTQzOTk5OTk5OTkgMTA4LjE4MDQ3OTk5OTk5OTk5UTYwNy40Njc1MTk5OTk5OTk5IDEwNy40MDI4OCA2MTAuMTUwMjM5OTk5OTk5OSAxMDYuMjM2NDhRNjEyLjgzMjk2IDEwNS4wNzAwNzk5OTk5OTk5OSA2MTUuMzIxMjggMTAzLjY3MDRRNjE1Ljk0MzM2IDEwMy4yODE2IDYxNi41MjY1NiAxMDMuMDA5NDRRNjE3LjEwOTc1OTk5OTk5OTkgMTAyLjczNzI4IDYxNy42NTQwOCAxMDIuNDI2MjRRNjE4LjE5ODQgMTAyLjExNTIgNjE4Ljc0MjcyIDEwMS44ODE5MlE2MTUuNzg3ODQgMTAwLjYzNzc2IDYxMy4yMjE3NTk5OTk5OTk5IDk5LjM5MzU5OTk5OTk5OTk5UTYxMC42NTU2OCA5OC4xNDk0NCA2MDguMjQ1MTE5OTk5OTk5OSA5Ny4xMzg1NlE2MDUuODM0NTU5OTk5OTk5OSA5Ni4xMjc2OCA2MDMuNTc5NTIgOTUuNTA1NlE2MDEuMzI0NDggOTQuODgzNTIgNTk5LjE0NzIgOTQuODgzNTJRNTk2LjgxNDQgOTQuODgzNTIgNTk0LjUyMDQ3OTk5OTk5OTkgOTYuMTY2NTZRNTkyLjIyNjU2IDk3LjQ0OTYgNTg5Ljk3MTUxOTk5OTk5OTkgMTAxLjEwNDMyTDU4My4xMjg2Mzk5OTk5OTk5IDk3LjUyNzM2UTU4NS40NjE0Mzk5OTk5OTk5IDkyLjYyODQ4IDU4OC4yOTk2Nzk5OTk5OTk5IDg5Ljc5MDI0UTU5MS4xMzc5MTk5OTk5OTk5IDg2Ljk1MiA1OTQuMjg3MiA4NS43ODU1OTk5OTk5OTk5OVE1OTcuNDM2NDggODQuNjE5MTk5OTk5OTk5OTkgNjAwLjU0Njg4IDg0LjYxOTE5OTk5OTk5OTk5UTYwNC41OTAzOTk5OTk5OTk5IDg0LjYxOTE5OTk5OTk5OTk5IDYwOC4wODk2IDg1LjkwMjI0UTYxMS41ODg4IDg3LjE4NTI4IDYxNC43NzY5NTk5OTk5OTk5IDg5LjA5MDRRNjE3Ljk2NTEyIDkwLjk5NTUyIDYyMS4wMzY2NCA5Mi45MDA2NFE2MjQuMTA4MTYgOTQuODA1NzU5OTk5OTk5OTkgNjI3LjE3OTY4IDk2LjEyNzY4UTYzMC4yNTExOTk5OTk5OTk5IDk3LjQ0OTYgNjMzLjUxNzEyIDk3LjM3MTgzOTk5OTk5OTk5TDYzMy4zNjE2IDEwNi4zMTQyNFE2MzEuMjYyMDggMTA2LjU0NzUxOTk5OTk5OTk5IDYyOC4xNTE2Nzk5OTk5OTk5IDEwNy44MzA1NTk5OTk5OTk5OVE2MjUuMDQxMjc5OTk5OTk5OSAxMDkuMTEzNTk5OTk5OTk5OTkgNjIwLjk5Nzc2IDExMS4yOTA4OFE2MTguMDQyODggMTEyLjc2ODMyIDYxNC43MzgwOCAxMTQuMzIzNTJRNjExLjQzMzI4IDExNS44Nzg3MiA2MDcuMDc4NzIgMTE3LjE2MTc2UTYwMi43MjQxNiAxMTguNDQ0OCA1OTYuNzM2NjQgMTE5LjIyMjRRNTkwLjc0OTEyIDEyMC4wIDU4Mi41ODQzMTk5OTk5OTk5IDEyMC4wWk01ODEuMTg0NjQgMTA5LjgxMzQ0SDU4MS45NjIyNFYxMjAuMEg1ODEuMTg0NjRRNTc4Ljg1MTgzOTk5OTk5OTkgMTIwLjAgNTc4Ljg1MTgzOTk5OTk5OTkgMTE0Ljg2Nzg0UTU3OC44NTE4Mzk5OTk5OTk5IDEwOS44MTM0NCA1ODEuMTg0NjQgMTA5LjgxMzQ0Wk02MDUuNzU2Nzk5OTk5OTk5OSAxMzkuOTg0MzIgNTk4LjQ0NzM1OTk5OTk5OTkgMTMyLjU5NzEyIDYwNS40NDU3NiAxMjUuMjA5OTIgNjEyLjc1NTIgMTMyLjU5NzEyWiIgZmlsbD0iIzE0MjMyQiIvPjwvc3ZnPg==" alt="Josour جسور" width="250" style="width:250px;height:auto">
+ <div><div class="eyebrow">Josour for Android · Phase 2 of 4 · for review</div><h1>Mockups: every screen and state</h1></div>
+ <p class="lede">This page holds the information architecture, the key flow from first launch to the end of a session, and high-fidelity frames for every screen and state in Arabic and English, light and dark, at 360×800 dp. The frames are built only from the Phase 1 tokens you approved, Readex Pro, and the logo files. The copy table, the view-model changes and the open questions follow the frames.</p>
+ <div class="decide"><b style="font-weight:600">Decisions for this review</b>
+  <ol>
+   <li>The request screen puts Accept and Reject <b>after</b> the consequence, at the end of the content, so they are not pinned. You reach the buttons only by passing what accepting means.</li>
+   <li>Accept and Reject use the same outlined style, side by side, each with an icon (✕ and ✓). Invitations get the same treatment with Decline and Accept.</li>
+   <li>"End the session now" is a filled teal button, not red. Ending is the safe action, and red would make it feel dangerous.</li>
+   <li>A reconnect shorter than 5 s shows "Getting ready…" instead of "Requests can't reach you".</li>
+   <li>Turning "without asking" <b>on</b> asks for confirmation in a bottom sheet; turning it off is immediate.</li>
+   <li>"No internet" has no button. Opening Wi-Fi settings would need a new platform call; say if you want one.</li>
+   <li>The launcher label follows the phone's language (Josour or جسور) through a <code>values-ar</code> Android string. The in-app switch stays as it is.</li>
+  </ol></div>
+</div></header>
+
+<nav class="toc" aria-label="Sections"><div class="wrap">
+ <a href="#ia">Structure</a><a href="#flow">Key flow</a><a href="#g-start">Starting</a><a href="#g-signin">Sign-in</a><a href="#g-share">Share</a><a href="#g-contacts">Contacts</a><a href="#g-request">Request</a><a href="#g-system">System</a><a href="#g-font">200%</a><a href="#g-future">Guest slot</a><a href="#copy">Copy</a><a href="#vm">View model</a><a href="#a11y">Accessibility</a>
+ <div class="ctl">
+  <span class="seg" role="group" aria-label="Language"><button type="button" data-k="l" data-v="all" aria-pressed="true">AR + EN</button><button type="button" data-k="l" data-v="ar" aria-pressed="false">العربية</button><button type="button" data-k="l" data-v="en" aria-pressed="false">English</button></span>
+  <span class="seg" role="group" aria-label="Theme"><button type="button" data-k="t" data-v="all" aria-pressed="true">Both</button><button type="button" data-k="t" data-v="light" aria-pressed="false">Light</button><button type="button" data-k="t" data-v="dark" aria-pressed="false">Dark</button></span>
+  <span class="seg" role="group" aria-label="Frame size"><button type="button" data-k="s" data-v=".45" aria-pressed="false">45%</button><button type="button" data-k="s" data-v=".6" aria-pressed="true">60%</button><button type="button" data-k="s" data-v=".8" aria-pressed="false">80%</button><button type="button" data-k="s" data-v="1" aria-pressed="false">100%</button></span>
+ </div>
+</div></nav>
+
+<main>
+<section class="sec" id="ia"><div class="wrap narrow">
+ <h2>Structure</h2>
+ <p class="intro">There are two tabs, one full-screen takeover, two confirmation sheets and the system surfaces. The tab bar has room for a third tab when the phone can also be a guest.</p>
+ <div class="ia">
+  <div class="box"><h4>Signed out</h4><ul><li>Splash (system) → Starting (restoring the stored sign-in)</li><li>Sign-in: lock-up, server, email, password, language; error, busy, signed-out reason</li></ul></div>
+  <div class="box main"><h4>Tab 1 · Share (home)</h4><ul><li>Status hero: Off · Connecting · Ready · Unreachable · No internet · Needs attention · In session · Ended</li><li>Available toggle (in the hero)</li><li>Invitations-waiting banner</li><li>Your connection: network, server, address sites see, mobile-data and VPN warnings</li><li>How sharing works (expandable)</li><li>Use someone else's connection (the guest-role note)</li><li>Account: email, language, sign out → sheet</li></ul></div>
+  <div class="box main"><h4>Tab 2 · Contacts (badge = invitations)</h4><ul><li>Invitations to you (Decline / Accept)</li><li>Contacts: presence, email, "without asking" toggle → sheet when turned on, Remove → inline confirmation</li><li>Invite someone: field, feedback</li><li>Invitations you sent (Waiting / Expired, Withdraw)</li><li>Loading and empty states</li></ul></div>
+  <div class="box later"><h4>Tab 3 · Use a connection (later)</h4><ul><li>Not designed here: placement only. It appears when the guest role ships (proposal doc, phase 2), and the Share tab's note announces it until then.</li></ul></div>
+  <div class="box"><h4>Over everything</h4><ul><li>Incoming request: full screen, from any tab or from the notification; countdown; Reject / Accept; expired state</li></ul></div>
+  <div class="box"><h4>System</h4><ul><li>Launcher icon (adaptive, themed), splash</li><li>Foreground notification: available (Stop sharing) / in session (countdown, End)</li><li>Request heads-up → request screen</li><li>Invitation → Contacts tab</li><li>Auto-accepted, signed-out notes</li></ul></div>
+ </div>
+ <h3>Which hero state wins</h3>
+ <div class="tbl"><table><thead><tr><th>#</th><th>State</th><th>When (only existing view-model facts)</th><th>Hero shows</th></tr></thead><tbody>
+  <tr><td>1</td><td>In session</td><td><code>HasSession</code> and the phase is Preparing, Connecting, Active or Ending</td><td>The guest, the phase, time left, data used, End now</td></tr>
+  <tr><td>2</td><td>Session ended</td><td><code>IsSessionEnded</code></td><td>The reason and data used, Dismiss</td></tr>
+  <tr><td>3</td><td>Off</td><td><code>!IsAvailable</code></td><td>The Off text, and the toggle; missing permissions are listed below it as "Before you turn it on"</td></tr>
+  <tr><td>4</td><td>No internet</td><td>Network kind is None</td><td>The broken arch and "Turn on Wi-Fi or mobile data"</td></tr>
+  <tr><td>5</td><td>Unreachable</td><td>The channel is not connected <b>and</b> has not been for 5 s or more</td><td>The broken arch, Reconnecting…, Reconnect now</td></tr>
+  <tr><td>6</td><td>Connecting</td><td>The channel is connecting, or connected but not yet announced, or disconnected for under 5 s</td><td>The arch drawing itself</td></tr>
+  <tr><td>7</td><td>Needs attention</td><td>Notifications not allowed, else battery restricted</td><td>The neutral arch, the one thing to fix, its button</td></tr>
+  <tr><td>8</td><td>Ready</td><td><code>IsReady</code></td><td>The complete arch and "You decide each time"</td></tr>
+ </tbody></table></div>
+</div></section>
+
+<section class="sec" id="flow"><div class="wrap">
+ <h2>Key flow</h2>
+ <p class="intro">From first launch to the end of a session, as one person goes through it. These are the same frames as below, at small size.</p>
+ <div id="flowRows"></div>
+</div></section>
+
+<div id="groups"></div>
+
+<section class="sec" id="copy"><div class="wrap narrow">
+ <h2>Copy changes, by resx key</h2>
+ <p class="intro">The table lists only new and changed strings; everything else in the frames is an existing key, unchanged. <span class="pill p-new">new</span> adds a phone-only key and leaves the desktop untouched. <span class="pill p-em">edit · mobile</span> changes the value of a key only the phone uses. <span class="pill p-es">edit · shared</span> changes a key the desktop shows too, with the same meaning in better words. No key changes its meaning.</p>
+ <div class="tbl" id="copyTable"></div>
+</div></section>
+
+<section class="sec" id="vm"><div class="wrap narrow">
+ <h2>View-model changes (proposed, minimal)</h2>
+ <p class="intro">These are additions only: every existing binding keeps working. Nothing touches networking, the tunnel or egress. Each change gets a test in <code>Josour.Mobile.Tests</code>.</p>
+ <div class="grid g2">
+  <div class="card"><h4>HostViewModel</h4><pre class="code">public enum HostStatus { Off, Connecting, Ready, Unreachable,
+    NoNetwork, NeedsNotifications, NeedsBackground,
+    InSession, SessionEnded }
+
+public HostStatus Status { get; }      // one UpdateStatus(), called
+                                       // where StatusText is updated
+public bool IsStatusOff => …           // one bool per value,
+public bool IsStatusReady => …         // for IsVisible bindings
+public bool HasNetwork { get; }        // ApplyNetwork: Kind != None
+public string SessionTimeLeftText      // "41:12" only
+public string SessionDataUsedText      // MobileDataUsedFormat(up+down)
+public bool SessionStartedAutomatically
+public string SessionAutoNoteText
+// Unreachable only after 5 s not connected:
+// a DispatcherTimer started on the drop, stopped on connect.</pre></div>
+  <div class="card"><h4>IncomingRequestViewModel + HostViewModel</h4><pre class="code">public bool IsExpired { get; }
+public string ExpiredText { get; }     // MobileRequestExpiredFormat
+[RelayCommand] void Close();           // completes Closed
+
+// HostViewModel.ReceiveAsync: when the answer is TimedOut,
+// keep Incoming on screen until Close (or 10 s), then clear it.
+// Nothing is sent: the server already expired the request.</pre></div>
+  <div class="card"><h4>ContactsViewModel / ContactItem</h4><pre class="code">// ContactItem: turning ON asks first
+public bool IsConfirmingTrust { get; }
+[RelayCommand] Task ConfirmTrustAsync();   // calls SetTrustAsync(true)
+[RelayCommand] void CancelTrust();         // reverts the toggle
+// turning OFF calls SetTrustAsync(false) at once, as today
+public string RemoveConfirmText            // MobileRemoveConfirmFormat
+
+// ContactsViewModel
+public bool IsLoaded { get; }              // first list arrived
+public bool StatusIsError { get; }         // styles the feedback</pre></div>
+  <div class="card"><h4>SignInViewModel / MainViewModel</h4><pre class="code">// SignIn
+public string? NoticeText { get; set; }    // signed-out reason
+public bool HasNotice { get; }
+public bool IsPasswordRevealed { get; set; }
+
+// Main
+public bool IsConfirmingSignOut { get; }
+[RelayCommand] void AskSignOut();
+[RelayCommand] void CancelSignOut();
+public string SignOutConfirmText { get; }  // session-aware
+// HandleSignedOutAsync also sets SignIn.NoticeText</pre></div>
+ </div>
+</div></section>
+
+<section class="sec" id="a11y"><div class="wrap narrow">
+ <h2>Accessibility, RTL and Android details carried into Phase 3</h2>
+ <div class="grid g3">
+  <div class="card"><h4>TalkBack</h4><ul class="note">
+   <li><code>AutomationProperties.Name</code> on every interactive element: the toggle ("Available for requests"), the eye button, tabs, the badge ("Invitations waiting for your answer: 1"), the countdown and End now.</li>
+   <li>The hero has <code>LiveSetting=Polite</code>, so a state change is announced once. The request heading and the sign-in error are <code>Assertive</code>.</li>
+   <li>When the request takeover opens, focus moves to its heading, and reading order follows the visual order.</li>
+   <li>Back on the takeover leaves the decision for later: the request stays on screen until it expires.</li></ul></div>
+  <div class="card"><h4>Size and contrast</h4><ul class="note">
+   <li>Touch targets are at least 48 dp, and fields are 52 dp tall.</li>
+   <li>Every text pair uses the approved token pairs (≥ 4.5:1), and borders and icons are ≥ 3:1.</li>
+   <li>At 200% font size text wraps and nothing is clipped (frames below). Only the hero's countdown digits stay on one line.</li>
+   <li>Warnings always pair an icon shape with words, never colour alone.</li></ul></div>
+  <div class="card"><h4>RTL</h4><ul class="note">
+   <li>Arabic mirrors the layout, the switch thumb, the tab order and the sign-out arrow.</li>
+   <li>The symbol and motif never mirror. Only which dot is "you" follows the reading start.</li>
+   <li>Emails, URLs, IPs, device names, times and sizes are wrapped in <code>Tr.Ltr</code>, and LTR fields align their text with the label side.</li>
+   <li>Western digits in both languages, as today.</li></ul></div>
+  <div class="card"><h4>Android resources</h4><ul class="note">
+   <li><code>mipmap-anydpi-v26/ic_launcher.xml</code> and <code>ic_launcher_round.xml</code>: background <code>@color/josour_teal</code>, foreground and monochrome are a 108 dp vector with the symbol path at translate(24, 18.375) and scale 2.5. minSdk 26 means no PNGs are needed.</li>
+   <li><code>drawable/ic_stat_josour.xml</code>: the symbol path, 24 dp, white.</li>
+   <li><code>values</code>, <code>values-night</code> and <code>values-v31</code> styles for window and bar colours and the splash attributes; <code>values-ar/strings.xml</code> for <code>app_name</code>.</li></ul></div>
+  <div class="card"><h4>Notifications</h4><ul class="note">
+   <li><code>SetColor(#0E7490)</code> on every notification.</li>
+   <li>In a session the notification uses a countdown chronometer (<code>SetUsesChronometer</code>, <code>SetChronometerCountDown</code>, <code>SetWhen</code> = the end time), so Android counts it down with no per-second updates. Data used is refreshed with each stats update, as today.</li>
+   <li>The request notification keeps no Accept action, by design. No full-screen intent (decision 7).</li></ul></div>
+  <div class="card"><h4>Not changed</h4><ul class="note">
+   <li>Networking, tunnel and egress code.</li>
+   <li>The desktop app, its icons, and the admin dashboard. The follow-ups are listed in Phase 1.</li>
+   <li>The real install in <code>~/Library/Application Support/Josour</code>: tests and runs use the emulator only.</li></ul></div>
+ </div>
+</div></section>
+</main>
+<footer><div class="wrap narrow">Josour for Android · Phase 2 for review · 2026-11-06 · tokens from Phase 1 (approved) · logo files from <code>1-qantara/</code>, unchanged</div></footer>
+</div>
+
+<script>
+// Every string the mockups show, keyed by its resx key. status: same = existing key unchanged,
+// edit-mobile = existing Mobile* key, new value; edit-shared = shared key, same meaning, new value (desktop too);
+// new = new key (phone only). Values with {0} are formats.
+const STR = {
+ AppName:{s:'same',en:'Josour',ar:'جسور'},
+ MobileStarting:{s:'new',en:'Signing you in…',ar:'جارٍ تسجيل دخولك…',w:'Starting screen, after 1 s'},
+ LoginHeading:{s:'same',en:'Sign in to Josour',ar:'تسجيل الدخول إلى جسور'},
+ MobileLoginDescription:{s:'new',en:'Sign in with the email and password of your Josour account.',ar:'سجّل الدخول بالبريد الإلكتروني وكلمة المرور لحسابك في جسور.',w:'Replaces LoginDescription on the phone ("the account your administrator created")'},
+ LoginServerUrlLabel:{s:'same',en:'Server address',ar:'عنوان الخادم'},
+ LoginServerUrlPlaceholder:{s:'same',en:'https://josour.example.com',ar:'https://josour.example.com'},
+ MobileServerUrlHelp:{s:'new',en:'Ask the person who runs your Josour server if you are not sure.',ar:'اسأل من يدير خادم جسور إن لم تكن متأكدًا.',w:'Helper under the server field'},
+ LoginEmailLabel:{s:'same',en:'Email',ar:'البريد الإلكتروني'},
+ LoginPasswordLabel:{s:'same',en:'Password',ar:'كلمة المرور'},
+ MobileShowPassword:{s:'new',en:'Show password',ar:'إظهار كلمة المرور',w:'Accessible name of the eye button'},
+ LoginSignIn:{s:'same',en:'Sign in',ar:'تسجيل الدخول'},
+ MobileSigningIn:{s:'new',en:'Signing in…',ar:'جارٍ تسجيل الدخول…',w:'Button label while busy'},
+ LoginErrorInvalidCredentials:{s:'same',en:'Wrong email or password.',ar:'البريد الإلكتروني أو كلمة المرور غير صحيحة.'},
+ SignedOutTitle:{s:'same',en:'Signed out of Josour',ar:'تم تسجيل الخروج من جسور'},
+ SignedOutSessionExpired:{s:'same',en:'Your session expired. Please sign in again.',ar:'انتهت صلاحية جلستك. سجّل الدخول من جديد.'},
+ SettingsLanguageEnglish:{s:'same',en:'English',ar:'الإنجليزية'},
+ SettingsLanguageArabic:{s:'same',en:'Arabic',ar:'العربية'},
+
+ MobileTabShare:{s:'same',en:'Share',ar:'المشاركة'},
+ ContactsPageTitle:{s:'same',en:'Contacts',ar:'جهات الاتصال'},
+ MobileHostHeading:{s:'same',en:"Share this phone's connection",ar:'شارك اتصال هذا الهاتف'},
+ HostAvailableToggle:{s:'same',en:'Available for requests',ar:'متاح لاستقبال الطلبات'},
+ MobileStatusOffTitle:{s:'new',en:'Not sharing',ar:'المشاركة متوقفة',w:'Hero, Off'},
+ MobileStatusOffText:{s:'new',en:'Turn on “Available” to let your contacts ask to use this phone’s connection.',ar:'فعّل «متاح» لتتمكن جهات اتصالك من طلب استخدام اتصال هذا الهاتف.',w:'Hero, Off'},
+ MobileStatusConnectingTitle:{s:'new',en:'Getting ready…',ar:'جارٍ التجهيز…',w:'Hero, Connecting'},
+ MobileStatusConnectingText:{s:'new',en:'Connecting to your Josour server.',ar:'جارٍ الاتصال بخادم جسور.',w:'Hero, Connecting'},
+ MobileStatusReadyTitle:{s:'new',en:'Ready for requests',ar:'جاهز لاستقبال الطلبات',w:'Hero, Ready'},
+ MobileReadyText:{s:'edit-mobile',en:'Your contacts can ask to use your connection now. You decide each time.',ar:'يمكن لجهات اتصالك الآن طلب استخدام اتصالك، والقرار لك في كل مرة.',old:'Ready: your contacts can ask to use your connection now.',w:'Hero, Ready ("Ready:" moves into the title)'},
+ MobileStatusUnreachableTitle:{s:'new',en:'Requests can’t reach you',ar:'لا تصل إليك الطلبات',w:'Hero, Unreachable'},
+ MobileUnreachableText:{s:'same',en:'Requests cannot reach this phone until it is connected to the server again.',ar:'لن تصل الطلبات إلى هذا الهاتف حتى يعود اتصاله بالخادم.'},
+ StatusReconnecting:{s:'same',en:'Reconnecting…',ar:'جارٍ إعادة الاتصال…'},
+ StatusConnected:{s:'same',en:'Connected',ar:'متصل'},
+ MobileReconnectNow:{s:'same',en:'Reconnect now',ar:'أعد الاتصال الآن'},
+ MobileStatusNoNetworkTitle:{s:'new',en:'No internet',ar:'لا يوجد إنترنت',w:'Hero, no network'},
+ MobileStatusNoNetworkText:{s:'new',en:'This phone is not connected to the internet. Turn on Wi-Fi or mobile data.',ar:'هذا الهاتف غير متصل بالإنترنت. شغّل Wi-Fi أو بيانات الجوال.',w:'Hero, no network'},
+ MobileStatusAttentionTitle:{s:'new',en:'Needs your attention',ar:'يحتاج إلى انتباهك',w:'Hero, notifications off / battery restricted'},
+ MobileNotificationsOffWarning:{s:'edit-mobile',en:'Notifications are off, so you won’t hear about a request while Josour is closed.',ar:'الإشعارات متوقفة، فلن تعلم بالطلب وجسور مغلق.',old:'Notifications are off: a request only shows while Josour is open on the screen.',w:'Hero, Needs attention'},
+ MobileBatteryRestricted:{s:'new',en:'Your phone may stop Josour in the background to save battery, and then requests won’t arrive.',ar:'قد يوقف هاتفك جسور في الخلفية لتوفير البطارية، فلا تصلك الطلبات.',w:'Hero, Needs attention'},
+ MobileNotificationsAllow:{s:'same',en:'Allow notifications',ar:'السماح بالإشعارات'},
+ MobileBatteryAllow:{s:'same',en:'Allow background use',ar:'السماح بالعمل في الخلفية'},
+ MobileBeforeYouStart:{s:'new',en:'Before you turn it on',ar:'قبل التفعيل',w:'Card heading, Off state with missing permissions'},
+ MobileNotificationsHint:{s:'same',en:"Allow Josour's notifications so you hear about incoming requests while the app is in the background.",ar:'اسمح لجسور بالإشعارات حتى تعرف بالطلبات الواردة والتطبيق في الخلفية.'},
+ MobileBatteryHint:{s:'same',en:'To stay available with the screen off, let Josour run in the background without battery restrictions.',ar:'ليبقى الهاتف متاحًا والشاشة مطفأة، اسمح لجسور بالعمل في الخلفية دون قيود البطارية.'},
+ MobileInvitationsWaitingFormat:{s:'same',en:'Invitations waiting for your answer: {0}',ar:'دعوات بانتظار ردك: {0}'},
+ MobileInvitationsShow:{s:'same',en:'Answer',ar:'الرد'},
+ MobileServiceSessionTitleFormat:{s:'same',en:'{0} is browsing through your connection',ar:'{0} يتصفح عبر اتصالك'},
+ SessionPhaseActive:{s:'same',en:'Connected',ar:'متصل'},
+ SessionPhaseConnecting:{s:'same',en:'Connecting to the other device…',ar:'جارٍ الاتصال بالجهاز الآخر…'},
+ MobileSessionTimeLeftLabel:{s:'new',en:'Time left',ar:'الوقت المتبقي',w:'Session hero, above the countdown'},
+ MobileDataUsedFormat:{s:'new',en:'About {0} used',ar:'استُخدم نحو {0}',w:'Session hero and notification (replaces "sent · received" on the phone)'},
+ MobileSessionAutoNoteFormat:{s:'new',en:'Started without asking, because you allow {0} to.',ar:'بدأت دون سؤالك، لأنك تسمح لـ{0} بذلك.',w:'Session hero, automatically accepted'},
+ MobileEndSessionNow:{s:'same',en:'End the session now',ar:'إنهاء الجلسة الآن'},
+ SessionPhaseEnded:{s:'same',en:'Session ended',ar:'انتهت الجلسة'},
+ SessionEndedByPeer:{s:'same',en:'The other side ended the session.',ar:'أنهى الطرف الآخر الجلسة.'},
+ SessionDismiss:{s:'same',en:'Dismiss',ar:'إغلاق'},
+ MobileCellularDataNote:{s:'same',en:'You are on mobile data: what the guest browses counts against your data plan.',ar:'أنت على بيانات الجوال: ما يتصفحه الضيف يُحتسب من باقتك.'},
+ MobileVpnWarning:{s:'same',en:'A VPN is running on this phone, so sites will see its address, not yours. Turn it off to share your own address.',ar:'يعمل VPN على هذا الهاتف، فستظهر للمواقع عنوانه لا عنوانك. أوقفه إن أردت أن تشارك عنوانك أنت.'},
+ MobileYourConnection:{s:'new',en:'Your connection',ar:'اتصالك',w:'Card heading on Share'},
+ MobileNetworkWifi:{s:'same',en:'Network: Wi-Fi',ar:'الشبكة: Wi-Fi'},
+ MobileNetworkCellular:{s:'same',en:'Network: mobile data',ar:'الشبكة: بيانات الجوال'},
+ MobileServerStatusFormat:{s:'new',en:'Josour server: {0}',ar:'خادم جسور: {0}',w:'Connection card row'},
+ MobilePublicIpFormat:{s:'same',en:'Address sites will see: {0}',ar:'العنوان الذي ستراه المواقع: {0}'},
+ MobileHowItWorks:{s:'new',en:'How sharing works',ar:'كيف تعمل المشاركة',w:'Disclosure row; opens MobileHostDescription'},
+ MobileHostDescription:{s:'same',en:"While “Available” is on, your contacts can ask to browse through this phone's connection, and sites see the phone's public address — on Wi-Fi or on mobile data. Josour stays connected in the background, with a notification, for as long as you are available.",ar:'عند تفعيل «متاح»، تستطيع جهات اتصالك طلب التصفح عبر اتصال هذا الهاتف، فترى المواقع عنوان الهاتف العام، سواء كان على Wi-Fi أو على بيانات الجوال. يبقى جسور متصلًا في الخلفية بإشعار دائم ما دمت متاحًا.'},
+ MobileGuestRoleTitle:{s:'new',en:'Use someone else’s connection',ar:'استخدام اتصال غيرك',w:'Card heading; the future guest role is announced here'},
+ MobileGuestRoleNote:{s:'same',en:"This version makes the phone a host only. To borrow someone else's connection, use Josour on Windows or macOS.",ar:'هذه النسخة تجعل الهاتف مضيفًا فقط. لاستعارة اتصال غيرك استخدم برنامج جسور على ويندوز أو ماك.'},
+ AboutSignedInLabel:{s:'same',en:'Account',ar:'الحساب'},
+ MobileSignedInAsFormat:{s:'same',en:'Signed in as {0}',ar:'مسجّل الدخول باسم {0}'},
+ SettingsLanguageLabel:{s:'same',en:'Interface language',ar:'لغة الواجهة'},
+ TraySignOut:{s:'same',en:'Sign out',ar:'تسجيل الخروج'},
+ MobileSignOutConfirmTitle:{s:'new',en:'Sign out of Josour?',ar:'تسجيل الخروج من جسور؟',w:'Sign-out sheet'},
+ MobileSignOutConfirmText:{s:'new',en:'This phone will stop being available for requests until you sign in again.',ar:'سيتوقف هذا الهاتف عن استقبال الطلبات حتى تسجّل الدخول من جديد.',w:'Sign-out sheet'},
+ MobileSignOutConfirmSessionFormat:{s:'new',en:'{0}’s session will end now, and this phone will stop being available for requests.',ar:'ستنتهي جلسة {0} الآن، وسيتوقف هذا الهاتف عن استقبال الطلبات.',w:'Sign-out sheet during a session'},
+ SettingsCancel:{s:'same',en:'Cancel',ar:'إلغاء'},
+
+ MobileContactsDescription:{s:'same',en:'The people who can ask to use your connection. When someone invites you, the invitation waits here for your answer.',ar:'الأشخاص الذين يمكنهم طلب استخدام اتصالك. عندما يدعوك أحد تنتظر دعوته هنا حتى ترد عليها.'},
+ ContactsIncomingTitle:{s:'same',en:'Invitations to you',ar:'دعوات وصلتك'},
+ ContactsIncomingFormat:{s:'same',en:'{0} wants to add you as a contact',ar:'{0} يريد إضافتك جهةَ اتصال'},
+ ContactsAccept:{s:'same',en:'Accept',ar:'قبول'},
+ ContactsDecline:{s:'same',en:'Decline',ar:'رفض'},
+ ContactsEmptyTitle:{s:'same',en:'No contacts yet',ar:'لا جهات اتصال بعد'},
+ ContactsEmptyText:{s:'same',en:'Invite someone by their email address. Once they accept, the two of you can share a connection.',ar:'ادعُ شخصًا ببريده الإلكتروني. بعد أن يقبل، يمكنكما مشاركة الاتصال.'},
+ MobileContactsLoading:{s:'new',en:'Loading your contacts…',ar:'جارٍ تحميل جهات اتصالك…',w:'Accessible name of the loading placeholder'},
+ ContactOnline:{s:'same',en:'Online',ar:'متصل'},
+ ContactOffline:{s:'same',en:'Offline',ar:'غير متصل'},
+ ContactAllowAlways:{s:'same',en:'Can use my connection without asking',ar:'يستخدم اتصالي دون أن يسألني'},
+ MobileTrustOffHelp:{s:'new',en:'Off: you are asked every time.',ar:'عند الإيقاف: تُسأل في كل مرة.',w:'Under the toggle'},
+ MobileTrustOnHelp:{s:'new',en:'On: accepted without asking. You are still told, and can end it.',ar:'عند التفعيل: يُقبل دون سؤالك، وتُبلَّغ دائمًا ويمكنك الإنهاء.',w:'Under the toggle'},
+ MobileTrustConfirmTitleFormat:{s:'new',en:'Let {0} use your connection without asking?',ar:'هل تسمح لـ{0} باستخدام اتصالك دون سؤال؟',w:'Trust sheet'},
+ MobileTrustConfirmText:{s:'new',en:'Their requests will be accepted automatically, on every device you sign in from. You are still told each time, and you can end a session or turn this off here at any moment.',ar:'ستُقبل طلباته تلقائيًا على كل أجهزتك. ستُبلَّغ في كل مرة، ويمكنك إنهاء الجلسة أو إيقاف هذا من هنا متى شئت.',w:'Trust sheet'},
+ MobileTrustAllow:{s:'new',en:'Allow without asking',ar:'السماح دون سؤال',w:'Trust sheet button'},
+ ContactRemove:{s:'same',en:'Remove',ar:'إزالة'},
+ MobileRemoveConfirmFormat:{s:'new',en:'Remove {0}? They will no longer be able to ask for your connection.',ar:'إزالة {0}؟ لن يتمكن بعدها من طلب اتصالك.',w:'Inline confirmation (replaces ContactRemoveConfirm on the phone)'},
+ MobileContactCancel:{s:'same',en:'Keep',ar:'إبقاء'},
+ MobileInviteHeading:{s:'new',en:'Invite someone',ar:'ادعُ شخصًا',w:'Invite card heading'},
+ ContactsInvitePlaceholder:{s:'same',en:'Email address',ar:'البريد الإلكتروني'},
+ MobileInviteHelp:{s:'new',en:'They need an account on the same Josour server.',ar:'يحتاج إلى حساب على خادم جسور نفسه.',w:'Helper under the invite field'},
+ ContactsInviteButton:{s:'same',en:'Invite',ar:'دعوة'},
+ ContactsInviteSentFormat:{s:'same',en:'If {0} uses Josour, they will see your invitation.',ar:'إذا كان {0} يستخدم جسور فستصله دعوتك.'},
+ ContactsInviteFailedFormat:{s:'same',en:'The invitation was not sent: {0}',ar:'لم تُرسل الدعوة: {0}'},
+ ContactsOutgoingTitle:{s:'same',en:'Invitations you sent',ar:'دعوات أرسلتها'},
+ ContactsOutgoingPending:{s:'same',en:'Waiting',ar:'بانتظار القبول'},
+ ContactsOutgoingExpired:{s:'same',en:'Expired',ar:'انتهت صلاحيتها'},
+ ContactsWithdraw:{s:'same',en:'Withdraw',ar:'سحب'},
+
+ IncomingRequestHeadingFormat:{s:'same',en:'{0} wants to browse through your connection',ar:'يطلب {0} التصفح عبر اتصالك'},
+ IncomingRequestRequesterLabel:{s:'edit-shared',en:'From',ar:'من',old:'Requester / مقدّم الطلب'},
+ IncomingRequestDeviceLabel:{s:'same',en:'Device',ar:'الجهاز'},
+ IncomingRequestDurationLabel:{s:'same',en:'Requested duration',ar:'المدة المطلوبة'},
+ DurationMinutesFormat:{s:'same',en:'{0} minutes',ar:'{0} دقيقة'},
+ CountdownFormat:{s:'edit-shared',en:'{0} seconds left to answer',ar:'باقٍ {0} ثانية للرد',old:'Expires in {0} s / تنتهي صلاحية الطلب خلال {0} ثانية'},
+ IncomingRequestAllowedSitesLabel:{s:'same',en:'Allowed sites',ar:'المواقع المسموح بها'},
+ AllowedSitesNote:{s:'edit-shared',en:"Only sites on this server's list of allowed sites can be reached through your connection.",ar:'لا يمكن الوصول عبر اتصالك إلا إلى المواقع المدرجة في قائمة المواقع المسموح بها على هذا الخادم.',old:'Only sites on the company allow-list can be reached through your device.'},
+ IncomingRequestScopeLabel:{s:'same',en:'Browsing scope',ar:'نطاق التصفح'},
+ MobileScopeUnrestricted:{s:'new',en:'Any browser, and other programs on their computer, can reach any site through your connection, with your address.',ar:'أي متصفح، وبرامج أخرى على حاسوبه، يمكنها الوصول إلى أي موقع عبر اتصالك وبعنوانك.',w:'Replaces AllowedSitesUnrestricted on the phone (same breadth, plainer)'},
+ AllowedSitesUnavailable:{s:'same',en:'The allowed sites could not be loaded from the server, so they cannot be shown. This does not mean the list is empty.',ar:'تعذّر تحميل قائمة المواقع المسموح بها من الخادم، فلا يمكن عرضها الآن. هذا لا يعني أن القائمة فارغة.'},
+ MobileConsequenceTitle:{s:'new',en:'What accepting means',ar:'ماذا يعني القبول',w:'Request screen, directly above the buttons'},
+ MobileConsequence:{s:'new',en:'The sites they visit will see your internet address, as if you were the one browsing.',ar:'المواقع التي يزورها سترى عنوان الإنترنت الخاص بك، كأنك أنت من يتصفح.',w:'Request screen (replaces "Privacy notice / public IP address" on the phone)'},
+ MobileEndAnytimeHint:{s:'new',en:'You can end it at any moment, here in Josour or from its notification.',ar:'يمكنك إنهاؤها في أي لحظة، من جسور أو من إشعاره.',w:'Replaces IncomingRequestDisconnectHint ("session panel") on the phone'},
+ IncomingRequestTrustThisGuest:{s:'same',en:'Always let this contact use my connection without asking',ar:'اسمح لجهة الاتصال هذه دائمًا باستخدام اتصالي دون سؤال'},
+ IncomingRequestTrustHint:{s:'same',en:'Applies on every device you sign in from. You are still told each time, and you can withdraw it from the Contacts tab whenever you like.',ar:'يسري على كل أجهزتك. ستُبلَّغ في كل مرة، ويمكنك سحبه من تبويب جهات الاتصال متى شئت.'},
+ Accept:{s:'same',en:'Accept',ar:'قبول'},
+ Reject:{s:'same',en:'Reject',ar:'رفض'},
+ RequestExpired:{s:'same',en:'Request expired',ar:'انتهت صلاحية الطلب'},
+ MobileRequestExpiredFormat:{s:'new',en:'You did not answer in time, so nothing was shared. {0} can ask again.',ar:'لم ترد في الوقت المحدد، فلم يُشارَك شيء. يمكن لـ{0} أن يطلب من جديد.',w:'Expired request, before closing'},
+
+ MobileServiceAvailableTitle:{s:'same',en:'Josour is available for requests',ar:'جسور متاح لاستقبال الطلبات'},
+ MobileServiceAvailableText:{s:'same',en:"Staying connected to receive your contacts' requests.",ar:'يبقى متصلًا ليستقبل طلبات جهات اتصالك.'},
+ MobileStopHosting:{s:'edit-mobile',en:'Stop sharing',ar:'إيقاف المشاركة',old:'Stop hosting / إيقاف الاستضافة'},
+ MobileServiceChannelName:{s:'edit-mobile',en:'Sharing your connection',ar:'مشاركة اتصالك',old:'Hosting / الاستضافة'},
+ MobileRequestsChannelName:{s:'same',en:'Incoming requests',ar:'الطلبات الواردة'},
+ ToastIncomingRequestTitle:{s:'same',en:'Incoming browsing request',ar:'طلب تصفح وارد'},
+ ToastIncomingRequestBodyFormat:{s:'same',en:'{0} ({1}) asks to browse through your connection for {2} minutes.',ar:'يطلب {0} ({1}) التصفح عبر اتصالك لمدة {2} دقيقة.'},
+ MobileRequestTapToAnswer:{s:'same',en:'Open Josour to answer.',ar:'افتح جسور للرد على الطلب.'},
+ MobileInvitationTitle:{s:'same',en:'New contact invitation',ar:'دعوة إضافة جديدة'},
+ AutoAcceptToastTitle:{s:'same',en:'Connected automatically',ar:'اتصال تلقائي'},
+ MobileAutoAcceptBodyFormat:{s:'new',en:'{0} ({1}) is using your connection: you allowed them to without asking. End it from Josour or from its notification.',ar:'{0} ({1}) يستخدم اتصالك: سمحت له بذلك دون سؤال. يمكنك إنهاء الجلسة من جسور أو من إشعاره.',w:'Replaces AutoAcceptToastBodyFormat ("app window") on the phone'},
+ MobileTabUse:{s:'later',en:'Use a connection',ar:'استخدام اتصال',w:'Third tab, only when the guest role ships (not added now)'},
+};
+// Shared-key edits proposed in Phase 1 that no mockup frame shows (sign-in errors, end reasons).
+const STR_EXTRA = {
+ LoginErrorAccountDisabled:{s:'edit-shared',en:'This account is turned off. Ask the person who runs your Josour server.',ar:'هذا الحساب معطّل. تواصل مع من يدير خادم جسور.',old:'This account is disabled. Contact your administrator.'},
+ LoginErrorAccountPending:{s:'edit-shared',en:'Your account is waiting for approval from the person who runs your Josour server.',ar:'حسابك بانتظار موافقة من يدير خادم جسور.',old:"Your account is waiting for an administrator's approval."},
+ LoginErrorDeviceRevoked:{s:'edit-shared',en:'This device was removed from your account on the server. Sign in again to register it anew.',ar:'أُزيل هذا الجهاز من حسابك على الخادم. سجّل الدخول من جديد لتسجيله مرة أخرى.',old:'An administrator removed this device. Sign in again to register it anew.'},
+ SignedOutDeviceRevoked:{s:'edit-shared',en:'This device was removed from your account on the server.',ar:'أُزيل هذا الجهاز من حسابك على الخادم.',old:'An administrator removed this device.'},
+ SessionEndedAdminTerminated:{s:'edit-shared',en:'The person who runs your Josour server ended the session.',ar:'أنهى مدير خادم جسور الجلسة.',old:'An administrator ended the session.'},
+};
+
+const LOCK = {"ar": {"light": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NzQgMjAwIiB3aWR0aD0iNjc0IiBoZWlnaHQ9IjIwMCI+PHBhdGggZD0iTTU1LjE5MTk5OTk5OTk5OTk5IDEyMC43MlE1Mi42NzIgMTIwLjcyIDUwLjM2Nzk5OTk5OTk5OTk5NSAxMjAuMDcyUTQ4LjA2NCAxMTkuNDI0IDQ2LjEyMDAwMDAwMDAwMDAwNSAxMTguMjM2UTQ0LjE3NiAxMTcuMDQ4IDQyLjYyOCAxMTUuMzU2UTQxLjA4IDExMy42NjQgNDAuMCAxMTEuNTc2TDQ1LjYxNiAxMDUuNzQ0UTQ3LjQ4OCAxMDguMjY0IDQ4LjkyOCAxMDkuNjMyUTUwLjM2Nzk5OTk5OTk5OTk5NSAxMTEuMCA1MS43MzYgMTExLjUwMzk5OTk5OTk5OTk5UTUzLjEwNCAxMTIuMDA4IDU0Ljc2IDExMi4wMDhRNTcuMDYzOTk5OTk5OTk5OTkgMTEyLjAwOCA1OC44Mjc5OTk5OTk5OTk5OTYgMTEwLjkyOFE2MC41OTIgMTA5Ljg0OCA2MS41MjggMTA3Ljk3NlE2Mi40NjQgMTA2LjEwNCA2Mi40NjQgMTAzLjcyODAwMDAwMDAwMDAxVjc3Ljk1Mkg1My4yNDhWNjkuNkg3OS40NTU5OTk5OTk5OTk5OVY3Ny45NTJINzEuNjhWMTA0LjY2NFE3MS42OCAxMDguMTkyMDAwMDAwMDAwMDEgNzAuNDU2IDExMS4xMDhRNjkuMjMyIDExNC4wMjQgNjcuMDM2IDExNi4xODRRNjQuODQgMTE4LjM0NCA2MS44MTYgMTE5LjUzMlE1OC43OTIgMTIwLjcyIDU1LjE5MTk5OTk5OTk5OTk5IDEyMC43MlpNMTAyLjI4IDEyMC43MlE5Ni41OTIgMTIwLjcyIDkyLjEyOCAxMTguMTY0UTg3LjY2NCAxMTUuNjA4IDg1LjEwOCAxMTEuMTQ0UTgyLjU1MiAxMDYuNjggODIuNTUyIDEwMC45OTJRODIuNTUyIDk1LjMwNCA4NS4xMDggOTAuODRRODcuNjY0IDg2LjM3NiA5Mi4xMjggODMuODIwMDAwMDAwMDAwMDFROTYuNTkyIDgxLjI2NDAwMDAwMDAwMDAxIDEwMi4yOCA4MS4yNjQwMDAwMDAwMDAwMVExMDcuODk2IDgxLjI2NDAwMDAwMDAwMDAxIDExMi4zNiA4My44MjAwMDAwMDAwMDAwMVExMTYuODI0IDg2LjM3NiAxMTkuMzggOTAuODRRMTIxLjkzNiA5NS4zMDQgMTIxLjkzNiAxMDAuOTkyUTEyMS45MzYgMTA2LjY4IDExOS4zOCAxMTEuMTQ0UTExNi44MjQgMTE1LjYwOCAxMTIuMzYgMTE4LjE2NFExMDcuODk2IDEyMC43MiAxMDIuMjggMTIwLjcyWk0xMDIuMjggMTEyLjg3MlExMDUuMzc2IDExMi44NzIgMTA3LjgyNCAxMTEuMzI0UTExMC4yNzE5OTk5OTk5OTk5OSAxMDkuNzc2IDExMS42NzU5OTk5OTk5OTk5OSAxMDcuMDc2UTExMy4wOCAxMDQuMzc2IDExMy4wMDgwMDAwMDAwMDAwMSAxMDAuOTkyUTExMy4wOCA5Ny41MzYgMTExLjY3NTk5OTk5OTk5OTk5IDk0LjgzNlExMTAuMjcxOTk5OTk5OTk5OTkgOTIuMTM2IDEwNy44MjQgOTAuNjI0UTEwNS4zNzYgODkuMTEyIDEwMi4yOCA4OS4xMTJROTkuMTg0IDg5LjExMiA5Ni43IDkwLjY2UTk0LjIxNjAwMDAwMDAwMDAxIDkyLjIwOCA5Mi44NDgwMDAwMDAwMDAwMSA5NC45MDhROTEuNDggOTcuNjA4IDkxLjQ4IDEwMC45OTJROTEuNDggMTA0LjM3NiA5Mi44NDgwMDAwMDAwMDAwMSAxMDcuMDc2UTk0LjIxNjAwMDAwMDAwMDAxIDEwOS43NzYgOTYuNyAxMTEuMzI0UTk5LjE4NCAxMTIuODcyIDEwMi4yOCAxMTIuODcyWk0xNDIuNTI4IDEyMC43MlExMzcuNTYgMTIwLjcyIDEzMy41NjQgMTE5LjAyNzk5OTk5OTk5OTk5UTEyOS41Njc5OTk5OTk5OTk5OCAxMTcuMzM2IDEyNy4wNDggMTE0LjE2OEwxMzIuNzM2IDEwOS4yNzJRMTM0Ljg5NiAxMTEuNjQ4IDEzNy41NiAxMTIuNzY0UTE0MC4yMjQgMTEzLjg4IDE0My4xNzYgMTEzLjg4UTE0NC40IDExMy44OCAxNDUuMzcyIDExMy41OTJRMTQ2LjM0NCAxMTMuMzA0IDE0Ny4wNjQgMTEyLjcyODAwMDAwMDAwMDAxUTE0Ny43ODQgMTEyLjE1MiAxNDguMTggMTExLjM2UTE0OC41NzYgMTEwLjU2OCAxNDguNTc2IDEwOS42MzJRMTQ4LjU3NiAxMDcuOTA0IDE0Ny4yOCAxMDYuODk2UTE0Ni41NiAxMDYuNDY0IDE0NS4wNDggMTA1Ljg1MlExNDMuNTM2IDEwNS4yNDAwMDAwMDAwMDAwMSAxNDEuMDg4IDEwNC42NjRRMTM3LjIgMTAzLjY1NiAxMzQuNTcyIDEwMi4zMjQwMDAwMDAwMDAwMVExMzEuOTQ0IDEwMC45OTIgMTMwLjUwNCA5OS4zMzZRMTI5LjI4IDk3Ljg5NiAxMjguNzA0IDk2LjIwNDAwMDAwMDAwMDAxUTEyOC4xMjggOTQuNTEyIDEyOC4xMjggOTIuNDI0UTEyOC4xMjggODkuMTg0IDEzMC4wMzYgODYuNjY0UTEzMS45NDQgODQuMTQ0IDEzNS4xMTIgODIuNzA0MDAwMDAwMDAwMDFRMTM4LjI4IDgxLjI2NDAwMDAwMDAwMDAxIDE0Mi4xNjggODEuMjY0MDAwMDAwMDAwMDFRMTQ1LjA0OCA4MS4yNjQwMDAwMDAwMDAwMSAxNDcuNzQ4IDgxLjk4NDAwMDAwMDAwMDAxUTE1MC40NDggODIuNzA0MDAwMDAwMDAwMDEgMTUyLjc1MiA4NC4wMzZRMTU1LjA1NTk5OTk5OTk5OTk4IDg1LjM2OCAxNTYuNzEyIDg3LjI0MDAwMDAwMDAwMDAxTDE1MS44MTYgOTIuNjRRMTUwLjUxOTk5OTk5OTk5OTk4IDkxLjM0NCAxNDguODk5OTk5OTk5OTk5OTggOTAuM1ExNDcuMjggODkuMjU2IDE0NS42MjQgODguNjhRMTQzLjk2OCA4OC4xMDQgMTQyLjUyOCA4OC4xMDRRMTQxLjE2IDg4LjEwNCAxNDAuMDc5OTk5OTk5OTk5OTggODguMzU2UTEzOS4wIDg4LjYwOCAxMzguMjggODkuMTEyUTEzNy41NiA4OS42MTYgMTM3LjE2NCA5MC4zNzJRMTM2Ljc2OCA5MS4xMjggMTM2Ljc2OCA5Mi4wNjQwMDAwMDAwMDAwMVExMzYuODQgOTMuMCAxMzcuMjM2IDkzLjc1NlExMzcuNjMyIDk0LjUxMiAxMzguMzUyIDk1LjAxNlExMzkuMDcyIDk1LjUyMDAwMDAwMDAwMDAxIDE0MC42NTYgOTYuMTY4UTE0Mi4yNCA5Ni44MTYgMTQ0Ljc2IDk3LjM5MlExNDguMjg4IDk4LjMyOCAxNTAuNjY0IDk5LjQ4UTE1My4wNCAxMDAuNjMyIDE1NC40MDggMTAyLjE0NFExNTUuNzc2IDEwMy40NCAxNTYuMzUyIDEwNS4xNjhRMTU2LjkyOCAxMDYuODk2IDE1Ni45MjggMTA5LjA1NlExNTYuOTI4IDExMi40NCAxNTUuMDE5OTk5OTk5OTk5OTggMTE1LjA2OFExNTMuMTEyIDExNy42OTYgMTQ5Ljg3MiAxMTkuMjA4UTE0Ni42MzIgMTIwLjcyIDE0Mi41MjggMTIwLjcyWk0xODEuOTgzOTk5OTk5OTk5OTggMTIwLjcyUTE3Ni4yOTYgMTIwLjcyIDE3MS44MzIgMTE4LjE2NFExNjcuMzY4IDExNS42MDggMTY0LjgxMTk5OTk5OTk5OTk4IDExMS4xNDRRMTYyLjI1NTk5OTk5OTk5OTk3IDEwNi42OCAxNjIuMjU1OTk5OTk5OTk5OTcgMTAwLjk5MlExNjIuMjU1OTk5OTk5OTk5OTcgOTUuMzA0IDE2NC44MTE5OTk5OTk5OTk5OCA5MC44NFExNjcuMzY4IDg2LjM3NiAxNzEuODMyIDgzLjgyMDAwMDAwMDAwMDAxUTE3Ni4yOTYgODEuMjY0MDAwMDAwMDAwMDEgMTgxLjk4Mzk5OTk5OTk5OTk4IDgxLjI2NDAwMDAwMDAwMDAxUTE4Ny41OTk5OTk5OTk5OTk5NyA4MS4yNjQwMDAwMDAwMDAwMSAxOTIuMDYzOTk5OTk5OTk5OTYgODMuODIwMDAwMDAwMDAwMDFRMTk2LjUyNzk5OTk5OTk5OTk2IDg2LjM3NiAxOTkuMDgzOTk5OTk5OTk5OTcgOTAuODRRMjAxLjY0IDk1LjMwNCAyMDEuNjQgMTAwLjk5MlEyMDEuNjQgMTA2LjY4IDE5OS4wODM5OTk5OTk5OTk5NyAxMTEuMTQ0UTE5Ni41Mjc5OTk5OTk5OTk5NiAxMTUuNjA4IDE5Mi4wNjM5OTk5OTk5OTk5NiAxMTguMTY0UTE4Ny41OTk5OTk5OTk5OTk5NyAxMjAuNzIgMTgxLjk4Mzk5OTk5OTk5OTk4IDEyMC43MlpNMTgxLjk4Mzk5OTk5OTk5OTk4IDExMi44NzJRMTg1LjA3OTk5OTk5OTk5OTk4IDExMi44NzIgMTg3LjUyNzk5OTk5OTk5OTk2IDExMS4zMjRRMTg5Ljk3NTk5OTk5OTk5OTk3IDEwOS43NzYgMTkxLjM4IDEwNy4wNzZRMTkyLjc4NCAxMDQuMzc2IDE5Mi43MTIgMTAwLjk5MlExOTIuNzg0IDk3LjUzNiAxOTEuMzggOTQuODM2UTE4OS45NzU5OTk5OTk5OTk5NyA5Mi4xMzYgMTg3LjUyNzk5OTk5OTk5OTk2IDkwLjYyNFExODUuMDc5OTk5OTk5OTk5OTggODkuMTEyIDE4MS45ODM5OTk5OTk5OTk5OCA4OS4xMTJRMTc4Ljg4Nzk5OTk5OTk5OTk4IDg5LjExMiAxNzYuNDA0IDkwLjY2UTE3My45MiA5Mi4yMDggMTcyLjU1MTk5OTk5OTk5OTk2IDk0LjkwOFExNzEuMTgzOTk5OTk5OTk5OTcgOTcuNjA4IDE3MS4xODM5OTk5OTk5OTk5NyAxMDAuOTkyUTE3MS4xODM5OTk5OTk5OTk5NyAxMDQuMzc2IDE3Mi41NTE5OTk5OTk5OTk5NiAxMDcuMDc2UTE3My45MiAxMDkuNzc2IDE3Ni40MDQgMTExLjMyNFExNzguODg3OTk5OTk5OTk5OTggMTEyLjg3MiAxODEuOTgzOTk5OTk5OTk5OTggMTEyLjg3MlpNMjIyLjczNiAxMjAuNzJRMjE4LjYzMTk5OTk5OTk5OTk4IDEyMC43MiAyMTUuNjQzOTk5OTk5OTk5OTggMTE4Ljg0OFEyMTIuNjU1OTk5OTk5OTk5OTggMTE2Ljk3NiAyMTEuMDM1OTk5OTk5OTk5OTcgMTEzLjU5MlEyMDkuNDE1OTk5OTk5OTk5OTcgMTEwLjIwOCAyMDkuNDE1OTk5OTk5OTk5OTcgMTA1LjQ1NlY4Mi4wNTYwMDAwMDAwMDAwMUgyMTguMlYxMDMuNTg0UTIxOC4yIDEwOC4wNDggMjIwLjMyMzk5OTk5OTk5OTk4IDExMC42NFEyMjIuNDQ3OTk5OTk5OTk5OTggMTEzLjIzMiAyMjYuMjYzOTk5OTk5OTk5OTggMTEzLjIzMlEyMjguMTM1OTk5OTk5OTk5OTcgMTEzLjIzMiAyMjkuNjgzOTk5OTk5OTk5OTcgMTEyLjYyUTIzMS4yMzE5OTk5OTk5OTk5NyAxMTIuMDA4IDIzMi4zODM5OTk5OTk5OTk5NiAxMTAuODkyUTIzMy41MzU5OTk5OTk5OTk5NyAxMDkuNzc2IDIzNC4xODM5OTk5OTk5OTk5NyAxMDguMTkyMDAwMDAwMDAwMDFRMjM0LjgzMTk5OTk5OTk5OTk3IDEwNi42MDggMjM0LjgzMTk5OTk5OTk5OTk3IDEwNC44MDhWODIuMDU2MDAwMDAwMDAwMDFIMjQzLjYxNTk5OTk5OTk5OTk5VjEyMC4wSDIzNS4wNDc5OTk5OTk5OTk5N0wyMzQuOTAzOTk5OTk5OTk5OTcgMTEyLjA4TDIzNi40ODc5OTk5OTk5OTk5NyAxMTEuMjE2MDAwMDAwMDAwMDFRMjM1LjYyMzk5OTk5OTk5OTk3IDExMy44OCAyMzMuNTcxOTk5OTk5OTk5OTcgMTE2LjAzOTk5OTk5OTk5OTk5UTIzMS41MTk5OTk5OTk5OTk5OCAxMTguMiAyMjguNzEyIDExOS40NjAwMDAwMDAwMDAwMVEyMjUuOTAzOTk5OTk5OTk5OTcgMTIwLjcyIDIyMi43MzYgMTIwLjcyWk0yNTQuMDU1OTk5OTk5OTk5OTUgMTIwLjBWODIuMDU2MDAwMDAwMDAwMDFIMjYyLjY5NTk5OTk5OTk5OTk3TDI2Mi44NCA5NC4xNTJMMjYxLjY4Nzk5OTk5OTk5OTkzIDkxLjQxNlEyNjIuNDc5OTk5OTk5OTk5OTYgODguNTM2IDI2NC40MjQgODYuMjMyUTI2Ni4zNjc5OTk5OTk5OTk5NCA4My45MjggMjY4LjkyNCA4Mi41OTZRMjcxLjQ3OTk5OTk5OTk5OTk2IDgxLjI2NDAwMDAwMDAwMDAxIDI3NC4yMTU5OTk5OTk5OTk5NSA4MS4yNjQwMDAwMDAwMDAwMVEyNzUuNDM5OTk5OTk5OTk5OTQgODEuMjY0MDAwMDAwMDAwMDEgMjc2LjU1NTk5OTk5OTk5OTkgODEuNDhRMjc3LjY3MTk5OTk5OTk5OTk3IDgxLjY5NiAyNzguMzkxOTk5OTk5OTk5OTQgODEuOTg0MDAwMDAwMDAwMDFMMjc2LjA4Nzk5OTk5OTk5OTk3IDkxLjYzMlEyNzUuMjIzOTk5OTk5OTk5OTMgOTEuMiAyNzQuMTA3OTk5OTk5OTk5OTUgOTAuOTQ4MDAwMDAwMDAwMDFRMjcyLjk5MTk5OTk5OTk5OTk2IDkwLjY5NiAyNzEuODQgOTAuNjk2UTI2OS45Njc5OTk5OTk5OTk5NiA5MC42OTYgMjY4LjM0Nzk5OTk5OTk5OTk2IDkxLjM4UTI2Ni43Mjc5OTk5OTk5OTk5NSA5Mi4wNjQwMDAwMDAwMDAwMSAyNjUuNTM5OTk5OTk5OTk5OTYgOTMuMjg4MDAwMDAwMDAwMDFRMjY0LjM1MiA5NC41MTIgMjYzLjYzMTk5OTk5OTk5OTk1IDk2LjEzMlEyNjIuOTEyIDk3Ljc1MjAwMDAwMDAwMDAxIDI2Mi45MTIgOTkuNjk2VjEyMC4wWiIgZmlsbD0iIzE0MjMyQiIvPjxwYXRoIGQ9Ik0zMjkuMzIxOTIgMTM4Ljk3MzQ0UTMyNS45MDA0Nzk5OTk5OTk5NiAxMzguOTczNDQgMzIxLjkzNDcxOTk5OTk5OTk3IDEzNy42OTA0UTMxNy45Njg5NTk5OTk5OTk5IDEzNi40MDczNiAzMTQuMzkxOTk5OTk5OTk5OTQgMTMzLjM3NDcyTDMxNy44MTM0Mzk5OTk5OTk5NiAxMjYuNjg3MzZRMzIwLjM3OTUxOTk5OTk5OTk2IDEyNy42OTgyNCAzMjIuOTA2NzE5OTk5OTk5OTUgMTI4LjI0MjU2UTMyNS40MzM5MTk5OTk5OTk5NCAxMjguNzg2ODggMzI3LjQ1NTY4IDEyOC43ODY4OFEzMzIuMDQzNTE5OTk5OTk5OTQgMTI4Ljc4Njg4IDMzNS4zNDgzMTk5OTk5OTk5NCAxMjYuOTU5NTJRMzM4LjY1MzExOTk5OTk5OTk0IDEyNS4xMzIxNiAzNDAuNTE5MzU5OTk5OTk5OTUgMTIxLjg2NjI0UTM0Mi4zODU1OTk5OTk5OTk5NSAxMTguNjAwMzIgMzQyLjM4NTU5OTk5OTk5OTk1IDExNC4xNjhRMzQyLjM4NTU5OTk5OTk5OTk1IDExMi4wNjg0OCAzNDEuNDUyNDc5OTk5OTk5OSAxMDkuODkxMlEzNDAuNTE5MzU5OTk5OTk5OTUgMTA3LjcxMzkyIDMzOC4zMDMxOTk5OTk5OTk5NSAxMDQuNTY0NjRRMzM2LjA4NzAzOTk5OTk5OTk0IDEwMS40MTUzNTk5OTk5OTk5OSAzMzIuMTIxMjc5OTk5OTk5OTYgOTYuNjcyTDM0MC4xMzA1NTk5OTk5OTk5NSA4Ni43OTY0OFEzNDQuMjUxODM5OTk5OTk5OTYgOTIuMzk1MTk5OTk5OTk5OTkgMzQ2Ljc3OTAzOTk5OTk5OTk1IDk2Ljk0NDE2UTM0OS4zMDYyMzk5OTk5OTk5NSAxMDEuNDkzMTIgMzUwLjUxMTUxOTk5OTk5OTk2IDEwNS41MzY2NFEzNTEuNzE2OCAxMDkuNTgwMTYgMzUxLjcxNjggMTEzLjcwMTQ0UTM1MS43MTY4IDExNi43MzQwOCAzNTAuOTM5MTk5OTk5OTk5OTcgMTIwLjE5NDRRMzUwLjE2MTU5OTk5OTk5OTk2IDEyMy42NTQ3MiAzNDguNTI4NjQgMTI2Ljk1OTUyUTM0Ni44OTU2Nzk5OTk5OTk5NyAxMzAuMjY0MzIgMzQ0LjI1MTgzOTk5OTk5OTk2IDEzMi45ODU5MlEzNDEuNjA3OTk5OTk5OTk5OTUgMTM1LjcwNzUyIDMzNy44NzU1MTk5OTk5OTk5NCAxMzcuMzQwNDhRMzM0LjE0MzAzOTk5OTk5OTkgMTM4Ljk3MzQ0IDMyOS4zMjE5MiAxMzguOTczNDRaTTM3MS4zMTIzMTk5OTk5OTk5NCAxMzcuODg0OFEzNjcuNjU3NTk5OTk5OTk5OTUgMTM3Ljg4NDggMzYzLjU3NTE5OTk5OTk5OTk0IDEzNi42MDE3NlEzNTkuNDkyNzk5OTk5OTk5OTMgMTM1LjMxODcyIDM1NS45MTU4Mzk5OTk5OTk5NSAxMzIuMjg2MDhMMzU5LjMzNzI3OTk5OTk5OTk2IDEyNS40NDMyUTM2MS44MjU1OTk5OTk5OTk5NSAxMjYuMjk4NTYgMzY0LjQ2OTQzOTk5OTk5OTk2IDEyNi44NDI4ODAwMDAwMDAwMVEzNjcuMTEzMjggMTI3LjM4NzIgMzY5LjM2ODMxOTk5OTk5OTkgMTI3LjM4NzJRMzc0LjM0NDk1OTk5OTk5OTk2IDEyNy4zODcyIDM3Ny42ODg2Mzk5OTk5OTk5NiAxMjUuNDA0MzIwMDAwMDAwMDFRMzgxLjAzMjMxOTk5OTk5OTk3IDEyMy40MjE0NCAzODIuNjY1Mjc5OTk5OTk5OTQgMTIwLjBIMzc3LjY4ODYzOTk5OTk5OTk2UTM3Mi44Njc1MTk5OTk5OTk5NiAxMjAuMCAzNjkuNTIzODM5OTk5OTk5OTUgMTE5LjAyNzk5OTk5OTk5OTk5UTM2Ni4xODAxNTk5OTk5OTk5NCAxMTguMDU2IDM2NC4xMTk1MTk5OTk5OTk5NyAxMTYuMzA2NFEzNjIuMDU4ODc5OTk5OTk5OTMgMTE0LjU1NjggMzYxLjEyNTc1OTk5OTk5OTkgMTEyLjE4NTEyUTM2MC4xOTI2Mzk5OTk5OTk5IDEwOS44MTM0NCAzNjAuMTkyNjM5OTk5OTk5OSAxMDcuMDE0MDc5OTk5OTk5OTlRMzYwLjE5MjYzOTk5OTk5OTkgMTAyLjgxNTA0IDM2MS41MTQ1NTk5OTk5OTk5NiA5OS4yNzY5NlEzNjIuODM2NDc5OTk5OTk5OTQgOTUuNzM4ODggMzY1LjEzMDM5OTk5OTk5OTk1IDkzLjEzMzkxOTk5OTk5OTk5UTM2Ny40MjQzMTk5OTk5OTk5NyA5MC41Mjg5NiAzNzAuMzc5MTk5OTk5OTk5OTcgODkuMTI5MjhRMzczLjMzNDA4IDg3LjcyOTYgMzc2LjUyMjIzOTk5OTk5OTk1IDg3LjcyOTZRMzgxLjI2NTU5OTk5OTk5OTk1IDg3LjcyOTYgMzg0LjY0ODE1OTk5OTk5OTk2IDkwLjA2MjRRMzg4LjAzMDcyIDkyLjM5NTE5OTk5OTk5OTk5IDM5MC4xMzAyMzk5OTk5OTk5NiA5Ni41MTY0OFEzOTIuMjI5NzU5OTk5OTk5OTQgMTAwLjYzNzc2IDM5Mi45Mjk1OTk5OTk5OTk5NCAxMDYuMDgwOTZRMzkzLjA4NTExOTk5OTk5OTk2IDEwNi45MzYzMiAzOTMuMjAxNzU5OTk5OTk5OSAxMDcuODY5NDRRMzkzLjMxODM5OTk5OTk5OTk0IDEwOC44MDI1NiAzOTMuMzE4Mzk5OTk5OTk5OTQgMTA5LjgxMzQ0SDM5Ny45MDYyMzk5OTk5OTk5N1YxMjAuMEgzOTIuMzg1Mjc5OTk5OTk5OTdRMzkxLjQ1MjE1OTk5OTk5OTk0IDEyMy4xODgxNiAzODkuNzgwMzE5OTk5OTk5OTYgMTI2LjMzNzQzOTk5OTk5OTk5UTM4OC4xMDg0Nzk5OTk5OTk5MyAxMjkuNDg2NzIgMzg1LjU0MjM5OTk5OTk5OTkzIDEzMi4xMzA1NlEzODIuOTc2MzE5OTk5OTk5OTMgMTM0Ljc3NDQgMzc5LjQzODIzOTk5OTk5OTk1IDEzNi4zMjk2MDAwMDAwMDAwM1EzNzUuOTAwMTU5OTk5OTk5OTcgMTM3Ljg4NDggMzcxLjMxMjMxOTk5OTk5OTk0IDEzNy44ODQ4Wk0zNzcuNjg4NjM5OTk5OTk5OTYgMTA5LjgxMzQ0SDM4My44MzE2Nzk5OTk5OTk5NVEzODMuNzUzOTE5OTk5OTk5OTQgMTA5LjExMzU5OTk5OTk5OTk5IDM4My42NzYxNiAxMDguNDkxNTJRMzgzLjU5ODM5OTk5OTk5OTk3IDEwNy44Njk0NCAzODMuNTIwNjM5OTk5OTk5OTYgMTA3LjMyNTEyUTM4My4wNTQwNzk5OTk5OTk5NCAxMDQuNjgxMjggMzgxLjkyNjU1OTk5OTk5OTk0IDEwMi41NDI4OFEzODAuNzk5MDM5OTk5OTk5OTMgMTAwLjQwNDQ3OTk5OTk5OTk5IDM3OS4yODI3MTk5OTk5OTk5IDk5LjE2MDMxOTk5OTk5OTk4UTM3Ny43NjY0IDk3LjkxNjE1OTk5OTk5OTk5IDM3NS45MDAxNTk5OTk5OTk5NyA5Ny45MTYxNTk5OTk5OTk5OVEzNzQuMTg5NDM5OTk5OTk5OTMgOTcuOTE2MTU5OTk5OTk5OTkgMzcyLjc4OTc1OTk5OTk5OTk0IDk4LjkyNzAzOTk5OTk5OTk5UTM3MS4zOTAwNzk5OTk5OTk5NSA5OS45Mzc5MTk5OTk5OTk5OSAzNzAuNTczNTk5OTk5OTk5OTQgMTAxLjYwOTc2UTM2OS43NTcxMTk5OTk5OTk5MyAxMDMuMjgxNiAzNjkuNzU3MTE5OTk5OTk5OTMgMTA1LjIyNTZRMzY5Ljc1NzExOTk5OTk5OTkzIDEwNi41NDc1MTk5OTk5OTk5OSAzNzAuNDU2OTYgMTA3LjU1ODM5OTk5OTk5OTk5UTM3MS4xNTY4IDEwOC41NjkyNzk5OTk5OTk5OSAzNzIuODY3NTE5OTk5OTk5OTYgMTA5LjE5MTM2UTM3NC41NzgyMzk5OTk5OTk5NCAxMDkuODEzNDQgMzc3LjY4ODYzOTk5OTk5OTk2IDEwOS44MTM0NFpNNDQ5Ljc3MjE2IDEyMC4wUTQ0NC45NTEwNCAxMjAuMCA0NDEuNDkwNzIgMTE5LjA2Njg4UTQzOC4wMzA0IDExOC4xMzM3NiA0MzUuNTgwOTYgMTE2LjgxMTgzOTk5OTk5OTk5UTQzMy4xMzE1MTk5OTk5OTk5NyAxMTUuNDg5OTIgNDMxLjE4NzUxOTk5OTk5OTk1IDExNC4yNDU3Nkw0MzYuNzA4NDc5OTk5OTk5OTUgMTA3LjYzNjE2UTQ0MC43NTE5OTk5OTk5OTk5NSAxMDkuODEzNDQgNDQ3LjEyODMyIDEwOS44MTM0NEg0NTcuMDAzODM5OTk5OTk5OTdRNDU2LjQ1OTUyIDEwNy40MDI4OCA0NTUuNzk4NTU5OTk5OTk5OTUgMTA1LjM4MTEyUTQ1NS4xMzc1OTk5OTk5OTk5NiAxMDMuMzU5MzYgNDU0LjI4MjI0IDEwMS4xODIwNzk5OTk5OTk5OFE0NTMuNDI2ODggOTkuMDA0Nzk5OTk5OTk5OTkgNDUyLjEwNDk2IDk2LjIwNTQ0TDQ2NC4wMDIyNCA4OC4xOTYxNTk5OTk5OTk5OVE0NjQuNzAyMDc5OTk5OTk5OTcgOTMuMDE3MjggNDY1LjEyOTc2IDk4LjE0OTQ0UTQ2NS41NTc0NCAxMDMuMjgxNiA0NjUuMTY4NjQgMTA4LjcyNDhRNDY0Ljc3OTg0IDExNC4xNjggNDYyLjk5MTM2IDEyMC4wWk0zOTcuOTA2MjM5OTk5OTk5OTcgMTIwLjBWMTA5LjgxMzQ0SDQwNi42OTMxMTk5OTk5OTk5NlE0MDcuMjM3NDQgMTA4LjI1ODI0IDQwNy42NjUxMiAxMDYuMTU4NzJRNDA4LjA5Mjc5OTk5OTk5OTk1IDEwNC4wNTkyIDQwOC4yNDgzMTk5OTk5OTk5IDEwMS43MjY0UTQwOC40MDM4Mzk5OTk5OTk5NSA5OS4zOTM1OTk5OTk5OTk5OSA0MDguMzI2MDggOTcuMDYwOEw0MjAuNjEyMTU5OTk5OTk5OTYgOTIuNzgzOTk5OTk5OTk5OTlRNDE5LjY3OTA0IDk3LjYwNTEyIDQxOC43MDcwNCAxMDEuMjIwOTU5OTk5OTk5OTlRNDE3LjczNTAzOTk5OTk5OTk3IDEwNC44MzY4IDQxNi41Mjk3NiAxMDcuODY5NDRRNDE1LjMyNDQ4IDExMC45MDIwOCA0MTMuNzMwNCAxMTMuNzc5MlE0MTIuMTM2MzE5OTk5OTk5OTYgMTE2LjY1NjMyIDQwOS44ODEyNzk5OTk5OTk5NSAxMjAuMFpNNDIzLjMzMzc2IDEyMC4wUTQxOC4yNzkzNiAxMjAuMCA0MTQuNTg1NzYgMTE5LjA2Njg4UTQxMC44OTIxNiAxMTguMTMzNzYgNDA4LjQ4MTU5OTk5OTk5OTk2IDExNi44NTA3MlE0MDYuMDcxMDQgMTE1LjU2NzY4IDQwNC42NzEzNiAxMTQuNTU2OEw0MDkuMTAzNjggMTA3LjI0NzM2UTQxMS4yMDMyIDEwOC40MTM3NiA0MTQuMDgwMzIgMTA5LjExMzU5OTk5OTk5OTk5UTQxNi45NTc0Mzk5OTk5OTk5NiAxMDkuODEzNDQgNDIwLjM3ODg4IDEwOS44MTM0NEg0MjguMzEwMzk5OTk5OTk5OTZRNDI4Ljg1NDcyIDEwOC40OTE1MiA0MjkuMjgyMzk5OTk5OTk5OTQgMTA2LjM1MzExOTk5OTk5OTk5UTQyOS43MTAwNzk5OTk5OTk5NSAxMDQuMjE0NzIgNDI5LjkwNDQ3OTk5OTk5OTkgMTAxLjgwNDE2UTQzMC4wOTg4Nzk5OTk5OTk5NSA5OS4zOTM1OTk5OTk5OTk5OSA0MzAuMDIxMTIgOTcuMDYwOEw0NDIuMzA3MTk5OTk5OTk5OTcgOTIuNzgzOTk5OTk5OTk5OTlRNDQxLjI5NjMyIDk3LjYwNTEyIDQ0MC4zMjQzMTk5OTk5OTk5NCAxMDEuMjIwOTU5OTk5OTk5OTlRNDM5LjM1MjMxOTk5OTk5OTk2IDEwNC44MzY4IDQzOC4xODU5MTk5OTk5OTk5NSAxMDcuODY5NDRRNDM3LjAxOTUxOTk5OTk5OTk0IDExMC45MDIwOCA0MzUuMzg2NTU5OTk5OTk5OSAxMTMuNzc5MlE0MzMuNzUzNTk5OTk5OTk5OTUgMTE2LjY1NjMyIDQzMS41NzYzMTk5OTk5OTk5NSAxMjAuMFpNNDcyLjQwMDMxOTk5OTk5OTk3IDEyMC4wUTQ2OC42Njc4Mzk5OTk5OTk5NiAxMjAuMCA0NjUuNjc0MDggMTE5LjM3NzkyUTQ2Mi42ODAzMiAxMTguNzU1ODQgNDYwLjM4NjQgMTE3Ljc4Mzg0UTQ1OC4wOTI0Nzk5OTk5OTk5NyAxMTYuODExODQgNDU2LjMwNCAxMTUuODAwOTZMNDYwLjM0NzUyIDEwOC4wMjQ5NlE0NjEuMjgwNjM5OTk5OTk5OTUgMTA4LjQ5MTUyIDQ2Mi40MDgxNTk5OTk5OTk5NSAxMDguODAyNTZRNDYzLjUzNTY3OTk5OTk5OTk2IDEwOS4xMTM1OTk5OTk5OTk5OSA0NjQuNzQwOTYgMTA5LjM0Njg4UTQ2NS45NDYyNCAxMDkuNTgwMTYgNDY3LjI2ODE1OTk5OTk5OTk3IDEwOS42OTY4UTQ2OC41OTAwNzk5OTk5OTk5NCAxMDkuODEzNDQgNDY5Ljk4OTc2IDEwOS44MTM0NEg0NzIuOTQ0NjRWMTIwLjBaTTM5Ny45MDYyMzk5OTk5OTk5NyAxMDkuODEzNDRIMzk4LjY4Mzg0VjEyMC4wSDM5Ny45MDYyMzk5OTk5OTk5N1EzOTUuNTczNDM5OTk5OTk5OTUgMTIwLjAgMzk1LjU3MzQzOTk5OTk5OTk1IDExNC44Njc4NFEzOTUuNTczNDM5OTk5OTk5OTUgMTA5LjgxMzQ0IDM5Ny45MDYyMzk5OTk5OTk5NyAxMDkuODEzNDRaTTQ3Mi45NDQ2Mzk5OTk5OTk5NCAxMjAuMFYxMDkuODEzNDRINDc0Ljk2NjM5OTk5OTk5OTlRNDgyLjEyMDMxOTk5OTk5OTk0IDEwOS44MTM0NCA0ODcuMTM1ODM5OTk5OTk5OSAxMDkuMzg1NzZRNDkyLjE1MTM1OTk5OTk5OTk1IDEwOC45NTgwOCA0OTUuNjg5NDM5OTk5OTk5OTMgMTA4LjE4MDQ3OTk5OTk5OTk5UTQ5OS4yMjc1MTk5OTk5OTk5IDEwNy40MDI4OCA1MDEuOTEwMjM5OTk5OTk5OTMgMTA2LjIzNjQ4UTUwNC41OTI5NTk5OTk5OTk5NSAxMDUuMDcwMDc5OTk5OTk5OTkgNTA3LjA4MTI3OTk5OTk5OTk0IDEwMy42NzA0UTUwNy43MDMzNTk5OTk5OTk5IDEwMy4yODE2IDUwOC4yODY1NTk5OTk5OTk5IDEwMy4wMDk0NFE1MDguODY5NzU5OTk5OTk5OSAxMDIuNzM3MjggNTA5LjQxNDA3OTk5OTk5OTkgMTAyLjQyNjI0UTUwOS45NTgzOTk5OTk5OTk5IDEwMi4xMTUyIDUxMC41MDI3MTk5OTk5OTk5NSAxMDEuODgxOTJRNTA3LjU0NzgzOTk5OTk5OTk1IDEwMC42Mzc3NiA1MDQuOTgxNzU5OTk5OTk5OTUgOTkuMzkzNTk5OTk5OTk5OTlRNTAyLjQxNTY3OTk5OTk5OTk1IDk4LjE0OTQ0IDUwMC4wMDUxMTk5OTk5OTk5IDk3LjEzODU2UTQ5Ny41OTQ1NTk5OTk5OTk5NCA5Ni4xMjc2OCA0OTUuMzM5NTE5OTk5OTk5OTQgOTUuNTA1NlE0OTMuMDg0NDc5OTk5OTk5OSA5NC44ODM1MiA0OTAuOTA3MTk5OTk5OTk5OTMgOTQuODgzNTJRNDg4LjU3NDM5OTk5OTk5OTkgOTQuODgzNTIgNDg2LjI4MDQ3OTk5OTk5OTkgOTYuMTY2NTZRNDgzLjk4NjU1OTk5OTk5OTk0IDk3LjQ0OTYgNDgxLjczMTUxOTk5OTk5OTkzIDEwMS4xMDQzMkw0NzQuODg4NjM5OTk5OTk5OTUgOTcuNTI3MzZRNDc3LjIyMTQzOTk5OTk5OTkgOTIuNjI4NDggNDgwLjA1OTY3OTk5OTk5OTk2IDg5Ljc5MDI0UTQ4Mi44OTc5MTk5OTk5OTk5NCA4Ni45NTIgNDg2LjA0NzIgODUuNzg1NTk5OTk5OTk5OTlRNDg5LjE5NjQ3OTk5OTk5OTk1IDg0LjYxOTE5OTk5OTk5OTk5IDQ5Mi4zMDY4Nzk5OTk5OTk5IDg0LjYxOTE5OTk5OTk5OTk5UTQ5Ni4zNTAzOTk5OTk5OTk5IDg0LjYxOTE5OTk5OTk5OTk5IDQ5OS44NDk1OTk5OTk5OTk5IDg1LjkwMjI0UTUwMy4zNDg3OTk5OTk5OTk5IDg3LjE4NTI4IDUwNi41MzY5NTk5OTk5OTk5IDg5LjA5MDRRNTA5LjcyNTExOTk5OTk5OTk1IDkwLjk5NTUyIDUxMi43OTY2NCA5Mi45MDA2NFE1MTUuODY4MTYgOTQuODA1NzU5OTk5OTk5OTkgNTE4LjkzOTY4IDk2LjEyNzY4UTUyMi4wMTExOTk5OTk5OTk5IDk3LjQ0OTYgNTI1LjI3NzEyIDk3LjM3MTgzOTk5OTk5OTk5TDUyNS4xMjE2IDEwNi4zMTQyNFE1MjMuMDIyMDggMTA2LjU0NzUxOTk5OTk5OTk5IDUxOS45MTE2Nzk5OTk5OTk5IDEwNy44MzA1NTk5OTk5OTk5OVE1MTYuODAxMjc5OTk5OTk5OSAxMDkuMTEzNTk5OTk5OTk5OTkgNTEyLjc1Nzc2IDExMS4yOTA4OFE1MDkuODAyODc5OTk5OTk5OTYgMTEyLjc2ODMyIDUwNi40OTgwNzk5OTk5OTk5NiAxMTQuMzIzNTJRNTAzLjE5MzI3OTk5OTk5OTk2IDExNS44Nzg3MiA0OTguODM4NzE5OTk5OTk5OTcgMTE3LjE2MTc2UTQ5NC40ODQxNTk5OTk5OTk5IDExOC40NDQ4IDQ4OC40OTY2Mzk5OTk5OTk5NiAxMTkuMjIyNFE0ODIuNTA5MTE5OTk5OTk5OTQgMTIwLjAgNDc0LjM0NDMxOTk5OTk5OTkgMTIwLjBaTTQ3Mi45NDQ2Mzk5OTk5OTk5NCAxMDkuODEzNDRINDczLjcyMjIzOTk5OTk5OTk0VjEyMC4wSDQ3Mi45NDQ2Mzk5OTk5OTk5NFE0NzAuNjExODM5OTk5OTk5OSAxMjAuMCA0NzAuNjExODM5OTk5OTk5OSAxMTQuODY3ODRRNDcwLjYxMTgzOTk5OTk5OTkgMTA5LjgxMzQ0IDQ3Mi45NDQ2Mzk5OTk5OTk5NCAxMDkuODEzNDRaTTQ5Ny41MTY3OTk5OTk5OTk5MyAxMzkuOTg0MzIgNDkwLjIwNzM1OTk5OTk5OTk0IDEzMi41OTcxMiA0OTcuMjA1NzU5OTk5OTk5OTQgMTI1LjIwOTkyIDUwNC41MTUxOTk5OTk5OTk5NCAxMzIuNTk3MTJaIiBmaWxsPSIjMTQyMzJCIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNTQyLjUyLDM1LjA1KSBzY2FsZSg0LjMzMzMpIj48cGF0aCBkPSJNMywxNUE5LDkgMCAwIDEgMjEsMTVMMTgsMTVBNiw2IDAgMCAwIDYsMTVaTTIuMjUsMjAuMjVhMi4yNSwyLjI1IDAgMSwxIDQuNSwwYTIuMjUsMi4yNSAwIDEsMSAtNC41LDBaTTE3LjI1LDIwLjI1YTIuMjUsMi4yNSAwIDEsMSA0LjUsMGEyLjI1LDIuMjUgMCAxLDEgLTQuNSwwWiIgZmlsbD0iIzBFNzQ5MCIvPjwvZz48L3N2Zz4=", "dark": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NzQgMjAwIiB3aWR0aD0iNjc0IiBoZWlnaHQ9IjIwMCI+PHBhdGggZD0iTTU1LjE5MTk5OTk5OTk5OTk5IDEyMC43MlE1Mi42NzIgMTIwLjcyIDUwLjM2Nzk5OTk5OTk5OTk5NSAxMjAuMDcyUTQ4LjA2NCAxMTkuNDI0IDQ2LjEyMDAwMDAwMDAwMDAwNSAxMTguMjM2UTQ0LjE3NiAxMTcuMDQ4IDQyLjYyOCAxMTUuMzU2UTQxLjA4IDExMy42NjQgNDAuMCAxMTEuNTc2TDQ1LjYxNiAxMDUuNzQ0UTQ3LjQ4OCAxMDguMjY0IDQ4LjkyOCAxMDkuNjMyUTUwLjM2Nzk5OTk5OTk5OTk5NSAxMTEuMCA1MS43MzYgMTExLjUwMzk5OTk5OTk5OTk5UTUzLjEwNCAxMTIuMDA4IDU0Ljc2IDExMi4wMDhRNTcuMDYzOTk5OTk5OTk5OTkgMTEyLjAwOCA1OC44Mjc5OTk5OTk5OTk5OTYgMTEwLjkyOFE2MC41OTIgMTA5Ljg0OCA2MS41MjggMTA3Ljk3NlE2Mi40NjQgMTA2LjEwNCA2Mi40NjQgMTAzLjcyODAwMDAwMDAwMDAxVjc3Ljk1Mkg1My4yNDhWNjkuNkg3OS40NTU5OTk5OTk5OTk5OVY3Ny45NTJINzEuNjhWMTA0LjY2NFE3MS42OCAxMDguMTkyMDAwMDAwMDAwMDEgNzAuNDU2IDExMS4xMDhRNjkuMjMyIDExNC4wMjQgNjcuMDM2IDExNi4xODRRNjQuODQgMTE4LjM0NCA2MS44MTYgMTE5LjUzMlE1OC43OTIgMTIwLjcyIDU1LjE5MTk5OTk5OTk5OTk5IDEyMC43MlpNMTAyLjI4IDEyMC43MlE5Ni41OTIgMTIwLjcyIDkyLjEyOCAxMTguMTY0UTg3LjY2NCAxMTUuNjA4IDg1LjEwOCAxMTEuMTQ0UTgyLjU1MiAxMDYuNjggODIuNTUyIDEwMC45OTJRODIuNTUyIDk1LjMwNCA4NS4xMDggOTAuODRRODcuNjY0IDg2LjM3NiA5Mi4xMjggODMuODIwMDAwMDAwMDAwMDFROTYuNTkyIDgxLjI2NDAwMDAwMDAwMDAxIDEwMi4yOCA4MS4yNjQwMDAwMDAwMDAwMVExMDcuODk2IDgxLjI2NDAwMDAwMDAwMDAxIDExMi4zNiA4My44MjAwMDAwMDAwMDAwMVExMTYuODI0IDg2LjM3NiAxMTkuMzggOTAuODRRMTIxLjkzNiA5NS4zMDQgMTIxLjkzNiAxMDAuOTkyUTEyMS45MzYgMTA2LjY4IDExOS4zOCAxMTEuMTQ0UTExNi44MjQgMTE1LjYwOCAxMTIuMzYgMTE4LjE2NFExMDcuODk2IDEyMC43MiAxMDIuMjggMTIwLjcyWk0xMDIuMjggMTEyLjg3MlExMDUuMzc2IDExMi44NzIgMTA3LjgyNCAxMTEuMzI0UTExMC4yNzE5OTk5OTk5OTk5OSAxMDkuNzc2IDExMS42NzU5OTk5OTk5OTk5OSAxMDcuMDc2UTExMy4wOCAxMDQuMzc2IDExMy4wMDgwMDAwMDAwMDAwMSAxMDAuOTkyUTExMy4wOCA5Ny41MzYgMTExLjY3NTk5OTk5OTk5OTk5IDk0LjgzNlExMTAuMjcxOTk5OTk5OTk5OTkgOTIuMTM2IDEwNy44MjQgOTAuNjI0UTEwNS4zNzYgODkuMTEyIDEwMi4yOCA4OS4xMTJROTkuMTg0IDg5LjExMiA5Ni43IDkwLjY2UTk0LjIxNjAwMDAwMDAwMDAxIDkyLjIwOCA5Mi44NDgwMDAwMDAwMDAwMSA5NC45MDhROTEuNDggOTcuNjA4IDkxLjQ4IDEwMC45OTJROTEuNDggMTA0LjM3NiA5Mi44NDgwMDAwMDAwMDAwMSAxMDcuMDc2UTk0LjIxNjAwMDAwMDAwMDAxIDEwOS43NzYgOTYuNyAxMTEuMzI0UTk5LjE4NCAxMTIuODcyIDEwMi4yOCAxMTIuODcyWk0xNDIuNTI4IDEyMC43MlExMzcuNTYgMTIwLjcyIDEzMy41NjQgMTE5LjAyNzk5OTk5OTk5OTk5UTEyOS41Njc5OTk5OTk5OTk5OCAxMTcuMzM2IDEyNy4wNDggMTE0LjE2OEwxMzIuNzM2IDEwOS4yNzJRMTM0Ljg5NiAxMTEuNjQ4IDEzNy41NiAxMTIuNzY0UTE0MC4yMjQgMTEzLjg4IDE0My4xNzYgMTEzLjg4UTE0NC40IDExMy44OCAxNDUuMzcyIDExMy41OTJRMTQ2LjM0NCAxMTMuMzA0IDE0Ny4wNjQgMTEyLjcyODAwMDAwMDAwMDAxUTE0Ny43ODQgMTEyLjE1MiAxNDguMTggMTExLjM2UTE0OC41NzYgMTEwLjU2OCAxNDguNTc2IDEwOS42MzJRMTQ4LjU3NiAxMDcuOTA0IDE0Ny4yOCAxMDYuODk2UTE0Ni41NiAxMDYuNDY0IDE0NS4wNDggMTA1Ljg1MlExNDMuNTM2IDEwNS4yNDAwMDAwMDAwMDAwMSAxNDEuMDg4IDEwNC42NjRRMTM3LjIgMTAzLjY1NiAxMzQuNTcyIDEwMi4zMjQwMDAwMDAwMDAwMVExMzEuOTQ0IDEwMC45OTIgMTMwLjUwNCA5OS4zMzZRMTI5LjI4IDk3Ljg5NiAxMjguNzA0IDk2LjIwNDAwMDAwMDAwMDAxUTEyOC4xMjggOTQuNTEyIDEyOC4xMjggOTIuNDI0UTEyOC4xMjggODkuMTg0IDEzMC4wMzYgODYuNjY0UTEzMS45NDQgODQuMTQ0IDEzNS4xMTIgODIuNzA0MDAwMDAwMDAwMDFRMTM4LjI4IDgxLjI2NDAwMDAwMDAwMDAxIDE0Mi4xNjggODEuMjY0MDAwMDAwMDAwMDFRMTQ1LjA0OCA4MS4yNjQwMDAwMDAwMDAwMSAxNDcuNzQ4IDgxLjk4NDAwMDAwMDAwMDAxUTE1MC40NDggODIuNzA0MDAwMDAwMDAwMDEgMTUyLjc1MiA4NC4wMzZRMTU1LjA1NTk5OTk5OTk5OTk4IDg1LjM2OCAxNTYuNzEyIDg3LjI0MDAwMDAwMDAwMDAxTDE1MS44MTYgOTIuNjRRMTUwLjUxOTk5OTk5OTk5OTk4IDkxLjM0NCAxNDguODk5OTk5OTk5OTk5OTggOTAuM1ExNDcuMjggODkuMjU2IDE0NS42MjQgODguNjhRMTQzLjk2OCA4OC4xMDQgMTQyLjUyOCA4OC4xMDRRMTQxLjE2IDg4LjEwNCAxNDAuMDc5OTk5OTk5OTk5OTggODguMzU2UTEzOS4wIDg4LjYwOCAxMzguMjggODkuMTEyUTEzNy41NiA4OS42MTYgMTM3LjE2NCA5MC4zNzJRMTM2Ljc2OCA5MS4xMjggMTM2Ljc2OCA5Mi4wNjQwMDAwMDAwMDAwMVExMzYuODQgOTMuMCAxMzcuMjM2IDkzLjc1NlExMzcuNjMyIDk0LjUxMiAxMzguMzUyIDk1LjAxNlExMzkuMDcyIDk1LjUyMDAwMDAwMDAwMDAxIDE0MC42NTYgOTYuMTY4UTE0Mi4yNCA5Ni44MTYgMTQ0Ljc2IDk3LjM5MlExNDguMjg4IDk4LjMyOCAxNTAuNjY0IDk5LjQ4UTE1My4wNCAxMDAuNjMyIDE1NC40MDggMTAyLjE0NFExNTUuNzc2IDEwMy40NCAxNTYuMzUyIDEwNS4xNjhRMTU2LjkyOCAxMDYuODk2IDE1Ni45MjggMTA5LjA1NlExNTYuOTI4IDExMi40NCAxNTUuMDE5OTk5OTk5OTk5OTggMTE1LjA2OFExNTMuMTEyIDExNy42OTYgMTQ5Ljg3MiAxMTkuMjA4UTE0Ni42MzIgMTIwLjcyIDE0Mi41MjggMTIwLjcyWk0xODEuOTgzOTk5OTk5OTk5OTggMTIwLjcyUTE3Ni4yOTYgMTIwLjcyIDE3MS44MzIgMTE4LjE2NFExNjcuMzY4IDExNS42MDggMTY0LjgxMTk5OTk5OTk5OTk4IDExMS4xNDRRMTYyLjI1NTk5OTk5OTk5OTk3IDEwNi42OCAxNjIuMjU1OTk5OTk5OTk5OTcgMTAwLjk5MlExNjIuMjU1OTk5OTk5OTk5OTcgOTUuMzA0IDE2NC44MTE5OTk5OTk5OTk5OCA5MC44NFExNjcuMzY4IDg2LjM3NiAxNzEuODMyIDgzLjgyMDAwMDAwMDAwMDAxUTE3Ni4yOTYgODEuMjY0MDAwMDAwMDAwMDEgMTgxLjk4Mzk5OTk5OTk5OTk4IDgxLjI2NDAwMDAwMDAwMDAxUTE4Ny41OTk5OTk5OTk5OTk5NyA4MS4yNjQwMDAwMDAwMDAwMSAxOTIuMDYzOTk5OTk5OTk5OTYgODMuODIwMDAwMDAwMDAwMDFRMTk2LjUyNzk5OTk5OTk5OTk2IDg2LjM3NiAxOTkuMDgzOTk5OTk5OTk5OTcgOTAuODRRMjAxLjY0IDk1LjMwNCAyMDEuNjQgMTAwLjk5MlEyMDEuNjQgMTA2LjY4IDE5OS4wODM5OTk5OTk5OTk5NyAxMTEuMTQ0UTE5Ni41Mjc5OTk5OTk5OTk5NiAxMTUuNjA4IDE5Mi4wNjM5OTk5OTk5OTk5NiAxMTguMTY0UTE4Ny41OTk5OTk5OTk5OTk5NyAxMjAuNzIgMTgxLjk4Mzk5OTk5OTk5OTk4IDEyMC43MlpNMTgxLjk4Mzk5OTk5OTk5OTk4IDExMi44NzJRMTg1LjA3OTk5OTk5OTk5OTk4IDExMi44NzIgMTg3LjUyNzk5OTk5OTk5OTk2IDExMS4zMjRRMTg5Ljk3NTk5OTk5OTk5OTk3IDEwOS43NzYgMTkxLjM4IDEwNy4wNzZRMTkyLjc4NCAxMDQuMzc2IDE5Mi43MTIgMTAwLjk5MlExOTIuNzg0IDk3LjUzNiAxOTEuMzggOTQuODM2UTE4OS45NzU5OTk5OTk5OTk5NyA5Mi4xMzYgMTg3LjUyNzk5OTk5OTk5OTk2IDkwLjYyNFExODUuMDc5OTk5OTk5OTk5OTggODkuMTEyIDE4MS45ODM5OTk5OTk5OTk5OCA4OS4xMTJRMTc4Ljg4Nzk5OTk5OTk5OTk4IDg5LjExMiAxNzYuNDA0IDkwLjY2UTE3My45MiA5Mi4yMDggMTcyLjU1MTk5OTk5OTk5OTk2IDk0LjkwOFExNzEuMTgzOTk5OTk5OTk5OTcgOTcuNjA4IDE3MS4xODM5OTk5OTk5OTk5NyAxMDAuOTkyUTE3MS4xODM5OTk5OTk5OTk5NyAxMDQuMzc2IDE3Mi41NTE5OTk5OTk5OTk5NiAxMDcuMDc2UTE3My45MiAxMDkuNzc2IDE3Ni40MDQgMTExLjMyNFExNzguODg3OTk5OTk5OTk5OTggMTEyLjg3MiAxODEuOTgzOTk5OTk5OTk5OTggMTEyLjg3MlpNMjIyLjczNiAxMjAuNzJRMjE4LjYzMTk5OTk5OTk5OTk4IDEyMC43MiAyMTUuNjQzOTk5OTk5OTk5OTggMTE4Ljg0OFEyMTIuNjU1OTk5OTk5OTk5OTggMTE2Ljk3NiAyMTEuMDM1OTk5OTk5OTk5OTcgMTEzLjU5MlEyMDkuNDE1OTk5OTk5OTk5OTcgMTEwLjIwOCAyMDkuNDE1OTk5OTk5OTk5OTcgMTA1LjQ1NlY4Mi4wNTYwMDAwMDAwMDAwMUgyMTguMlYxMDMuNTg0UTIxOC4yIDEwOC4wNDggMjIwLjMyMzk5OTk5OTk5OTk4IDExMC42NFEyMjIuNDQ3OTk5OTk5OTk5OTggMTEzLjIzMiAyMjYuMjYzOTk5OTk5OTk5OTggMTEzLjIzMlEyMjguMTM1OTk5OTk5OTk5OTcgMTEzLjIzMiAyMjkuNjgzOTk5OTk5OTk5OTcgMTEyLjYyUTIzMS4yMzE5OTk5OTk5OTk5NyAxMTIuMDA4IDIzMi4zODM5OTk5OTk5OTk5NiAxMTAuODkyUTIzMy41MzU5OTk5OTk5OTk5NyAxMDkuNzc2IDIzNC4xODM5OTk5OTk5OTk5NyAxMDguMTkyMDAwMDAwMDAwMDFRMjM0LjgzMTk5OTk5OTk5OTk3IDEwNi42MDggMjM0LjgzMTk5OTk5OTk5OTk3IDEwNC44MDhWODIuMDU2MDAwMDAwMDAwMDFIMjQzLjYxNTk5OTk5OTk5OTk5VjEyMC4wSDIzNS4wNDc5OTk5OTk5OTk5N0wyMzQuOTAzOTk5OTk5OTk5OTcgMTEyLjA4TDIzNi40ODc5OTk5OTk5OTk5NyAxMTEuMjE2MDAwMDAwMDAwMDFRMjM1LjYyMzk5OTk5OTk5OTk3IDExMy44OCAyMzMuNTcxOTk5OTk5OTk5OTcgMTE2LjAzOTk5OTk5OTk5OTk5UTIzMS41MTk5OTk5OTk5OTk5OCAxMTguMiAyMjguNzEyIDExOS40NjAwMDAwMDAwMDAwMVEyMjUuOTAzOTk5OTk5OTk5OTcgMTIwLjcyIDIyMi43MzYgMTIwLjcyWk0yNTQuMDU1OTk5OTk5OTk5OTUgMTIwLjBWODIuMDU2MDAwMDAwMDAwMDFIMjYyLjY5NTk5OTk5OTk5OTk3TDI2Mi44NCA5NC4xNTJMMjYxLjY4Nzk5OTk5OTk5OTkzIDkxLjQxNlEyNjIuNDc5OTk5OTk5OTk5OTYgODguNTM2IDI2NC40MjQgODYuMjMyUTI2Ni4zNjc5OTk5OTk5OTk5NCA4My45MjggMjY4LjkyNCA4Mi41OTZRMjcxLjQ3OTk5OTk5OTk5OTk2IDgxLjI2NDAwMDAwMDAwMDAxIDI3NC4yMTU5OTk5OTk5OTk5NSA4MS4yNjQwMDAwMDAwMDAwMVEyNzUuNDM5OTk5OTk5OTk5OTQgODEuMjY0MDAwMDAwMDAwMDEgMjc2LjU1NTk5OTk5OTk5OTkgODEuNDhRMjc3LjY3MTk5OTk5OTk5OTk3IDgxLjY5NiAyNzguMzkxOTk5OTk5OTk5OTQgODEuOTg0MDAwMDAwMDAwMDFMMjc2LjA4Nzk5OTk5OTk5OTk3IDkxLjYzMlEyNzUuMjIzOTk5OTk5OTk5OTMgOTEuMiAyNzQuMTA3OTk5OTk5OTk5OTUgOTAuOTQ4MDAwMDAwMDAwMDFRMjcyLjk5MTk5OTk5OTk5OTk2IDkwLjY5NiAyNzEuODQgOTAuNjk2UTI2OS45Njc5OTk5OTk5OTk5NiA5MC42OTYgMjY4LjM0Nzk5OTk5OTk5OTk2IDkxLjM4UTI2Ni43Mjc5OTk5OTk5OTk5NSA5Mi4wNjQwMDAwMDAwMDAwMSAyNjUuNTM5OTk5OTk5OTk5OTYgOTMuMjg4MDAwMDAwMDAwMDFRMjY0LjM1MiA5NC41MTIgMjYzLjYzMTk5OTk5OTk5OTk1IDk2LjEzMlEyNjIuOTEyIDk3Ljc1MjAwMDAwMDAwMDAxIDI2Mi45MTIgOTkuNjk2VjEyMC4wWiIgZmlsbD0iI0ZGRkZGRiIvPjxwYXRoIGQ9Ik0zMjkuMzIxOTIgMTM4Ljk3MzQ0UTMyNS45MDA0Nzk5OTk5OTk5NiAxMzguOTczNDQgMzIxLjkzNDcxOTk5OTk5OTk3IDEzNy42OTA0UTMxNy45Njg5NTk5OTk5OTk5IDEzNi40MDczNiAzMTQuMzkxOTk5OTk5OTk5OTQgMTMzLjM3NDcyTDMxNy44MTM0Mzk5OTk5OTk5NiAxMjYuNjg3MzZRMzIwLjM3OTUxOTk5OTk5OTk2IDEyNy42OTgyNCAzMjIuOTA2NzE5OTk5OTk5OTUgMTI4LjI0MjU2UTMyNS40MzM5MTk5OTk5OTk5NCAxMjguNzg2ODggMzI3LjQ1NTY4IDEyOC43ODY4OFEzMzIuMDQzNTE5OTk5OTk5OTQgMTI4Ljc4Njg4IDMzNS4zNDgzMTk5OTk5OTk5NCAxMjYuOTU5NTJRMzM4LjY1MzExOTk5OTk5OTk0IDEyNS4xMzIxNiAzNDAuNTE5MzU5OTk5OTk5OTUgMTIxLjg2NjI0UTM0Mi4zODU1OTk5OTk5OTk5NSAxMTguNjAwMzIgMzQyLjM4NTU5OTk5OTk5OTk1IDExNC4xNjhRMzQyLjM4NTU5OTk5OTk5OTk1IDExMi4wNjg0OCAzNDEuNDUyNDc5OTk5OTk5OSAxMDkuODkxMlEzNDAuNTE5MzU5OTk5OTk5OTUgMTA3LjcxMzkyIDMzOC4zMDMxOTk5OTk5OTk5NSAxMDQuNTY0NjRRMzM2LjA4NzAzOTk5OTk5OTk0IDEwMS40MTUzNTk5OTk5OTk5OSAzMzIuMTIxMjc5OTk5OTk5OTYgOTYuNjcyTDM0MC4xMzA1NTk5OTk5OTk5NSA4Ni43OTY0OFEzNDQuMjUxODM5OTk5OTk5OTYgOTIuMzk1MTk5OTk5OTk5OTkgMzQ2Ljc3OTAzOTk5OTk5OTk1IDk2Ljk0NDE2UTM0OS4zMDYyMzk5OTk5OTk5NSAxMDEuNDkzMTIgMzUwLjUxMTUxOTk5OTk5OTk2IDEwNS41MzY2NFEzNTEuNzE2OCAxMDkuNTgwMTYgMzUxLjcxNjggMTEzLjcwMTQ0UTM1MS43MTY4IDExNi43MzQwOCAzNTAuOTM5MTk5OTk5OTk5OTcgMTIwLjE5NDRRMzUwLjE2MTU5OTk5OTk5OTk2IDEyMy42NTQ3MiAzNDguNTI4NjQgMTI2Ljk1OTUyUTM0Ni44OTU2Nzk5OTk5OTk5NyAxMzAuMjY0MzIgMzQ0LjI1MTgzOTk5OTk5OTk2IDEzMi45ODU5MlEzNDEuNjA3OTk5OTk5OTk5OTUgMTM1LjcwNzUyIDMzNy44NzU1MTk5OTk5OTk5NCAxMzcuMzQwNDhRMzM0LjE0MzAzOTk5OTk5OTkgMTM4Ljk3MzQ0IDMyOS4zMjE5MiAxMzguOTczNDRaTTM3MS4zMTIzMTk5OTk5OTk5NCAxMzcuODg0OFEzNjcuNjU3NTk5OTk5OTk5OTUgMTM3Ljg4NDggMzYzLjU3NTE5OTk5OTk5OTk0IDEzNi42MDE3NlEzNTkuNDkyNzk5OTk5OTk5OTMgMTM1LjMxODcyIDM1NS45MTU4Mzk5OTk5OTk5NSAxMzIuMjg2MDhMMzU5LjMzNzI3OTk5OTk5OTk2IDEyNS40NDMyUTM2MS44MjU1OTk5OTk5OTk5NSAxMjYuMjk4NTYgMzY0LjQ2OTQzOTk5OTk5OTk2IDEyNi44NDI4ODAwMDAwMDAwMVEzNjcuMTEzMjggMTI3LjM4NzIgMzY5LjM2ODMxOTk5OTk5OTkgMTI3LjM4NzJRMzc0LjM0NDk1OTk5OTk5OTk2IDEyNy4zODcyIDM3Ny42ODg2Mzk5OTk5OTk5NiAxMjUuNDA0MzIwMDAwMDAwMDFRMzgxLjAzMjMxOTk5OTk5OTk3IDEyMy40MjE0NCAzODIuNjY1Mjc5OTk5OTk5OTQgMTIwLjBIMzc3LjY4ODYzOTk5OTk5OTk2UTM3Mi44Njc1MTk5OTk5OTk5NiAxMjAuMCAzNjkuNTIzODM5OTk5OTk5OTUgMTE5LjAyNzk5OTk5OTk5OTk5UTM2Ni4xODAxNTk5OTk5OTk5NCAxMTguMDU2IDM2NC4xMTk1MTk5OTk5OTk5NyAxMTYuMzA2NFEzNjIuMDU4ODc5OTk5OTk5OTMgMTE0LjU1NjggMzYxLjEyNTc1OTk5OTk5OTkgMTEyLjE4NTEyUTM2MC4xOTI2Mzk5OTk5OTk5IDEwOS44MTM0NCAzNjAuMTkyNjM5OTk5OTk5OSAxMDcuMDE0MDc5OTk5OTk5OTlRMzYwLjE5MjYzOTk5OTk5OTkgMTAyLjgxNTA0IDM2MS41MTQ1NTk5OTk5OTk5NiA5OS4yNzY5NlEzNjIuODM2NDc5OTk5OTk5OTQgOTUuNzM4ODggMzY1LjEzMDM5OTk5OTk5OTk1IDkzLjEzMzkxOTk5OTk5OTk5UTM2Ny40MjQzMTk5OTk5OTk5NyA5MC41Mjg5NiAzNzAuMzc5MTk5OTk5OTk5OTcgODkuMTI5MjhRMzczLjMzNDA4IDg3LjcyOTYgMzc2LjUyMjIzOTk5OTk5OTk1IDg3LjcyOTZRMzgxLjI2NTU5OTk5OTk5OTk1IDg3LjcyOTYgMzg0LjY0ODE1OTk5OTk5OTk2IDkwLjA2MjRRMzg4LjAzMDcyIDkyLjM5NTE5OTk5OTk5OTk5IDM5MC4xMzAyMzk5OTk5OTk5NiA5Ni41MTY0OFEzOTIuMjI5NzU5OTk5OTk5OTQgMTAwLjYzNzc2IDM5Mi45Mjk1OTk5OTk5OTk5NCAxMDYuMDgwOTZRMzkzLjA4NTExOTk5OTk5OTk2IDEwNi45MzYzMiAzOTMuMjAxNzU5OTk5OTk5OSAxMDcuODY5NDRRMzkzLjMxODM5OTk5OTk5OTk0IDEwOC44MDI1NiAzOTMuMzE4Mzk5OTk5OTk5OTQgMTA5LjgxMzQ0SDM5Ny45MDYyMzk5OTk5OTk5N1YxMjAuMEgzOTIuMzg1Mjc5OTk5OTk5OTdRMzkxLjQ1MjE1OTk5OTk5OTk0IDEyMy4xODgxNiAzODkuNzgwMzE5OTk5OTk5OTYgMTI2LjMzNzQzOTk5OTk5OTk5UTM4OC4xMDg0Nzk5OTk5OTk5MyAxMjkuNDg2NzIgMzg1LjU0MjM5OTk5OTk5OTkzIDEzMi4xMzA1NlEzODIuOTc2MzE5OTk5OTk5OTMgMTM0Ljc3NDQgMzc5LjQzODIzOTk5OTk5OTk1IDEzNi4zMjk2MDAwMDAwMDAwM1EzNzUuOTAwMTU5OTk5OTk5OTcgMTM3Ljg4NDggMzcxLjMxMjMxOTk5OTk5OTk0IDEzNy44ODQ4Wk0zNzcuNjg4NjM5OTk5OTk5OTYgMTA5LjgxMzQ0SDM4My44MzE2Nzk5OTk5OTk5NVEzODMuNzUzOTE5OTk5OTk5OTQgMTA5LjExMzU5OTk5OTk5OTk5IDM4My42NzYxNiAxMDguNDkxNTJRMzgzLjU5ODM5OTk5OTk5OTk3IDEwNy44Njk0NCAzODMuNTIwNjM5OTk5OTk5OTYgMTA3LjMyNTEyUTM4My4wNTQwNzk5OTk5OTk5NCAxMDQuNjgxMjggMzgxLjkyNjU1OTk5OTk5OTk0IDEwMi41NDI4OFEzODAuNzk5MDM5OTk5OTk5OTMgMTAwLjQwNDQ3OTk5OTk5OTk5IDM3OS4yODI3MTk5OTk5OTk5IDk5LjE2MDMxOTk5OTk5OTk4UTM3Ny43NjY0IDk3LjkxNjE1OTk5OTk5OTk5IDM3NS45MDAxNTk5OTk5OTk5NyA5Ny45MTYxNTk5OTk5OTk5OVEzNzQuMTg5NDM5OTk5OTk5OTMgOTcuOTE2MTU5OTk5OTk5OTkgMzcyLjc4OTc1OTk5OTk5OTk0IDk4LjkyNzAzOTk5OTk5OTk5UTM3MS4zOTAwNzk5OTk5OTk5NSA5OS45Mzc5MTk5OTk5OTk5OSAzNzAuNTczNTk5OTk5OTk5OTQgMTAxLjYwOTc2UTM2OS43NTcxMTk5OTk5OTk5MyAxMDMuMjgxNiAzNjkuNzU3MTE5OTk5OTk5OTMgMTA1LjIyNTZRMzY5Ljc1NzExOTk5OTk5OTkzIDEwNi41NDc1MTk5OTk5OTk5OSAzNzAuNDU2OTYgMTA3LjU1ODM5OTk5OTk5OTk5UTM3MS4xNTY4IDEwOC41NjkyNzk5OTk5OTk5OSAzNzIuODY3NTE5OTk5OTk5OTYgMTA5LjE5MTM2UTM3NC41NzgyMzk5OTk5OTk5NCAxMDkuODEzNDQgMzc3LjY4ODYzOTk5OTk5OTk2IDEwOS44MTM0NFpNNDQ5Ljc3MjE2IDEyMC4wUTQ0NC45NTEwNCAxMjAuMCA0NDEuNDkwNzIgMTE5LjA2Njg4UTQzOC4wMzA0IDExOC4xMzM3NiA0MzUuNTgwOTYgMTE2LjgxMTgzOTk5OTk5OTk5UTQzMy4xMzE1MTk5OTk5OTk5NyAxMTUuNDg5OTIgNDMxLjE4NzUxOTk5OTk5OTk1IDExNC4yNDU3Nkw0MzYuNzA4NDc5OTk5OTk5OTUgMTA3LjYzNjE2UTQ0MC43NTE5OTk5OTk5OTk5NSAxMDkuODEzNDQgNDQ3LjEyODMyIDEwOS44MTM0NEg0NTcuMDAzODM5OTk5OTk5OTdRNDU2LjQ1OTUyIDEwNy40MDI4OCA0NTUuNzk4NTU5OTk5OTk5OTUgMTA1LjM4MTEyUTQ1NS4xMzc1OTk5OTk5OTk5NiAxMDMuMzU5MzYgNDU0LjI4MjI0IDEwMS4xODIwNzk5OTk5OTk5OFE0NTMuNDI2ODggOTkuMDA0Nzk5OTk5OTk5OTkgNDUyLjEwNDk2IDk2LjIwNTQ0TDQ2NC4wMDIyNCA4OC4xOTYxNTk5OTk5OTk5OVE0NjQuNzAyMDc5OTk5OTk5OTcgOTMuMDE3MjggNDY1LjEyOTc2IDk4LjE0OTQ0UTQ2NS41NTc0NCAxMDMuMjgxNiA0NjUuMTY4NjQgMTA4LjcyNDhRNDY0Ljc3OTg0IDExNC4xNjggNDYyLjk5MTM2IDEyMC4wWk0zOTcuOTA2MjM5OTk5OTk5OTcgMTIwLjBWMTA5LjgxMzQ0SDQwNi42OTMxMTk5OTk5OTk5NlE0MDcuMjM3NDQgMTA4LjI1ODI0IDQwNy42NjUxMiAxMDYuMTU4NzJRNDA4LjA5Mjc5OTk5OTk5OTk1IDEwNC4wNTkyIDQwOC4yNDgzMTk5OTk5OTk5IDEwMS43MjY0UTQwOC40MDM4Mzk5OTk5OTk5NSA5OS4zOTM1OTk5OTk5OTk5OSA0MDguMzI2MDggOTcuMDYwOEw0MjAuNjEyMTU5OTk5OTk5OTYgOTIuNzgzOTk5OTk5OTk5OTlRNDE5LjY3OTA0IDk3LjYwNTEyIDQxOC43MDcwNCAxMDEuMjIwOTU5OTk5OTk5OTlRNDE3LjczNTAzOTk5OTk5OTk3IDEwNC44MzY4IDQxNi41Mjk3NiAxMDcuODY5NDRRNDE1LjMyNDQ4IDExMC45MDIwOCA0MTMuNzMwNCAxMTMuNzc5MlE0MTIuMTM2MzE5OTk5OTk5OTYgMTE2LjY1NjMyIDQwOS44ODEyNzk5OTk5OTk5NSAxMjAuMFpNNDIzLjMzMzc2IDEyMC4wUTQxOC4yNzkzNiAxMjAuMCA0MTQuNTg1NzYgMTE5LjA2Njg4UTQxMC44OTIxNiAxMTguMTMzNzYgNDA4LjQ4MTU5OTk5OTk5OTk2IDExNi44NTA3MlE0MDYuMDcxMDQgMTE1LjU2NzY4IDQwNC42NzEzNiAxMTQuNTU2OEw0MDkuMTAzNjggMTA3LjI0NzM2UTQxMS4yMDMyIDEwOC40MTM3NiA0MTQuMDgwMzIgMTA5LjExMzU5OTk5OTk5OTk5UTQxNi45NTc0Mzk5OTk5OTk5NiAxMDkuODEzNDQgNDIwLjM3ODg4IDEwOS44MTM0NEg0MjguMzEwMzk5OTk5OTk5OTZRNDI4Ljg1NDcyIDEwOC40OTE1MiA0MjkuMjgyMzk5OTk5OTk5OTQgMTA2LjM1MzExOTk5OTk5OTk5UTQyOS43MTAwNzk5OTk5OTk5NSAxMDQuMjE0NzIgNDI5LjkwNDQ3OTk5OTk5OTkgMTAxLjgwNDE2UTQzMC4wOTg4Nzk5OTk5OTk5NSA5OS4zOTM1OTk5OTk5OTk5OSA0MzAuMDIxMTIgOTcuMDYwOEw0NDIuMzA3MTk5OTk5OTk5OTcgOTIuNzgzOTk5OTk5OTk5OTlRNDQxLjI5NjMyIDk3LjYwNTEyIDQ0MC4zMjQzMTk5OTk5OTk5NCAxMDEuMjIwOTU5OTk5OTk5OTlRNDM5LjM1MjMxOTk5OTk5OTk2IDEwNC44MzY4IDQzOC4xODU5MTk5OTk5OTk5NSAxMDcuODY5NDRRNDM3LjAxOTUxOTk5OTk5OTk0IDExMC45MDIwOCA0MzUuMzg2NTU5OTk5OTk5OSAxMTMuNzc5MlE0MzMuNzUzNTk5OTk5OTk5OTUgMTE2LjY1NjMyIDQzMS41NzYzMTk5OTk5OTk5NSAxMjAuMFpNNDcyLjQwMDMxOTk5OTk5OTk3IDEyMC4wUTQ2OC42Njc4Mzk5OTk5OTk5NiAxMjAuMCA0NjUuNjc0MDggMTE5LjM3NzkyUTQ2Mi42ODAzMiAxMTguNzU1ODQgNDYwLjM4NjQgMTE3Ljc4Mzg0UTQ1OC4wOTI0Nzk5OTk5OTk5NyAxMTYuODExODQgNDU2LjMwNCAxMTUuODAwOTZMNDYwLjM0NzUyIDEwOC4wMjQ5NlE0NjEuMjgwNjM5OTk5OTk5OTUgMTA4LjQ5MTUyIDQ2Mi40MDgxNTk5OTk5OTk5NSAxMDguODAyNTZRNDYzLjUzNTY3OTk5OTk5OTk2IDEwOS4xMTM1OTk5OTk5OTk5OSA0NjQuNzQwOTYgMTA5LjM0Njg4UTQ2NS45NDYyNCAxMDkuNTgwMTYgNDY3LjI2ODE1OTk5OTk5OTk3IDEwOS42OTY4UTQ2OC41OTAwNzk5OTk5OTk5NCAxMDkuODEzNDQgNDY5Ljk4OTc2IDEwOS44MTM0NEg0NzIuOTQ0NjRWMTIwLjBaTTM5Ny45MDYyMzk5OTk5OTk5NyAxMDkuODEzNDRIMzk4LjY4Mzg0VjEyMC4wSDM5Ny45MDYyMzk5OTk5OTk5N1EzOTUuNTczNDM5OTk5OTk5OTUgMTIwLjAgMzk1LjU3MzQzOTk5OTk5OTk1IDExNC44Njc4NFEzOTUuNTczNDM5OTk5OTk5OTUgMTA5LjgxMzQ0IDM5Ny45MDYyMzk5OTk5OTk5NyAxMDkuODEzNDRaTTQ3Mi45NDQ2Mzk5OTk5OTk5NCAxMjAuMFYxMDkuODEzNDRINDc0Ljk2NjM5OTk5OTk5OTlRNDgyLjEyMDMxOTk5OTk5OTk0IDEwOS44MTM0NCA0ODcuMTM1ODM5OTk5OTk5OSAxMDkuMzg1NzZRNDkyLjE1MTM1OTk5OTk5OTk1IDEwOC45NTgwOCA0OTUuNjg5NDM5OTk5OTk5OTMgMTA4LjE4MDQ3OTk5OTk5OTk5UTQ5OS4yMjc1MTk5OTk5OTk5IDEwNy40MDI4OCA1MDEuOTEwMjM5OTk5OTk5OTMgMTA2LjIzNjQ4UTUwNC41OTI5NTk5OTk5OTk5NSAxMDUuMDcwMDc5OTk5OTk5OTkgNTA3LjA4MTI3OTk5OTk5OTk0IDEwMy42NzA0UTUwNy43MDMzNTk5OTk5OTk5IDEwMy4yODE2IDUwOC4yODY1NTk5OTk5OTk5IDEwMy4wMDk0NFE1MDguODY5NzU5OTk5OTk5OSAxMDIuNzM3MjggNTA5LjQxNDA3OTk5OTk5OTkgMTAyLjQyNjI0UTUwOS45NTgzOTk5OTk5OTk5IDEwMi4xMTUyIDUxMC41MDI3MTk5OTk5OTk5NSAxMDEuODgxOTJRNTA3LjU0NzgzOTk5OTk5OTk1IDEwMC42Mzc3NiA1MDQuOTgxNzU5OTk5OTk5OTUgOTkuMzkzNTk5OTk5OTk5OTlRNTAyLjQxNTY3OTk5OTk5OTk1IDk4LjE0OTQ0IDUwMC4wMDUxMTk5OTk5OTk5IDk3LjEzODU2UTQ5Ny41OTQ1NTk5OTk5OTk5NCA5Ni4xMjc2OCA0OTUuMzM5NTE5OTk5OTk5OTQgOTUuNTA1NlE0OTMuMDg0NDc5OTk5OTk5OSA5NC44ODM1MiA0OTAuOTA3MTk5OTk5OTk5OTMgOTQuODgzNTJRNDg4LjU3NDM5OTk5OTk5OTkgOTQuODgzNTIgNDg2LjI4MDQ3OTk5OTk5OTkgOTYuMTY2NTZRNDgzLjk4NjU1OTk5OTk5OTk0IDk3LjQ0OTYgNDgxLjczMTUxOTk5OTk5OTkzIDEwMS4xMDQzMkw0NzQuODg4NjM5OTk5OTk5OTUgOTcuNTI3MzZRNDc3LjIyMTQzOTk5OTk5OTkgOTIuNjI4NDggNDgwLjA1OTY3OTk5OTk5OTk2IDg5Ljc5MDI0UTQ4Mi44OTc5MTk5OTk5OTk5NCA4Ni45NTIgNDg2LjA0NzIgODUuNzg1NTk5OTk5OTk5OTlRNDg5LjE5NjQ3OTk5OTk5OTk1IDg0LjYxOTE5OTk5OTk5OTk5IDQ5Mi4zMDY4Nzk5OTk5OTk5IDg0LjYxOTE5OTk5OTk5OTk5UTQ5Ni4zNTAzOTk5OTk5OTk5IDg0LjYxOTE5OTk5OTk5OTk5IDQ5OS44NDk1OTk5OTk5OTk5IDg1LjkwMjI0UTUwMy4zNDg3OTk5OTk5OTk5IDg3LjE4NTI4IDUwNi41MzY5NTk5OTk5OTk5IDg5LjA5MDRRNTA5LjcyNTExOTk5OTk5OTk1IDkwLjk5NTUyIDUxMi43OTY2NCA5Mi45MDA2NFE1MTUuODY4MTYgOTQuODA1NzU5OTk5OTk5OTkgNTE4LjkzOTY4IDk2LjEyNzY4UTUyMi4wMTExOTk5OTk5OTk5IDk3LjQ0OTYgNTI1LjI3NzEyIDk3LjM3MTgzOTk5OTk5OTk5TDUyNS4xMjE2IDEwNi4zMTQyNFE1MjMuMDIyMDggMTA2LjU0NzUxOTk5OTk5OTk5IDUxOS45MTE2Nzk5OTk5OTk5IDEwNy44MzA1NTk5OTk5OTk5OVE1MTYuODAxMjc5OTk5OTk5OSAxMDkuMTEzNTk5OTk5OTk5OTkgNTEyLjc1Nzc2IDExMS4yOTA4OFE1MDkuODAyODc5OTk5OTk5OTYgMTEyLjc2ODMyIDUwNi40OTgwNzk5OTk5OTk5NiAxMTQuMzIzNTJRNTAzLjE5MzI3OTk5OTk5OTk2IDExNS44Nzg3MiA0OTguODM4NzE5OTk5OTk5OTcgMTE3LjE2MTc2UTQ5NC40ODQxNTk5OTk5OTk5IDExOC40NDQ4IDQ4OC40OTY2Mzk5OTk5OTk5NiAxMTkuMjIyNFE0ODIuNTA5MTE5OTk5OTk5OTQgMTIwLjAgNDc0LjM0NDMxOTk5OTk5OTkgMTIwLjBaTTQ3Mi45NDQ2Mzk5OTk5OTk5NCAxMDkuODEzNDRINDczLjcyMjIzOTk5OTk5OTk0VjEyMC4wSDQ3Mi45NDQ2Mzk5OTk5OTk5NFE0NzAuNjExODM5OTk5OTk5OSAxMjAuMCA0NzAuNjExODM5OTk5OTk5OSAxMTQuODY3ODRRNDcwLjYxMTgzOTk5OTk5OTkgMTA5LjgxMzQ0IDQ3Mi45NDQ2Mzk5OTk5OTk5NCAxMDkuODEzNDRaTTQ5Ny41MTY3OTk5OTk5OTk5MyAxMzkuOTg0MzIgNDkwLjIwNzM1OTk5OTk5OTk0IDEzMi41OTcxMiA0OTcuMjA1NzU5OTk5OTk5OTQgMTI1LjIwOTkyIDUwNC41MTUxOTk5OTk5OTk5NCAxMzIuNTk3MTJaIiBmaWxsPSIjRkZGRkZGIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNTQyLjUyLDM1LjA1KSBzY2FsZSg0LjMzMzMpIj48cGF0aCBkPSJNMywxNUE5LDkgMCAwIDEgMjEsMTVMMTgsMTVBNiw2IDAgMCAwIDYsMTVaTTIuMjUsMjAuMjVhMi4yNSwyLjI1IDAgMSwxIDQuNSwwYTIuMjUsMi4yNSAwIDEsMSAtNC41LDBaTTE3LjI1LDIwLjI1YTIuMjUsMi4yNSAwIDEsMSA0LjUsMGEyLjI1LDIuMjUgMCAxLDEgLTQuNSwwWiIgZmlsbD0iI0ZGRkZGRiIvPjwvZz48L3N2Zz4="}, "en": {"light": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NzQgMjAwIiB3aWR0aD0iNjc0IiBoZWlnaHQ9IjIwMCI+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMjcuMDAsMzUuMDUpIHNjYWxlKDQuMzMzMykiPjxwYXRoIGQ9Ik0zLDE1QTksOSAwIDAgMSAyMSwxNUwxOCwxNUE2LDYgMCAwIDAgNiwxNVpNMi4yNSwyMC4yNWEyLjI1LDIuMjUgMCAxLDEgNC41LDBhMi4yNSwyLjI1IDAgMSwxIC00LjUsMFpNMTcuMjUsMjAuMjVhMi4yNSwyLjI1IDAgMSwxIDQuNSwwYTIuMjUsMi4yNSAwIDEsMSAtNC41LDBaIiBmaWxsPSIjMEU3NDkwIi8+PC9nPjxwYXRoIGQ9Ik0xNjMuNDMyMDAwMDAwMDAwMDIgMTIwLjcyUTE2MC45MTIwMDAwMDAwMDAwMyAxMjAuNzIgMTU4LjYwODAwMDAwMDAwMDAzIDEyMC4wNzJRMTU2LjMwNDAwMDAwMDAwMDAzIDExOS40MjQgMTU0LjM2IDExOC4yMzZRMTUyLjQxNjAwMDAwMDAwMDAzIDExNy4wNDggMTUwLjg2ODAwMDAwMDAwMDAyIDExNS4zNTZRMTQ5LjMyMDAwMDAwMDAwMDAyIDExMy42NjQgMTQ4LjI0IDExMS41NzZMMTUzLjg1NjAwMDAwMDAwMDAyIDEwNS43NDRRMTU1LjcyOCAxMDguMjY0IDE1Ny4xNjggMTA5LjYzMlExNTguNjA4MDAwMDAwMDAwMDMgMTExLjAgMTU5Ljk3NjAwMDAwMDAwMDAzIDExMS41MDM5OTk5OTk5OTk5OVExNjEuMzQ0MDAwMDAwMDAwMDIgMTEyLjAwOCAxNjMuMDAwMDAwMDAwMDAwMDMgMTEyLjAwOFExNjUuMzA0MDAwMDAwMDAwMDMgMTEyLjAwOCAxNjcuMDY4MDAwMDAwMDAwMDQgMTEwLjkyOFExNjguODMyMDAwMDAwMDAwMDIgMTA5Ljg0OCAxNjkuNzY4MDAwMDAwMDAwMDMgMTA3Ljk3NlExNzAuNzA0IDEwNi4xMDQgMTcwLjcwNCAxMDMuNzI4MDAwMDAwMDAwMDFWNzcuOTUySDE2MS40ODgwMDAwMDAwMDAwM1Y2OS42SDE4Ny42OTYwMDAwMDAwMDAwM1Y3Ny45NTJIMTc5LjkyMDAwMDAwMDAwMDAyVjEwNC42NjRRMTc5LjkyMDAwMDAwMDAwMDAyIDEwOC4xOTIwMDAwMDAwMDAwMSAxNzguNjk2MDAwMDAwMDAwMDMgMTExLjEwOFExNzcuNDcyMDAwMDAwMDAwMDQgMTE0LjAyNCAxNzUuMjc2IDExNi4xODRRMTczLjA4IDExOC4zNDQgMTcwLjA1NiAxMTkuNTMyUTE2Ny4wMzIgMTIwLjcyIDE2My40MzIwMDAwMDAwMDAwMiAxMjAuNzJaTTIxMC41MiAxMjAuNzJRMjA0LjgzMjAwMDAwMDAwMDAyIDEyMC43MiAyMDAuMzY4IDExOC4xNjRRMTk1LjkwNCAxMTUuNjA4IDE5My4zNDggMTExLjE0NFExOTAuNzkyIDEwNi42OCAxOTAuNzkyIDEwMC45OTJRMTkwLjc5MiA5NS4zMDQgMTkzLjM0OCA5MC44NFExOTUuOTA0IDg2LjM3NiAyMDAuMzY4IDgzLjgyMDAwMDAwMDAwMDAxUTIwNC44MzIwMDAwMDAwMDAwMiA4MS4yNjQwMDAwMDAwMDAwMSAyMTAuNTIgODEuMjY0MDAwMDAwMDAwMDFRMjE2LjEzNjAwMDAwMDAwMDAyIDgxLjI2NDAwMDAwMDAwMDAxIDIyMC42MDAwMDAwMDAwMDAwMiA4My44MjAwMDAwMDAwMDAwMVEyMjUuMDY0MDAwMDAwMDAwMDIgODYuMzc2IDIyNy42MiA5MC44NFEyMzAuMTc2MDAwMDAwMDAwMDIgOTUuMzA0IDIzMC4xNzYwMDAwMDAwMDAwMiAxMDAuOTkyUTIzMC4xNzYwMDAwMDAwMDAwMiAxMDYuNjggMjI3LjYyIDExMS4xNDRRMjI1LjA2NDAwMDAwMDAwMDAyIDExNS42MDggMjIwLjYwMDAwMDAwMDAwMDAyIDExOC4xNjRRMjE2LjEzNjAwMDAwMDAwMDAyIDEyMC43MiAyMTAuNTIgMTIwLjcyWk0yMTAuNTIgMTEyLjg3MlEyMTMuNjE2IDExMi44NzIgMjE2LjA2NDAwMDAwMDAwMDAyIDExMS4zMjRRMjE4LjUxMiAxMDkuNzc2IDIxOS45MTYgMTA3LjA3NlEyMjEuMzIgMTA0LjM3NiAyMjEuMjQ4MDAwMDAwMDAwMDIgMTAwLjk5MlEyMjEuMzIgOTcuNTM2IDIxOS45MTYgOTQuODM2UTIxOC41MTIgOTIuMTM2IDIxNi4wNjQwMDAwMDAwMDAwMiA5MC42MjRRMjEzLjYxNiA4OS4xMTIgMjEwLjUyIDg5LjExMlEyMDcuNDI0IDg5LjExMiAyMDQuOTQgOTAuNjZRMjAyLjQ1NjAwMDAwMDAwMDAyIDkyLjIwOCAyMDEuMDg4MDAwMDAwMDAwMDIgOTQuOTA4UTE5OS43MiA5Ny42MDggMTk5LjcyIDEwMC45OTJRMTk5LjcyIDEwNC4zNzYgMjAxLjA4ODAwMDAwMDAwMDAyIDEwNy4wNzZRMjAyLjQ1NjAwMDAwMDAwMDAyIDEwOS43NzYgMjA0Ljk0IDExMS4zMjRRMjA3LjQyNCAxMTIuODcyIDIxMC41MiAxMTIuODcyWk0yNTAuNzY4MDAwMDAwMDAwMDMgMTIwLjcyUTI0NS44MDAwMDAwMDAwMDAwNCAxMjAuNzIgMjQxLjgwNDAwMDAwMDAwMDAzIDExOS4wMjc5OTk5OTk5OTk5OVEyMzcuODA4MDAwMDAwMDAwMDIgMTE3LjMzNiAyMzUuMjg4MDAwMDAwMDAwMDQgMTE0LjE2OEwyNDAuOTc2MDAwMDAwMDAwMDMgMTA5LjI3MlEyNDMuMTM2MDAwMDAwMDAwMDIgMTExLjY0OCAyNDUuOCAxMTIuNzY0UTI0OC40NjQwMDAwMDAwMDAwMyAxMTMuODggMjUxLjQxNjAwMDAwMDAwMDAzIDExMy44OFEyNTIuNjQwMDAwMDAwMDAwMDQgMTEzLjg4IDI1My42MTIwMDAwMDAwMDAwMiAxMTMuNTkyUTI1NC41ODQwMDAwMDAwMDAwMyAxMTMuMzA0IDI1NS4zMDQwMDAwMDAwMDAwMyAxMTIuNzI4MDAwMDAwMDAwMDFRMjU2LjAyNDAwMDAwMDAwMDA2IDExMi4xNTIgMjU2LjQyMDAwMDAwMDAwMDEgMTExLjM2UTI1Ni44MTYwMDAwMDAwMDAwMyAxMTAuNTY4IDI1Ni44MTYwMDAwMDAwMDAwMyAxMDkuNjMyUTI1Ni44MTYwMDAwMDAwMDAwMyAxMDcuOTA0IDI1NS41MjAwMDAwMDAwMDAwNCAxMDYuODk2UTI1NC44MDAwMDAwMDAwMDAwNCAxMDYuNDY0IDI1My4yODgwMDAwMDAwMDAwNCAxMDUuODUyUTI1MS43NzYwMDAwMDAwMDAwNCAxMDUuMjQwMDAwMDAwMDAwMDEgMjQ5LjMyODAwMDAwMDAwMDAzIDEwNC42NjRRMjQ1LjQ0MDAwMDAwMDAwMDAzIDEwMy42NTYgMjQyLjgxMiAxMDIuMzI0MDAwMDAwMDAwMDFRMjQwLjE4NDAwMDAwMDAwMDAzIDEwMC45OTIgMjM4Ljc0NDAwMDAwMDAwMDAzIDk5LjMzNlEyMzcuNTIwMDAwMDAwMDAwMDQgOTcuODk2IDIzNi45NDQwMDAwMDAwMDAwMiA5Ni4yMDQwMDAwMDAwMDAwMVEyMzYuMzY4MDAwMDAwMDAwMDIgOTQuNTEyIDIzNi4zNjgwMDAwMDAwMDAwMiA5Mi40MjRRMjM2LjM2ODAwMDAwMDAwMDAyIDg5LjE4NCAyMzguMjc2IDg2LjY2NFEyNDAuMTg0MDAwMDAwMDAwMDMgODQuMTQ0IDI0My4zNTIwMDAwMDAwMDAwMyA4Mi43MDQwMDAwMDAwMDAwMVEyNDYuNTIwMDAwMDAwMDAwMDQgODEuMjY0MDAwMDAwMDAwMDEgMjUwLjQwODAwMDAwMDAwMDA0IDgxLjI2NDAwMDAwMDAwMDAxUTI1My4yODgwMDAwMDAwMDAwNCA4MS4yNjQwMDAwMDAwMDAwMSAyNTUuOTg4MDAwMDAwMDAwMDYgODEuOTg0MDAwMDAwMDAwMDFRMjU4LjY4ODAwMDAwMDAwMDA1IDgyLjcwNDAwMDAwMDAwMDAxIDI2MC45OTIwMDAwMDAwMDAxIDg0LjAzNlEyNjMuMjk2MDAwMDAwMDAwMDUgODUuMzY4IDI2NC45NTIwMDAwMDAwMDAwNiA4Ny4yNDAwMDAwMDAwMDAwMUwyNjAuMDU2MDAwMDAwMDAwMDQgOTIuNjRRMjU4Ljc2MDAwMDAwMDAwMDA1IDkxLjM0NCAyNTcuMTQwMDAwMDAwMDAwMDQgOTAuM1EyNTUuNTIwMDAwMDAwMDAwMDQgODkuMjU2IDI1My44NjQwMDAwMDAwMDAwMyA4OC42OFEyNTIuMjA4MDAwMDAwMDAwMDMgODguMTA0IDI1MC43NjgwMDAwMDAwMDAwMyA4OC4xMDRRMjQ5LjQwMDAwMDAwMDAwMDAzIDg4LjEwNCAyNDguMzIwMDAwMDAwMDAwMDUgODguMzU2UTI0Ny4yNDAwMDAwMDAwMDAwNCA4OC42MDggMjQ2LjUyMDAwMDAwMDAwMDA0IDg5LjExMlEyNDUuODAwMDAwMDAwMDAwMDQgODkuNjE2IDI0NS40MDQwMDAwMDAwMDAwNSA5MC4zNzJRMjQ1LjAwODAwMDAwMDAwMDA0IDkxLjEyOCAyNDUuMDA4MDAwMDAwMDAwMDQgOTIuMDY0MDAwMDAwMDAwMDFRMjQ1LjA4MDAwMDAwMDAwMDA0IDkzLjAgMjQ1LjQ3NjAwMDAwMDAwMDA2IDkzLjc1NlEyNDUuODcyMDAwMDAwMDAwMDQgOTQuNTEyIDI0Ni41OTIwMDAwMDAwMDAwNCA5NS4wMTZRMjQ3LjMxMjAwMDAwMDAwMDA0IDk1LjUyMDAwMDAwMDAwMDAxIDI0OC44OTYwMDAwMDAwMDAwMiA5Ni4xNjhRMjUwLjQ4MDAwMDAwMDAwMDAyIDk2LjgxNiAyNTMuMDAwMDAwMDAwMDAwMDMgOTcuMzkyUTI1Ni41MjggOTguMzI4IDI1OC45MDQgOTkuNDhRMjYxLjI4MDAwMDAwMDAwMDAzIDEwMC42MzIgMjYyLjY0OCAxMDIuMTQ0UTI2NC4wMTYgMTAzLjQ0IDI2NC41OTIgMTA1LjE2OFEyNjUuMTY4IDEwNi44OTYgMjY1LjE2OCAxMDkuMDU2UTI2NS4xNjggMTEyLjQ0IDI2My4yNiAxMTUuMDY4UTI2MS4zNTIwMDAwMDAwMDAwMyAxMTcuNjk2IDI1OC4xMTIgMTE5LjIwOFEyNTQuODcyMDAwMDAwMDAwMDQgMTIwLjcyIDI1MC43NjgwMDAwMDAwMDAwMyAxMjAuNzJaTTI5MC4yMjQgMTIwLjcyUTI4NC41MzYgMTIwLjcyIDI4MC4wNzIgMTE4LjE2NFEyNzUuNjA4IDExNS42MDggMjczLjA1MiAxMTEuMTQ0UTI3MC40OTYgMTA2LjY4IDI3MC40OTYgMTAwLjk5MlEyNzAuNDk2IDk1LjMwNCAyNzMuMDUyIDkwLjg0UTI3NS42MDggODYuMzc2IDI4MC4wNzIgODMuODIwMDAwMDAwMDAwMDFRMjg0LjUzNiA4MS4yNjQwMDAwMDAwMDAwMSAyOTAuMjI0IDgxLjI2NDAwMDAwMDAwMDAxUTI5NS44NCA4MS4yNjQwMDAwMDAwMDAwMSAzMDAuMzA0IDgzLjgyMDAwMDAwMDAwMDAxUTMwNC43NjggODYuMzc2IDMwNy4zMjM5OTk5OTk5OTk5NiA5MC44NFEzMDkuODggOTUuMzA0IDMwOS44OCAxMDAuOTkyUTMwOS44OCAxMDYuNjggMzA3LjMyMzk5OTk5OTk5OTk2IDExMS4xNDRRMzA0Ljc2OCAxMTUuNjA4IDMwMC4zMDQgMTE4LjE2NFEyOTUuODQgMTIwLjcyIDI5MC4yMjQgMTIwLjcyWk0yOTAuMjI0IDExMi44NzJRMjkzLjMyIDExMi44NzIgMjk1Ljc2ODAwMDAwMDAwMDAzIDExMS4zMjRRMjk4LjIxNiAxMDkuNzc2IDI5OS42MiAxMDcuMDc2UTMwMS4wMjQgMTA0LjM3NiAzMDAuOTUyIDEwMC45OTJRMzAxLjAyNCA5Ny41MzYgMjk5LjYyIDk0LjgzNlEyOTguMjE2IDkyLjEzNiAyOTUuNzY4MDAwMDAwMDAwMDMgOTAuNjI0UTI5My4zMiA4OS4xMTIgMjkwLjIyNCA4OS4xMTJRMjg3LjEyOCA4OS4xMTIgMjg0LjY0NCA5MC42NlEyODIuMTU5OTk5OTk5OTk5OTcgOTIuMjA4IDI4MC43OTIgOTQuOTA4UTI3OS40MjQgOTcuNjA4IDI3OS40MjQgMTAwLjk5MlEyNzkuNDI0IDEwNC4zNzYgMjgwLjc5MiAxMDcuMDc2UTI4Mi4xNTk5OTk5OTk5OTk5NyAxMDkuNzc2IDI4NC42NDQgMTExLjMyNFEyODcuMTI4IDExMi44NzIgMjkwLjIyNCAxMTIuODcyWk0zMzAuOTc2IDEyMC43MlEzMjYuODcxOTk5OTk5OTk5OTYgMTIwLjcyIDMyMy44ODM5OTk5OTk5OTk5NiAxMTguODQ4UTMyMC44OTU5OTk5OTk5OTk5NiAxMTYuOTc2IDMxOS4yNzU5OTk5OTk5OTk5NSAxMTMuNTkyUTMxNy42NTYgMTEwLjIwOCAzMTcuNjU2IDEwNS40NTZWODIuMDU2MDAwMDAwMDAwMDFIMzI2LjQ0VjEwMy41ODRRMzI2LjQ0IDEwOC4wNDggMzI4LjU2Mzk5OTk5OTk5OTk2IDExMC42NFEzMzAuNjg4IDExMy4yMzIgMzM0LjUwMzk5OTk5OTk5OTk2IDExMy4yMzJRMzM2LjM3NiAxMTMuMjMyIDMzNy45MjQgMTEyLjYyUTMzOS40NzIgMTEyLjAwOCAzNDAuNjIzOTk5OTk5OTk5OTcgMTEwLjg5MlEzNDEuNzc1OTk5OTk5OTk5OTUgMTA5Ljc3NiAzNDIuNDI0IDEwOC4xOTIwMDAwMDAwMDAwMVEzNDMuMDcyIDEwNi42MDggMzQzLjA3MiAxMDQuODA4VjgyLjA1NjAwMDAwMDAwMDAxSDM1MS44NTZWMTIwLjBIMzQzLjI4OEwzNDMuMTQ0IDExMi4wOEwzNDQuNzI3OTk5OTk5OTk5OTUgMTExLjIxNjAwMDAwMDAwMDAxUTM0My44NjQgMTEzLjg4IDM0MS44MTIgMTE2LjAzOTk5OTk5OTk5OTk5UTMzOS43NiAxMTguMiAzMzYuOTUyIDExOS40NjAwMDAwMDAwMDAwMVEzMzQuMTQ0IDEyMC43MiAzMzAuOTc2IDEyMC43MlpNMzYyLjI5NiAxMjAuMFY4Mi4wNTYwMDAwMDAwMDAwMUgzNzAuOTM2TDM3MS4wOCA5NC4xNTJMMzY5LjkyNzk5OTk5OTk5OTk0IDkxLjQxNlEzNzAuNzE5OTk5OTk5OTk5OTcgODguNTM2IDM3Mi42NjQgODYuMjMyUTM3NC42MDc5OTk5OTk5OTk5NSA4My45MjggMzc3LjE2NCA4Mi41OTZRMzc5LjcxOTk5OTk5OTk5OTk3IDgxLjI2NDAwMDAwMDAwMDAxIDM4Mi40NTU5OTk5OTk5OTk5NiA4MS4yNjQwMDAwMDAwMDAwMVEzODMuNjc5OTk5OTk5OTk5OTUgODEuMjY0MDAwMDAwMDAwMDEgMzg0Ljc5NTk5OTk5OTk5OTk0IDgxLjQ4UTM4NS45MTIgODEuNjk2IDM4Ni42MzE5OTk5OTk5OTk5NSA4MS45ODQwMDAwMDAwMDAwMUwzODQuMzI4IDkxLjYzMlEzODMuNDYzOTk5OTk5OTk5OTQgOTEuMiAzODIuMzQ3OTk5OTk5OTk5OTYgOTAuOTQ4MDAwMDAwMDAwMDFRMzgxLjIzMTk5OTk5OTk5OTk3IDkwLjY5NiAzODAuMDggOTAuNjk2UTM3OC4yMDc5OTk5OTk5OTk5NyA5MC42OTYgMzc2LjU4Nzk5OTk5OTk5OTk3IDkxLjM4UTM3NC45Njc5OTk5OTk5OTk5NiA5Mi4wNjQwMDAwMDAwMDAwMSAzNzMuNzggOTMuMjg4MDAwMDAwMDAwMDFRMzcyLjU5MiA5NC41MTIgMzcxLjg3MTk5OTk5OTk5OTk2IDk2LjEzMlEzNzEuMTUyIDk3Ljc1MjAwMDAwMDAwMDAxIDM3MS4xNTIgOTkuNjk2VjEyMC4wWiIgZmlsbD0iIzE0MjMyQiIvPjxwYXRoIGQ9Ik00MzcuNTYxOTIgMTM4Ljk3MzQ0UTQzNC4xNDA0Nzk5OTk5OTk5NyAxMzguOTczNDQgNDMwLjE3NDcyIDEzNy42OTA0UTQyNi4yMDg5NTk5OTk5OTk5MyAxMzYuNDA3MzYgNDIyLjYzMTk5OTk5OTk5OTk1IDEzMy4zNzQ3Mkw0MjYuMDUzNDM5OTk5OTk5OTcgMTI2LjY4NzM2UTQyOC42MTk1MTk5OTk5OTk5NyAxMjcuNjk4MjQgNDMxLjE0NjcxOTk5OTk5OTk2IDEyOC4yNDI1NlE0MzMuNjczOTE5OTk5OTk5OTUgMTI4Ljc4Njg4IDQzNS42OTU2OCAxMjguNzg2ODhRNDQwLjI4MzUxOTk5OTk5OTk1IDEyOC43ODY4OCA0NDMuNTg4MzE5OTk5OTk5OTUgMTI2Ljk1OTUyUTQ0Ni44OTMxMTk5OTk5OTk5NSAxMjUuMTMyMTYgNDQ4Ljc1OTM1OTk5OTk5OTk2IDEyMS44NjYyNFE0NTAuNjI1NTk5OTk5OTk5OTYgMTE4LjYwMDMyIDQ1MC42MjU1OTk5OTk5OTk5NiAxMTQuMTY4UTQ1MC42MjU1OTk5OTk5OTk5NiAxMTIuMDY4NDggNDQ5LjY5MjQ3OTk5OTk5OTkzIDEwOS44OTEyUTQ0OC43NTkzNTk5OTk5OTk5NiAxMDcuNzEzOTIgNDQ2LjU0MzE5OTk5OTk5OTk2IDEwNC41NjQ2NFE0NDQuMzI3MDM5OTk5OTk5OTUgMTAxLjQxNTM1OTk5OTk5OTk5IDQ0MC4zNjEyNzk5OTk5OTk5NyA5Ni42NzJMNDQ4LjM3MDU1OTk5OTk5OTk1IDg2Ljc5NjQ4UTQ1Mi40OTE4Mzk5OTk5OTk5NyA5Mi4zOTUxOTk5OTk5OTk5OSA0NTUuMDE5MDM5OTk5OTk5OTYgOTYuOTQ0MTZRNDU3LjU0NjIzOTk5OTk5OTk1IDEwMS40OTMxMiA0NTguNzUxNTE5OTk5OTk5OTcgMTA1LjUzNjY0UTQ1OS45NTY4IDEwOS41ODAxNiA0NTkuOTU2OCAxMTMuNzAxNDRRNDU5Ljk1NjggMTE2LjczNDA4IDQ1OS4xNzkyIDEyMC4xOTQ0UTQ1OC40MDE2IDEyMy42NTQ3MiA0NTYuNzY4NjQgMTI2Ljk1OTUyUTQ1NS4xMzU2OCAxMzAuMjY0MzIgNDUyLjQ5MTgzOTk5OTk5OTk3IDEzMi45ODU5MlE0NDkuODQ3OTk5OTk5OTk5OTYgMTM1LjcwNzUyIDQ0Ni4xMTU1MTk5OTk5OTk5NSAxMzcuMzQwNDhRNDQyLjM4MzAzOTk5OTk5OTk0IDEzOC45NzM0NCA0MzcuNTYxOTIgMTM4Ljk3MzQ0Wk00NzkuNTUyMzE5OTk5OTk5OTUgMTM3Ljg4NDhRNDc1Ljg5NzU5OTk5OTk5OTk1IDEzNy44ODQ4IDQ3MS44MTUxOTk5OTk5OTk5NSAxMzYuNjAxNzZRNDY3LjczMjc5OTk5OTk5OTk0IDEzNS4zMTg3MiA0NjQuMTU1ODM5OTk5OTk5OTYgMTMyLjI4NjA4TDQ2Ny41NzcyOCAxMjUuNDQzMlE0NzAuMDY1NTk5OTk5OTk5OTYgMTI2LjI5ODU2IDQ3Mi43MDk0NCAxMjYuODQyODgwMDAwMDAwMDFRNDc1LjM1MzI4IDEyNy4zODcyIDQ3Ny42MDgzMTk5OTk5OTk5NCAxMjcuMzg3MlE0ODIuNTg0OTU5OTk5OTk5OTcgMTI3LjM4NzIgNDg1LjkyODY0IDEyNS40MDQzMjAwMDAwMDAwMVE0ODkuMjcyMzIgMTIzLjQyMTQ0IDQ5MC45MDUyNzk5OTk5OTk5NSAxMjAuMEg0ODUuOTI4NjRRNDgxLjEwNzUxOTk5OTk5OTk3IDEyMC4wIDQ3Ny43NjM4Mzk5OTk5OTk5NiAxMTkuMDI3OTk5OTk5OTk5OTlRNDc0LjQyMDE1OTk5OTk5OTk1IDExOC4wNTYgNDcyLjM1OTUyIDExNi4zMDY0UTQ3MC4yOTg4Nzk5OTk5OTk5NCAxMTQuNTU2OCA0NjkuMzY1NzU5OTk5OTk5OSAxMTIuMTg1MTJRNDY4LjQzMjYzOTk5OTk5OTk0IDEwOS44MTM0NCA0NjguNDMyNjM5OTk5OTk5OTQgMTA3LjAxNDA3OTk5OTk5OTk5UTQ2OC40MzI2Mzk5OTk5OTk5NCAxMDIuODE1MDQgNDY5Ljc1NDU1OTk5OTk5OTk3IDk5LjI3Njk2UTQ3MS4wNzY0Nzk5OTk5OTk5NSA5NS43Mzg4OCA0NzMuMzcwMzk5OTk5OTk5OTYgOTMuMTMzOTE5OTk5OTk5OTlRNDc1LjY2NDMyIDkwLjUyODk2IDQ3OC42MTkyIDg5LjEyOTI4UTQ4MS41NzQwOCA4Ny43Mjk2IDQ4NC43NjIyMzk5OTk5OTk5NiA4Ny43Mjk2UTQ4OS41MDU1OTk5OTk5OTk5NiA4Ny43Mjk2IDQ5Mi44ODgxNTk5OTk5OTk5NyA5MC4wNjI0UTQ5Ni4yNzA3MiA5Mi4zOTUxOTk5OTk5OTk5OSA0OTguMzcwMjM5OTk5OTk5OTcgOTYuNTE2NDhRNTAwLjQ2OTc1OTk5OTk5OTk1IDEwMC42Mzc3NiA1MDEuMTY5NTk5OTk5OTk5OTUgMTA2LjA4MDk2UTUwMS4zMjUxMTk5OTk5OTk5NyAxMDYuOTM2MzIgNTAxLjQ0MTc1OTk5OTk5OTkzIDEwNy44Njk0NFE1MDEuNTU4Mzk5OTk5OTk5OTUgMTA4LjgwMjU2IDUwMS41NTgzOTk5OTk5OTk5NSAxMDkuODEzNDRINTA2LjE0NjI0VjEyMC4wSDUwMC42MjUyOFE0OTkuNjkyMTU5OTk5OTk5OTQgMTIzLjE4ODE2IDQ5OC4wMjAzMTk5OTk5OTk5NyAxMjYuMzM3NDM5OTk5OTk5OTlRNDk2LjM0ODQ3OTk5OTk5OTk0IDEyOS40ODY3MiA0OTMuNzgyMzk5OTk5OTk5OTQgMTMyLjEzMDU2UTQ5MS4yMTYzMTk5OTk5OTk5NCAxMzQuNzc0NCA0ODcuNjc4MjM5OTk5OTk5OTYgMTM2LjMyOTYwMDAwMDAwMDAzUTQ4NC4xNDAxNiAxMzcuODg0OCA0NzkuNTUyMzE5OTk5OTk5OTUgMTM3Ljg4NDhaTTQ4NS45Mjg2NCAxMDkuODEzNDRINDkyLjA3MTY3OTk5OTk5OTk2UTQ5MS45OTM5MTk5OTk5OTk5NSAxMDkuMTEzNTk5OTk5OTk5OTkgNDkxLjkxNjE2IDEwOC40OTE1MlE0OTEuODM4NCAxMDcuODY5NDQgNDkxLjc2MDYzOTk5OTk5OTk3IDEwNy4zMjUxMlE0OTEuMjk0MDc5OTk5OTk5OTUgMTA0LjY4MTI4IDQ5MC4xNjY1NTk5OTk5OTk5NSAxMDIuNTQyODhRNDg5LjAzOTAzOTk5OTk5OTk0IDEwMC40MDQ0Nzk5OTk5OTk5OSA0ODcuNTIyNzE5OTk5OTk5OTQgOTkuMTYwMzE5OTk5OTk5OThRNDg2LjAwNjQgOTcuOTE2MTU5OTk5OTk5OTkgNDg0LjE0MDE2IDk3LjkxNjE1OTk5OTk5OTk5UTQ4Mi40Mjk0Mzk5OTk5OTk5NCA5Ny45MTYxNTk5OTk5OTk5OSA0ODEuMDI5NzU5OTk5OTk5OTUgOTguOTI3MDM5OTk5OTk5OTlRNDc5LjYzMDA3OTk5OTk5OTk2IDk5LjkzNzkxOTk5OTk5OTk5IDQ3OC44MTM1OTk5OTk5OTk5NSAxMDEuNjA5NzZRNDc3Ljk5NzExOTk5OTk5OTk0IDEwMy4yODE2IDQ3Ny45OTcxMTk5OTk5OTk5NCAxMDUuMjI1NlE0NzcuOTk3MTE5OTk5OTk5OTQgMTA2LjU0NzUxOTk5OTk5OTk5IDQ3OC42OTY5NiAxMDcuNTU4Mzk5OTk5OTk5OTlRNDc5LjM5NjggMTA4LjU2OTI3OTk5OTk5OTk5IDQ4MS4xMDc1MTk5OTk5OTk5NyAxMDkuMTkxMzZRNDgyLjgxODIzOTk5OTk5OTk1IDEwOS44MTM0NCA0ODUuOTI4NjQgMTA5LjgxMzQ0Wk01NTguMDEyMTYgMTIwLjBRNTUzLjE5MTAzOTk5OTk5OTkgMTIwLjAgNTQ5LjczMDcyIDExOS4wNjY4OFE1NDYuMjcwNCAxMTguMTMzNzYgNTQzLjgyMDk2IDExNi44MTE4Mzk5OTk5OTk5OVE1NDEuMzcxNTIgMTE1LjQ4OTkyIDUzOS40Mjc1MiAxMTQuMjQ1NzZMNTQ0Ljk0ODQ4IDEwNy42MzYxNlE1NDguOTkyIDEwOS44MTM0NCA1NTUuMzY4MzIgMTA5LjgxMzQ0SDU2NS4yNDM4NFE1NjQuNjk5NTIgMTA3LjQwMjg4IDU2NC4wMzg1NiAxMDUuMzgxMTJRNTYzLjM3NzYgMTAzLjM1OTM2IDU2Mi41MjIyNCAxMDEuMTgyMDc5OTk5OTk5OThRNTYxLjY2Njg4IDk5LjAwNDc5OTk5OTk5OTk5IDU2MC4zNDQ5NiA5Ni4yMDU0NEw1NzIuMjQyMjQgODguMTk2MTU5OTk5OTk5OTlRNTcyLjk0MjA4IDkzLjAxNzI4IDU3My4zNjk3NiA5OC4xNDk0NFE1NzMuNzk3NDM5OTk5OTk5OSAxMDMuMjgxNiA1NzMuNDA4NjM5OTk5OTk5OSAxMDguNzI0OFE1NzMuMDE5ODM5OTk5OTk5OSAxMTQuMTY4IDU3MS4yMzEzNiAxMjAuMFpNNTA2LjE0NjI0IDEyMC4wVjEwOS44MTM0NEg1MTQuOTMzMTJRNTE1LjQ3NzQ0IDEwOC4yNTgyNCA1MTUuOTA1MTIgMTA2LjE1ODcyUTUxNi4zMzI4IDEwNC4wNTkyIDUxNi40ODgzMTk5OTk5OTk5IDEwMS43MjY0UTUxNi42NDM4NCA5OS4zOTM1OTk5OTk5OTk5OSA1MTYuNTY2MDc5OTk5OTk5OSA5Ny4wNjA4TDUyOC44NTIxNiA5Mi43ODM5OTk5OTk5OTk5OVE1MjcuOTE5MDQgOTcuNjA1MTIgNTI2Ljk0NzA0IDEwMS4yMjA5NTk5OTk5OTk5OVE1MjUuOTc1MDQgMTA0LjgzNjggNTI0Ljc2OTc2IDEwNy44Njk0NFE1MjMuNTY0NDggMTEwLjkwMjA4IDUyMS45NzAzOTk5OTk5OTk5IDExMy43NzkyUTUyMC4zNzYzMiAxMTYuNjU2MzIgNTE4LjEyMTI4IDEyMC4wWk01MzEuNTczNzYgMTIwLjBRNTI2LjUxOTM2IDEyMC4wIDUyMi44MjU3NiAxMTkuMDY2ODhRNTE5LjEzMjE2IDExOC4xMzM3NiA1MTYuNzIxNiAxMTYuODUwNzJRNTE0LjMxMTAzOTk5OTk5OTkgMTE1LjU2NzY4IDUxMi45MTEzNiAxMTQuNTU2OEw1MTcuMzQzNjggMTA3LjI0NzM2UTUxOS40NDMxOTk5OTk5OTk5IDEwOC40MTM3NiA1MjIuMzIwMzIgMTA5LjExMzU5OTk5OTk5OTk5UTUyNS4xOTc0NCAxMDkuODEzNDQgNTI4LjYxODg4IDEwOS44MTM0NEg1MzYuNTUwNFE1MzcuMDk0NzE5OTk5OTk5OSAxMDguNDkxNTIgNTM3LjUyMjQgMTA2LjM1MzExOTk5OTk5OTk5UTUzNy45NTAwOCAxMDQuMjE0NzIgNTM4LjE0NDQ3OTk5OTk5OTkgMTAxLjgwNDE2UTUzOC4zMzg4OCA5OS4zOTM1OTk5OTk5OTk5OSA1MzguMjYxMTIgOTcuMDYwOEw1NTAuNTQ3MiA5Mi43ODM5OTk5OTk5OTk5OVE1NDkuNTM2MzE5OTk5OTk5OSA5Ny42MDUxMiA1NDguNTY0MzIgMTAxLjIyMDk1OTk5OTk5OTk5UTU0Ny41OTIzMiAxMDQuODM2OCA1NDYuNDI1OTE5OTk5OTk5OSAxMDcuODY5NDRRNTQ1LjI1OTUyIDExMC45MDIwOCA1NDMuNjI2NTU5OTk5OTk5OSAxMTMuNzc5MlE1NDEuOTkzNiAxMTYuNjU2MzIgNTM5LjgxNjMyIDEyMC4wWk01ODAuNjQwMzIgMTIwLjBRNTc2LjkwNzg0IDEyMC4wIDU3My45MTQwOCAxMTkuMzc3OTJRNTcwLjkyMDMyIDExOC43NTU4NCA1NjguNjI2NCAxMTcuNzgzODRRNTY2LjMzMjQ4IDExNi44MTE4NCA1NjQuNTQ0IDExNS44MDA5Nkw1NjguNTg3NTIgMTA4LjAyNDk2UTU2OS41MjA2NCAxMDguNDkxNTIgNTcwLjY0ODE2IDEwOC44MDI1NlE1NzEuNzc1NjggMTA5LjExMzU5OTk5OTk5OTk5IDU3Mi45ODA5NiAxMDkuMzQ2ODhRNTc0LjE4NjI0IDEwOS41ODAxNiA1NzUuNTA4MTYgMTA5LjY5NjhRNTc2LjgzMDA4IDEwOS44MTM0NCA1NzguMjI5NzU5OTk5OTk5OSAxMDkuODEzNDRINTgxLjE4NDY0VjEyMC4wWk01MDYuMTQ2MjQgMTA5LjgxMzQ0SDUwNi45MjM4NFYxMjAuMEg1MDYuMTQ2MjRRNTAzLjgxMzQzOTk5OTk5OTk2IDEyMC4wIDUwMy44MTM0Mzk5OTk5OTk5NiAxMTQuODY3ODRRNTAzLjgxMzQzOTk5OTk5OTk2IDEwOS44MTM0NCA1MDYuMTQ2MjQgMTA5LjgxMzQ0Wk01ODEuMTg0NjQgMTIwLjBWMTA5LjgxMzQ0SDU4My4yMDYzOTk5OTk5OTk5UTU5MC4zNjAzMiAxMDkuODEzNDQgNTk1LjM3NTgzOTk5OTk5OTkgMTA5LjM4NTc2UTYwMC4zOTEzNiAxMDguOTU4MDggNjAzLjkyOTQzOTk5OTk5OTkgMTA4LjE4MDQ3OTk5OTk5OTk5UTYwNy40Njc1MTk5OTk5OTk5IDEwNy40MDI4OCA2MTAuMTUwMjM5OTk5OTk5OSAxMDYuMjM2NDhRNjEyLjgzMjk2IDEwNS4wNzAwNzk5OTk5OTk5OSA2MTUuMzIxMjggMTAzLjY3MDRRNjE1Ljk0MzM2IDEwMy4yODE2IDYxNi41MjY1NiAxMDMuMDA5NDRRNjE3LjEwOTc1OTk5OTk5OTkgMTAyLjczNzI4IDYxNy42NTQwOCAxMDIuNDI2MjRRNjE4LjE5ODQgMTAyLjExNTIgNjE4Ljc0MjcyIDEwMS44ODE5MlE2MTUuNzg3ODQgMTAwLjYzNzc2IDYxMy4yMjE3NTk5OTk5OTk5IDk5LjM5MzU5OTk5OTk5OTk5UTYxMC42NTU2OCA5OC4xNDk0NCA2MDguMjQ1MTE5OTk5OTk5OSA5Ny4xMzg1NlE2MDUuODM0NTU5OTk5OTk5OSA5Ni4xMjc2OCA2MDMuNTc5NTIgOTUuNTA1NlE2MDEuMzI0NDggOTQuODgzNTIgNTk5LjE0NzIgOTQuODgzNTJRNTk2LjgxNDQgOTQuODgzNTIgNTk0LjUyMDQ3OTk5OTk5OTkgOTYuMTY2NTZRNTkyLjIyNjU2IDk3LjQ0OTYgNTg5Ljk3MTUxOTk5OTk5OTkgMTAxLjEwNDMyTDU4My4xMjg2Mzk5OTk5OTk5IDk3LjUyNzM2UTU4NS40NjE0Mzk5OTk5OTk5IDkyLjYyODQ4IDU4OC4yOTk2Nzk5OTk5OTk5IDg5Ljc5MDI0UTU5MS4xMzc5MTk5OTk5OTk5IDg2Ljk1MiA1OTQuMjg3MiA4NS43ODU1OTk5OTk5OTk5OVE1OTcuNDM2NDggODQuNjE5MTk5OTk5OTk5OTkgNjAwLjU0Njg4IDg0LjYxOTE5OTk5OTk5OTk5UTYwNC41OTAzOTk5OTk5OTk5IDg0LjYxOTE5OTk5OTk5OTk5IDYwOC4wODk2IDg1LjkwMjI0UTYxMS41ODg4IDg3LjE4NTI4IDYxNC43NzY5NTk5OTk5OTk5IDg5LjA5MDRRNjE3Ljk2NTEyIDkwLjk5NTUyIDYyMS4wMzY2NCA5Mi45MDA2NFE2MjQuMTA4MTYgOTQuODA1NzU5OTk5OTk5OTkgNjI3LjE3OTY4IDk2LjEyNzY4UTYzMC4yNTExOTk5OTk5OTk5IDk3LjQ0OTYgNjMzLjUxNzEyIDk3LjM3MTgzOTk5OTk5OTk5TDYzMy4zNjE2IDEwNi4zMTQyNFE2MzEuMjYyMDggMTA2LjU0NzUxOTk5OTk5OTk5IDYyOC4xNTE2Nzk5OTk5OTk5IDEwNy44MzA1NTk5OTk5OTk5OVE2MjUuMDQxMjc5OTk5OTk5OSAxMDkuMTEzNTk5OTk5OTk5OTkgNjIwLjk5Nzc2IDExMS4yOTA4OFE2MTguMDQyODggMTEyLjc2ODMyIDYxNC43MzgwOCAxMTQuMzIzNTJRNjExLjQzMzI4IDExNS44Nzg3MiA2MDcuMDc4NzIgMTE3LjE2MTc2UTYwMi43MjQxNiAxMTguNDQ0OCA1OTYuNzM2NjQgMTE5LjIyMjRRNTkwLjc0OTEyIDEyMC4wIDU4Mi41ODQzMTk5OTk5OTk5IDEyMC4wWk01ODEuMTg0NjQgMTA5LjgxMzQ0SDU4MS45NjIyNFYxMjAuMEg1ODEuMTg0NjRRNTc4Ljg1MTgzOTk5OTk5OTkgMTIwLjAgNTc4Ljg1MTgzOTk5OTk5OTkgMTE0Ljg2Nzg0UTU3OC44NTE4Mzk5OTk5OTk5IDEwOS44MTM0NCA1ODEuMTg0NjQgMTA5LjgxMzQ0Wk02MDUuNzU2Nzk5OTk5OTk5OSAxMzkuOTg0MzIgNTk4LjQ0NzM1OTk5OTk5OTkgMTMyLjU5NzEyIDYwNS40NDU3NiAxMjUuMjA5OTIgNjEyLjc1NTIgMTMyLjU5NzEyWiIgZmlsbD0iIzE0MjMyQiIvPjwvc3ZnPg==", "dark": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NzQgMjAwIiB3aWR0aD0iNjc0IiBoZWlnaHQ9IjIwMCI+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMjcuMDAsMzUuMDUpIHNjYWxlKDQuMzMzMykiPjxwYXRoIGQ9Ik0zLDE1QTksOSAwIDAgMSAyMSwxNUwxOCwxNUE2LDYgMCAwIDAgNiwxNVpNMi4yNSwyMC4yNWEyLjI1LDIuMjUgMCAxLDEgNC41LDBhMi4yNSwyLjI1IDAgMSwxIC00LjUsMFpNMTcuMjUsMjAuMjVhMi4yNSwyLjI1IDAgMSwxIDQuNSwwYTIuMjUsMi4yNSAwIDEsMSAtNC41LDBaIiBmaWxsPSIjRkZGRkZGIi8+PC9nPjxwYXRoIGQ9Ik0xNjMuNDMyMDAwMDAwMDAwMDIgMTIwLjcyUTE2MC45MTIwMDAwMDAwMDAwMyAxMjAuNzIgMTU4LjYwODAwMDAwMDAwMDAzIDEyMC4wNzJRMTU2LjMwNDAwMDAwMDAwMDAzIDExOS40MjQgMTU0LjM2IDExOC4yMzZRMTUyLjQxNjAwMDAwMDAwMDAzIDExNy4wNDggMTUwLjg2ODAwMDAwMDAwMDAyIDExNS4zNTZRMTQ5LjMyMDAwMDAwMDAwMDAyIDExMy42NjQgMTQ4LjI0IDExMS41NzZMMTUzLjg1NjAwMDAwMDAwMDAyIDEwNS43NDRRMTU1LjcyOCAxMDguMjY0IDE1Ny4xNjggMTA5LjYzMlExNTguNjA4MDAwMDAwMDAwMDMgMTExLjAgMTU5Ljk3NjAwMDAwMDAwMDAzIDExMS41MDM5OTk5OTk5OTk5OVExNjEuMzQ0MDAwMDAwMDAwMDIgMTEyLjAwOCAxNjMuMDAwMDAwMDAwMDAwMDMgMTEyLjAwOFExNjUuMzA0MDAwMDAwMDAwMDMgMTEyLjAwOCAxNjcuMDY4MDAwMDAwMDAwMDQgMTEwLjkyOFExNjguODMyMDAwMDAwMDAwMDIgMTA5Ljg0OCAxNjkuNzY4MDAwMDAwMDAwMDMgMTA3Ljk3NlExNzAuNzA0IDEwNi4xMDQgMTcwLjcwNCAxMDMuNzI4MDAwMDAwMDAwMDFWNzcuOTUySDE2MS40ODgwMDAwMDAwMDAwM1Y2OS42SDE4Ny42OTYwMDAwMDAwMDAwM1Y3Ny45NTJIMTc5LjkyMDAwMDAwMDAwMDAyVjEwNC42NjRRMTc5LjkyMDAwMDAwMDAwMDAyIDEwOC4xOTIwMDAwMDAwMDAwMSAxNzguNjk2MDAwMDAwMDAwMDMgMTExLjEwOFExNzcuNDcyMDAwMDAwMDAwMDQgMTE0LjAyNCAxNzUuMjc2IDExNi4xODRRMTczLjA4IDExOC4zNDQgMTcwLjA1NiAxMTkuNTMyUTE2Ny4wMzIgMTIwLjcyIDE2My40MzIwMDAwMDAwMDAwMiAxMjAuNzJaTTIxMC41MiAxMjAuNzJRMjA0LjgzMjAwMDAwMDAwMDAyIDEyMC43MiAyMDAuMzY4IDExOC4xNjRRMTk1LjkwNCAxMTUuNjA4IDE5My4zNDggMTExLjE0NFExOTAuNzkyIDEwNi42OCAxOTAuNzkyIDEwMC45OTJRMTkwLjc5MiA5NS4zMDQgMTkzLjM0OCA5MC44NFExOTUuOTA0IDg2LjM3NiAyMDAuMzY4IDgzLjgyMDAwMDAwMDAwMDAxUTIwNC44MzIwMDAwMDAwMDAwMiA4MS4yNjQwMDAwMDAwMDAwMSAyMTAuNTIgODEuMjY0MDAwMDAwMDAwMDFRMjE2LjEzNjAwMDAwMDAwMDAyIDgxLjI2NDAwMDAwMDAwMDAxIDIyMC42MDAwMDAwMDAwMDAwMiA4My44MjAwMDAwMDAwMDAwMVEyMjUuMDY0MDAwMDAwMDAwMDIgODYuMzc2IDIyNy42MiA5MC44NFEyMzAuMTc2MDAwMDAwMDAwMDIgOTUuMzA0IDIzMC4xNzYwMDAwMDAwMDAwMiAxMDAuOTkyUTIzMC4xNzYwMDAwMDAwMDAwMiAxMDYuNjggMjI3LjYyIDExMS4xNDRRMjI1LjA2NDAwMDAwMDAwMDAyIDExNS42MDggMjIwLjYwMDAwMDAwMDAwMDAyIDExOC4xNjRRMjE2LjEzNjAwMDAwMDAwMDAyIDEyMC43MiAyMTAuNTIgMTIwLjcyWk0yMTAuNTIgMTEyLjg3MlEyMTMuNjE2IDExMi44NzIgMjE2LjA2NDAwMDAwMDAwMDAyIDExMS4zMjRRMjE4LjUxMiAxMDkuNzc2IDIxOS45MTYgMTA3LjA3NlEyMjEuMzIgMTA0LjM3NiAyMjEuMjQ4MDAwMDAwMDAwMDIgMTAwLjk5MlEyMjEuMzIgOTcuNTM2IDIxOS45MTYgOTQuODM2UTIxOC41MTIgOTIuMTM2IDIxNi4wNjQwMDAwMDAwMDAwMiA5MC42MjRRMjEzLjYxNiA4OS4xMTIgMjEwLjUyIDg5LjExMlEyMDcuNDI0IDg5LjExMiAyMDQuOTQgOTAuNjZRMjAyLjQ1NjAwMDAwMDAwMDAyIDkyLjIwOCAyMDEuMDg4MDAwMDAwMDAwMDIgOTQuOTA4UTE5OS43MiA5Ny42MDggMTk5LjcyIDEwMC45OTJRMTk5LjcyIDEwNC4zNzYgMjAxLjA4ODAwMDAwMDAwMDAyIDEwNy4wNzZRMjAyLjQ1NjAwMDAwMDAwMDAyIDEwOS43NzYgMjA0Ljk0IDExMS4zMjRRMjA3LjQyNCAxMTIuODcyIDIxMC41MiAxMTIuODcyWk0yNTAuNzY4MDAwMDAwMDAwMDMgMTIwLjcyUTI0NS44MDAwMDAwMDAwMDAwNCAxMjAuNzIgMjQxLjgwNDAwMDAwMDAwMDAzIDExOS4wMjc5OTk5OTk5OTk5OVEyMzcuODA4MDAwMDAwMDAwMDIgMTE3LjMzNiAyMzUuMjg4MDAwMDAwMDAwMDQgMTE0LjE2OEwyNDAuOTc2MDAwMDAwMDAwMDMgMTA5LjI3MlEyNDMuMTM2MDAwMDAwMDAwMDIgMTExLjY0OCAyNDUuOCAxMTIuNzY0UTI0OC40NjQwMDAwMDAwMDAwMyAxMTMuODggMjUxLjQxNjAwMDAwMDAwMDAzIDExMy44OFEyNTIuNjQwMDAwMDAwMDAwMDQgMTEzLjg4IDI1My42MTIwMDAwMDAwMDAwMiAxMTMuNTkyUTI1NC41ODQwMDAwMDAwMDAwMyAxMTMuMzA0IDI1NS4zMDQwMDAwMDAwMDAwMyAxMTIuNzI4MDAwMDAwMDAwMDFRMjU2LjAyNDAwMDAwMDAwMDA2IDExMi4xNTIgMjU2LjQyMDAwMDAwMDAwMDEgMTExLjM2UTI1Ni44MTYwMDAwMDAwMDAwMyAxMTAuNTY4IDI1Ni44MTYwMDAwMDAwMDAwMyAxMDkuNjMyUTI1Ni44MTYwMDAwMDAwMDAwMyAxMDcuOTA0IDI1NS41MjAwMDAwMDAwMDAwNCAxMDYuODk2UTI1NC44MDAwMDAwMDAwMDAwNCAxMDYuNDY0IDI1My4yODgwMDAwMDAwMDAwNCAxMDUuODUyUTI1MS43NzYwMDAwMDAwMDAwNCAxMDUuMjQwMDAwMDAwMDAwMDEgMjQ5LjMyODAwMDAwMDAwMDAzIDEwNC42NjRRMjQ1LjQ0MDAwMDAwMDAwMDAzIDEwMy42NTYgMjQyLjgxMiAxMDIuMzI0MDAwMDAwMDAwMDFRMjQwLjE4NDAwMDAwMDAwMDAzIDEwMC45OTIgMjM4Ljc0NDAwMDAwMDAwMDAzIDk5LjMzNlEyMzcuNTIwMDAwMDAwMDAwMDQgOTcuODk2IDIzNi45NDQwMDAwMDAwMDAwMiA5Ni4yMDQwMDAwMDAwMDAwMVEyMzYuMzY4MDAwMDAwMDAwMDIgOTQuNTEyIDIzNi4zNjgwMDAwMDAwMDAwMiA5Mi40MjRRMjM2LjM2ODAwMDAwMDAwMDAyIDg5LjE4NCAyMzguMjc2IDg2LjY2NFEyNDAuMTg0MDAwMDAwMDAwMDMgODQuMTQ0IDI0My4zNTIwMDAwMDAwMDAwMyA4Mi43MDQwMDAwMDAwMDAwMVEyNDYuNTIwMDAwMDAwMDAwMDQgODEuMjY0MDAwMDAwMDAwMDEgMjUwLjQwODAwMDAwMDAwMDA0IDgxLjI2NDAwMDAwMDAwMDAxUTI1My4yODgwMDAwMDAwMDAwNCA4MS4yNjQwMDAwMDAwMDAwMSAyNTUuOTg4MDAwMDAwMDAwMDYgODEuOTg0MDAwMDAwMDAwMDFRMjU4LjY4ODAwMDAwMDAwMDA1IDgyLjcwNDAwMDAwMDAwMDAxIDI2MC45OTIwMDAwMDAwMDAxIDg0LjAzNlEyNjMuMjk2MDAwMDAwMDAwMDUgODUuMzY4IDI2NC45NTIwMDAwMDAwMDAwNiA4Ny4yNDAwMDAwMDAwMDAwMUwyNjAuMDU2MDAwMDAwMDAwMDQgOTIuNjRRMjU4Ljc2MDAwMDAwMDAwMDA1IDkxLjM0NCAyNTcuMTQwMDAwMDAwMDAwMDQgOTAuM1EyNTUuNTIwMDAwMDAwMDAwMDQgODkuMjU2IDI1My44NjQwMDAwMDAwMDAwMyA4OC42OFEyNTIuMjA4MDAwMDAwMDAwMDMgODguMTA0IDI1MC43NjgwMDAwMDAwMDAwMyA4OC4xMDRRMjQ5LjQwMDAwMDAwMDAwMDAzIDg4LjEwNCAyNDguMzIwMDAwMDAwMDAwMDUgODguMzU2UTI0Ny4yNDAwMDAwMDAwMDAwNCA4OC42MDggMjQ2LjUyMDAwMDAwMDAwMDA0IDg5LjExMlEyNDUuODAwMDAwMDAwMDAwMDQgODkuNjE2IDI0NS40MDQwMDAwMDAwMDAwNSA5MC4zNzJRMjQ1LjAwODAwMDAwMDAwMDA0IDkxLjEyOCAyNDUuMDA4MDAwMDAwMDAwMDQgOTIuMDY0MDAwMDAwMDAwMDFRMjQ1LjA4MDAwMDAwMDAwMDA0IDkzLjAgMjQ1LjQ3NjAwMDAwMDAwMDA2IDkzLjc1NlEyNDUuODcyMDAwMDAwMDAwMDQgOTQuNTEyIDI0Ni41OTIwMDAwMDAwMDAwNCA5NS4wMTZRMjQ3LjMxMjAwMDAwMDAwMDA0IDk1LjUyMDAwMDAwMDAwMDAxIDI0OC44OTYwMDAwMDAwMDAwMiA5Ni4xNjhRMjUwLjQ4MDAwMDAwMDAwMDAyIDk2LjgxNiAyNTMuMDAwMDAwMDAwMDAwMDMgOTcuMzkyUTI1Ni41MjggOTguMzI4IDI1OC45MDQgOTkuNDhRMjYxLjI4MDAwMDAwMDAwMDAzIDEwMC42MzIgMjYyLjY0OCAxMDIuMTQ0UTI2NC4wMTYgMTAzLjQ0IDI2NC41OTIgMTA1LjE2OFEyNjUuMTY4IDEwNi44OTYgMjY1LjE2OCAxMDkuMDU2UTI2NS4xNjggMTEyLjQ0IDI2My4yNiAxMTUuMDY4UTI2MS4zNTIwMDAwMDAwMDAwMyAxMTcuNjk2IDI1OC4xMTIgMTE5LjIwOFEyNTQuODcyMDAwMDAwMDAwMDQgMTIwLjcyIDI1MC43NjgwMDAwMDAwMDAwMyAxMjAuNzJaTTI5MC4yMjQgMTIwLjcyUTI4NC41MzYgMTIwLjcyIDI4MC4wNzIgMTE4LjE2NFEyNzUuNjA4IDExNS42MDggMjczLjA1MiAxMTEuMTQ0UTI3MC40OTYgMTA2LjY4IDI3MC40OTYgMTAwLjk5MlEyNzAuNDk2IDk1LjMwNCAyNzMuMDUyIDkwLjg0UTI3NS42MDggODYuMzc2IDI4MC4wNzIgODMuODIwMDAwMDAwMDAwMDFRMjg0LjUzNiA4MS4yNjQwMDAwMDAwMDAwMSAyOTAuMjI0IDgxLjI2NDAwMDAwMDAwMDAxUTI5NS44NCA4MS4yNjQwMDAwMDAwMDAwMSAzMDAuMzA0IDgzLjgyMDAwMDAwMDAwMDAxUTMwNC43NjggODYuMzc2IDMwNy4zMjM5OTk5OTk5OTk5NiA5MC44NFEzMDkuODggOTUuMzA0IDMwOS44OCAxMDAuOTkyUTMwOS44OCAxMDYuNjggMzA3LjMyMzk5OTk5OTk5OTk2IDExMS4xNDRRMzA0Ljc2OCAxMTUuNjA4IDMwMC4zMDQgMTE4LjE2NFEyOTUuODQgMTIwLjcyIDI5MC4yMjQgMTIwLjcyWk0yOTAuMjI0IDExMi44NzJRMjkzLjMyIDExMi44NzIgMjk1Ljc2ODAwMDAwMDAwMDAzIDExMS4zMjRRMjk4LjIxNiAxMDkuNzc2IDI5OS42MiAxMDcuMDc2UTMwMS4wMjQgMTA0LjM3NiAzMDAuOTUyIDEwMC45OTJRMzAxLjAyNCA5Ny41MzYgMjk5LjYyIDk0LjgzNlEyOTguMjE2IDkyLjEzNiAyOTUuNzY4MDAwMDAwMDAwMDMgOTAuNjI0UTI5My4zMiA4OS4xMTIgMjkwLjIyNCA4OS4xMTJRMjg3LjEyOCA4OS4xMTIgMjg0LjY0NCA5MC42NlEyODIuMTU5OTk5OTk5OTk5OTcgOTIuMjA4IDI4MC43OTIgOTQuOTA4UTI3OS40MjQgOTcuNjA4IDI3OS40MjQgMTAwLjk5MlEyNzkuNDI0IDEwNC4zNzYgMjgwLjc5MiAxMDcuMDc2UTI4Mi4xNTk5OTk5OTk5OTk5NyAxMDkuNzc2IDI4NC42NDQgMTExLjMyNFEyODcuMTI4IDExMi44NzIgMjkwLjIyNCAxMTIuODcyWk0zMzAuOTc2IDEyMC43MlEzMjYuODcxOTk5OTk5OTk5OTYgMTIwLjcyIDMyMy44ODM5OTk5OTk5OTk5NiAxMTguODQ4UTMyMC44OTU5OTk5OTk5OTk5NiAxMTYuOTc2IDMxOS4yNzU5OTk5OTk5OTk5NSAxMTMuNTkyUTMxNy42NTYgMTEwLjIwOCAzMTcuNjU2IDEwNS40NTZWODIuMDU2MDAwMDAwMDAwMDFIMzI2LjQ0VjEwMy41ODRRMzI2LjQ0IDEwOC4wNDggMzI4LjU2Mzk5OTk5OTk5OTk2IDExMC42NFEzMzAuNjg4IDExMy4yMzIgMzM0LjUwMzk5OTk5OTk5OTk2IDExMy4yMzJRMzM2LjM3NiAxMTMuMjMyIDMzNy45MjQgMTEyLjYyUTMzOS40NzIgMTEyLjAwOCAzNDAuNjIzOTk5OTk5OTk5OTcgMTEwLjg5MlEzNDEuNzc1OTk5OTk5OTk5OTUgMTA5Ljc3NiAzNDIuNDI0IDEwOC4xOTIwMDAwMDAwMDAwMVEzNDMuMDcyIDEwNi42MDggMzQzLjA3MiAxMDQuODA4VjgyLjA1NjAwMDAwMDAwMDAxSDM1MS44NTZWMTIwLjBIMzQzLjI4OEwzNDMuMTQ0IDExMi4wOEwzNDQuNzI3OTk5OTk5OTk5OTUgMTExLjIxNjAwMDAwMDAwMDAxUTM0My44NjQgMTEzLjg4IDM0MS44MTIgMTE2LjAzOTk5OTk5OTk5OTk5UTMzOS43NiAxMTguMiAzMzYuOTUyIDExOS40NjAwMDAwMDAwMDAwMVEzMzQuMTQ0IDEyMC43MiAzMzAuOTc2IDEyMC43MlpNMzYyLjI5NiAxMjAuMFY4Mi4wNTYwMDAwMDAwMDAwMUgzNzAuOTM2TDM3MS4wOCA5NC4xNTJMMzY5LjkyNzk5OTk5OTk5OTk0IDkxLjQxNlEzNzAuNzE5OTk5OTk5OTk5OTcgODguNTM2IDM3Mi42NjQgODYuMjMyUTM3NC42MDc5OTk5OTk5OTk5NSA4My45MjggMzc3LjE2NCA4Mi41OTZRMzc5LjcxOTk5OTk5OTk5OTk3IDgxLjI2NDAwMDAwMDAwMDAxIDM4Mi40NTU5OTk5OTk5OTk5NiA4MS4yNjQwMDAwMDAwMDAwMVEzODMuNjc5OTk5OTk5OTk5OTUgODEuMjY0MDAwMDAwMDAwMDEgMzg0Ljc5NTk5OTk5OTk5OTk0IDgxLjQ4UTM4NS45MTIgODEuNjk2IDM4Ni42MzE5OTk5OTk5OTk5NSA4MS45ODQwMDAwMDAwMDAwMUwzODQuMzI4IDkxLjYzMlEzODMuNDYzOTk5OTk5OTk5OTQgOTEuMiAzODIuMzQ3OTk5OTk5OTk5OTYgOTAuOTQ4MDAwMDAwMDAwMDFRMzgxLjIzMTk5OTk5OTk5OTk3IDkwLjY5NiAzODAuMDggOTAuNjk2UTM3OC4yMDc5OTk5OTk5OTk5NyA5MC42OTYgMzc2LjU4Nzk5OTk5OTk5OTk3IDkxLjM4UTM3NC45Njc5OTk5OTk5OTk5NiA5Mi4wNjQwMDAwMDAwMDAwMSAzNzMuNzggOTMuMjg4MDAwMDAwMDAwMDFRMzcyLjU5MiA5NC41MTIgMzcxLjg3MTk5OTk5OTk5OTk2IDk2LjEzMlEzNzEuMTUyIDk3Ljc1MjAwMDAwMDAwMDAxIDM3MS4xNTIgOTkuNjk2VjEyMC4wWiIgZmlsbD0iI0ZGRkZGRiIvPjxwYXRoIGQ9Ik00MzcuNTYxOTIgMTM4Ljk3MzQ0UTQzNC4xNDA0Nzk5OTk5OTk5NyAxMzguOTczNDQgNDMwLjE3NDcyIDEzNy42OTA0UTQyNi4yMDg5NTk5OTk5OTk5MyAxMzYuNDA3MzYgNDIyLjYzMTk5OTk5OTk5OTk1IDEzMy4zNzQ3Mkw0MjYuMDUzNDM5OTk5OTk5OTcgMTI2LjY4NzM2UTQyOC42MTk1MTk5OTk5OTk5NyAxMjcuNjk4MjQgNDMxLjE0NjcxOTk5OTk5OTk2IDEyOC4yNDI1NlE0MzMuNjczOTE5OTk5OTk5OTUgMTI4Ljc4Njg4IDQzNS42OTU2OCAxMjguNzg2ODhRNDQwLjI4MzUxOTk5OTk5OTk1IDEyOC43ODY4OCA0NDMuNTg4MzE5OTk5OTk5OTUgMTI2Ljk1OTUyUTQ0Ni44OTMxMTk5OTk5OTk5NSAxMjUuMTMyMTYgNDQ4Ljc1OTM1OTk5OTk5OTk2IDEyMS44NjYyNFE0NTAuNjI1NTk5OTk5OTk5OTYgMTE4LjYwMDMyIDQ1MC42MjU1OTk5OTk5OTk5NiAxMTQuMTY4UTQ1MC42MjU1OTk5OTk5OTk5NiAxMTIuMDY4NDggNDQ5LjY5MjQ3OTk5OTk5OTkzIDEwOS44OTEyUTQ0OC43NTkzNTk5OTk5OTk5NiAxMDcuNzEzOTIgNDQ2LjU0MzE5OTk5OTk5OTk2IDEwNC41NjQ2NFE0NDQuMzI3MDM5OTk5OTk5OTUgMTAxLjQxNTM1OTk5OTk5OTk5IDQ0MC4zNjEyNzk5OTk5OTk5NyA5Ni42NzJMNDQ4LjM3MDU1OTk5OTk5OTk1IDg2Ljc5NjQ4UTQ1Mi40OTE4Mzk5OTk5OTk5NyA5Mi4zOTUxOTk5OTk5OTk5OSA0NTUuMDE5MDM5OTk5OTk5OTYgOTYuOTQ0MTZRNDU3LjU0NjIzOTk5OTk5OTk1IDEwMS40OTMxMiA0NTguNzUxNTE5OTk5OTk5OTcgMTA1LjUzNjY0UTQ1OS45NTY4IDEwOS41ODAxNiA0NTkuOTU2OCAxMTMuNzAxNDRRNDU5Ljk1NjggMTE2LjczNDA4IDQ1OS4xNzkyIDEyMC4xOTQ0UTQ1OC40MDE2IDEyMy42NTQ3MiA0NTYuNzY4NjQgMTI2Ljk1OTUyUTQ1NS4xMzU2OCAxMzAuMjY0MzIgNDUyLjQ5MTgzOTk5OTk5OTk3IDEzMi45ODU5MlE0NDkuODQ3OTk5OTk5OTk5OTYgMTM1LjcwNzUyIDQ0Ni4xMTU1MTk5OTk5OTk5NSAxMzcuMzQwNDhRNDQyLjM4MzAzOTk5OTk5OTk0IDEzOC45NzM0NCA0MzcuNTYxOTIgMTM4Ljk3MzQ0Wk00NzkuNTUyMzE5OTk5OTk5OTUgMTM3Ljg4NDhRNDc1Ljg5NzU5OTk5OTk5OTk1IDEzNy44ODQ4IDQ3MS44MTUxOTk5OTk5OTk5NSAxMzYuNjAxNzZRNDY3LjczMjc5OTk5OTk5OTk0IDEzNS4zMTg3MiA0NjQuMTU1ODM5OTk5OTk5OTYgMTMyLjI4NjA4TDQ2Ny41NzcyOCAxMjUuNDQzMlE0NzAuMDY1NTk5OTk5OTk5OTYgMTI2LjI5ODU2IDQ3Mi43MDk0NCAxMjYuODQyODgwMDAwMDAwMDFRNDc1LjM1MzI4IDEyNy4zODcyIDQ3Ny42MDgzMTk5OTk5OTk5NCAxMjcuMzg3MlE0ODIuNTg0OTU5OTk5OTk5OTcgMTI3LjM4NzIgNDg1LjkyODY0IDEyNS40MDQzMjAwMDAwMDAwMVE0ODkuMjcyMzIgMTIzLjQyMTQ0IDQ5MC45MDUyNzk5OTk5OTk5NSAxMjAuMEg0ODUuOTI4NjRRNDgxLjEwNzUxOTk5OTk5OTk3IDEyMC4wIDQ3Ny43NjM4Mzk5OTk5OTk5NiAxMTkuMDI3OTk5OTk5OTk5OTlRNDc0LjQyMDE1OTk5OTk5OTk1IDExOC4wNTYgNDcyLjM1OTUyIDExNi4zMDY0UTQ3MC4yOTg4Nzk5OTk5OTk5NCAxMTQuNTU2OCA0NjkuMzY1NzU5OTk5OTk5OSAxMTIuMTg1MTJRNDY4LjQzMjYzOTk5OTk5OTk0IDEwOS44MTM0NCA0NjguNDMyNjM5OTk5OTk5OTQgMTA3LjAxNDA3OTk5OTk5OTk5UTQ2OC40MzI2Mzk5OTk5OTk5NCAxMDIuODE1MDQgNDY5Ljc1NDU1OTk5OTk5OTk3IDk5LjI3Njk2UTQ3MS4wNzY0Nzk5OTk5OTk5NSA5NS43Mzg4OCA0NzMuMzcwMzk5OTk5OTk5OTYgOTMuMTMzOTE5OTk5OTk5OTlRNDc1LjY2NDMyIDkwLjUyODk2IDQ3OC42MTkyIDg5LjEyOTI4UTQ4MS41NzQwOCA4Ny43Mjk2IDQ4NC43NjIyMzk5OTk5OTk5NiA4Ny43Mjk2UTQ4OS41MDU1OTk5OTk5OTk5NiA4Ny43Mjk2IDQ5Mi44ODgxNTk5OTk5OTk5NyA5MC4wNjI0UTQ5Ni4yNzA3MiA5Mi4zOTUxOTk5OTk5OTk5OSA0OTguMzcwMjM5OTk5OTk5OTcgOTYuNTE2NDhRNTAwLjQ2OTc1OTk5OTk5OTk1IDEwMC42Mzc3NiA1MDEuMTY5NTk5OTk5OTk5OTUgMTA2LjA4MDk2UTUwMS4zMjUxMTk5OTk5OTk5NyAxMDYuOTM2MzIgNTAxLjQ0MTc1OTk5OTk5OTkzIDEwNy44Njk0NFE1MDEuNTU4Mzk5OTk5OTk5OTUgMTA4LjgwMjU2IDUwMS41NTgzOTk5OTk5OTk5NSAxMDkuODEzNDRINTA2LjE0NjI0VjEyMC4wSDUwMC42MjUyOFE0OTkuNjkyMTU5OTk5OTk5OTQgMTIzLjE4ODE2IDQ5OC4wMjAzMTk5OTk5OTk5NyAxMjYuMzM3NDM5OTk5OTk5OTlRNDk2LjM0ODQ3OTk5OTk5OTk0IDEyOS40ODY3MiA0OTMuNzgyMzk5OTk5OTk5OTQgMTMyLjEzMDU2UTQ5MS4yMTYzMTk5OTk5OTk5NCAxMzQuNzc0NCA0ODcuNjc4MjM5OTk5OTk5OTYgMTM2LjMyOTYwMDAwMDAwMDAzUTQ4NC4xNDAxNiAxMzcuODg0OCA0NzkuNTUyMzE5OTk5OTk5OTUgMTM3Ljg4NDhaTTQ4NS45Mjg2NCAxMDkuODEzNDRINDkyLjA3MTY3OTk5OTk5OTk2UTQ5MS45OTM5MTk5OTk5OTk5NSAxMDkuMTEzNTk5OTk5OTk5OTkgNDkxLjkxNjE2IDEwOC40OTE1MlE0OTEuODM4NCAxMDcuODY5NDQgNDkxLjc2MDYzOTk5OTk5OTk3IDEwNy4zMjUxMlE0OTEuMjk0MDc5OTk5OTk5OTUgMTA0LjY4MTI4IDQ5MC4xNjY1NTk5OTk5OTk5NSAxMDIuNTQyODhRNDg5LjAzOTAzOTk5OTk5OTk0IDEwMC40MDQ0Nzk5OTk5OTk5OSA0ODcuNTIyNzE5OTk5OTk5OTQgOTkuMTYwMzE5OTk5OTk5OThRNDg2LjAwNjQgOTcuOTE2MTU5OTk5OTk5OTkgNDg0LjE0MDE2IDk3LjkxNjE1OTk5OTk5OTk5UTQ4Mi40Mjk0Mzk5OTk5OTk5NCA5Ny45MTYxNTk5OTk5OTk5OSA0ODEuMDI5NzU5OTk5OTk5OTUgOTguOTI3MDM5OTk5OTk5OTlRNDc5LjYzMDA3OTk5OTk5OTk2IDk5LjkzNzkxOTk5OTk5OTk5IDQ3OC44MTM1OTk5OTk5OTk5NSAxMDEuNjA5NzZRNDc3Ljk5NzExOTk5OTk5OTk0IDEwMy4yODE2IDQ3Ny45OTcxMTk5OTk5OTk5NCAxMDUuMjI1NlE0NzcuOTk3MTE5OTk5OTk5OTQgMTA2LjU0NzUxOTk5OTk5OTk5IDQ3OC42OTY5NiAxMDcuNTU4Mzk5OTk5OTk5OTlRNDc5LjM5NjggMTA4LjU2OTI3OTk5OTk5OTk5IDQ4MS4xMDc1MTk5OTk5OTk5NyAxMDkuMTkxMzZRNDgyLjgxODIzOTk5OTk5OTk1IDEwOS44MTM0NCA0ODUuOTI4NjQgMTA5LjgxMzQ0Wk01NTguMDEyMTYgMTIwLjBRNTUzLjE5MTAzOTk5OTk5OTkgMTIwLjAgNTQ5LjczMDcyIDExOS4wNjY4OFE1NDYuMjcwNCAxMTguMTMzNzYgNTQzLjgyMDk2IDExNi44MTE4Mzk5OTk5OTk5OVE1NDEuMzcxNTIgMTE1LjQ4OTkyIDUzOS40Mjc1MiAxMTQuMjQ1NzZMNTQ0Ljk0ODQ4IDEwNy42MzYxNlE1NDguOTkyIDEwOS44MTM0NCA1NTUuMzY4MzIgMTA5LjgxMzQ0SDU2NS4yNDM4NFE1NjQuNjk5NTIgMTA3LjQwMjg4IDU2NC4wMzg1NiAxMDUuMzgxMTJRNTYzLjM3NzYgMTAzLjM1OTM2IDU2Mi41MjIyNCAxMDEuMTgyMDc5OTk5OTk5OThRNTYxLjY2Njg4IDk5LjAwNDc5OTk5OTk5OTk5IDU2MC4zNDQ5NiA5Ni4yMDU0NEw1NzIuMjQyMjQgODguMTk2MTU5OTk5OTk5OTlRNTcyLjk0MjA4IDkzLjAxNzI4IDU3My4zNjk3NiA5OC4xNDk0NFE1NzMuNzk3NDM5OTk5OTk5OSAxMDMuMjgxNiA1NzMuNDA4NjM5OTk5OTk5OSAxMDguNzI0OFE1NzMuMDE5ODM5OTk5OTk5OSAxMTQuMTY4IDU3MS4yMzEzNiAxMjAuMFpNNTA2LjE0NjI0IDEyMC4wVjEwOS44MTM0NEg1MTQuOTMzMTJRNTE1LjQ3NzQ0IDEwOC4yNTgyNCA1MTUuOTA1MTIgMTA2LjE1ODcyUTUxNi4zMzI4IDEwNC4wNTkyIDUxNi40ODgzMTk5OTk5OTk5IDEwMS43MjY0UTUxNi42NDM4NCA5OS4zOTM1OTk5OTk5OTk5OSA1MTYuNTY2MDc5OTk5OTk5OSA5Ny4wNjA4TDUyOC44NTIxNiA5Mi43ODM5OTk5OTk5OTk5OVE1MjcuOTE5MDQgOTcuNjA1MTIgNTI2Ljk0NzA0IDEwMS4yMjA5NTk5OTk5OTk5OVE1MjUuOTc1MDQgMTA0LjgzNjggNTI0Ljc2OTc2IDEwNy44Njk0NFE1MjMuNTY0NDggMTEwLjkwMjA4IDUyMS45NzAzOTk5OTk5OTk5IDExMy43NzkyUTUyMC4zNzYzMiAxMTYuNjU2MzIgNTE4LjEyMTI4IDEyMC4wWk01MzEuNTczNzYgMTIwLjBRNTI2LjUxOTM2IDEyMC4wIDUyMi44MjU3NiAxMTkuMDY2ODhRNTE5LjEzMjE2IDExOC4xMzM3NiA1MTYuNzIxNiAxMTYuODUwNzJRNTE0LjMxMTAzOTk5OTk5OTkgMTE1LjU2NzY4IDUxMi45MTEzNiAxMTQuNTU2OEw1MTcuMzQzNjggMTA3LjI0NzM2UTUxOS40NDMxOTk5OTk5OTk5IDEwOC40MTM3NiA1MjIuMzIwMzIgMTA5LjExMzU5OTk5OTk5OTk5UTUyNS4xOTc0NCAxMDkuODEzNDQgNTI4LjYxODg4IDEwOS44MTM0NEg1MzYuNTUwNFE1MzcuMDk0NzE5OTk5OTk5OSAxMDguNDkxNTIgNTM3LjUyMjQgMTA2LjM1MzExOTk5OTk5OTk5UTUzNy45NTAwOCAxMDQuMjE0NzIgNTM4LjE0NDQ3OTk5OTk5OTkgMTAxLjgwNDE2UTUzOC4zMzg4OCA5OS4zOTM1OTk5OTk5OTk5OSA1MzguMjYxMTIgOTcuMDYwOEw1NTAuNTQ3MiA5Mi43ODM5OTk5OTk5OTk5OVE1NDkuNTM2MzE5OTk5OTk5OSA5Ny42MDUxMiA1NDguNTY0MzIgMTAxLjIyMDk1OTk5OTk5OTk5UTU0Ny41OTIzMiAxMDQuODM2OCA1NDYuNDI1OTE5OTk5OTk5OSAxMDcuODY5NDRRNTQ1LjI1OTUyIDExMC45MDIwOCA1NDMuNjI2NTU5OTk5OTk5OSAxMTMuNzc5MlE1NDEuOTkzNiAxMTYuNjU2MzIgNTM5LjgxNjMyIDEyMC4wWk01ODAuNjQwMzIgMTIwLjBRNTc2LjkwNzg0IDEyMC4wIDU3My45MTQwOCAxMTkuMzc3OTJRNTcwLjkyMDMyIDExOC43NTU4NCA1NjguNjI2NCAxMTcuNzgzODRRNTY2LjMzMjQ4IDExNi44MTE4NCA1NjQuNTQ0IDExNS44MDA5Nkw1NjguNTg3NTIgMTA4LjAyNDk2UTU2OS41MjA2NCAxMDguNDkxNTIgNTcwLjY0ODE2IDEwOC44MDI1NlE1NzEuNzc1NjggMTA5LjExMzU5OTk5OTk5OTk5IDU3Mi45ODA5NiAxMDkuMzQ2ODhRNTc0LjE4NjI0IDEwOS41ODAxNiA1NzUuNTA4MTYgMTA5LjY5NjhRNTc2LjgzMDA4IDEwOS44MTM0NCA1NzguMjI5NzU5OTk5OTk5OSAxMDkuODEzNDRINTgxLjE4NDY0VjEyMC4wWk01MDYuMTQ2MjQgMTA5LjgxMzQ0SDUwNi45MjM4NFYxMjAuMEg1MDYuMTQ2MjRRNTAzLjgxMzQzOTk5OTk5OTk2IDEyMC4wIDUwMy44MTM0Mzk5OTk5OTk5NiAxMTQuODY3ODRRNTAzLjgxMzQzOTk5OTk5OTk2IDEwOS44MTM0NCA1MDYuMTQ2MjQgMTA5LjgxMzQ0Wk01ODEuMTg0NjQgMTIwLjBWMTA5LjgxMzQ0SDU4My4yMDYzOTk5OTk5OTk5UTU5MC4zNjAzMiAxMDkuODEzNDQgNTk1LjM3NTgzOTk5OTk5OTkgMTA5LjM4NTc2UTYwMC4zOTEzNiAxMDguOTU4MDggNjAzLjkyOTQzOTk5OTk5OTkgMTA4LjE4MDQ3OTk5OTk5OTk5UTYwNy40Njc1MTk5OTk5OTk5IDEwNy40MDI4OCA2MTAuMTUwMjM5OTk5OTk5OSAxMDYuMjM2NDhRNjEyLjgzMjk2IDEwNS4wNzAwNzk5OTk5OTk5OSA2MTUuMzIxMjggMTAzLjY3MDRRNjE1Ljk0MzM2IDEwMy4yODE2IDYxNi41MjY1NiAxMDMuMDA5NDRRNjE3LjEwOTc1OTk5OTk5OTkgMTAyLjczNzI4IDYxNy42NTQwOCAxMDIuNDI2MjRRNjE4LjE5ODQgMTAyLjExNTIgNjE4Ljc0MjcyIDEwMS44ODE5MlE2MTUuNzg3ODQgMTAwLjYzNzc2IDYxMy4yMjE3NTk5OTk5OTk5IDk5LjM5MzU5OTk5OTk5OTk5UTYxMC42NTU2OCA5OC4xNDk0NCA2MDguMjQ1MTE5OTk5OTk5OSA5Ny4xMzg1NlE2MDUuODM0NTU5OTk5OTk5OSA5Ni4xMjc2OCA2MDMuNTc5NTIgOTUuNTA1NlE2MDEuMzI0NDggOTQuODgzNTIgNTk5LjE0NzIgOTQuODgzNTJRNTk2LjgxNDQgOTQuODgzNTIgNTk0LjUyMDQ3OTk5OTk5OTkgOTYuMTY2NTZRNTkyLjIyNjU2IDk3LjQ0OTYgNTg5Ljk3MTUxOTk5OTk5OTkgMTAxLjEwNDMyTDU4My4xMjg2Mzk5OTk5OTk5IDk3LjUyNzM2UTU4NS40NjE0Mzk5OTk5OTk5IDkyLjYyODQ4IDU4OC4yOTk2Nzk5OTk5OTk5IDg5Ljc5MDI0UTU5MS4xMzc5MTk5OTk5OTk5IDg2Ljk1MiA1OTQuMjg3MiA4NS43ODU1OTk5OTk5OTk5OVE1OTcuNDM2NDggODQuNjE5MTk5OTk5OTk5OTkgNjAwLjU0Njg4IDg0LjYxOTE5OTk5OTk5OTk5UTYwNC41OTAzOTk5OTk5OTk5IDg0LjYxOTE5OTk5OTk5OTk5IDYwOC4wODk2IDg1LjkwMjI0UTYxMS41ODg4IDg3LjE4NTI4IDYxNC43NzY5NTk5OTk5OTk5IDg5LjA5MDRRNjE3Ljk2NTEyIDkwLjk5NTUyIDYyMS4wMzY2NCA5Mi45MDA2NFE2MjQuMTA4MTYgOTQuODA1NzU5OTk5OTk5OTkgNjI3LjE3OTY4IDk2LjEyNzY4UTYzMC4yNTExOTk5OTk5OTk5IDk3LjQ0OTYgNjMzLjUxNzEyIDk3LjM3MTgzOTk5OTk5OTk5TDYzMy4zNjE2IDEwNi4zMTQyNFE2MzEuMjYyMDggMTA2LjU0NzUxOTk5OTk5OTk5IDYyOC4xNTE2Nzk5OTk5OTk5IDEwNy44MzA1NTk5OTk5OTk5OVE2MjUuMDQxMjc5OTk5OTk5OSAxMDkuMTEzNTk5OTk5OTk5OTkgNjIwLjk5Nzc2IDExMS4yOTA4OFE2MTguMDQyODggMTEyLjc2ODMyIDYxNC43MzgwOCAxMTQuMzIzNTJRNjExLjQzMzI4IDExNS44Nzg3MiA2MDcuMDc4NzIgMTE3LjE2MTc2UTYwMi43MjQxNiAxMTguNDQ0OCA1OTYuNzM2NjQgMTE5LjIyMjRRNTkwLjc0OTEyIDEyMC4wIDU4Mi41ODQzMTk5OTk5OTk5IDEyMC4wWk01ODEuMTg0NjQgMTA5LjgxMzQ0SDU4MS45NjIyNFYxMjAuMEg1ODEuMTg0NjRRNTc4Ljg1MTgzOTk5OTk5OTkgMTIwLjAgNTc4Ljg1MTgzOTk5OTk5OTkgMTE0Ljg2Nzg0UTU3OC44NTE4Mzk5OTk5OTk5IDEwOS44MTM0NCA1ODEuMTg0NjQgMTA5LjgxMzQ0Wk02MDUuNzU2Nzk5OTk5OTk5OSAxMzkuOTg0MzIgNTk4LjQ0NzM1OTk5OTk5OTkgMTMyLjU5NzEyIDYwNS40NDU3NiAxMjUuMjA5OTIgNjEyLjc1NTIgMTMyLjU5NzEyWiIgZmlsbD0iI0ZGRkZGRiIvPjwvc3ZnPg=="}};
+// ---------------------------------------------------------------- helpers
+const SYM = "M3,15A9,9 0 0 1 21,15L18,15A6,6 0 0 0 6,15ZM2.25,20.25a2.25,2.25 0 1,1 4.5,0a2.25,2.25 0 1,1 -4.5,0ZM17.25,20.25a2.25,2.25 0 1,1 4.5,0a2.25,2.25 0 1,1 -4.5,0Z";
+let L = 'en', TH = 'light';
+const RTL = () => L === 'ar';
+function t(k, ...a) {
+  const v = STR[k] || STR_EXTRA[k];
+  if (!v) return '⟦' + k + '⟧';
+  let s = v[L];
+  a.forEach((x, i) => { s = s.split('{' + i + '}').join(x); });
+  return s;
+}
+const ltr = s => `<bdi dir="ltr">${s}</bdi>`;
+const NAMES = { en: { sara: 'Sara', ahmad: 'Ahmad', khalid: 'Khalid', mona: 'Mona' }, ar: { sara: 'سارة', ahmad: 'أحمد', khalid: 'خالد', mona: 'منى' } };
+const nm = k => NAMES[L][k];
+const ic = (id, cls = '') => `<svg class="ic ${cls}" aria-hidden="true"><use href="#${id}"/></svg>`;
+const youX = () => RTL() ? 19.5 : 4.5, otherX = () => RTL() ? 4.5 : 19.5;
+const ARC = 'M4.5 15A7.5 7.5 0 0 1 19.5 15';
+const GAP = 'M4.5 15A7.5 7.5 0 0 1 9.435 7.952M14.565 7.952A7.5 7.5 0 0 1 19.5 15';
+
+function motif(kind, size = 88) {
+  const dot = (x, k) => k === 'on' ? `<circle class="dot-on" cx="${x}" cy="20.25" r="2.25"/>`
+    : k === 'idle' ? `<circle class="dot-idle" cx="${x}" cy="20.25" r="2.25"/>`
+    : `<circle class="dot-off" cx="${x}" cy="20.25" r="1.65"/>`;
+  const k = {
+    off: [`<path class="arc-idle" d="${ARC}"/>`, 'off', 'off'],
+    connecting: [`<path class="arc-idle" d="${ARC}"/><path class="arc-on drawing" d="${ARC}"/>`, 'on', 'off'],
+    ready: [`<path class="arc-on" d="${ARC}"/>`, 'on', 'off'],
+    unreach: [`<path class="arc-idle" d="${GAP}"/>`, 'idle', 'off'],
+    attention: [`<path class="arc-idle" d="${ARC}"/>`, 'idle', 'off'],
+    session: [`<path class="arc-on" d="${ARC}"/><path class="travel traveling" d="${ARC}"/>`, 'on', 'on'],
+    ended: [`<path class="arc-idle" d="${ARC}"/>`, 'on', 'idle'],
+    empty: [`<path class="arc-idle" d="${ARC}"/>`, 'off', 'off'],
+    offer: [`<path class="arc-on dashed" d="${ARC}"/>`, 'on', 'on'],
+  }[kind];
+  return `<svg class="m" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke-width="3" stroke-linecap="butt">${k[0]}</g>${dot(youX(), k[1])}${dot(otherX(), k[2])}</svg>`;
+}
+const symbolBadge = (size = 96) => `<svg width="${size}" height="${size}" viewBox="18 18 72 72" aria-hidden="true"><circle cx="54" cy="54" r="36" fill="#0E7490"/><path transform="translate(24 18.375) scale(2.5)" d="${SYM}" fill="#FFFFFF"/></svg>`;
+const sw = on => `<span class="sw ${on ? 'on' : ''}" role="switch" aria-checked="${on}"></span>`;
+const btn = (kind, label, icon = '', extra = '') => `<span class="b b-${kind} ${extra}">${icon ? ic(icon) : ''}<span>${label}</span></span>`;
+const banner = (kind, icon, html, action = '') => `<div class="bn bn-${kind}">${ic(icon)}<div class="t-caption-b">${html}${action ? `<div class="bn-a">${action}</div>` : ''}</div></div>`;
+const avatar = (k, cls = '') => `<span class="av ${cls}" aria-hidden="true">${nm(k).slice(0, 1)}</span>`;
+const field = (label, value, o = {}) => `<div class="fd ${o.err ? 'err' : ''} ${o.dis ? 'dis' : ''}"><label class="t-label-s">${label}</label>
+  <div class="in">${value ? `<span class="val" dir="ltr">${value}</span>` : `<span class="ph-t" dir="ltr">${o.ph || ''}</span>`}${o.eye ? `<span class="eye" title="${t('MobileShowPassword')}">${ic('i-eye')}</span>` : ''}</div>
+  ${o.help ? `<div class="t-micro-n muted">${o.help}</div>` : ''}</div>`;
+const sb = (o = {}) => `<div class="sb"><span>12:30</span>${o.fg ? `<svg class="sbi" viewBox="0 0 24 24" aria-hidden="true"><path d="${SYM}" fill="currentColor"/></svg>` : ''}<span class="sp"></span>${ic(o.net === 'cell' ? 'i-cell' : o.net === 'none' ? 'i-nonet' : 'i-wifi', 's')}<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7.5" width="15.5" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="5.5" y="10" width="9" height="4" rx=".5" fill="currentColor"/><path d="M21 10.75v2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>`;
+function tabbar(active, badge = 0, third = false) {
+  const tab = (id, icon, label, on, extra = '') => `<div class="tab ${on ? 'on' : ''} ${extra}" role="tab" aria-selected="${on}"><span class="ind">${ic(icon)}${id === 'c' && badge ? `<span class="badge" aria-label="${t('MobileInvitationsWaitingFormat', badge)}">${badge}</span>` : ''}</span><span>${label}</span></div>`;
+  return `<nav class="tabbar" style="grid-template-columns:repeat(${third ? 3 : 2},1fr)" role="tablist">${tab('s', 'i-share', t('MobileTabShare'), active === 's')}${tab('c', 'i-people', t('ContactsPageTitle'), active === 'c')}${third ? tab('u', 'i-swap', t('MobileTabUse'), false, 'later') : ''}</nav>`;
+}
+const toggleRow = on => `<div class="trow"><span class="t-label">${t('HostAvailableToggle')}</span>${sw(on)}</div>`;
+const header = (title) => `<header class="ah"><h1 class="t-title">${title}</h1></header>`;
+function hero(o) {
+  return `<section class="hero" aria-live="polite">${motif(o.m)}
+    <h2 class="${o.small ? 't-title' : 't-display'} ht">${o.icon ? ic(o.icon, 'hi-' + (o.tone || 'warn')) : ''}${o.title}</h2>
+    ${o.text ? `<p class="t-body muted">${o.text}</p>` : ''}${o.extra || ''}${o.btn || ''}${o.toggle !== undefined ? toggleRow(o.toggle) : ''}</section>`;
+}
+const card = (inner, cls = '') => `<section class="cd ${cls}">${inner}</section>`;
+const row = (icon, text, sub = '', trail = '') => `<div class="lr">${icon ? ic(icon, 'lr-i') : ''}<div class="lr-t"><div class="t-body">${text}</div>${sub ? `<div class="t-caption muted">${sub}</div>` : ''}</div>${trail}</div>`;
+const IP = '203.0.113.24';
+function connCard(o = {}) {
+  const net = o.cell ? t('MobileNetworkCellular') : t('MobileNetworkWifi');
+  return card(`<h3 class="t-heading">${t('MobileYourConnection')}</h3>
+    ${row(o.cell ? 'i-cell' : 'i-wifi', net)}
+    ${row('i-server', t('MobileServerStatusFormat', o.server || t('StatusConnected')))}
+    ${row('i-pin', t('MobilePublicIpFormat', ltr(IP)))}
+    ${o.cell ? banner('warning', 'i-warn', t('MobileCellularDataNote')) : ''}
+    ${o.vpn ? banner('warning', 'i-warn', t('MobileVpnWarning')) : ''}`);
+}
+const inviteBanner = () => banner('info', 'i-person', t('MobileInvitationsWaitingFormat', 1), `<span class="tb">${t('MobileInvitationsShow')}</span>`);
+const shareTop = (h, rest = '') => header(t('MobileHostHeading')) + h + rest;
+function lowerShare(o = {}) {
+  return connCard({ cell: true, vpn: true }) +
+    card(`<div class="lr disc">${ic('i-info', 'lr-i')}<div class="lr-t"><div class="t-body">${t('MobileHowItWorks')}</div></div>${ic('i-chevd', 'chev')}</div><p class="t-caption muted" style="margin:0">${t('MobileHostDescription')}</p>`) +
+    card(`<h3 class="t-heading">${t('MobileGuestRoleTitle')}</h3><p class="t-caption muted" style="margin:0">${t('MobileGuestRoleNote')}</p>`) +
+    card(`<h3 class="t-heading">${t('AboutSignedInLabel')}</h3>
+      ${row('i-user', t('MobileSignedInAsFormat', ltr('layla@example.com')))}
+      ${row('i-lang', t('SettingsLanguageLabel'), '', `<span class="chip">${L === 'en' ? 'العربية' : 'English'}</span>`)}
+      <div class="lr danger-row">${ic('i-signout', 'lr-i mir')}<div class="lr-t"><div class="t-body">${t('TraySignOut')}</div></div></div>`);
+}
+function sessionHero(o = {}) {
+  const g = nm('sara');
+  const phase = o.connecting ? t('SessionPhaseConnecting') : t('SessionPhaseActive');
+  return `<section class="hero session" aria-live="polite">${motif('session')}
+    <h2 class="t-title ht">${t('MobileServiceSessionTitleFormat', g)}</h2>
+    <div class="phase t-caption"><span class="pd ${o.connecting ? 'pend' : ''}"></span>${phase} · ${ltr('MacBook Air')}</div>
+    ${o.connecting ? '' : `<div class="tl-block"><div class="t-caption muted">${t('MobileSessionTimeLeftLabel')}</div><div class="big num">${ltr('41:12')}</div><div class="t-caption muted">${ic('i-data', 'tiny')} ${t('MobileDataUsedFormat', ltr('120 MB'))}</div></div>`}
+    ${o.auto ? banner('info', 'i-info', t('MobileSessionAutoNoteFormat', g)) : ''}
+    ${btn('p', t('MobileEndSessionNow'), 'i-stop', 'full')}</section>`;
+}
+
+// ---------------------------------------------------------------- screens
+const S = {};
+const def = (id, group, caption, o) => { S[id] = Object.assign({ id, group, caption }, o); };
+
+def('splash', 'start', 'System splash (Android 12+): canvas + the launcher icon', {
+  raw: () => `<div class="center">${symbolBadge(104)}</div>`, nav: false });
+def('starting', 'start', 'Starting: same symbol in the same place; text appears after 1 s', {
+  raw: () => `<div class="center">${symbolBadge(104)}<div class="start-t"><div class="t-body muted">${t('MobileStarting')}</div><div class="bar"><i></i></div></div></div>`, nav: false });
+
+function signin(o = {}) {
+  const lock = `<img class="lock" alt="${t('AppName')}" src="${LOCK[L][TH]}">`;
+  return `<div class="sc pad">
+    <div class="si-top"><span class="chip lang-chip">${ic('i-lang', 'tiny')} ${L === 'en' ? 'العربية' : 'English'}</span></div>
+    ${lock}
+    ${o.notice ? banner('info', 'i-info', `<b>${t('SignedOutTitle')}</b><br>${t('SignedOutSessionExpired')}`) : ''}
+    <h1 class="t-title">${t('LoginHeading')}</h1>
+    <p class="t-body muted" style="margin:0">${t('MobileLoginDescription')}</p>
+    ${field(t('LoginServerUrlLabel'), 'https://josour.family.example', { help: t('MobileServerUrlHelp'), dis: o.busy })}
+    ${field(t('LoginEmailLabel'), 'layla@example.com', { dis: o.busy })}
+    ${field(t('LoginPasswordLabel'), '••••••••••', { eye: true, dis: o.busy, err: o.err })}
+    ${o.err ? banner('danger', 'i-danger', t('LoginErrorInvalidCredentials')) : ''}
+    ${o.busy ? btn('p', t('MobileSigningIn'), '', 'full busy') : btn('p', t('LoginSignIn'), '', 'full')}
+  </div>`;
+}
+def('signin', 'signin', 'Sign-in: lock-up for the language, labelled fields, LTR values', { raw: () => signin(), nav: false });
+def('signin-err', 'signin', 'Sign-in error: announced danger banner next to the button', { raw: () => signin({ err: true }), nav: false, scroll: 'bottom' });
+def('signin-busy', 'signin', 'Busy: fields disabled, the button says what is happening', { raw: () => signin({ busy: true }), nav: false, scroll: 'bottom' });
+def('signin-notice', 'signin', 'Signed out by the server: the reason stays on screen', { raw: () => signin({ notice: true }), nav: false });
+
+def('share-off', 'share', 'Off — with the two permissions still missing', { tabs: 's',
+  body: () => shareTop(hero({ m: 'off', title: t('MobileStatusOffTitle'), text: t('MobileStatusOffText'), toggle: false }),
+    card(`<h3 class="t-heading">${t('MobileBeforeYouStart')}</h3>
+      ${row('i-belloff', t('MobileNotificationsHint'))}${btn('s', t('MobileNotificationsAllow'), '', 'full')}
+      <hr>${row('i-battery', t('MobileBatteryHint'))}${btn('s', t('MobileBatteryAllow'), '', 'full')}`)) });
+def('share-connecting', 'share', 'Connecting — a short wait, not a failure', { tabs: 's', sb: { fg: 1 },
+  body: () => shareTop(hero({ m: 'connecting', title: t('MobileStatusConnectingTitle'), text: t('MobileStatusConnectingText'), toggle: true }), connCard({ server: t('StatusReconnecting') })) });
+def('share-ready', 'share', 'Ready — with an invitation waiting (banner + badge)', { tabs: 's', badge: 1, sb: { fg: 1 },
+  body: () => shareTop(hero({ m: 'ready', icon: 'i-check', tone: 'ok', title: t('MobileStatusReadyTitle'), text: t('MobileReadyText'), toggle: true }), inviteBanner() + connCard()) });
+def('share-lower', 'share', 'Scrolled: network (mobile data + VPN warnings), how it works, guest role, account', { tabs: 's', sb: { fg: 1, net: 'cell' }, scroll: 'bottom',
+  body: () => shareTop(hero({ m: 'ready', icon: 'i-check', tone: 'ok', title: t('MobileStatusReadyTitle'), text: t('MobileReadyText'), toggle: true }), lowerShare()) });
+def('share-unreach', 'share', 'Unreachable — broken arch, one Reconnect button', { tabs: 's', sb: { fg: 1 },
+  body: () => shareTop(hero({ m: 'unreach', icon: 'i-warn', title: t('MobileStatusUnreachableTitle'), text: t('MobileUnreachableText'),
+    extra: `<div class="phase t-caption"><span class="pd pend"></span>${t('StatusReconnecting')}</div>`, btn: btn('p', t('MobileReconnectNow'), '', 'full'), toggle: true }), connCard({ server: t('StatusReconnecting') })) });
+def('share-nonet', 'share', 'Needs attention: no internet', { tabs: 's', sb: { fg: 1, net: 'none' },
+  body: () => shareTop(hero({ m: 'unreach', icon: 'i-nonet', title: t('MobileStatusNoNetworkTitle'), text: t('MobileStatusNoNetworkText'), toggle: true })) });
+def('share-notif', 'share', 'Needs attention: notifications off', { tabs: 's', sb: { fg: 1 },
+  body: () => shareTop(hero({ m: 'attention', icon: 'i-belloff', title: t('MobileStatusAttentionTitle'), text: t('MobileNotificationsOffWarning'), btn: btn('p', t('MobileNotificationsAllow'), '', 'full'), toggle: true }), connCard()) });
+def('share-battery', 'share', 'Needs attention: battery restricted', { tabs: 's', sb: { fg: 1 },
+  body: () => shareTop(hero({ m: 'attention', icon: 'i-battery', title: t('MobileStatusAttentionTitle'), text: t('MobileBatteryRestricted'), btn: btn('p', t('MobileBatteryAllow'), '', 'full'), toggle: true }), connCard()) });
+def('share-session', 'share', 'In session — the hero becomes the session; End is one tap', { tabs: 's', sb: { fg: 1 },
+  body: () => shareTop(sessionHero(), card(toggleRow(true)) + connCard()) });
+def('share-session-auto', 'share', 'In session, accepted automatically (trusted contact)', { tabs: 's', sb: { fg: 1 },
+  body: () => shareTop(sessionHero({ auto: true }), card(toggleRow(true))) });
+def('share-session-conn', 'share', 'Session starting (Preparing / Connecting) — End already available', { tabs: 's', sb: { fg: 1 },
+  body: () => shareTop(sessionHero({ connecting: true }), card(toggleRow(true)) + connCard()) });
+def('share-ended', 'share', 'Session ended — reason + data, then Dismiss', { tabs: 's', sb: { fg: 1 },
+  body: () => shareTop(hero({ m: 'ended', small: true, title: t('SessionPhaseEnded'), text: `${t('SessionEndedByPeer')} · ${t('MobileDataUsedFormat', ltr('120 MB'))}`, btn: btn('s', t('SessionDismiss'), '', 'full') }), card(toggleRow(true)) + connCard()) });
+def('share-signout', 'share', 'Sign out asks first, and names what stops', { tabs: 's', sb: { fg: 1 }, scroll: 'bottom',
+  body: () => shareTop(sessionHero(), card(toggleRow(true)) + lowerShare()),
+  overlay: () => sheet(`<h2 class="t-title">${t('MobileSignOutConfirmTitle')}</h2><p class="t-body muted">${t('MobileSignOutConfirmSessionFormat', nm('sara'))}</p>
+     <div class="b2">${btn('s', t('SettingsCancel'))}${btn('d', t('TraySignOut'))}</div>`) });
+
+const sheet = inner => `<div class="scrim"></div><div class="sheet" role="dialog"><span class="handle"></span>${inner}</div>`;
+function contactCard(k, email, online, trusted, o = {}) {
+  return card(`<div class="lr">${avatar(k)}<div class="lr-t"><div class="t-heading">${nm(k)}</div>
+      <div class="t-caption muted pres"><span class="presence ${online ? 'on' : 'off'}"></span>${t(online ? 'ContactOnline' : 'ContactOffline')} · ${ltr(email)}</div></div></div>
+    <hr><div class="trow nb"><span class="t-body">${t('ContactAllowAlways')}</span>${sw(trusted)}</div>
+    <div class="t-caption muted">${t(trusted ? 'MobileTrustOnHelp' : 'MobileTrustOffHelp')}</div>
+    ${o.confirm ? `<div class="confirm">${banner('danger', 'i-danger', t('MobileRemoveConfirmFormat', nm(k)))}<div class="b2">${btn('s', t('MobileContactCancel'))}${btn('d', t('ContactRemove'))}</div></div>`
+      : `<div class="end-row"><span class="tb danger">${t('ContactRemove')}</span></div>`}`);
+}
+function inviteCard(o = {}) {
+  return card(`<h3 class="t-heading">${t('MobileInviteHeading')}</h3>
+    ${field(t('ContactsInvitePlaceholder'), o.value || '', { ph: 'name@example.com', help: t('MobileInviteHelp'), err: o.err })}
+    ${btn('p', t('ContactsInviteButton'), 'i-person', 'full')}
+    ${o.ok ? banner('success', 'i-check', t('ContactsInviteSentFormat', ltr('khalid@example.com'))) : ''}
+    ${o.err ? banner('danger', 'i-danger', t('ContactsInviteFailedFormat', ltr('No account uses this email address.'))) : ''}`, 'invite');
+}
+const sent = () => `<h3 class="t-heading sec">${t('ContactsOutgoingTitle')}</h3>` + card(
+  `<div class="lr">${ic('i-mail', 'lr-i')}<div class="lr-t"><div class="t-body">${ltr('khalid@example.com')}</div><div class="t-caption muted">${t('ContactsOutgoingPending')}</div></div><span class="tb">${t('ContactsWithdraw')}</span></div><hr>
+   <div class="lr">${ic('i-mail', 'lr-i')}<div class="lr-t"><div class="t-body">${ltr('noor@example.com')}</div><div class="t-caption muted">${ic('i-clock', 'tiny')} ${t('ContactsOutgoingExpired')}</div></div><span class="tb">${t('ContactsWithdraw')}</span></div>`);
+const incomingInvite = () => `<h3 class="t-heading sec">${t('ContactsIncomingTitle')}</h3>` + card(
+  `<div class="lr">${avatar('mona')}<div class="lr-t"><div class="t-body"><b>${t('ContactsIncomingFormat', nm('mona'))}</b></div><div class="t-caption muted">${ltr('mona@example.com')}</div></div></div>
+   <div class="b2">${btn('s', t('ContactsDecline'))}${btn('s', t('ContactsAccept'))}</div>`, 'attn');
+const contactsHead = () => header(t('ContactsPageTitle')) + `<p class="t-caption muted intro">${t('MobileContactsDescription')}</p>`;
+
+def('contacts-loading', 'contacts', 'Loading — placeholders, never the empty state', { tabs: 'c',
+  body: () => contactsHead() + `<div class="skel" role="progressbar" aria-label="${t('MobileContactsLoading')}">${'<div class="sk"><i class="a"></i><i class="l1"></i><i class="l2"></i></div>'.repeat(3)}</div>` });
+def('contacts-empty', 'contacts', 'Empty — motif with both dots open, then the invite card', { tabs: 'c',
+  body: () => contactsHead() + `<section class="empty">${motif('empty', 72)}<h2 class="t-heading">${t('ContactsEmptyTitle')}</h2><p class="t-body muted">${t('ContactsEmptyText')}</p></section>` + inviteCard() });
+def('contacts-full', 'contacts', 'Invitations first, then contacts with the trust toggle', { tabs: 'c', badge: 1,
+  body: () => contactsHead() + incomingInvite() + `<h3 class="t-heading sec">${t('ContactsPageTitle')}</h3>` + contactCard('sara', 'sara@example.com', true, true) + contactCard('ahmad', 'ahmad@example.com', false, false) });
+def('contacts-lower', 'contacts', 'Scrolled: inline Remove confirmation, invite sent, sent invitations', { tabs: 'c', scroll: 'bottom',
+  body: () => contactsHead() + `<h3 class="t-heading sec">${t('ContactsPageTitle')}</h3>` + contactCard('sara', 'sara@example.com', true, true) + contactCard('ahmad', 'ahmad@example.com', false, false, { confirm: true }) + inviteCard({ ok: true }) + sent() });
+def('contacts-trust', 'contacts', 'Turning trust ON asks first (OFF is immediate)', { tabs: 'c',
+  body: () => contactsHead() + `<h3 class="t-heading sec">${t('ContactsPageTitle')}</h3>` + contactCard('sara', 'sara@example.com', true, true) + contactCard('ahmad', 'ahmad@example.com', false, false),
+  overlay: () => sheet(`<h2 class="t-title">${t('MobileTrustConfirmTitleFormat', nm('ahmad'))}</h2><p class="t-body muted">${t('MobileTrustConfirmText')}</p>
+    <div class="b2">${btn('s', t('SettingsCancel'))}${btn('s', t('MobileTrustAllow'))}</div>`) });
+def('contacts-invite-err', 'contacts', 'Invite failed — the reason next to the field', { tabs: 'c', scroll: 'bottom',
+  body: () => contactsHead() + `<section class="empty">${motif('empty', 72)}<h2 class="t-heading">${t('ContactsEmptyTitle')}</h2><p class="t-body muted">${t('ContactsEmptyText')}</p></section>` + inviteCard({ value: 'khalid@exmple.com', err: true }) });
+
+function request(o = {}) {
+  const g = nm('sara');
+  const sites = ['bank.example.sa', 'my.gov.example', 'tax.gov.example'];
+  const scope = o.unrestricted
+    ? `<h3 class="t-heading">${t('IncomingRequestScopeLabel')}</h3><p class="t-body" style="margin:0">${t('MobileScopeUnrestricted')}</p>`
+    : o.unavailable
+      ? `<h3 class="t-heading">${t('IncomingRequestAllowedSitesLabel')}</h3>${banner('warning', 'i-warn', t('AllowedSitesUnavailable'))}`
+      : `<h3 class="t-heading">${t('IncomingRequestAllowedSitesLabel')}</h3><p class="t-caption muted" style="margin:0">${t('AllowedSitesNote')}</p><ul class="sites">${sites.map(s => `<li>${ic('i-link', 'tiny')}<bdi dir="ltr">${s}</bdi></li>`).join('')}</ul>`;
+  const top = `<div class="rq-top">${o.expired ? `<span class="cd-pill exp">${ic('i-clock', 'tiny')}${t('RequestExpired')}</span>` : `<span class="cd-pill">${ic('i-clock', 'tiny')}${t('CountdownFormat', 37)}<i style="--p:.62"></i></span>`}</div>`;
+  return `<div class="rq ${o.expired ? 'expired' : ''}">${top}<div class="sc pad rq-body">
+    <div class="rq-h">${motif('offer', 64)}<h1 class="t-title">${t('IncomingRequestHeadingFormat', g)}</h1></div>
+    ${o.expired ? banner('info', 'i-info', t('MobileRequestExpiredFormat', g), `<span class="b b-s full">${t('SessionDismiss')}</span>`) : ''}
+    ${card(`${row('i-user', `<span class="muted">${t('IncomingRequestRequesterLabel')}</span> · ${g}`)}${row('i-laptop', `<span class="muted">${t('IncomingRequestDeviceLabel')}</span> · ${ltr('MacBook Air')}`)}${row('i-clock', `<span class="muted">${t('IncomingRequestDurationLabel')}</span> · ${t('DurationMinutesFormat', 30)}`)}`, 'facts')}
+    ${card(scope)}
+    <section class="conseq">${ic('i-info')}<div><h3 class="t-heading">${t('MobileConsequenceTitle')}</h3><p class="t-body">${t('MobileConsequence')}</p><p class="t-caption muted">${t('MobileEndAnytimeHint')}</p></div></section>
+    <label class="cb"><span class="box" role="checkbox" aria-checked="false"></span><span><span class="t-body">${t('IncomingRequestTrustThisGuest')}</span><span class="t-caption muted d">${t('IncomingRequestTrustHint')}</span></span></label>
+    <div class="b2 rq-b">${btn('s', t('Reject'), 'i-x')}${btn('s', t('Accept'), 'i-ok')}</div>
+  </div></div>`;
+}
+def('req-top', 'request', 'Request arrives: who, which device, how long, which sites', { raw: () => request(), nav: false });
+def('req-bottom', 'request', 'Scrolled: the consequence sits directly above equal Accept / Reject', { raw: () => request(), nav: false, scroll: 'bottom' });
+def('req-unrestricted', 'request', 'No site list on this server: the wider scope in plain words', { raw: () => request({ unrestricted: true }), nav: false, scroll: 'bottom' });
+def('req-unavailable', 'request', 'Site list could not be loaded — never shown as an empty list', { raw: () => request({ unavailable: true }), nav: false, scroll: 'bottom' });
+def('req-expired', 'request', 'Expired: stays until dismissed, so a slow reader is told why', { raw: () => request({ expired: true }), nav: false });
+
+// ---------------------------------------------------------------- system surfaces
+const app = (svg, label) => `<figure class="app">${svg}<figcaption>${label}</figcaption></figure>`;
+const gen = (bg, inner) => `<svg viewBox="0 0 60 60" aria-hidden="true"><circle cx="30" cy="30" r="30" fill="${bg}"/>${inner}</svg>`;
+const josourIcon = (bg = '#0E7490', fg = '#FFFFFF') => `<svg viewBox="18 18 72 72" aria-hidden="true"><circle cx="54" cy="54" r="36" fill="${bg}"/><path transform="translate(24 18.375) scale(2.5)" d="${SYM}" fill="${fg}"/></svg>`;
+function home(themed) {
+  const dark = TH === 'dark';
+  const tb = themed ? (dark ? ['#2C4A4F', '#BFE6EC'] : ['#D3ECEE', '#1E4950']) : null;
+  const g1 = themed ? gen(tb[0], `<rect x="19" y="19" width="22" height="22" rx="4" fill="${tb[1]}"/>`) : gen('#E8EAED', '<rect x="19" y="19" width="22" height="22" rx="4" fill="#80868B"/>');
+  const g2 = themed ? gen(tb[0], `<circle cx="30" cy="30" r="10" fill="none" stroke="${tb[1]}" stroke-width="5"/>`) : gen('#FCE8E6', '<circle cx="30" cy="30" r="10" fill="none" stroke="#A3523F" stroke-width="5"/>');
+  const g3 = themed ? gen(tb[0], `<path d="M18 22h24v16H18z" fill="none" stroke="${tb[1]}" stroke-width="4"/>`) : gen('#E6F4EA', '<path d="M18 22h24v16H18z" fill="none" stroke="#3B7A57" stroke-width="4"/>');
+  const g4 = themed ? gen(tb[0], `<path d="M20 40 30 18l10 22z" fill="${tb[1]}"/>`) : gen('#FEF7E0', '<path d="M20 40 30 18l10 22z" fill="#9A6B00"/>');
+  const label = L === 'ar' ? 'جسور' : 'Josour';
+  const names = L === 'ar' ? ['الملفات', 'الكاميرا', 'الرسائل', 'الخرائط'] : ['Files', 'Camera', 'Messages', 'Maps'];
+  const jo = themed ? josourIcon(tb[0], tb[1]) : josourIcon();
+  return `<div class="home ${dark ? 'dk' : ''}"><div class="clock">12:30</div><div class="apps">${app(g1, names[0])}${app(g2, names[1])}${app(jo, label)}${app(g3, names[2])}${app(g4, names[3])}</div>
+    <div class="dock">${app(g2, '')}${app(g3, '')}${app(jo, '')}${app(g1, '')}</div></div>`;
+}
+def('sys-home', 'system', 'Launcher: adaptive icon (white on teal); label follows the phone language', { raw: () => home(false), nav: false });
+def('sys-home-themed', 'system', 'Themed icons on (Android 13+): the monochrome layer', { raw: () => home(true), nav: false });
+const notif = (title, body, o = {}) => `<div class="nt ${o.silent ? 'silent' : ''}"><div class="nt-h"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${SYM}" fill="currentColor"/></svg><span>${t('AppName')}${o.ch ? ' · ' + o.ch : ''} · ${o.when || (L === 'ar' ? 'الآن' : 'now')}</span>${o.chrono ? `<span class="chrono">${ic('i-clock', 'tiny')}<bdi dir="ltr">${o.chrono}</bdi></span>` : ''}</div>
+  <div class="nt-t">${title}</div><div class="nt-b">${body}</div>${o.actions ? `<div class="nt-a">${o.actions.map(a => `<span>${a}</span>`).join('')}</div>` : ''}</div>`;
+const shade = inner => `<div class="shade"><div class="qs"><span class="qt on">${ic('i-wifi', 'tiny')}</span><span class="qt">${ic('i-cell', 'tiny')}</span><span class="qt">${ic('i-belloff', 'tiny')}</span><span class="qt">${ic('i-battery', 'tiny')}</span></div>${inner}</div>`;
+def('sys-shade', 'system', 'Shade: “available” (silent, Stop sharing) and an invitation', { raw: () => shade(
+  notif(t('MobileInvitationTitle'), t('ContactsIncomingFormat', nm('mona'))) +
+  notif(t('MobileServiceAvailableTitle'), t('MobileServiceAvailableText'), { silent: 1, ch: t('MobileServiceChannelName'), actions: [t('MobileStopHosting')] })), nav: false, sb: { fg: 1 } });
+def('sys-shade-session', 'system', 'Shade in session: guest, countdown chronometer, data, End', { raw: () => shade(
+  notif(t('MobileServiceSessionTitleFormat', nm('sara')), t('MobileDataUsedFormat', ltr('120 MB')), { silent: 1, ch: t('MobileServiceChannelName'), chrono: '41:12', actions: [t('MobileEndSessionNow')] }) +
+  notif(t('AutoAcceptToastTitle'), t('MobileAutoAcceptBodyFormat', nm('sara'), ltr('MacBook Air')), { when: L === 'ar' ? 'قبل ٢ د'.replace('٢', '2') : '2 min' })), nav: false, sb: { fg: 1 } });
+def('sys-lock', 'system', 'Lock screen: request heads-up — no Accept action, by design', { raw: () => `<div class="lock-s ${TH === 'dark' ? 'dk' : ''}"><div class="lk-c">12:30</div>
+  ${notif(t('ToastIncomingRequestTitle'), t('ToastIncomingRequestBodyFormat', nm('sara'), ltr('MacBook Air'), 30) + '<br>' + t('MobileRequestTapToAnswer'), { ch: t('MobileRequestsChannelName') })}</div>`, nav: false, sb: { fg: 1 } });
+
+def('future-tab', 'future', 'Placement only: a third tab when the phone can be a guest', { tabs: 's', third: true, sb: { fg: 1 },
+  body: () => shareTop(hero({ m: 'ready', icon: 'i-check', tone: 'ok', title: t('MobileStatusReadyTitle'), text: t('MobileReadyText'), toggle: true }), connCard()) });
+
+// ---------------------------------------------------------------- frame
+function frame(id, lang, theme, fs = 1, extraCls = '') {
+  L = lang; TH = theme;
+  const s = S[id];
+  const inner = s.raw ? s.raw() : `<div class="sc pad">${s.body()}</div>`;
+  const isRq = id.startsWith('req');
+  const body = isRq ? (s.scroll ? inner.replace('<div class="sc pad rq-body">', '<div class="sc pad rq-body" data-scroll="rq">') : inner)
+    : `<div class="scw" ${s.scroll ? 'data-scroll="bottom"' : ''}>${inner}</div>`;
+  return `<figure class="fw ${extraCls}" data-lang="${lang}" data-theme="${theme}">
+    <div class="ph ${theme === 'dark' ? 'td' : 'tl'}" dir="${lang === 'ar' ? 'rtl' : 'ltr'}" lang="${lang}" style="--fs:${fs}">
+      ${sb(s.sb || {})}<div class="bd">${body}</div>${s.tabs ? tabbar(s.tabs, s.badge || 0, s.third) : ''}<div class="gb"><i></i></div>
+      ${s.overlay ? `<div class="ov">${s.overlay()}</div>` : ''}
+    </div><figcaption>${lang === 'ar' ? 'العربية' : 'English'} · ${theme === 'dark' ? 'Dark' : 'Light'}${fs > 1 ? ' · font 200%' : ''}</figcaption></figure>`;
+}
+function applyScrolls(root) {
+  root.querySelectorAll('[data-scroll]').forEach(el => {
+    let vp;
+    if (el.dataset.scroll === 'rq') { const rq = el.closest('.rq'); vp = rq.clientHeight - rq.querySelector('.rq-top').offsetHeight; }
+    else vp = el.parentElement.clientHeight;
+    el.style.transform = `translateY(-${Math.max(0, el.offsetHeight - vp)}px)`;
+  });
+}
+
+const GROUPS = [
+ ['g-start', '1 · Starting', 'The system splash and the app’s own Starting screen show the same icon in the same place, so the hand-off is seamless.', ['splash', 'starting']],
+ ['g-signin', '2 · Sign-in', 'The lock-up for the current language (the white variant in dark mode), real labels, and values kept left to right. Errors appear next to the button and are announced.', ['signin', 'signin-err', 'signin-busy', 'signin-notice']],
+ ['g-share', '3 · Share tab', 'The hero answers one question first: can a request reach me right now, and if not, what do I do? Everything else sits below it.', ['share-off', 'share-connecting', 'share-ready', 'share-lower', 'share-unreach', 'share-nonet', 'share-notif', 'share-battery', 'share-session', 'share-session-auto', 'share-session-conn', 'share-ended', 'share-signout']],
+ ['g-contacts', '4 · Contacts tab', 'Invitations come first. "Without asking" is a toggle with its consequence written under it, and turning it on asks first.', ['contacts-loading', 'contacts-empty', 'contacts-full', 'contacts-lower', 'contacts-trust', 'contacts-invite-err']],
+ ['g-request', '5 · Incoming request', 'Full screen, with the countdown pinned at the top and calm. Who, device, duration and scope come first, then the consequence directly above two equal buttons. Trust is never ticked by default.', ['req-top', 'req-bottom', 'req-unrestricted', 'req-unavailable', 'req-expired']],
+ ['g-system', '6 · System surfaces', 'Launcher icon (option B) and themed icon, the persistent notification in both modes, the request heads-up on the lock screen, and an invitation.', ['sys-home', 'sys-home-themed', 'sys-shade', 'sys-shade-session', 'sys-lock']],
+];
+const FONT = ['share-session', 'req-bottom', 'contacts-full'];
+const ORDER = [['ar', 'light'], ['ar', 'dark'], ['en', 'light'], ['en', 'dark']];
+function rowHtml(id, fs = 1) {
+  const s = S[id];
+  return `<div class="srow"><h4>${s.caption.replace(' — ', ' <span>— ') + (s.caption.includes(' — ') ? '</span>' : '')}</h4><div class="frames">${ORDER.map(([l, th]) => frame(id, l, th, fs)).join('')}</div></div>`;
+}
+let html = '';
+for (const [gid, title, note, ids] of GROUPS) {
+  html += `<section class="sec group" id="${gid}"><div class="wrap"><h3>${title}</h3><p class="intro">${note}</p>${ids.map(i => rowHtml(i)).join('')}</div></section>`;
+}
+html += `<section class="sec group" id="g-font"><div class="wrap"><h3>7 · Font size 200%</h3><p class="intro">Android's largest font setting doubles the text but not the layout (sp against dp). Text wraps and the screens scroll; nothing is clipped. The session's End button and the request's two buttons stay full size.</p>${FONT.map(i => rowHtml(i, 2)).join('')}</div></section>`;
+html += `<section class="sec group" id="g-future"><div class="wrap"><h3>8 · Room for the guest role</h3><p class="intro">Placement only. When the phone can borrow a connection, a third tab, "Use a connection", joins the bar. Nothing else on Share or Contacts moves.</p>${rowHtml('future-tab')}</div></section>`;
+document.getElementById('groups').innerHTML = html;
+
+const FLOW = [['splash', 'Open the app'], ['signin', 'First launch: sign in'], ['share-off', 'Signed in, not sharing yet'], ['share-connecting', 'Turn on Available'], ['share-ready', 'Ready: put the phone away'],
+  ['sys-lock', 'A request arrives in the background'], ['req-top', 'Tap: the request screen'], ['req-bottom', 'Read what accepting means, answer'], ['share-session', 'Session: End is one tap away'],
+  ['sys-shade-session', '… and in the notification'], ['share-ended', 'Ended (by either side)'], ['share-ready', 'Dismiss: ready again']];
+document.getElementById('flowRows').innerHTML = ['ar', 'en'].map(l => `<div class="flow">${FLOW.map(([id, cap], i) =>
+  `${i ? '<span class="arrow" aria-hidden="true">' + (l === 'ar' ? '←' : '→') + '</span>' : ''}<div class="step"><b>${i + 1}. ${cap}</b>${frame(id, l, 'light')}</div>`).join('')}</div>`).join('');
+
+// copy table
+const label = { 'new': ['p-new', 'new'], 'edit-mobile': ['p-em', 'edit · mobile'], 'edit-shared': ['p-es', 'edit · shared'], 'later': ['p-later', 'later'] };
+const rows = Object.entries(STR).filter(([, v]) => v.s !== 'same').concat(Object.entries(STR_EXTRA));
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+document.getElementById('copyTable').innerHTML = `<table><thead><tr><th>Key</th><th>Change</th><th>English</th><th>Arabic</th><th>Where · was</th></tr></thead><tbody>${rows.map(([k, v]) =>
+  `<tr><td><code>${k}</code></td><td><span class="pill ${label[v.s][0]}">${label[v.s][1]}</span></td><td>${esc(v.en)}</td><td class="arv" lang="ar">${esc(v.ar)}</td><td class="note">${esc(v.w || '')}${v.old ? (v.w ? '<br>' : '') + 'Was: ' + esc(v.old) : ''}</td></tr>`).join('')}</tbody></table>
+  <p class="note" style="padding:10px 12px;margin:0">${rows.length} keys: ${rows.filter(r => r[1].s === 'new').length} new, ${rows.filter(r => r[1].s === 'edit-mobile').length} mobile edits, ${rows.filter(r => r[1].s === 'edit-shared').length} shared edits (the desktop shows these too), 1 reserved for later.</p>`;
+
+applyScrolls(document);
+// controls
+document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+  const k = b.dataset.k, v = b.dataset.v;
+  b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  if (k === 's') document.documentElement.style.setProperty('--s', v);
+  else document.body.dataset[k] = v;
+}));
+</script>
+</body>
+</html>

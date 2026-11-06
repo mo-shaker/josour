@@ -28,8 +28,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The Arabic fallback font (MobileApp.UseFonts) and its licence; see Assets/Fonts/OFL.txt. -->
+    <!-- Readex Pro, the interface font for Arabic and Latin (MobileApp.UseFonts), and its licence beside it. -->
     <AvaloniaResource Include="Assets/Fonts/*.ttf" />
+    <AvaloniaResource Include="Assets/Fonts/OFL.txt" />
   </ItemGroup>
 
   <ItemGroup>

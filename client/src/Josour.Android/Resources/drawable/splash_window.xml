@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The window behind the app before Android 12: the canvas with the splash badge where Android 12+ draws its own. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+  <item android:drawable="@color/josour_canvas" />
+  <item android:drawable="@drawable/splash_icon" android:gravity="center" android:width="288dp" android:height="288dp" />
+</layer-list>

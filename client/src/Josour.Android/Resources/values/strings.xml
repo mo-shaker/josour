@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- The launcher label follows the phone's language (values-ar); the app's own language switch is separate. -->
+  <string name="app_name">Josour</string>
+</resources>

@@ -6,6 +6,26 @@ Every release of Josour: the apps, the server and the relay share one version nu
 
 ## Unreleased
 
+### Android
+- **A new look around the qantara mark.** The phone's interface is rebuilt on the new logo
+  ([docs/design/mobile-phase1-foundation.html](docs/design/mobile-phase1-foundation.html), mockups in
+  [mobile-phase2-mockups.html](docs/design/mobile-phase2-mockups.html)): colours derived from the logo's teal and ink with
+  light and dark themes, Readex Pro (the wordmark's own typeface) for Arabic and English instead of Noto Naskh Arabic UI,
+  the lock-up on the sign-in screen, and a new launcher icon (adaptive, with a themed icon on Android 13+), notification
+  icon and splash screen.
+- **The Share tab answers one question first**: can a request reach the phone right now, and if not, what to do. One status
+  (off, getting ready, ready, unreachable, no internet, needs attention, in session, ended) with the one button that fixes
+  it; a short reconnect no longer reads as "requests can't reach you".
+- **Consent screens are fairer.** Accept and Reject on a request are the same size and weight and come after "What
+  accepting means"; an expired request says so instead of vanishing; letting a contact connect without asking now asks
+  for confirmation first; signing out asks first and names what stops.
+- Text follows Android's font size setting (up to 200%, non-linearly as Android does), every control has an accessible
+  name, the session notification counts the time left down by itself, and the theme follows the phone's light or dark
+  setting while the app runs. Sign-in shows why the server signed the phone out.
+- Some shared wording changed meaning-for-meaning on Windows and macOS too: "the person who runs your Josour server"
+  instead of "your administrator", "this server's list of allowed sites" instead of "the company allow-list", "From"
+  instead of "Requester", and "N seconds left to answer".
+
 ### Server
 - **The same-network warning now works over IPv6.** Each device on an IPv6 network has its own address, so
   `same_public_ip` (in the host list and in `session.created`) now compares the `/64` network instead of the exact

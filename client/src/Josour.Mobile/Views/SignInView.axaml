@@ -1,0 +1,57 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:m="using:Josour.Mobile"
+             xmlns:c="using:Josour.Mobile.Controls"
+             xmlns:v="using:Josour.Mobile.Views"
+             xmlns:vm="using:Josour.Mobile.ViewModels"
+             x:Class="Josour.Mobile.Views.SignInView"
+             x:DataType="vm:SignInViewModel">
+  <!-- Sign-in: the lock-up for the language, labelled fields with values left to right, the reason for a sign-out. -->
+  <ScrollViewer>
+    <StackPanel Margin="20,16,20,28" Spacing="14">
+      <Button Classes="chip" HorizontalAlignment="Right"
+              Command="{CompiledBinding $parent[v:MainView].((vm:MainViewModel)DataContext).SwitchLanguageCommand}"
+              AutomationProperties.Name="{m:Tr SettingsLanguageLabel}">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <c:Icon Kind="Language" Classes="small" />
+          <TextBlock TextWrapping="NoWrap" Text="{CompiledBinding $parent[v:MainView].((vm:MainViewModel)DataContext).SwitchLanguageText}" />
+        </StackPanel>
+      </Button>
+
+      <c:BrandLockup Width="230" HorizontalAlignment="Left" AutomationProperties.Name="{m:Tr AppName}" />
+
+      <c:Banner Kind="Info" IsVisible="{Binding HasNotice}" AutomationProperties.LiveSetting="Polite">
+        <TextBlock Text="{Binding NoticeText}" />
+      </c:Banner>
+
+      <TextBlock Classes="title" Text="{m:Tr LoginHeading}" />
+      <TextBlock Classes="body muted" Text="{m:Tr MobileLoginDescription}" />
+
+      <StackPanel Spacing="6">
+        <TextBlock Name="ServerLabel" Classes="label" Text="{m:Tr LoginServerUrlLabel}" />
+        <TextBox Classes="ltr" Text="{Binding ServerUrl}" Watermark="{m:Tr LoginServerUrlPlaceholder}" IsEnabled="{Binding IsIdle}"
+                 TextInputOptions.ContentType="Url" AutomationProperties.LabeledBy="{Binding #ServerLabel}" />
+        <TextBlock Classes="caption muted" Text="{m:Tr MobileServerUrlHelp}" />
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Name="EmailLabel" Classes="label" Text="{m:Tr LoginEmailLabel}" />
+        <TextBox Classes="ltr" Text="{Binding Email}" IsEnabled="{Binding IsIdle}"
+                 TextInputOptions.ContentType="Email" AutomationProperties.LabeledBy="{Binding #EmailLabel}" />
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Name="PasswordLabel" Classes="label" Text="{m:Tr LoginPasswordLabel}" />
+        <TextBox Classes="ltr revealPasswordButton" Classes.error="{Binding HasError}" Text="{Binding Password}" PasswordChar="●"
+                 IsEnabled="{Binding IsIdle}" TextInputOptions.ContentType="Password" AutomationProperties.LabeledBy="{Binding #PasswordLabel}" />
+      </StackPanel>
+
+      <c:Banner Kind="Danger" IsVisible="{Binding HasError}" AutomationProperties.LiveSetting="Assertive">
+        <TextBlock Text="{Binding ErrorText}" />
+      </c:Banner>
+
+      <Button Classes="primary" HorizontalAlignment="Stretch" Command="{Binding SignInCommand}" Content="{Binding SignInButtonText}" />
+      <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

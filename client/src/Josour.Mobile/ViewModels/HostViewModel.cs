@@ -9,6 +9,7 @@ using Josour.Infrastructure.Api;
 using Josour.Infrastructure.Contacts;
 using Josour.Infrastructure.Localization;
 using Josour.Infrastructure.Session;
+using Josour.Mobile.Controls;
 using Josour.Mobile.Platform;
 using Josour.Mobile.Services;
 using Microsoft.Extensions.Logging;
@@ -40,6 +41,11 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
     private readonly ILogger<HostViewModel> _logger;
     private bool _suppressPublish;
     private RequestIncomingMessage? _autoAccepted;
+    private bool _autoAcceptPending;
+    private Guid? _sessionSeen;
+    private Guid? _chronometerSession;
+    private DateTimeOffset? _chronometerEnd;
+    private DateTime? _notConnectedSince = DateTime.UtcNow;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsReady))]
@@ -57,10 +63,32 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(IsDisconnected))]
     private bool _isConnected;
 
+    // ---- the status hero (docs/design/mobile-phase2-mockups.html) ----
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HeroMotif), nameof(IsStatusOff), nameof(IsStatusConnecting), nameof(IsStatusReady), nameof(IsStatusUnreachable),
+        nameof(IsStatusNoNetwork), nameof(IsStatusNeedsNotifications), nameof(IsStatusNeedsBackground), nameof(IsStatusInSession),
+        nameof(IsStatusSessionEnded), nameof(IsStatusProblem), nameof(ShowsAvailabilityInHero), nameof(HeroIcon), nameof(HasHeroIcon))]
+    private HostStatus _status;
+
+    [ObservableProperty]
+    private string _heroTitle = string.Empty;
+
+    [ObservableProperty]
+    private string _heroText = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NetworkIcon))]
+    private bool _hasNetwork = true;
+
+    /// <summary>"How sharing works" is open on the Share tab.</summary>
+    [ObservableProperty]
+    private bool _isHowItWorksOpen;
+
     [ObservableProperty]
     private string _statusText = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ServerStatusText))]
     private string _connectionText = string.Empty;
 
     [ObservableProperty]
@@ -70,6 +98,7 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
     private string _publicIpText = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NetworkIcon))]
     private bool _isCellular;
 
     [ObservableProperty]
@@ -112,6 +141,24 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string _sessionEndedText = string.Empty;
 
+    [ObservableProperty]
+    private string _sessionPhaseLine = string.Empty;
+
+    [ObservableProperty]
+    private string _sessionGuestName = string.Empty;
+
+    [ObservableProperty]
+    private string _sessionTimeLeftText = string.Empty;
+
+    [ObservableProperty]
+    private string _sessionDataUsedText = string.Empty;
+
+    [ObservableProperty]
+    private bool _sessionStartedAutomatically;
+
+    [ObservableProperty]
+    private string _sessionAutoNoteText = string.Empty;
+
     public HostViewModel(
         IControlChannel channel,
         SessionCoordinator sessions,
@@ -148,9 +195,66 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
         ApplyNetwork(_platform.Network.Current);
         ApplyPermissions();
         RefreshSession();
+        UpdateStatus();
     }
 
     public bool HasIncoming => Incoming is not null;
+
+    /// <summary>How long a lost connection may take to come back before the hero says requests cannot arrive.</summary>
+    public TimeSpan UnreachableGrace { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>How long an expired request stays on screen, saying so, unless it is closed sooner.</summary>
+    public TimeSpan ExpiredHold { get; set; } = TimeSpan.FromSeconds(10);
+
+    public MotifState HeroMotif => Status switch
+    {
+        HostStatus.Off => MotifState.Off,
+        HostStatus.Connecting => MotifState.Connecting,
+        HostStatus.Ready => MotifState.Ready,
+        HostStatus.Unreachable or HostStatus.NoNetwork => MotifState.Unreachable,
+        HostStatus.NeedsNotifications or HostStatus.NeedsBackground => MotifState.Attention,
+        HostStatus.InSession => MotifState.Session,
+        _ => MotifState.Ended,
+    };
+
+    public bool IsStatusOff => Status == HostStatus.Off;
+    public bool IsStatusConnecting => Status == HostStatus.Connecting;
+    public bool IsStatusReady => Status == HostStatus.Ready;
+    public bool IsStatusUnreachable => Status == HostStatus.Unreachable;
+    public bool IsStatusNoNetwork => Status == HostStatus.NoNetwork;
+    public bool IsStatusNeedsNotifications => Status == HostStatus.NeedsNotifications;
+    public bool IsStatusNeedsBackground => Status == HostStatus.NeedsBackground;
+    public bool IsStatusInSession => Status == HostStatus.InSession;
+    public bool IsStatusSessionEnded => Status == HostStatus.SessionEnded;
+
+    /// <summary>The icon beside the hero's title: a check when ready, the problem's own shape when something needs doing.</summary>
+    public IconKind HeroIcon => Status switch
+    {
+        HostStatus.Ready => IconKind.Check,
+        HostStatus.Unreachable => IconKind.Warning,
+        HostStatus.NoNetwork => IconKind.NoNetwork,
+        HostStatus.NeedsNotifications => IconKind.NotificationsOff,
+        HostStatus.NeedsBackground => IconKind.Battery,
+        _ => IconKind.None,
+    };
+
+    public bool HasHeroIcon => HeroIcon != IconKind.None;
+
+    public IconKind NetworkIcon => !HasNetwork ? IconKind.NoNetwork : IsCellular ? IconKind.Cellular : IconKind.Wifi;
+
+    public string ServerStatusText => Tr.Format(UiStringKeys.MobileServerStatusFormat, ConnectionText);
+
+    [RelayCommand]
+    private void ToggleHowItWorks() => IsHowItWorksOpen = !IsHowItWorksOpen;
+
+    /// <summary>A state the user has to act on: the hero's title carries a warning icon.</summary>
+    public bool IsStatusProblem => Status is HostStatus.Unreachable or HostStatus.NoNetwork or HostStatus.NeedsNotifications or HostStatus.NeedsBackground;
+
+    /// <summary>The "Available" switch sits in the hero except while a session holds it; then it moves below.</summary>
+    public bool ShowsAvailabilityInHero => Status is not (HostStatus.InSession or HostStatus.SessionEnded);
+
+    /// <summary>Off, with a permission still missing: the "Before you turn it on" card.</summary>
+    public bool ShowBeforeYouStart => !IsAvailable && (ShowNotificationsHint || ShowBatteryHint);
 
     /// <summary>Available, connected and confirmed by the server: a request can reach this phone right now.</summary>
     public bool IsReady => IsAvailable && IsConnected && IsAnnounced;
@@ -174,6 +278,7 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
         UpdateConnectionText();
         ApplyNetwork(_platform.Network.Current);
         RefreshSession(); // also the foreground notification
+        UpdateStatus();
     }
 
     /// <summary>After sign-in or a restored start: come back available if the user left the phone that way.</summary>
@@ -246,8 +351,14 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
         {
             IsAnnounced = false;
         }
+        else if (!IsConnected)
+        {
+            StartUnreachableGrace();
+        }
 
         UpdateStatusText();
+        UpdateStatus();
+        OnPropertyChanged(nameof(ShowBeforeYouStart));
         if (_suppressPublish)
         {
             return;
@@ -259,7 +370,81 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
         _ = PublishAvailabilityAsync(value);
     }
 
-    partial void OnIsAnnouncedChanged(bool value) => UpdateStatusText();
+    partial void OnIsAnnouncedChanged(bool value)
+    {
+        UpdateStatusText();
+        UpdateStatus();
+    }
+
+    partial void OnIsConnectedChanged(bool value)
+    {
+        if (value)
+        {
+            _notConnectedSince = null;
+        }
+        else
+        {
+            StartUnreachableGrace();
+        }
+
+        UpdateStatus();
+    }
+
+    partial void OnShowNotificationsHintChanged(bool value)
+    {
+        UpdateStatus();
+        OnPropertyChanged(nameof(ShowBeforeYouStart));
+    }
+
+    partial void OnShowBatteryHintChanged(bool value)
+    {
+        UpdateStatus();
+        OnPropertyChanged(nameof(ShowBeforeYouStart));
+    }
+
+    private void StartUnreachableGrace()
+    {
+        _notConnectedSince = DateTime.UtcNow;
+        if (UnreachableGrace > TimeSpan.Zero)
+        {
+            DispatcherTimer.RunOnce(UpdateStatus, UnreachableGrace + TimeSpan.FromMilliseconds(50));
+        }
+    }
+
+    /// <summary>The order of precedence of <see cref="HostStatus"/>: a session, then off, then the network, the server and the permissions.</summary>
+    private HostStatus ComputeStatus()
+    {
+        if (HasSession) return IsSessionEnded ? HostStatus.SessionEnded : HostStatus.InSession;
+        if (!IsAvailable) return HostStatus.Off;
+        if (!HasNetwork) return HostStatus.NoNetwork;
+        if (!IsConnected)
+        {
+            return _notConnectedSince is { } since && DateTime.UtcNow - since < UnreachableGrace ? HostStatus.Connecting : HostStatus.Unreachable;
+        }
+
+        if (!IsAnnounced) return HostStatus.Connecting;
+        if (ShowNotificationsHint) return HostStatus.NeedsNotifications;
+        if (ShowBatteryHint) return HostStatus.NeedsBackground;
+        return HostStatus.Ready;
+    }
+
+    private void UpdateStatus()
+    {
+        Status = ComputeStatus();
+        (HeroTitle, HeroText) = Status switch
+        {
+            HostStatus.Off => (Tr.Get(UiStringKeys.MobileStatusOffTitle), Tr.Get(UiStringKeys.MobileStatusOffText)),
+            HostStatus.Connecting => (Tr.Get(UiStringKeys.MobileStatusConnectingTitle), Tr.Get(UiStringKeys.MobileStatusConnectingText)),
+            HostStatus.Ready => (Tr.Get(UiStringKeys.MobileStatusReadyTitle), Tr.Get(UiStringKeys.MobileReadyText)),
+            HostStatus.Unreachable => (Tr.Get(UiStringKeys.MobileStatusUnreachableTitle), Tr.Get(UiStringKeys.MobileUnreachableText)),
+            HostStatus.NoNetwork => (Tr.Get(UiStringKeys.MobileStatusNoNetworkTitle), Tr.Get(UiStringKeys.MobileStatusNoNetworkText)),
+            HostStatus.NeedsNotifications => (Tr.Get(UiStringKeys.MobileStatusAttentionTitle), Tr.Get(UiStringKeys.MobileNotificationsOffWarning)),
+            HostStatus.NeedsBackground => (Tr.Get(UiStringKeys.MobileStatusAttentionTitle), Tr.Get(UiStringKeys.MobileBatteryRestricted)),
+            HostStatus.InSession => (Tr.Format(UiStringKeys.MobileServiceSessionTitleFormat, _sessions.CurrentSession?.PeerUserDisplayName ?? string.Empty), string.Empty),
+            _ => (Tr.Get(UiStringKeys.SessionPhaseEnded),
+                Tr.Format(UiStringKeys.SessionSummaryFormat, DescribeEndReason(_sessions.LastEndReason), SessionDataUsedText)),
+        };
+    }
 
     [RelayCommand]
     private void AllowNotifications() => _platform.Permissions.RequestNotificationPermission();
@@ -355,6 +540,8 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
         };
         IsCellular = snapshot.Kind == NetworkKind.Cellular;
         IsVpn = snapshot.IsVpn;
+        HasNetwork = snapshot.Kind != NetworkKind.None;
+        UpdateStatus();
     }
 
     private void OnPermissionsChanged() => Dispatcher.UIThread.Post(ApplyPermissions);
@@ -405,6 +592,13 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
             return;
         }
 
+        if (Incoming is { IsExpired: true } stale && stale.RequestId != request.RequestId)
+        {
+            // A request that expired is only being shown; a new one takes its place.
+            stale.Close();
+            Incoming = null;
+        }
+
         if (Incoming?.RequestId == request.RequestId)
         {
             // The server rings a host again after it reconnects; the question is already on screen.
@@ -423,6 +617,7 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
             return;
         }
 
+        _autoAcceptPending = false;
         if (!allowAuto)
         {
             _platform.Notifier.ShowInfo(Tr.Get(UiStringKeys.AutoAcceptToastTitle), Tr.Get(UiStringKeys.ErrorTrustRevoked));
@@ -443,6 +638,12 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
         try
         {
             answer = await prompt.Completion;
+            if (answer.Decision == RequestDecision.TimedOut)
+            {
+                // Say so instead of vanishing under a reader's eyes: the screen stays until closed, or for a moment.
+                _platform.Notifier.CancelIncomingRequest(request.RequestId);
+                await Task.WhenAny(prompt.Closed, Task.Delay(ExpiredHold));
+            }
         }
         finally
         {
@@ -480,6 +681,7 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
         }
 
         _autoAccepted = request;
+        _autoAcceptPending = true;
         var sent = false;
         await AnswerAsync(
             async () =>
@@ -491,12 +693,13 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
         if (!sent)
         {
             _autoAccepted = null;
+            _autoAcceptPending = false;
             return false;
         }
 
         _platform.Notifier.ShowInfo(
             Tr.Get(UiStringKeys.AutoAcceptToastTitle),
-            Tr.Format(UiStringKeys.AutoAcceptToastBodyFormat, request.GuestName, Tr.Ltr(request.GuestDevice)));
+            Tr.Format(UiStringKeys.MobileAutoAcceptBodyFormat, request.GuestName, Tr.Ltr(request.GuestDevice)));
         return true;
     }
 
@@ -564,7 +767,29 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
             ? Tr.Format(UiStringKeys.SessionSummaryFormat, DescribeEndReason(_sessions.LastEndReason), SessionDataText)
             : string.Empty;
 
+        // The phone's own wording: one figure for the data, the countdown alone, and the phase with the guest's device.
+        SessionGuestName = session?.PeerUserDisplayName ?? string.Empty;
+        SessionDataUsedText = Tr.Format(UiStringKeys.MobileDataUsedFormat, FormatBytes(_sessions.BytesUp + _sessions.BytesDown));
+        SessionTimeLeftText = remaining is null || phase != SessionPhase.Active
+            ? string.Empty
+            : remaining.Value <= TimeSpan.Zero ? Tr.Get(UiStringKeys.SessionTimeUp) : Tr.Ltr(FormatDuration(remaining.Value));
+        SessionPhaseLine = session is null || SessionPhaseText.Length == 0
+            ? string.Empty
+            : Tr.Format(UiStringKeys.SessionPeerFormat, SessionPhaseText, Tr.Ltr(session.PeerDeviceName));
+        if (session is not null && session.SessionId != _sessionSeen)
+        {
+            // A new session: it started without asking if an automatic acceptance is what led to it.
+            _sessionSeen = session.SessionId;
+            SessionStartedAutomatically = _autoAcceptPending;
+            _autoAcceptPending = false;
+        }
+
+        SessionAutoNoteText = SessionStartedAutomatically && session is not null
+            ? Tr.Format(UiStringKeys.MobileSessionAutoNoteFormat, session.PeerUserDisplayName)
+            : string.Empty;
+
         UpdateForegroundService();
+        UpdateStatus();
     }
 
     [RelayCommand(CanExecute = nameof(CanEndSession))]
@@ -592,7 +817,7 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
             // The data used, which changes with each session.stats; not the countdown, which would rewrite the
             // notification every second for as long as the session lasts.
             var guest = _sessions.CurrentSession?.PeerUserDisplayName ?? string.Empty;
-            _platform.Hosting.Show(Tr.Format(UiStringKeys.MobileServiceSessionTitleFormat, guest), SessionDataText, sessionActive: true);
+            _platform.Hosting.Show(Tr.Format(UiStringKeys.MobileServiceSessionTitleFormat, guest), SessionDataUsedText, sessionActive: true, SessionEndsAtLocal());
         }
         else if (IsAvailable)
         {
@@ -602,6 +827,27 @@ public sealed partial class HostViewModel : ObservableObject, IDisposable
         {
             _platform.Hosting.Stop();
         }
+    }
+
+    /// <summary>
+    /// When the session ends, on this phone's clock (the server's <c>expires_at</c> moved by the clock offset), fixed once per
+    /// session so the notification's countdown is handed to Android once instead of being re-posted every second.
+    /// </summary>
+    private DateTimeOffset? SessionEndsAtLocal()
+    {
+        if (_sessions.CurrentSession is not { } session || _sessions.Phase != SessionPhase.Active)
+        {
+            return null;
+        }
+
+        if (_chronometerSession != session.SessionId)
+        {
+            _chronometerSession = session.SessionId;
+            var end = DateTimeOffset.UtcNow + (session.ExpiresAt - _sessions.ServerTimeNow());
+            _chronometerEnd = new DateTimeOffset(end.Ticks - end.Ticks % TimeSpan.TicksPerSecond, TimeSpan.Zero);
+        }
+
+        return _chronometerEnd;
     }
 
     internal static string DescribeEndReason(string? reason) => reason switch

@@ -1,0 +1,304 @@
+<!--
+  The phone's style classes, from the tokens: the type scale (sizes and line heights are DynamicResources that MobileTheme
+  sets for the language and the font size setting), surfaces, the tab bar, presence, the motif and its light motion.
+  No colour value is written here or in the views.
+-->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:Josour.Mobile.Controls">
+
+  <!-- ===================================================================== type -->
+  <Style Selector="TextBlock">
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="TextBlock.display">
+    <Setter Property="Padding" Value="{DynamicResource Josour.TextInset.Display}" />
+    <Setter Property="FontSize" Value="{DynamicResource Josour.FontSize.Display}" />
+    <Setter Property="LineHeight" Value="{DynamicResource Josour.LineHeight.Display}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.title">
+    <Setter Property="Padding" Value="{DynamicResource Josour.TextInset.Title}" />
+    <Setter Property="FontSize" Value="{DynamicResource Josour.FontSize.Title}" />
+    <Setter Property="LineHeight" Value="{DynamicResource Josour.LineHeight.Title}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.heading">
+    <Setter Property="Padding" Value="{DynamicResource Josour.TextInset.Heading}" />
+    <Setter Property="FontSize" Value="{DynamicResource Josour.FontSize.Heading}" />
+    <Setter Property="LineHeight" Value="{DynamicResource Josour.LineHeight.Heading}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.body">
+    <Setter Property="Padding" Value="{DynamicResource Josour.TextInset.Body}" />
+    <Setter Property="FontSize" Value="{DynamicResource Josour.FontSize.Body}" />
+    <Setter Property="LineHeight" Value="{DynamicResource Josour.LineHeight.Body}" />
+  </Style>
+  <Style Selector="TextBlock.label">
+    <Setter Property="Padding" Value="{DynamicResource Josour.TextInset.Label}" />
+    <Setter Property="FontSize" Value="{DynamicResource Josour.FontSize.Label}" />
+    <Setter Property="LineHeight" Value="{DynamicResource Josour.LineHeight.Label}" />
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+  <Style Selector="TextBlock.caption">
+    <Setter Property="Padding" Value="{DynamicResource Josour.TextInset.Caption}" />
+    <Setter Property="FontSize" Value="{DynamicResource Josour.FontSize.Caption}" />
+    <Setter Property="LineHeight" Value="{DynamicResource Josour.LineHeight.Caption}" />
+  </Style>
+  <Style Selector="TextBlock.micro">
+    <Setter Property="Padding" Value="{DynamicResource Josour.TextInset.Micro}" />
+    <Setter Property="FontSize" Value="{DynamicResource Josour.FontSize.Micro}" />
+    <Setter Property="LineHeight" Value="{DynamicResource Josour.LineHeight.Micro}" />
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+  <Style Selector="TextBlock.countdown">
+    <Setter Property="Padding" Value="{DynamicResource Josour.TextInset.Countdown}" />
+    <Setter Property="FontSize" Value="{DynamicResource Josour.FontSize.Countdown}" />
+    <Setter Property="LineHeight" Value="{DynamicResource Josour.LineHeight.Countdown}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="TextWrapping" Value="NoWrap" />
+  </Style>
+  <Style Selector="TextBlock.muted">
+    <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.TextSecondary}" />
+  </Style>
+  <Style Selector="TextBlock.strong">
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.center">
+    <Setter Property="TextAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.danger">
+    <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.DangerFg}" />
+  </Style>
+  <Style Selector="c|Banner TextBlock">
+    <Setter Property="FontSize" Value="{DynamicResource Josour.FontSize.Caption}" />
+    <Setter Property="LineHeight" Value="{DynamicResource Josour.LineHeight.Caption}" />
+  </Style>
+
+  <!-- ===================================================================== surfaces -->
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource Josour.Brush.Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource Josour.Radius.Lg}" />
+    <Setter Property="Padding" Value="16" />
+    <Setter Property="BoxShadow" Value="{DynamicResource Josour.Elevation.1}" />
+  </Style>
+  <Style Selector="Border.card.hero">
+    <Setter Property="Padding" Value="20" />
+  </Style>
+  <Style Selector="Border.card.attention">
+    <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.Primary}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+  <Style Selector="Border.consequence">
+    <Setter Property="Background" Value="{DynamicResource Josour.Brush.InfoContainer}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.InfoBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource Josour.Radius.Lg}" />
+    <Setter Property="Padding" Value="16" />
+  </Style>
+  <Style Selector="Rectangle.divider">
+    <Setter Property="Height" Value="1" />
+    <Setter Property="Fill" Value="{DynamicResource Josour.Brush.Border}" />
+  </Style>
+  <Style Selector="Border.scrim">
+    <Setter Property="Background" Value="{DynamicResource Josour.Brush.Scrim}" />
+  </Style>
+  <Style Selector="Border.sheet">
+    <Setter Property="Background" Value="{DynamicResource Josour.Brush.SurfaceRaised}" />
+    <Setter Property="CornerRadius" Value="24,24,0,0" />
+    <Setter Property="Padding" Value="16,12,16,28" />
+    <Setter Property="BoxShadow" Value="{DynamicResource Josour.Elevation.3}" />
+    <Setter Property="VerticalAlignment" Value="Bottom" />
+  </Style>
+  <Style Selector="Border.handle">
+    <Setter Property="Width" Value="36" />
+    <Setter Property="Height" Value="4" />
+    <Setter Property="CornerRadius" Value="2" />
+    <Setter Property="Background" Value="{DynamicResource Josour.Brush.BorderStrong}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.pill">
+    <Setter Property="Background" Value="{DynamicResource Josour.Brush.Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource Josour.Radius.Full}" />
+    <Setter Property="Padding" Value="14,8" />
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+  <Style Selector="Border.pill.expired">
+    <Setter Property="Background" Value="{DynamicResource Josour.Brush.SurfaceSunken}" />
+  </Style>
+
+  <!-- ===================================================================== tab bar -->
+  <Style Selector="Border.tabbar">
+    <Setter Property="Background" Value="{DynamicResource Josour.Brush.Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.Border}" />
+    <Setter Property="BorderThickness" Value="0,1,0,0" />
+  </Style>
+  <Style Selector="Border.indicator">
+    <Setter Property="Width" Value="60" />
+    <Setter Property="Height" Value="32" />
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.tab.selected Border.indicator">
+    <Setter Property="Background" Value="{DynamicResource Josour.Brush.PrimaryContainer}" />
+  </Style>
+  <Style Selector="Button.tab.selected Border.indicator c|Icon">
+    <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.OnPrimaryContainer}" />
+  </Style>
+  <Style Selector="Border.badge">
+    <Setter Property="Background" Value="{DynamicResource Josour.Brush.Primary}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.Surface}" />
+    <Setter Property="BorderThickness" Value="2" />
+    <Setter Property="CornerRadius" Value="{DynamicResource Josour.Radius.Full}" />
+    <Setter Property="MinWidth" Value="{DynamicResource Josour.Size.Badge}" />
+    <Setter Property="Height" Value="{DynamicResource Josour.Size.Badge}" />
+    <Setter Property="Padding" Value="5,0" />
+  </Style>
+  <Style Selector="Border.badge > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.OnPrimary}" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="TextWrapping" Value="NoWrap" />
+  </Style>
+
+  <!-- ===================================================================== people -->
+  <Style Selector="Border.avatar">
+    <Setter Property="Width" Value="40" />
+    <Setter Property="Height" Value="40" />
+    <Setter Property="CornerRadius" Value="20" />
+    <Setter Property="Background" Value="{DynamicResource Josour.Brush.PrimaryContainer}" />
+    <Setter Property="VerticalAlignment" Value="Top" />
+  </Style>
+  <Style Selector="Border.avatar > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.OnPrimaryContainer}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="TextWrapping" Value="NoWrap" />
+  </Style>
+  <Style Selector="Ellipse.presence">
+    <Setter Property="Width" Value="{DynamicResource Josour.Size.PresenceDot}" />
+    <Setter Property="Height" Value="{DynamicResource Josour.Size.PresenceDot}" />
+    <Setter Property="Fill" Value="{DynamicResource Josour.Brush.Primary}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Ellipse.presence.offline">
+    <Setter Property="Fill" Value="Transparent" />
+    <Setter Property="Stroke" Value="{DynamicResource Josour.Brush.TextTertiary}" />
+    <Setter Property="StrokeThickness" Value="2" />
+  </Style>
+
+  <!-- ===================================================================== icons, brand, motif -->
+  <Style Selector="c|Icon.muted">
+    <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.TextSecondary}" />
+  </Style>
+  <Style Selector="c|Icon.small">
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Height" Value="16" />
+  </Style>
+  <Style Selector="c|Icon.warning">
+    <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.WarningFg}" />
+  </Style>
+  <Style Selector="c|Icon.success">
+    <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.SuccessFg}" />
+  </Style>
+  <Style Selector="c|Icon.info">
+    <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.InfoFg}" />
+  </Style>
+  <Style Selector="c|Icon.danger">
+    <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.DangerFg}" />
+  </Style>
+  <Style Selector="c|BrandLockup">
+    <Setter Property="SymbolBrush" Value="{DynamicResource Josour.Brush.LogoSymbol}" />
+    <Setter Property="WordmarkBrush" Value="{DynamicResource Josour.Brush.LogoWordmark}" />
+  </Style>
+  <Style Selector="c|SymbolBadge">
+    <Setter Property="DiscBrush" Value="{DynamicResource Josour.Brush.BrandTeal}" />
+    <Setter Property="SymbolBrush" Value="{DynamicResource Josour.Brush.BrandWhite}" />
+  </Style>
+  <Style Selector="c|Motif">
+    <Setter Property="ActiveBrush" Value="{DynamicResource Josour.Brush.MotifActive}" />
+    <Setter Property="IdleBrush" Value="{DynamicResource Josour.Brush.MotifIdle}" />
+    <Setter Property="DotOffBrush" Value="{DynamicResource Josour.Brush.MotifDotOff}" />
+    <Setter Property="HighlightBrush" Value="{DynamicResource Josour.Brush.Surface}" />
+  </Style>
+  <!-- Light motion only: a stroke drawing itself while connecting, a short highlight travelling while in session. -->
+  <Style Selector="c|Motif[State=Connecting]">
+    <Style.Animations>
+      <Animation Duration="0:0:2.2" IterationCount="Infinite" Easing="CubicEaseInOut">
+        <KeyFrame Cue="0%"><Setter Property="Progress" Value="0" /></KeyFrame>
+        <KeyFrame Cue="60%"><Setter Property="Progress" Value="1" /></KeyFrame>
+        <KeyFrame Cue="100%"><Setter Property="Progress" Value="1" /></KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+  <Style Selector="c|Motif[State=Session]">
+    <Style.Animations>
+      <Animation Duration="0:0:3.2" IterationCount="Infinite">
+        <KeyFrame Cue="0%"><Setter Property="Progress" Value="0" /></KeyFrame>
+        <KeyFrame Cue="100%"><Setter Property="Progress" Value="1" /></KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+
+  <!-- ===================================================================== fields -->
+  <Style Selector="TextBox">
+    <Setter Property="Background" Value="{DynamicResource Josour.Brush.Surface}" />
+    <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.Text}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.BorderStrong}" />
+    <Setter Property="BorderThickness" Value="1.5" />
+    <Setter Property="CornerRadius" Value="{DynamicResource Josour.Radius.Md}" />
+    <Setter Property="MinHeight" Value="{DynamicResource Josour.Size.InputHeight}" />
+    <Setter Property="Padding" Value="14,12" />
+    <Setter Property="FontSize" Value="{DynamicResource Josour.FontSize.Body}" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{DynamicResource Josour.Brush.Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.BorderStrong}" />
+  </Style>
+  <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{DynamicResource Josour.Brush.Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.Primary}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+  <Style Selector="TextBox.error /template/ Border#PART_BorderElement">
+    <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.DangerFg}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+  <Style Selector="TextBox /template/ TextBlock#PART_Watermark">
+    <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.TextTertiary}" />
+  </Style>
+  <Style Selector="ProgressBar">
+    <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.Primary}" />
+    <Setter Property="Background" Value="{DynamicResource Josour.Brush.SurfaceSunken}" />
+  </Style>
+  <!-- ===================================================================== screen details -->
+  <Style Selector="TextBox.ltr">
+    <Setter Property="FlowDirection" Value="LeftToRight" />
+    <Setter Property="TextAlignment" Value="{DynamicResource Josour.LtrFieldAlignment}" />
+  </Style>
+  <Style Selector="StackPanel.expired > Border">
+    <Setter Property="Opacity" Value="0.4" />
+  </Style>
+  <Style Selector="StackPanel.expired > CheckBox, StackPanel.expired > Grid">
+    <Setter Property="Opacity" Value="0.4" />
+  </Style>
+  <Style Selector="StackPanel.delayed">
+    <Style.Animations>
+      <Animation Duration="0:0:1.3" FillMode="Both">
+        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0" /></KeyFrame>
+        <KeyFrame Cue="77%"><Setter Property="Opacity" Value="0" /></KeyFrame>
+        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+</Styles>

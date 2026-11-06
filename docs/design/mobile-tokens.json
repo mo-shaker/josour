@@ -1,0 +1,273 @@
+{
+  "color": {
+    "brand": {
+      "teal": "#0E7490",
+      "ink": "#14232B",
+      "white": "#FFFFFF"
+    },
+    "teal": {
+      "50": "#ECFAFE",
+      "100": "#D6F2FC",
+      "200": "#B2E6F7",
+      "300": "#84D7F1",
+      "400": "#53BFDF",
+      "500": "#1CA2C3",
+      "600": "#0689AA",
+      "700": "#0E7490",
+      "800": "#035D75",
+      "900": "#09485A",
+      "950": "#06313D"
+    },
+    "ink": {
+      "50": "#F5F8FA",
+      "100": "#ECF1F3",
+      "200": "#DCE2E6",
+      "300": "#C3CCD2",
+      "400": "#94A1A8",
+      "500": "#707E86",
+      "600": "#54636B",
+      "700": "#3C4C54",
+      "800": "#27373F",
+      "900": "#14232B",
+      "950": "#09141A"
+    },
+    "light": {
+      "canvas": "#F6FAFA",
+      "surface": "#FFFFFF",
+      "surfaceRaised": "#FFFFFF",
+      "surfaceSunken": "#ECF3F3",
+      "border": "#D0D9DD",
+      "borderStrong": "#7A8990",
+      "text": "#14232B",
+      "textSecondary": "#54636B",
+      "textTertiary": "#707E86",
+      "textDisabled": "#94A1A8",
+      "primary": "#0E7490",
+      "primaryHover": "#035D75",
+      "primaryPressed": "#09485A",
+      "onPrimary": "#FFFFFF",
+      "primaryContainer": "#D6F2FC",
+      "onPrimaryContainer": "#09485A",
+      "focus": "#0689AA",
+      "motif": {
+        "active": "#0E7490",
+        "idle": "#C3CCD2",
+        "dotOff": "#707E86"
+      },
+      "logo": {
+        "symbol": "#0E7490",
+        "wordmark": "#14232B",
+        "note": "as supplied"
+      },
+      "success": {
+        "fg": "#107550",
+        "container": "#DCF8E9",
+        "border": "#95CCB0",
+        "onContainer": "#14232B"
+      },
+      "warning": {
+        "fg": "#8B570F",
+        "container": "#FFF0E0",
+        "border": "#EFB87C",
+        "onContainer": "#14232B"
+      },
+      "danger": {
+        "fg": "#AD301C",
+        "container": "#FFEBE7",
+        "border": "#EDAB9E",
+        "onContainer": "#14232B"
+      },
+      "info": {
+        "fg": "#2F62AC",
+        "container": "#E9F2FF",
+        "border": "#ACC6EC",
+        "onContainer": "#14232B"
+      },
+      "shadow": "#14232B"
+    },
+    "dark": {
+      "canvas": "#091114",
+      "surface": "#111B20",
+      "surfaceRaised": "#19252A",
+      "surfaceSunken": "#060B0E",
+      "border": "#29353A",
+      "borderStrong": "#66747B",
+      "text": "#E9F0F2",
+      "textSecondary": "#B0BDC2",
+      "textTertiary": "#94A1A8",
+      "textDisabled": "#6B777C",
+      "primary": "#5ECCE4",
+      "primaryHover": "#81DAEE",
+      "primaryPressed": "#4EBBD5",
+      "onPrimary": "#051920",
+      "primaryContainer": "#003C4B",
+      "onPrimaryContainer": "#CBEFF9",
+      "focus": "#6FD5EC",
+      "motif": {
+        "active": "#5ECCE4",
+        "idle": "#3C4C54",
+        "dotOff": "#94A1A8"
+      },
+      "logo": {
+        "symbol": "#FFFFFF",
+        "wordmark": "#FFFFFF",
+        "note": "dark = proposal (decision 3)"
+      },
+      "success": {
+        "fg": "#6ED6A6",
+        "container": "#163527",
+        "border": "#356A51",
+        "onContainer": "#E9F0F2"
+      },
+      "warning": {
+        "fg": "#FEBB71",
+        "container": "#412B12",
+        "border": "#815A2D",
+        "onContainer": "#E9F0F2"
+      },
+      "danger": {
+        "fg": "#FD9884",
+        "container": "#47211A",
+        "border": "#8D4638",
+        "onContainer": "#E9F0F2"
+      },
+      "info": {
+        "fg": "#9AC0F8",
+        "container": "#1E2E47",
+        "border": "#415E8A",
+        "onContainer": "#E9F0F2"
+      },
+      "shadow": null
+    }
+  },
+  "font": {
+    "family": {
+      "ui": "Readex Pro",
+      "files": [
+        "ReadexPro-Regular.ttf",
+        "ReadexPro-Medium.ttf",
+        "ReadexPro-SemiBold.ttf",
+        "ReadexPro-Bold.ttf"
+      ],
+      "licence": "SIL OFL 1.1"
+    },
+    "weight": {
+      "regular": 400,
+      "medium": 500,
+      "semibold": 600,
+      "bold": 700
+    },
+    "size": {
+      "display": 28,
+      "title": 22,
+      "heading": 18,
+      "body": 16,
+      "label": 16,
+      "caption": 14,
+      "micro": 13,
+      "microEn": 12
+    },
+    "lineHeight": {
+      "en": {
+        "display": 36,
+        "title": 28,
+        "heading": 24,
+        "body": 24,
+        "label": 20,
+        "caption": 20,
+        "micro": 16
+      },
+      "ar": {
+        "display": 46,
+        "title": 36,
+        "heading": 30,
+        "body": 28,
+        "label": 24,
+        "caption": 24,
+        "micro": 20
+      }
+    },
+    "weightFor": {
+      "display": 600,
+      "title": 600,
+      "heading": 600,
+      "body": 400,
+      "label": 500,
+      "caption": 400,
+      "micro": 500
+    },
+    "letterSpacing": {
+      "en": 0,
+      "ar": 0
+    }
+  },
+  "size": {
+    "touchTarget": 48,
+    "buttonHeight": 48,
+    "inputHeight": 52,
+    "tabBarHeight": 64,
+    "icon": {
+      "sm": 16,
+      "md": 24,
+      "lg": 32
+    },
+    "iconStroke": 2,
+    "iconLiveArea": 20,
+    "motif": {
+      "hero": 96,
+      "splash": 96,
+      "emptyState": 72,
+      "strokeRatio": 0.125
+    },
+    "presenceDot": 10,
+    "badge": 22,
+    "focusRing": 3,
+    "border": 1
+  },
+  "radius": {
+    "xs": 3,
+    "sm": 6,
+    "md": 12,
+    "lg": 18,
+    "xl": 24,
+    "full": 999
+  },
+  "space": {
+    "xxs": 2,
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 20,
+    "2xl": 24,
+    "3xl": 32,
+    "4xl": 40,
+    "5xl": 48,
+    "gutter": 16,
+    "cardPadding": 16,
+    "heroPadding": 20,
+    "cardGap": 12,
+    "sectionGap": 24
+  },
+  "elevation": {
+    "light": {
+      "0": "none",
+      "1": "0 1 2 0 #0F14232B, 0 1 1 0 #0A14232B",
+      "2": "0 -1 0 0 #0A14232B, 0 4 12 0 #1414232B",
+      "3": "0 12 32 0 #2E14232B, 0 2 6 0 #1414232B"
+    },
+    "dark": {
+      "0": "none",
+      "1": "surface + border",
+      "2": "surfaceRaised + border",
+      "3": "surfaceRaised + borderStrong"
+    }
+  },
+  "motion": {
+    "durationShort": 150,
+    "durationMedium": 250,
+    "arcDraw": 2200,
+    "sessionTravel": 3200,
+    "reducedMotion": "static"
+  }
+}

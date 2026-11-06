@@ -339,7 +339,7 @@
     <value>تعذّر على الجهازين الوصول إلى بعضهما.</value>
   </data>
   <data name="SessionEndedAdminTerminated" xml:space="preserve">
-    <value>أنهى المسؤول الجلسة.</value>
+    <value>أنهى مدير خادم جسور الجلسة.</value>
   </data>
   <data name="SessionEndedBrowserNotProxied" xml:space="preserve">
     <value>لم تمر حركة متصفح العمل عبر جسور، فأُوقفت الجلسة.</value>
@@ -359,7 +359,7 @@
     <value>يطلب {0} التصفح عبر اتصالك</value>
   </data>
   <data name="IncomingRequestRequesterLabel" xml:space="preserve">
-    <value>مقدّم الطلب</value>
+    <value>من</value>
   </data>
   <data name="IncomingRequestDeviceLabel" xml:space="preserve">
     <value>الجهاز</value>
@@ -377,7 +377,7 @@
     <value>نطاق التصفح</value>
   </data>
   <data name="AllowedSitesNote" xml:space="preserve">
-    <value>لا يمكن الوصول عبر جهازك إلا إلى المواقع المدرجة في قائمة الشركة.</value>
+    <value>لا يمكن الوصول عبر اتصالك إلا إلى المواقع المدرجة في قائمة المواقع المسموح بها على هذا الخادم.</value>
   </data>
   <data name="AllowedSitesSummaryFormat" xml:space="preserve">
     <value>الإصدار {1} من القائمة · عدد المدخلات: {0}</value>
@@ -401,7 +401,7 @@
     <value>يمكنك قطع الجلسة في أي وقت من لوحة الجلسة.</value>
   </data>
   <data name="CountdownFormat" xml:space="preserve">
-    <value>تنتهي صلاحية الطلب خلال {0} ثانية</value>
+    <value>باقٍ {0} ثانية للرد</value>
   </data>
   <data name="RequestExpired" xml:space="preserve">
     <value>انتهت صلاحية الطلب</value>
@@ -464,10 +464,10 @@
     <value>محاولات فاشلة كثيرة. الحساب مقفل لمدة خمس عشرة دقيقة.</value>
   </data>
   <data name="LoginErrorAccountDisabled" xml:space="preserve">
-    <value>هذا الحساب معطّل. راجع المسؤول.</value>
+    <value>هذا الحساب معطّل. تواصل مع من يدير خادم جسور.</value>
   </data>
   <data name="LoginErrorDeviceRevoked" xml:space="preserve">
-    <value>ألغى المسؤول تسجيل هذا الجهاز. سجّل الدخول من جديد لتسجيله مرة أخرى.</value>
+    <value>أُزيل هذا الجهاز من حسابك على الخادم. سجّل الدخول من جديد لتسجيله مرة أخرى.</value>
   </data>
   <data name="LoginErrorDeviceRejected" xml:space="preserve">
     <value>تعذّر التحقق من هذا الجهاز. سجّل الدخول من جديد لتسجيله مرة أخرى.</value>
@@ -492,7 +492,7 @@
     <value>انتهت صلاحية جلستك. سجّل الدخول من جديد.</value>
   </data>
   <data name="SignedOutDeviceRevoked" xml:space="preserve">
-    <value>ألغى المسؤول تسجيل هذا الجهاز.</value>
+    <value>أُزيل هذا الجهاز من حسابك على الخادم.</value>
   </data>
   <data name="SignedOutAccountDisabled" xml:space="preserve">
     <value>عُطّل حسابك.</value>
@@ -1038,7 +1038,7 @@
     <value>اكتب اسمك.</value>
   </data>
   <data name="LoginErrorAccountPending" xml:space="preserve">
-    <value>حسابك بانتظار موافقة المسؤول.</value>
+    <value>حسابك بانتظار موافقة من يدير خادم جسور.</value>
   </data>
   <data name="LoginErrorAccountRejected" xml:space="preserve">
     <value>لم تتم الموافقة على تسجيلك.</value>
@@ -1134,7 +1134,7 @@
     <value>السماح بالإشعارات</value>
   </data>
   <data name="MobileServiceChannelName" xml:space="preserve">
-    <value>الاستضافة</value>
+    <value>مشاركة اتصالك</value>
   </data>
   <data name="MobileRequestsChannelName" xml:space="preserve">
     <value>الطلبات الواردة</value>
@@ -1149,7 +1149,7 @@
     <value>{0} يتصفح عبر اتصالك</value>
   </data>
   <data name="MobileStopHosting" xml:space="preserve">
-    <value>إيقاف الاستضافة</value>
+    <value>إيقاف المشاركة</value>
   </data>
   <data name="MobileEndSessionNow" xml:space="preserve">
     <value>إنهاء الجلسة الآن</value>
@@ -1185,7 +1185,7 @@
     <value>الرد</value>
   </data>
   <data name="MobileReadyText" xml:space="preserve">
-    <value>جاهز: يمكن لجهات اتصالك الآن طلب استخدام اتصالك.</value>
+    <value>يمكن لجهات اتصالك الآن طلب استخدام اتصالك، والقرار لك في كل مرة.</value>
   </data>
   <data name="MobileUnreachableText" xml:space="preserve">
     <value>لن تصل الطلبات إلى هذا الهاتف حتى يعود اتصاله بالخادم.</value>
@@ -1194,7 +1194,7 @@
     <value>أعد الاتصال الآن</value>
   </data>
   <data name="MobileNotificationsOffWarning" xml:space="preserve">
-    <value>الإشعارات متوقفة: لن يظهر الطلب إلا وجسور مفتوح على الشاشة.</value>
+    <value>الإشعارات متوقفة، فلن تعلم بالطلب وجسور مغلق.</value>
   </data>
   <data name="MobileContactCancel" xml:space="preserve">
     <value>إبقاء</value>
@@ -1204,5 +1204,128 @@
   </data>
   <data name="SessionSameNetworkWarning" xml:space="preserve">
     <value>هذا الجهاز على نفس شبكتك، لذلك ترى المواقع عنوانك أنت وليس عنوانًا جديدًا. لتظهر من مكان آخر استخدم جهاز جهة اتصال موجودة في ذلك المكان.</value>
+  </data>
+  <data name="MobileStarting" xml:space="preserve">
+    <value>جارٍ تسجيل دخولك…</value>
+  </data>
+  <data name="MobileLoginDescription" xml:space="preserve">
+    <value>سجّل الدخول بالبريد الإلكتروني وكلمة المرور لحسابك في جسور.</value>
+  </data>
+  <data name="MobileServerUrlHelp" xml:space="preserve">
+    <value>اسأل من يدير خادم جسور إن لم تكن متأكدًا.</value>
+  </data>
+  <data name="MobileShowPassword" xml:space="preserve">
+    <value>إظهار كلمة المرور</value>
+  </data>
+  <data name="MobileSigningIn" xml:space="preserve">
+    <value>جارٍ تسجيل الدخول…</value>
+  </data>
+  <data name="MobileStatusOffTitle" xml:space="preserve">
+    <value>المشاركة متوقفة</value>
+  </data>
+  <data name="MobileStatusOffText" xml:space="preserve">
+    <value>فعّل «متاح» لتتمكن جهات اتصالك من طلب استخدام اتصال هذا الهاتف.</value>
+  </data>
+  <data name="MobileStatusConnectingTitle" xml:space="preserve">
+    <value>جارٍ التجهيز…</value>
+  </data>
+  <data name="MobileStatusConnectingText" xml:space="preserve">
+    <value>جارٍ الاتصال بخادم جسور.</value>
+  </data>
+  <data name="MobileStatusReadyTitle" xml:space="preserve">
+    <value>جاهز لاستقبال الطلبات</value>
+  </data>
+  <data name="MobileStatusUnreachableTitle" xml:space="preserve">
+    <value>لا تصل إليك الطلبات</value>
+  </data>
+  <data name="MobileStatusNoNetworkTitle" xml:space="preserve">
+    <value>لا يوجد إنترنت</value>
+  </data>
+  <data name="MobileStatusNoNetworkText" xml:space="preserve">
+    <value>هذا الهاتف غير متصل بالإنترنت. شغّل Wi-Fi أو بيانات الجوال.</value>
+  </data>
+  <data name="MobileStatusAttentionTitle" xml:space="preserve">
+    <value>يحتاج إلى انتباهك</value>
+  </data>
+  <data name="MobileBatteryRestricted" xml:space="preserve">
+    <value>قد يوقف هاتفك جسور في الخلفية لتوفير البطارية، فلا تصلك الطلبات.</value>
+  </data>
+  <data name="MobileBeforeYouStart" xml:space="preserve">
+    <value>قبل التفعيل</value>
+  </data>
+  <data name="MobileSessionTimeLeftLabel" xml:space="preserve">
+    <value>الوقت المتبقي</value>
+  </data>
+  <data name="MobileDataUsedFormat" xml:space="preserve">
+    <value>استُخدم نحو {0}</value>
+  </data>
+  <data name="MobileSessionAutoNoteFormat" xml:space="preserve">
+    <value>بدأت دون سؤالك، لأنك تسمح لـ{0} بذلك.</value>
+  </data>
+  <data name="MobileYourConnection" xml:space="preserve">
+    <value>اتصالك</value>
+  </data>
+  <data name="MobileServerStatusFormat" xml:space="preserve">
+    <value>خادم جسور: {0}</value>
+  </data>
+  <data name="MobileHowItWorks" xml:space="preserve">
+    <value>كيف تعمل المشاركة</value>
+  </data>
+  <data name="MobileGuestRoleTitle" xml:space="preserve">
+    <value>استخدام اتصال غيرك</value>
+  </data>
+  <data name="MobileSignOutConfirmTitle" xml:space="preserve">
+    <value>تسجيل الخروج من جسور؟</value>
+  </data>
+  <data name="MobileSignOutConfirmText" xml:space="preserve">
+    <value>سيتوقف هذا الهاتف عن استقبال الطلبات حتى تسجّل الدخول من جديد.</value>
+  </data>
+  <data name="MobileSignOutConfirmSessionFormat" xml:space="preserve">
+    <value>ستنتهي جلسة {0} الآن، وسيتوقف هذا الهاتف عن استقبال الطلبات.</value>
+  </data>
+  <data name="MobileContactsLoading" xml:space="preserve">
+    <value>جارٍ تحميل جهات اتصالك…</value>
+  </data>
+  <data name="MobileTrustOffHelp" xml:space="preserve">
+    <value>عند الإيقاف: تُسأل في كل مرة.</value>
+  </data>
+  <data name="MobileTrustOnHelp" xml:space="preserve">
+    <value>عند التفعيل: يُقبل دون سؤالك، وتُبلَّغ دائمًا ويمكنك الإنهاء.</value>
+  </data>
+  <data name="MobileTrustConfirmTitleFormat" xml:space="preserve">
+    <value>هل تسمح لـ{0} باستخدام اتصالك دون سؤال؟</value>
+  </data>
+  <data name="MobileTrustConfirmText" xml:space="preserve">
+    <value>ستُقبل طلباته تلقائيًا على كل أجهزتك. ستُبلَّغ في كل مرة، ويمكنك إنهاء الجلسة أو إيقاف هذا من هنا متى شئت.</value>
+  </data>
+  <data name="MobileTrustAllow" xml:space="preserve">
+    <value>السماح دون سؤال</value>
+  </data>
+  <data name="MobileRemoveConfirmFormat" xml:space="preserve">
+    <value>إزالة {0}؟ لن يتمكن بعدها من طلب اتصالك.</value>
+  </data>
+  <data name="MobileInviteHeading" xml:space="preserve">
+    <value>ادعُ شخصًا</value>
+  </data>
+  <data name="MobileInviteHelp" xml:space="preserve">
+    <value>يحتاج إلى حساب على خادم جسور نفسه.</value>
+  </data>
+  <data name="MobileScopeUnrestricted" xml:space="preserve">
+    <value>أي متصفح، وبرامج أخرى على حاسوبه، يمكنها الوصول إلى أي موقع عبر اتصالك وبعنوانك.</value>
+  </data>
+  <data name="MobileConsequenceTitle" xml:space="preserve">
+    <value>ماذا يعني القبول</value>
+  </data>
+  <data name="MobileConsequence" xml:space="preserve">
+    <value>المواقع التي يزورها سترى عنوان الإنترنت الخاص بك، كأنك أنت من يتصفح.</value>
+  </data>
+  <data name="MobileEndAnytimeHint" xml:space="preserve">
+    <value>يمكنك إنهاؤها في أي لحظة، من جسور أو من إشعاره.</value>
+  </data>
+  <data name="MobileRequestExpiredFormat" xml:space="preserve">
+    <value>لم ترد في الوقت المحدد، فلم يُشارَك شيء. يمكن لـ{0} أن يطلب من جديد.</value>
+  </data>
+  <data name="MobileAutoAcceptBodyFormat" xml:space="preserve">
+    <value>{0} ({1}) يستخدم اتصالك: سمحت له بذلك دون سؤال. يمكنك إنهاء الجلسة من جسور أو من إشعاره.</value>
   </data>
 </root>

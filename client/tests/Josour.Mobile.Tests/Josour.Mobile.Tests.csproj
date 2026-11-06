@@ -8,6 +8,8 @@
 
   <ItemGroup>
     <PackageReference Include="Avalonia.Headless.XUnit" Version="11.3.22" />
+    <!-- Real text shaping and drawing: the bundled Readex Pro is the default family, which the stub font manager cannot load. -->
+    <PackageReference Include="Avalonia.Skia" Version="11.3.22" />
     <PackageReference Include="coverlet.collector" Version="6.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="xunit" Version="2.5.3" />

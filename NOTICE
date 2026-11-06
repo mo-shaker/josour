@@ -37,14 +37,18 @@ Fluent System Icons
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 
-Noto Naskh Arabic UI, version 1.08 (Regular and Bold)
-    Copyright 2013 Google Inc. All Rights Reserved.
+Readex Pro, version 1.205 (Regular, Medium, SemiBold and Bold)
+    Copyright 2018 The Readex Pro Project Authors
+    (https://github.com/ThomasJockin/readexpro), with Reserved Font Name
+    "RevReading Lexend".
     Licensed under the SIL Open Font License, Version 1.1
     https://openfontlicense.org
 
-    The two font files are bundled unmodified in
-    client/src/Josour.Mobile/Assets/Fonts/ so the Android app can draw Arabic.
-    The full licence text is beside them in OFL.txt.
+    Four static instances of the variable font, cut with fontTools and
+    renamed to the family "Readex Pro" (no glyph changed), are bundled in
+    client/src/Josour.Mobile/Assets/Fonts/ for the Android app; it is also the
+    typeface of the Josour wordmark. The full licence text is beside them in
+    OFL.txt.
 
 --------------------------------------------------------------------------------
 

@@ -544,4 +544,47 @@ public static class UiStringKeys
     public const string ContactSameNetworkNote = "ContactSameNetworkNote";
 
     public const string SessionSameNetworkWarning = "SessionSameNetworkWarning";
+
+    // ---- the phone redesign around the qantara mark (docs/design/mobile-phase2-mockups.html) ----
+    public const string MobileStarting = "MobileStarting";
+    public const string MobileLoginDescription = "MobileLoginDescription";
+    public const string MobileServerUrlHelp = "MobileServerUrlHelp";
+    public const string MobileShowPassword = "MobileShowPassword";
+    public const string MobileSigningIn = "MobileSigningIn";
+    public const string MobileStatusOffTitle = "MobileStatusOffTitle";
+    public const string MobileStatusOffText = "MobileStatusOffText";
+    public const string MobileStatusConnectingTitle = "MobileStatusConnectingTitle";
+    public const string MobileStatusConnectingText = "MobileStatusConnectingText";
+    public const string MobileStatusReadyTitle = "MobileStatusReadyTitle";
+    public const string MobileStatusUnreachableTitle = "MobileStatusUnreachableTitle";
+    public const string MobileStatusNoNetworkTitle = "MobileStatusNoNetworkTitle";
+    public const string MobileStatusNoNetworkText = "MobileStatusNoNetworkText";
+    public const string MobileStatusAttentionTitle = "MobileStatusAttentionTitle";
+    public const string MobileBatteryRestricted = "MobileBatteryRestricted";
+    public const string MobileBeforeYouStart = "MobileBeforeYouStart";
+    public const string MobileSessionTimeLeftLabel = "MobileSessionTimeLeftLabel";
+    public const string MobileDataUsedFormat = "MobileDataUsedFormat";
+    public const string MobileSessionAutoNoteFormat = "MobileSessionAutoNoteFormat";
+    public const string MobileYourConnection = "MobileYourConnection";
+    public const string MobileServerStatusFormat = "MobileServerStatusFormat";
+    public const string MobileHowItWorks = "MobileHowItWorks";
+    public const string MobileGuestRoleTitle = "MobileGuestRoleTitle";
+    public const string MobileSignOutConfirmTitle = "MobileSignOutConfirmTitle";
+    public const string MobileSignOutConfirmText = "MobileSignOutConfirmText";
+    public const string MobileSignOutConfirmSessionFormat = "MobileSignOutConfirmSessionFormat";
+    public const string MobileContactsLoading = "MobileContactsLoading";
+    public const string MobileTrustOffHelp = "MobileTrustOffHelp";
+    public const string MobileTrustOnHelp = "MobileTrustOnHelp";
+    public const string MobileTrustConfirmTitleFormat = "MobileTrustConfirmTitleFormat";
+    public const string MobileTrustConfirmText = "MobileTrustConfirmText";
+    public const string MobileTrustAllow = "MobileTrustAllow";
+    public const string MobileRemoveConfirmFormat = "MobileRemoveConfirmFormat";
+    public const string MobileInviteHeading = "MobileInviteHeading";
+    public const string MobileInviteHelp = "MobileInviteHelp";
+    public const string MobileScopeUnrestricted = "MobileScopeUnrestricted";
+    public const string MobileConsequenceTitle = "MobileConsequenceTitle";
+    public const string MobileConsequence = "MobileConsequence";
+    public const string MobileEndAnytimeHint = "MobileEndAnytimeHint";
+    public const string MobileRequestExpiredFormat = "MobileRequestExpiredFormat";
+    public const string MobileAutoAcceptBodyFormat = "MobileAutoAcceptBodyFormat";
 }
