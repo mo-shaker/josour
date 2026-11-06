@@ -235,7 +235,7 @@ def desktop_fluent_axaml(t: dict) -> str:
 
 # ------------------------------------------------------------------------------------------------------ logo geometry
 def logo_parts(svg: Path) -> dict:
-    text = svg.read_text()
+    text = read_text(svg)
     parts = {"wordmark": [], "symbol": None, "transform": None}
     group = re.search(r'<g transform="translate\(([\d.]+),([\d.]+)\) scale\(([\d.]+)\)">\s*<path d="([^"]+)" fill="#0E7490"/>', text)
     if group:
@@ -616,11 +616,16 @@ def images(t: dict, symbol: str, en: dict) -> dict:
     return out
 
 
+def read_text(path: Path) -> str:
+    """UTF-8 whatever the platform's default, and line endings as LF (a Windows checkout may have turned them into CRLF)."""
+    return path.read_bytes().decode("utf-8").replace("\r\n", "\n")
+
+
 def inputs_hash() -> str:
     h = hashlib.sha256()
     for path in [TOKENS, *sorted(LOGO.glob("*.svg")), Path(__file__)]:
         h.update(path.name.encode())
-        h.update(path.read_bytes())
+        h.update(path.read_bytes().replace(b"\r\n", b"\n"))
     h.update(RENDER_VERSION.encode())
     return h.hexdigest()
 
@@ -630,8 +635,8 @@ def main() -> int:
     parser.add_argument("--check", action="store_true", help="fail when a generated file differs instead of writing it")
     args = parser.parse_args()
 
-    t = json.loads(TOKENS.read_text())
-    symbol = re.search(r'<path d="([^"]+)"', (LOGO / "symbol-teal.svg").read_text()).group(1)
+    t = json.loads(read_text(TOKENS))
+    symbol = re.search(r'<path d="([^"]+)"', read_text(LOGO / "symbol-teal.svg")).group(1)
     en, ar = logo_parts(LOGO / "lockup-en-first-ltr.svg"), logo_parts(LOGO / "lockup-ar-first-rtl.svg")
     if en["symbol"] != symbol or ar["symbol"] != symbol:
         print("The lock-ups' symbol differs from symbol-teal.svg; refusing to guess which is right.", file=sys.stderr)
@@ -649,12 +654,12 @@ def main() -> int:
     rel = lambda p: str(p.relative_to(ROOT))
     if args.check:
         for path, content in texts.items():
-            if not path.exists() or path.read_text() != content:
+            if not path.exists() or read_text(path) != content:
                 stale.append(rel(path))
         if not STAMP.exists():
             stale.append(rel(STAMP))
         else:
-            lines = STAMP.read_text().split("\n")
+            lines = read_text(STAMP).split("\n")
             if lines[0] != "inputs " + inputs_hash():
                 stale.append(rel(STAMP) + " (the tokens, the logo or the generator changed)")
             for line in lines[1:]:
@@ -672,7 +677,7 @@ def main() -> int:
 
     for path, content in texts.items():
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content)
+        path.write_bytes(content.encode("utf-8"))
     try:
         binaries = images(t, symbol, en)
     except ImportError:
@@ -683,7 +688,7 @@ def main() -> int:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(blob)
         stamp.append(f"{hashlib.sha256(blob).hexdigest()}  {rel(path)}")
-    STAMP.write_text("\n".join(stamp) + "\n")
+    STAMP.write_bytes(("\n".join(stamp) + "\n").encode("utf-8"))
     print(f"Wrote {len(texts)} files and {len(binaries)} images.")
     return 0
 
