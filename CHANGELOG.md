@@ -6,6 +6,8 @@ Every release of Josour: the apps, the server and the relay share one version nu
 
 ## Unreleased
 
+## 2.7.0 - 2026-11-06
+
 ### Windows and macOS
 - **A new look around the qantara mark.** The desktop app is rebuilt on the identity the phone got in 2.6.0
   ([docs/design/desktop-phase1-foundation.html](docs/design/desktop-phase1-foundation.html), mockups in
