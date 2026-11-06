@@ -10,7 +10,8 @@
   <Application.Resources>
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
-        <ResourceInclude Source="avares://Josour.Mobile/Theme/Tokens.axaml" />
+        <ResourceInclude Source="avares://Josour.Brand/Theme/Tokens.axaml" />
+        <ResourceInclude Source="avares://Josour.Mobile/Theme/Metrics.axaml" />
         <ResourceInclude Source="avares://Josour.Mobile/Theme/ControlThemes.axaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>

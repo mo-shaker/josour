@@ -1,9 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
-using Josour.Infrastructure.Localization;
 
-namespace Josour.Mobile.Controls;
+namespace Josour.Brand.Controls;
 
 /// <summary>
 /// The lock-up for the interface language (<c>lockup-ar-first-rtl.svg</c> in Arabic, <c>lockup-en-first-ltr.svg</c> in English),
@@ -33,7 +32,8 @@ public sealed class BrandLockup : Control
 
     public override void Render(DrawingContext context)
     {
-        var (wordmark, symbol) = LocalizedStrings.Current.IsRightToLeft ? Ar.Value : En.Value;
+        // The interface language shows in the inherited reading direction: Arabic is right to left.
+        var (wordmark, symbol) = FlowDirection == FlowDirection.RightToLeft ? Ar.Value : En.Value;
         var scale = Math.Min(Bounds.Width / LockupGeometry.Width, Bounds.Height / LockupGeometry.Height);
         using var _ = context.PushTransform(Matrix.CreateScale(scale, scale));
         foreach (var part in wordmark)

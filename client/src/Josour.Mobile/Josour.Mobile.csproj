@@ -25,13 +25,10 @@
     <ProjectReference Include="../Josour.Tunnel/Josour.Tunnel.csproj" />
     <ProjectReference Include="../Josour.Proxy/Josour.Proxy.csproj" />
     <ProjectReference Include="../Josour.Egress/Josour.Egress.csproj" />
+    <!-- The identity shared with the desktop: tokens, Readex Pro, lock-up, motif, icons. -->
+    <ProjectReference Include="../Josour.Brand/Josour.Brand.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- Readex Pro, the interface font for Arabic and Latin (MobileApp.UseFonts), and its licence beside it. -->
-    <AvaloniaResource Include="Assets/Fonts/*.ttf" />
-    <AvaloniaResource Include="Assets/Fonts/OFL.txt" />
-  </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Josour.Mobile.Tests" />

@@ -1,107 +1,113 @@
 <Window x:Class="Josour.App.Views.SettingsWindow"
-                 xmlns="https://github.com/avaloniaui"
-                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-                 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-                 xmlns:app="clr-namespace:Josour.App"
-                 xmlns:c="clr-namespace:Josour.App.Controls"
-                 xmlns:vm="clr-namespace:Josour.App.ViewModels"
-                 mc:Ignorable="d"
-                 Title="{x:Static app:Strings.SettingsWindowTitle}"
-                 FlowDirection="{x:Static app:UiFlow.Direction}"
-                 Icon="/Assets/josour.ico"
-                 Width="480" Height="620" MinWidth="440" MinHeight="520"
-                 WindowStartupLocation="CenterOwner">
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:app="clr-namespace:Josour.App"
+        xmlns:c="https://josour.app/controls"
+        xmlns:vm="clr-namespace:Josour.App.ViewModels"
+        mc:Ignorable="d"
+        Title="{x:Static app:Strings.SettingsWindowTitle}"
+        FlowDirection="{x:Static app:UiFlow.Direction}"
+        Icon="/Assets/josour.ico"
+        Width="520" Height="600" MinWidth="440" MinHeight="480"
+        WindowStartupLocation="CenterOwner">
+    <!-- Grouped in cards; switches for on/off settings; the button bar in each system's order, Enter saves, Esc cancels. -->
+    <DockPanel>
+        <Border DockPanel.Dock="Bottom" Background="{DynamicResource Josour.Brush.Surface}"
+                BorderBrush="{DynamicResource Josour.Brush.Border}" BorderThickness="0,1,0,0" Padding="20,12">
+            <c:PlatformButtonRow>
+                <Button MinWidth="100" Classes="primary" IsDefault="True" Content="{x:Static app:Strings.SettingsSave}" Command="{Binding SaveCommand}" />
+                <Button MinWidth="100" IsCancel="True" Content="{x:Static app:Strings.SettingsCancel}" Command="{Binding CancelCommand}" />
+            </c:PlatformButtonRow>
+        </Border>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="20,4,20,0">
-            <StackPanel IsEnabled="{Binding IsIdle}">
-                <TextBlock Classes="title" Text="{x:Static app:Strings.SettingsHeading}" />
-                <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,4,0,16"
-                              Text="{x:Static app:Strings.SettingsDescription}" />
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="20,16,20,20" Spacing="12" IsEnabled="{Binding IsIdle}">
+                <StackPanel Spacing="2">
+                    <TextBlock Classes="title" Text="{x:Static app:Strings.SettingsHeading}" />
+                    <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.SettingsDescription}" />
+                </StackPanel>
 
-                <!-- server -->
-                <TextBlock Classes="bodyStrong" Text="{x:Static app:Strings.SettingsServerSection}" />
-                <TextBlock Classes="caption secondary" Margin="0,8,0,0"
-                              Text="{x:Static app:Strings.SettingsServerUrlLabel}" />
-                <!-- A URL is typed left to right whatever the interface language is. -->
-                <TextBox Margin="0,4,0,4"
-                            FlowDirection="{x:Static app:UiFlow.Technical}"
-                            Text="{Binding ServerUrl, Mode=TwoWay}"
-                            Watermark="{x:Static app:Strings.LoginServerUrlPlaceholder}">
-                                <TextBox.InnerLeftContent>
-                                    <c:Icon Symbol="Globe" Margin="8,0,2,0" />
-                                </TextBox.InnerLeftContent>
-                            </TextBox>
-                <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
-                              Text="{x:Static app:Strings.SettingsServerUrlHint}" />
+                <c:Card>
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <c:Icon Kind="Server" Classes="sm" />
+                            <TextBlock Classes="heading" Text="{x:Static app:Strings.SettingsServerSection}" />
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                            <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.SettingsServerUrlLabel}" />
+                            <TextBox FlowDirection="{x:Static app:UiFlow.Technical}"
+                                     Text="{Binding ServerUrl, Mode=TwoWay}"
+                                     Watermark="{x:Static app:Strings.LoginServerUrlPlaceholder}"
+                                     AutomationProperties.Name="{x:Static app:Strings.SettingsServerUrlLabel}" />
+                            <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.MobileServerUrlHelp}" />
+                        </StackPanel>
+                        <Button HorizontalAlignment="Left" Content="{Binding TestButtonText}" Command="{Binding TestConnectionCommand}" />
+                        <ProgressBar IsIndeterminate="True" Height="3" IsVisible="{Binding IsBusy}" />
+                        <c:InfoBar IsClosable="False" IsOpen="{Binding HasServerMessage, Mode=OneWay}"
+                                   Severity="{Binding IsServerMessageAnError, Converter={StaticResource ErrorSeverity}}"
+                                   Message="{Binding ServerMessage}" AutomationProperties.LiveSetting="Polite" />
+                    </StackPanel>
+                </c:Card>
 
-                <Grid Margin="0,8,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Button Grid.Column="0" Content="{Binding TestButtonText}" Command="{Binding TestConnectionCommand}" />
-                    <ProgressBar IsIndeterminate="True" Grid.Column="1" Width="72" Height="4"
-                                     HorizontalAlignment="Left" Margin="12,0,0,0"
-                                     IsVisible="{Binding IsBusy}" />
-                </Grid>
+                <c:Card>
+                    <StackPanel Spacing="10">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <c:Icon Kind="Language" Classes="sm" />
+                            <TextBlock Classes="heading" Text="{x:Static app:Strings.SettingsInterfaceSection}" />
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                            <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.SettingsLanguageLabel}" />
+                            <ComboBox HorizontalAlignment="Stretch"
+                                      AutomationProperties.Name="{x:Static app:Strings.SettingsLanguageLabel}"
+                                      ItemsSource="{Binding Source={x:Static vm:SettingsViewModel.Languages}}"
+                                      SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}" />
+                        </StackPanel>
+                        <c:InfoBar IsClosable="False" Severity="Informational"
+                                   IsOpen="{Binding IsLanguageRestartNoteVisible, Mode=OneWay}"
+                                   Message="{x:Static app:Strings.SettingsLanguageRestartNote}" />
+                        <Border Classes="divider" />
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2">
+                                <TextBlock Classes="label" Text="{x:Static app:Strings.SettingsCheckPageLabel}" />
+                                <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.SettingsCheckPageHint}" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" OnContent="" OffContent="" Margin="12,0,0,0" VerticalAlignment="Top"
+                                          IsChecked="{Binding OpenCheckPageOnConnect, Mode=TwoWay}"
+                                          AutomationProperties.Name="{x:Static app:Strings.SettingsCheckPageLabel}" />
+                        </Grid>
+                    </StackPanel>
+                </c:Card>
 
-                <c:InfoBar Margin="0,8,0,0" IsClosable="False"
-                            IsOpen="{Binding HasServerMessage, Mode=OneWay}"
-                            Severity="{Binding IsServerMessageAnError, Converter={StaticResource ErrorSeverity}}"
-                            Message="{Binding ServerMessage}" />
+                <c:Card>
+                    <StackPanel Spacing="10">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <c:Icon Kind="Clock" Classes="sm" />
+                            <TextBlock Classes="heading" Text="{x:Static app:Strings.SettingsStartupSection}" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2">
+                                <TextBlock Classes="label" Text="{x:Static app:Strings.SettingsStartAtLogin}" />
+                                <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.SettingsStartAtLoginUnavailable}"
+                                           IsVisible="{Binding !IsStartAtLoginSupported}" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" OnContent="" OffContent="" Margin="12,0,0,0" VerticalAlignment="Center"
+                                          IsChecked="{Binding StartAtLogin, Mode=TwoWay}" IsEnabled="{Binding IsStartAtLoginSupported}"
+                                          AutomationProperties.Name="{x:Static app:Strings.SettingsStartAtLogin}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" VerticalAlignment="Center" Text="{x:Static app:Strings.SettingsStartMinimized}" />
+                            <ToggleSwitch Grid.Column="1" OnContent="" OffContent="" Margin="12,0,0,0" VerticalAlignment="Center"
+                                          IsChecked="{Binding StartMinimized, Mode=TwoWay}"
+                                          AutomationProperties.Name="{x:Static app:Strings.SettingsStartMinimized}" />
+                        </Grid>
+                    </StackPanel>
+                </c:Card>
 
-                <!-- interface -->
-                <TextBlock Classes="bodyStrong" Margin="0,20,0,0" Text="{x:Static app:Strings.SettingsInterfaceSection}" />
-
-                <TextBlock Classes="caption secondary" Margin="0,8,0,0"
-                              Text="{x:Static app:Strings.SettingsLanguageLabel}" />
-                <ComboBox Margin="0,4,0,0"
-                          ItemsSource="{Binding Source={x:Static vm:SettingsViewModel.Languages}}"
-                          SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}" />
-                <c:InfoBar Margin="0,8,0,0" IsClosable="False" Severity="Informational"
-                            IsOpen="{Binding IsLanguageRestartNoteVisible, Mode=OneWay}"
-                            Message="{x:Static app:Strings.SettingsLanguageRestartNote}" />
-
-                <CheckBox Margin="0,12,0,0"
-                          Content="{x:Static app:Strings.SettingsCheckPageLabel}"
-                          IsChecked="{Binding OpenCheckPageOnConnect, Mode=TwoWay}" />
-                <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Margin="0,4,0,0"
-                              Text="{x:Static app:Strings.SettingsCheckPageHint}" />
-
-                <!-- start-up -->
-                <TextBlock Classes="bodyStrong" Margin="0,20,0,0" Text="{x:Static app:Strings.SettingsStartupSection}" />
-                <CheckBox Margin="0,8,0,0"
-                          Content="{x:Static app:Strings.SettingsStartAtLogin}"
-                          IsChecked="{Binding StartAtLogin, Mode=TwoWay}"
-                          IsEnabled="{Binding IsStartAtLoginSupported}" />
-                <TextBlock Classes="caption tertiary" Margin="0,2,0,0"
-                              Text="{x:Static app:Strings.SettingsStartAtLoginUnavailable}"
-                              IsVisible="{Binding !IsStartAtLoginSupported}" />
-                <CheckBox Margin="0,8,0,0"
-                          Content="{x:Static app:Strings.SettingsStartMinimized}"
-                          IsChecked="{Binding StartMinimized, Mode=TwoWay}" />
-
-                <!-- Who may use this connection without asking is set per contact now (ADR-0014). -->
-                <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Margin="0,20,0,0"
-                              Text="{x:Static app:Strings.SettingsTrustMovedHint}" />
-
-                <c:InfoBar Margin="0,16,0,0" IsClosable="False" Severity="Error"
-                            IsOpen="{Binding HasSaveMessage, Mode=OneWay}"
-                            Message="{Binding SaveMessage}" />
+                <c:InfoBar IsClosable="False" Severity="Error" IsOpen="{Binding HasSaveMessage, Mode=OneWay}" Message="{Binding SaveMessage}"
+                           AutomationProperties.LiveSetting="Assertive" />
             </StackPanel>
         </ScrollViewer>
-
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,12,20,16">
-            <Button MinWidth="100" Content="{x:Static app:Strings.SettingsCancel}" Command="{Binding CancelCommand}" />
-            <Button MinWidth="100" Margin="8,0,0,0" Classes="accent" IsDefault="True"
-                       Content="{x:Static app:Strings.SettingsSave}" Command="{Binding SaveCommand}" />
-        </StackPanel>
-    </Grid>
+    </DockPanel>
 </Window>

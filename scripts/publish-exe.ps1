@@ -38,6 +38,13 @@ if ($running.Count) {
     throw "Josour is running from $outDir (PID $($running[0].Id)). Close it, or publish to another folder with -Output."
 }
 
+# The brand assets (the exe's icon, the tray icons, the installer art) must match their sources: scripts/brand-theme.py
+# generates them, and its --check needs nothing but Python.
+$python = @('python3', 'python', 'py') | Where-Object { Get-Command $_ -ErrorAction SilentlyContinue } | Select-Object -First 1
+if (-not $python) { throw "Python is needed to verify the brand assets (scripts\brand-theme.py --check)" }
+& $python (Join-Path $PSScriptRoot 'brand-theme.py') --check
+if ($LASTEXITCODE -ne 0) { throw "the brand assets are out of date: run python3 scripts/brand-theme.py" }
+
 Push-Location $client
 try {
     & dotnet publish src\Josour.App -c Release -f net8.0-windows10.0.19041.0 -r $Runtime --self-contained true `

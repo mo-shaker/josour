@@ -47,7 +47,7 @@ public sealed partial class FirstRunViewModel : ObservableObject
     private readonly ILogger<FirstRunViewModel> _logger;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsServerStep), nameof(IsSignInStep), nameof(IsReadinessStep), nameof(StepText), nameof(StepTitle), nameof(StepDescription))]
+    [NotifyPropertyChangedFor(nameof(IsServerStep), nameof(IsSignInStep), nameof(IsReadinessStep), nameof(StepText), nameof(StepTitle), nameof(StepDescription), nameof(IsStepTwoReached), nameof(IsStepThreeReached))]
     private FirstRunStep _step = FirstRunStep.Server;
 
     [ObservableProperty]
@@ -100,6 +100,20 @@ public sealed partial class FirstRunViewModel : ObservableObject
     [ObservableProperty]
     private bool _isVpnWarning;
 
+    /// <summary>The password is shown in clear while the eye button is pressed on (Phase 2, sign-in).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PasswordChar), nameof(RevealPasswordName))]
+    private bool _isPasswordRevealed;
+
+    /// <summary>The field's mask: none while revealed.</summary>
+    public char PasswordChar => IsPasswordRevealed ? '\0' : '\u25CF';
+
+    /// <summary>The eye button's accessible name, which says what pressing it does.</summary>
+    public string RevealPasswordName => IsPasswordRevealed ? Strings.DesktopHidePassword : Strings.MobileShowPassword;
+
+    [RelayCommand]
+    private void TogglePassword() => IsPasswordRevealed = !IsPasswordRevealed;
+
     public FirstRunViewModel(
         IAppSettingsStore settings,
         IApiClient api,
@@ -133,6 +147,11 @@ public sealed partial class FirstRunViewModel : ObservableObject
 
     public string StepText => string.Format(UiFlow.Culture, Strings.FirstRunStepFormat, (int)Step + 1, StepCount);
 
+    /// <summary>The progress bar's second and third segments (the first is always reached).</summary>
+    public bool IsStepTwoReached => Step >= FirstRunStep.SignIn;
+
+    public bool IsStepThreeReached => Step >= FirstRunStep.Readiness;
+
     public string StepTitle => Step switch
     {
         FirstRunStep.Server => Strings.FirstRunServerTitle,
@@ -143,7 +162,7 @@ public sealed partial class FirstRunViewModel : ObservableObject
     public string StepDescription => Step switch
     {
         FirstRunStep.Server => Strings.FirstRunServerText,
-        FirstRunStep.SignIn => Strings.FirstRunSignInText,
+        FirstRunStep.SignIn => Strings.MobileLoginDescription,
         _ => Strings.FirstRunReadyText,
     };
 

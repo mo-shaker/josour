@@ -5,6 +5,9 @@ using Josour.Infrastructure.Localization;
 
 [assembly: AvaloniaTestApplication(typeof(Josour.App.Tests.TestAppBuilder))]
 
+// The interface language and the theme are process-wide, and the rendering tests switch both: one test at a time.
+[assembly: CollectionBehavior(DisableTestParallelization = true)]
+
 namespace Josour.App.Tests;
 
 /// <summary>
@@ -32,9 +35,11 @@ public static class TestAppBuilder
 
     /// <summary>
     /// Built through <see cref="Program.ConfigureApp"/> — the same method the real entry point uses — so the tests
-    /// run on the app's own fonts and options rather than on a second, quietly different configuration. Only the
-    /// windowing backend differs, which is the one thing a headless run must change.
+    /// run on the app's own fonts (Readex Pro) and options rather than on a second, quietly different configuration.
+    /// Only the windowing backend differs, which is the one thing a headless run must change; it draws with Skia.
     /// </summary>
     public static AppBuilder BuildAvaloniaApp() =>
-        Program.ConfigureApp(AppBuilder.Configure<App>()).UseHeadless(new AvaloniaHeadlessPlatformOptions());
+        Program.ConfigureApp(AppBuilder.Configure<App>())
+            .UseSkia()
+            .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false });
 }

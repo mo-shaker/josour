@@ -165,7 +165,7 @@
     <value>Firewall rule missing</value>
   </data>
   <data name="HostFirewallWarningMessage" xml:space="preserve">
-    <value>Windows Firewall has no inbound rule named "Josour Tunnel", which may stop the other device from reaching you. Run the installer again or ask your administrator.</value>
+    <value>Windows Firewall has no rule that lets the other device reach this computer, so a session may fail to connect. Run the Josour installer again to add it.</value>
   </data>
   <data name="HostSimulatedServerTitle" xml:space="preserve">
     <value>Simulated server</value>
@@ -499,10 +499,10 @@
   </data>
   <!-- host readiness: firewall + VPN (week 6) -->
   <data name="HostVpnWarningTitle" xml:space="preserve">
-    <value>This device goes out through a VPN</value>
+    <value>A VPN carries your traffic</value>
   </data>
   <data name="HostVpnWarningMessageFormat" xml:space="preserve">
-    <value>Outbound traffic from this device goes through the “{0}” adapter, so sites will see the VPN's exit address, not this device's. You may continue, but the point of sharing your device may be lost.</value>
+    <value>Traffic from this computer goes out through “{0}”, so sites will see the VPN’s address, not yours. Sharing still works, but not with your own address.</value>
   </data>
   <data name="ReadinessTitle" xml:space="preserve">
     <value>This device's readiness to host</value>
@@ -596,7 +596,7 @@
     <value>Not available on this system.</value>
   </data>
   <data name="SettingsStartMinimized" xml:space="preserve">
-    <value>Start minimized to the notification area</value>
+    <value>Start in the background, without opening the window</value>
   </data>
   <data name="SettingsSave" xml:space="preserve">
     <value>Save</value>
@@ -618,7 +618,7 @@
     <value>Welcome to Josour</value>
   </data>
   <data name="FirstRunWelcomeText" xml:space="preserve">
-    <value>Two steps before you begin: the server address, then signing in.</value>
+    <value>Three short steps: the server address, signing in, and a check of this computer.</value>
   </data>
   <data name="FirstRunStepFormat" xml:space="preserve">
     <value>Step {0} of {1}</value>
@@ -627,7 +627,7 @@
     <value>The server address</value>
   </data>
   <data name="FirstRunServerText" xml:space="preserve">
-    <value>Enter the address your administrator gave you, and test it before continuing.</value>
+    <value>Enter the address of your Josour server, and test it before you continue.</value>
   </data>
   <data name="FirstRunSignInTitle" xml:space="preserve">
     <value>Sign in</value>
@@ -726,7 +726,7 @@
     <value>Connected automatically</value>
   </data>
   <data name="AutoAcceptToastBodyFormat" xml:space="preserve">
-    <value>{0} ({1}) is using your connection: you allowed them to without asking. You can end the session from the app window.</value>
+    <value>{0} ({1}) is using your connection: you allowed them to without asking. You can end it from the Josour window or from its icon by the clock.</value>
   </data>
   <data name="SettingsAutoAcceptSection" xml:space="preserve">
     <value>Automatic acceptance</value>
@@ -792,7 +792,7 @@
     <value>Users</value>
   </data>
   <data name="AdminDescription" xml:space="preserve">
-    <value>Create, disable, unlock and set passwords. There is no delete: deleting an account erases the record of every session it was part of, including the other party's half — and disabling removes the person just as completely while leaving the history of those they shared with intact.</value>
+    <value>Create accounts, turn them off and unlock them. Accounts are never deleted: turning one off removes the person and keeps the record of the sessions they shared.</value>
   </data>
   <data name="AdminSearchPlaceholder" xml:space="preserve">
     <value>Search by email or name</value>
@@ -1327,5 +1327,70 @@
   </data>
   <data name="MobileAutoAcceptBodyFormat" xml:space="preserve">
     <value>{0} ({1}) is using your connection: you allowed them to without asking. End it from Josour or from its notification.</value>
+  </data>
+  <data name="DesktopTabDevice" xml:space="preserve">
+    <value>This device</value>
+  </data>
+  <data name="DesktopMenuMore" xml:space="preserve">
+    <value>More</value>
+  </data>
+  <data name="DesktopStatusOffText" xml:space="preserve">
+    <value>Turn on “Available” to let your contacts ask to use this computer’s connection.</value>
+  </data>
+  <data name="DesktopUnreachableText" xml:space="preserve">
+    <value>Requests cannot reach this computer until it is connected to the server again.</value>
+  </data>
+  <data name="DesktopGuestSessionTitleFormat" xml:space="preserve">
+    <value>You are browsing through {0}’s connection</value>
+  </data>
+  <data name="DesktopDataUsedLabel" xml:space="preserve">
+    <value>Data used</value>
+  </data>
+  <data name="DesktopHowItWorksText" xml:space="preserve">
+    <value>While “Available” is on, your contacts can ask to browse through this computer’s connection, and the sites they visit see its address. You answer each request, unless you allowed that contact to connect without asking. Josour keeps running by the clock while you are available.</value>
+  </data>
+  <data name="DesktopQuitConfirmTitle" xml:space="preserve">
+    <value>Quit Josour?</value>
+  </data>
+  <data name="DesktopQuitConfirmText" xml:space="preserve">
+    <value>This computer will stop being available for requests until you open Josour again.</value>
+  </data>
+  <data name="DesktopConfirmEndsSessionFormat" xml:space="preserve">
+    <value>{0}’s session will end now, and this computer will stop being available for requests.</value>
+  </data>
+  <data name="DesktopQuit" xml:space="preserve">
+    <value>Quit</value>
+  </data>
+  <data name="DesktopSignOutConfirmText" xml:space="preserve">
+    <value>This computer will stop being available for requests until you sign in again.</value>
+  </data>
+  <data name="DesktopAcceptAndTrust" xml:space="preserve">
+    <value>Accept and always allow</value>
+  </data>
+  <data name="DesktopEndAnytimeHint" xml:space="preserve">
+    <value>You can end it at any moment, from the Josour window or from its icon by the clock.</value>
+  </data>
+  <data name="DesktopAdminDisableTitleFormat" xml:space="preserve">
+    <value>Disable {0}?</value>
+  </data>
+  <data name="DesktopAdminLoading" xml:space="preserve">
+    <value>Loading accounts…</value>
+  </data>
+  <data name="DesktopHidePassword" xml:space="preserve">
+    <value>Hide password</value>
+  </data>
+  <data name="DesktopQuitApp" xml:space="preserve">
+    <value>Quit Josour</value>
+  </data>
+  <data name="DesktopHideApp" xml:space="preserve">
+    <value>Hide Josour</value>
+  </data>
+  <data name="DesktopStartupFailedFormat" xml:space="preserve">
+    <value>Josour could not start.
+
+{0}
+
+The details are in the log folder:
+{1}</value>
   </data>
 </root>

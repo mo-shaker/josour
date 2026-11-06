@@ -13,6 +13,7 @@ using Josour.Mobile.Controls;
 using Josour.Mobile.Platform;
 using Josour.Mobile.Services;
 using Microsoft.Extensions.Logging;
+using Josour.Brand.Controls;
 
 namespace Josour.Mobile.ViewModels;
 

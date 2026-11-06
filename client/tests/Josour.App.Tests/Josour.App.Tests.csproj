@@ -10,6 +10,8 @@
 
   <ItemGroup>
     <PackageReference Include="Avalonia.Headless.XUnit" Version="11.3.22" />
+    <!-- Drawn with Skia: Readex Pro needs a real font manager, and frames are captured to check layout and to compare. -->
+    <PackageReference Include="Avalonia.Skia" Version="11.3.22" />
     <PackageReference Include="coverlet.collector" Version="6.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="xunit" Version="2.5.3" />

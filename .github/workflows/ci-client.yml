@@ -3,9 +3,9 @@ name: ci-client
 on:
   push:
     branches: [main]
-    paths: ["client/**", ".github/workflows/ci-client.yml"]
+    paths: ["client/**", "docs/design/brand-tokens.json", "1-qantara/**", "scripts/brand-theme.py", ".github/workflows/ci-client.yml"]
   pull_request:
-    paths: ["client/**", ".github/workflows/ci-client.yml"]
+    paths: ["client/**", "docs/design/brand-tokens.json", "1-qantara/**", "scripts/brand-theme.py", ".github/workflows/ci-client.yml"]
   # By hand, from the Actions tab: everything above plus the soak and deep-fuzz job below.
   workflow_dispatch:
 
@@ -20,6 +20,9 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "8.0.x"
+      # Every theme file and brand image is generated from docs/design/brand-tokens.json and 1-qantara/.
+      - name: Brand assets are current
+        run: python ../scripts/brand-theme.py --check
       - name: Restore
         run: dotnet restore Josour.sln
       - name: Build

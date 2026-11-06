@@ -3,135 +3,168 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:app="clr-namespace:Josour.App"
-        xmlns:c="clr-namespace:Josour.App.Controls"
+        xmlns:c="https://josour.app/controls"
         xmlns:vm="clr-namespace:Josour.App.ViewModels"
         mc:Ignorable="d"
         x:Class="Josour.App.Views.AdminWindow"
         Title="{x:Static app:Strings.AdminWindowTitle}"
         FlowDirection="{x:Static app:UiFlow.Direction}"
         Icon="/Assets/josour.ico"
-        Width="720" Height="660" MinWidth="560" MinHeight="480"
+        Width="760" Height="640" MinWidth="600" MinHeight="480"
         WindowStartupLocation="CenterOwner">
-    <Grid RowDefinitions="Auto,*,Auto,Auto" Margin="20,16,20,16">
-
-        <StackPanel Grid.Row="0">
-            <TextBlock Classes="title" Text="{x:Static app:Strings.AdminHeading}" />
-            <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,4,0,4"
-                       Text="{x:Static app:Strings.AdminDescription}" />
-            <Button Classes="transparent" HorizontalAlignment="Left" Padding="0,2" Margin="0,0,0,12"
-                    Command="{Binding OpenWebDashboardCommand}">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <c:Icon Symbol="Globe" />
-                    <TextBlock VerticalAlignment="Center" Text="{x:Static app:Strings.AdminOpenWebDashboard}" />
+    <!-- User management (administrators only). Each state is a pill with an icon and a word; disabling asks first. -->
+    <Panel>
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="20,16,20,20" Spacing="12">
+                <StackPanel Spacing="2">
+                    <TextBlock Classes="title" Text="{x:Static app:Strings.AdminHeading}" />
+                    <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.AdminDescription}" />
                 </StackPanel>
-            </Button>
 
-            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
-                <TextBox Grid.Column="0"
-                         Text="{Binding SearchText, Mode=TwoWay}"
-                         Watermark="{x:Static app:Strings.AdminSearchPlaceholder}" />
-                <Button Grid.Column="1" Margin="8,0,0,0"
-                        Command="{Binding RefreshCommand}">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <c:Icon Symbol="ArrowSync" />
-                        <TextBlock Text="{x:Static app:Strings.AdminRefresh}" VerticalAlignment="Center" />
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBox Text="{Binding SearchText, Mode=TwoWay}" Watermark="{x:Static app:Strings.AdminSearchPlaceholder}"
+                             AutomationProperties.Name="{x:Static app:Strings.AdminSearchPlaceholder}">
+                        <TextBox.InnerLeftContent>
+                            <c:Icon Kind="Search" Classes="sm muted" Margin="10,0,0,0" />
+                        </TextBox.InnerLeftContent>
+                    </TextBox>
+                    <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding RefreshCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <c:Icon Kind="Refresh" Classes="sm" />
+                            <TextBlock Text="{x:Static app:Strings.AdminRefresh}" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <c:InfoBar IsClosable="False" IsOpen="{Binding HasMessage}"
+                           Severity="{Binding IsMessageAnError, Converter={StaticResource ErrorSeverity}}"
+                           Message="{Binding Message}" AutomationProperties.LiveSetting="Polite" />
+
+                <c:Card IsVisible="{Binding IsLoading}">
+                    <StackPanel Spacing="8">
+                        <Border Classes="skeleton" Width="220" HorizontalAlignment="Left" />
+                        <Border Classes="skeleton" Width="320" HorizontalAlignment="Left" />
+                        <Border Classes="skeleton" Width="260" HorizontalAlignment="Left" />
+                        <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.DesktopAdminLoading}" AutomationProperties.LiveSetting="Polite" />
                     </StackPanel>
-                </Button>
-            </Grid>
-        </StackPanel>
+                </c:Card>
 
-        <!-- The list. Each row states what it is in words; the state is never a colour alone. -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel>
-                <TextBlock Classes="secondary" Margin="0,12,0,0"
-                           Text="{x:Static app:Strings.AdminEmptyList}"
-                           IsVisible="{Binding !HasUsers}" />
+                <StackPanel HorizontalAlignment="Center" Spacing="6" Margin="0,12" IsVisible="{Binding ShowsEmpty}">
+                    <c:Icon Kind="Search" Classes="muted" HorizontalAlignment="Center" />
+                    <TextBlock Classes="body secondary" Text="{x:Static app:Strings.AdminEmptyList}" />
+                </StackPanel>
 
-                <ItemsControl ItemsSource="{Binding Users}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <c:Card Margin="0,0,0,6" Padding="12,10">
-                                <Grid ColumnDefinitions="*,Auto,Auto">
-                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <TextBlock Classes="bodyStrong" Text="{Binding DisplayName}" />
-                                            <TextBlock Classes="caption tertiary" VerticalAlignment="Center"
-                                                       Text="{x:Static app:Strings.AdminRoleAdmin}"
-                                                       IsVisible="{Binding IsAdmin}" />
+                <c:Card Classes="rows" IsVisible="{Binding HasUsers}">
+                    <ItemsControl ItemsSource="{Binding Users}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel>
+                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,10">
+                                        <Border Classes="avatar" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Initial}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Classes="label" Text="{Binding DisplayName}" />
+                                                <Border Classes="pill neutral" IsVisible="{Binding IsAdmin}" VerticalAlignment="Center">
+                                                    <TextBlock Classes="micro" Text="{x:Static app:Strings.AdminRoleAdmin}" />
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock Classes="caption secondary" Text="{Binding Email}" />
                                         </StackPanel>
-                                        <!-- The email is bidi-isolated by the row, so it reads left to right in Arabic. -->
-                                        <TextBlock Classes="caption secondary" Text="{Binding Email}" />
-                                        <TextBlock Classes="caption tertiary" Margin="0,2,0,0" Text="{Binding StateText}" />
-                                    </StackPanel>
+                                        <Panel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,8,0">
+                                            <Border Classes="pill success" IsVisible="{Binding IsStateActive}">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <c:Icon Kind="Check" Classes="sm" />
+                                                    <TextBlock Classes="micro" Text="{Binding StateText}" />
+                                                </StackPanel>
+                                            </Border>
+                                            <Border Classes="pill warning" IsVisible="{Binding IsStateLocked}">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <c:Icon Kind="Clock" Classes="sm" />
+                                                    <TextBlock Classes="micro" Text="{Binding StateText}" />
+                                                </StackPanel>
+                                            </Border>
+                                            <Border Classes="pill neutral" IsVisible="{Binding IsStateDisabled}">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <c:Icon Kind="Stop" Classes="sm" />
+                                                    <TextBlock Classes="micro" Text="{Binding StateText}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </Panel>
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <Button IsVisible="{Binding CanUnlock}"
+                                                    Command="{Binding DataContext.UnlockCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                    CommandParameter="{Binding}">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <c:Icon Kind="Unlock" Classes="sm" />
+                                                    <TextBlock Text="{x:Static app:Strings.AdminUnlock}" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button MinWidth="88" Content="{Binding ToggleActiveText}" IsEnabled="{Binding CanToggleActive}"
+                                                    ToolTip.Tip="{x:Static app:Strings.AdminSelfNote}"
+                                                    Command="{Binding DataContext.ToggleActiveCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                    CommandParameter="{Binding}" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border Classes="divider" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </c:Card>
 
-                                    <Button Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center"
-                                            Content="{x:Static app:Strings.AdminUnlock}"
-                                            IsVisible="{Binding CanUnlock}"
-                                            Command="{Binding DataContext.UnlockCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                            CommandParameter="{Binding}" />
+                <!-- Creating an account: what manage.py create-user used to be. -->
+                <c:Card>
+                    <StackPanel Spacing="10">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <c:Icon Kind="PersonAdd" Classes="sm" />
+                            <TextBlock Classes="heading" Text="{x:Static app:Strings.AdminCreateSection}" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.AdminEmailLabel}" />
+                                <TextBox FlowDirection="{x:Static app:UiFlow.Technical}" Text="{Binding NewEmail, Mode=TwoWay}"
+                                         AutomationProperties.Name="{x:Static app:Strings.AdminEmailLabel}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.AdminDisplayNameLabel}" />
+                                <TextBox Text="{Binding NewDisplayName, Mode=TwoWay}" AutomationProperties.Name="{x:Static app:Strings.AdminDisplayNameLabel}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="4">
+                                <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.AdminPasswordLabel}" />
+                                <TextBox PasswordChar="●" FlowDirection="{x:Static app:UiFlow.Technical}" Text="{Binding NewPassword, Mode=TwoWay}"
+                                         AutomationProperties.Name="{x:Static app:Strings.AdminPasswordLabel}" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <CheckBox VerticalAlignment="Center" IsChecked="{Binding NewIsAdmin, Mode=TwoWay}">
+                                <TextBlock Classes="body" Text="{x:Static app:Strings.AdminMakeAdmin}" />
+                            </CheckBox>
+                            <Button Grid.Column="1" Classes="primary" MinWidth="110" Content="{x:Static app:Strings.AdminCreate}" Command="{Binding CreateUserCommand}" />
+                        </Grid>
+                    </StackPanel>
+                </c:Card>
 
-                                    <Button Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center" MinWidth="88"
-                                            Content="{Binding ToggleActiveText}"
-                                            IsEnabled="{Binding CanToggleActive}"
-                                            ToolTip.Tip="{x:Static app:Strings.AdminSelfNote}"
-                                            Command="{Binding DataContext.ToggleActiveCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                            CommandParameter="{Binding}" />
-                                </Grid>
-                            </c:Card>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <ProgressBar IsIndeterminate="True" Height="3" IsVisible="{Binding IsBusy}" />
+
+                <Button Classes="link" HorizontalAlignment="Left" Command="{Binding OpenWebDashboardCommand}" Content="{x:Static app:Strings.AdminOpenWebDashboard}" />
             </StackPanel>
         </ScrollViewer>
 
-        <!-- Creating an account: what manage.py create-user used to be. -->
-        <StackPanel Grid.Row="2" Margin="0,12,0,0">
-            <TextBlock Classes="bodyStrong" Text="{x:Static app:Strings.AdminCreateSection}" />
-            <Grid ColumnDefinitions="*,*" Margin="0,8,0,0">
-                <StackPanel Grid.Column="0" Margin="0,0,6,0">
-                    <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.AdminEmailLabel}" />
-                    <TextBox Margin="0,4,0,0"
-                             FlowDirection="{x:Static app:UiFlow.Technical}"
-                             Text="{Binding NewEmail, Mode=TwoWay}">
-                        <TextBox.InnerLeftContent>
-                            <c:Icon Symbol="Mail" Margin="8,0,2,0" />
-                        </TextBox.InnerLeftContent>
-                    </TextBox>
+        <!-- Disabling cuts the person off at once: asked first, with what it does as the question's text. -->
+        <Panel IsVisible="{Binding IsConfirmingDisable}">
+            <Border Classes="scrim" />
+            <Border Classes="dialog">
+                <StackPanel Spacing="12">
+                    <TextBlock Classes="heading" Text="{Binding DisableConfirmTitle}" AutomationProperties.LiveSetting="Assertive" />
+                    <TextBlock Classes="body" Text="{x:Static app:Strings.AdminDisableWarning}" />
+                    <c:PlatformButtonRow>
+                        <Button Classes="danger" c:PlatformButtonRow.IsPrimary="True" Content="{x:Static app:Strings.AdminDisable}" Command="{Binding ConfirmDisableCommand}" />
+                        <Button IsCancel="True" Content="{x:Static app:Strings.SettingsCancel}" Command="{Binding CancelDisableCommand}" />
+                    </c:PlatformButtonRow>
                 </StackPanel>
-                <StackPanel Grid.Column="1" Margin="6,0,0,0">
-                    <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.AdminDisplayNameLabel}" />
-                    <TextBox Margin="0,4,0,0" Text="{Binding NewDisplayName, Mode=TwoWay}" />
-                </StackPanel>
-            </Grid>
-
-            <TextBlock Classes="caption secondary" Margin="0,8,0,0" Text="{x:Static app:Strings.AdminPasswordLabel}" />
-            <TextBox Margin="0,4,0,0" PasswordChar="●"
-                     FlowDirection="{x:Static app:UiFlow.Technical}"
-                     Text="{Binding NewPassword, Mode=TwoWay}">
-                <TextBox.InnerLeftContent>
-                    <c:Icon Symbol="Key" Margin="8,0,2,0" />
-                </TextBox.InnerLeftContent>
-            </TextBox>
-
-            <Grid ColumnDefinitions="*,Auto" Margin="0,10,0,0">
-                <CheckBox Grid.Column="0"
-                          Content="{x:Static app:Strings.AdminMakeAdmin}"
-                          IsChecked="{Binding NewIsAdmin, Mode=TwoWay}" />
-                <Button Grid.Column="1" Classes="accent" MinWidth="110"
-                        Content="{x:Static app:Strings.AdminCreate}"
-                        Command="{Binding CreateUserCommand}" />
-            </Grid>
-        </StackPanel>
-
-        <StackPanel Grid.Row="3" Margin="0,12,0,0">
-            <c:InfoBar Margin="0,0,0,8" IsClosable="False" Severity="Warning" IsOpen="True"
-                       Message="{x:Static app:Strings.AdminDisableWarning}" />
-            <ProgressBar IsIndeterminate="True" Height="4" Margin="0,0,0,8"
-                         IsVisible="{Binding IsBusy}" />
-            <c:InfoBar IsClosable="False"
-                       IsOpen="{Binding HasMessage}"
-                       Severity="{Binding IsMessageAnError, Converter={StaticResource ErrorSeverity}}"
-                       Message="{Binding Message}" />
-        </StackPanel>
-    </Grid>
+            </Border>
+        </Panel>
+    </Panel>
 </Window>

@@ -46,7 +46,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ "$OSTYPE" != darwin* ]]; then
-    echo "this builds a macOS bundle and needs macOS tools (sips, iconutil, hdiutil)" >&2
+    echo "this builds a macOS bundle and needs macOS tools (hdiutil)" >&2
     exit 1
 fi
 
@@ -90,31 +90,10 @@ chmod +x "$app/Contents/MacOS/Josour"
 
 # ---------------------------------------------------------------- icon
 #
-# The source art is 64x64, which is all there is. macOS asks for sizes up to 1024 and will happily upscale,
-# so the large icon looks soft. Replacing Assets/josour.ico with a 1024x1024 master is the fix; this is
-# noted at the end of the run rather than hidden.
-iconset="$staging/josour.iconset"
-mkdir -p "$iconset"
-
-# Through PNG first: sips refuses to scale an .ico up past its own size, and would take the whole script
-# down with it under `set -e`. From a PNG it will.
-base="$staging/josour-base.png"
-sips -s format png "$project/Assets/josour.ico" --out "$base" >/dev/null
-
-missing=0
-for spec in "16:icon_16x16" "32:icon_16x16@2x" "32:icon_32x32" "64:icon_32x32@2x" \
-            "128:icon_128x128" "256:icon_128x128@2x" "256:icon_256x256" "512:icon_256x256@2x" \
-            "512:icon_512x512" "1024:icon_512x512@2x"; do
-    size="${spec%%:*}"
-    name="${spec##*:}"
-    if ! sips -z "$size" "$size" "$base" --out "$iconset/$name.png" >/dev/null 2>&1; then
-        # A size that cannot be produced is a softer icon at that size, not a reason to fail the build.
-        missing=$((missing + 1))
-    fi
-done
-
-[[ "$missing" == "0" ]] || echo "note: $missing icon size(s) could not be generated"
-iconutil -c icns "$iconset" -o "$app/Contents/Resources/josour.icns"
+# Generated from the logo (1-qantara/) by scripts/brand-theme.py: Apple's grid, every size from 16 to 1024 @2x.
+# The check fails the build when the icon (or any other brand asset) is older than its sources.
+python3 "$root/scripts/brand-theme.py" --check
+cp "$project/Assets/josour.icns" "$app/Contents/Resources/josour.icns"
 
 # ---------------------------------------------------------------- Info.plist
 #
@@ -232,6 +211,4 @@ fi
 echo
 echo "Signed ad hoc, not notarized (ADR-0011). On another Mac the first launch must be allowed once: right-click"
 echo "the app, choose Open, then confirm — on macOS 15, System Settings → Privacy & Security → Open Anyway."
-echo
-echo "The icon is generated from a 64x64 source, so it is soft above that size. A 1024x1024 master in"
-echo "client/src/Josour.App/Assets is what fixes it."
+

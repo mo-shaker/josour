@@ -138,6 +138,8 @@ public sealed partial class AdminViewModel : ObservableObject
                 OnPropertyChanged(nameof(HasUsers));
             },
             successMessage: null);
+        IsLoaded = true;
+        OnPropertyChanged(nameof(ShowsEmpty));
     }
 
     [RelayCommand(CanExecute = nameof(CanCreateUser))]
@@ -166,6 +168,30 @@ public sealed partial class AdminViewModel : ObservableObject
     /// control channels closed. The message says so, because "disabled" that only takes effect later is the kind of
     /// half-truth an administrator acts on.
     /// </summary>
+    /// <summary>The account waiting for "Disable?" to be confirmed (Phase 2 decision 4); null when none is.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsConfirmingDisable), nameof(DisableConfirmTitle))]
+    private AdminUserRow? _confirmingDisable;
+
+    public bool IsConfirmingDisable => ConfirmingDisable is not null;
+
+    public string DisableConfirmTitle => ConfirmingDisable is { } row
+        ? string.Format(UiFlow.Culture, Strings.DesktopAdminDisableTitleFormat, row.DisplayName)
+        : string.Empty;
+
+    /// <summary>The first list has been asked for and answered (or failed): until then the list shows loading rows.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLoading), nameof(ShowsEmpty))]
+    private bool _isLoaded;
+
+    public bool IsLoading => !IsLoaded;
+
+    public bool ShowsEmpty => IsLoaded && !HasUsers;
+
+    /// <summary>
+    /// Enabling takes effect at once; disabling asks first, because it cuts the person off immediately (the warning that
+    /// used to stay open in the window is now this question's text).
+    /// </summary>
     [RelayCommand]
     private async Task ToggleActiveAsync(AdminUserRow? row)
     {
@@ -174,7 +200,28 @@ public sealed partial class AdminViewModel : ObservableObject
             return;
         }
 
-        var enabling = !row.IsActive;
+        if (row.IsActive)
+        {
+            ConfirmingDisable = row;
+            return;
+        }
+
+        await SetActiveAsync(row, enabling: true);
+    }
+
+    [RelayCommand]
+    private void CancelDisable() => ConfirmingDisable = null;
+
+    [RelayCommand]
+    private Task ConfirmDisableAsync()
+    {
+        var row = ConfirmingDisable;
+        ConfirmingDisable = null;
+        return row is null ? Task.CompletedTask : SetActiveAsync(row, enabling: false);
+    }
+
+    private async Task SetActiveAsync(AdminUserRow row, bool enabling)
+    {
         await RunAsync(
             async () =>
             {

@@ -1,16 +1,21 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
-using Josour.Mobile.ViewModels;
 
-namespace Josour.Mobile.Controls;
+namespace Josour.Brand.Controls;
+
+/// <summary>The drawing the arch motif shows.</summary>
+public enum MotifState
+{
+    Off, Connecting, Ready, Unreachable, Attention, Session, Ended, Empty, Offer,
+}
 
 /// <summary>
-/// The arch as a motif (docs/design/mobile-phase1-foundation.html, "The arch as a motif"): the symbol's own geometry drawn as
+/// The arch as a motif (docs/design/mobile-phase1-foundation.html, "The arch as a motif"; the same on the desktop): the symbol's own geometry drawn as
 /// a 3-unit band of radius 7.5 about (12, 15) and two dots of radius 2.25, in the state the status hero, the empty contacts
 /// list or the request screen needs. The dot at the reading start is "you": in a right-to-left layout the whole drawing is
 /// mirrored by the layout, which moves only that meaning, since the shape is symmetric.
-/// <para>Motion is a stroke offset only (<see cref="Progress"/>, animated by the styles) and stops when <see cref="MobileTheme.ReduceMotion"/> is set.</para>
+/// <para>Motion is a stroke offset only (<see cref="Progress"/>, animated by the styles) and stops when <see cref="BrandMotion.ReduceMotion"/> is set.</para>
 /// </summary>
 public sealed class Motif : Control
 {
@@ -39,7 +44,7 @@ public sealed class Motif : Control
     }
 
     /// <summary>The system's "remove animations" setting, as the Android head read it.</summary>
-    private static bool ReduceMotion => MobileTheme.ReduceMotion;
+    private static bool ReduceMotion => BrandMotion.ReduceMotion;
 
     public MotifState State { get => GetValue(StateProperty); set => SetValue(StateProperty, value); }
     public double Progress { get => GetValue(ProgressProperty); set => SetValue(ProgressProperty, value); }

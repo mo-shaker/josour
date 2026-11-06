@@ -72,7 +72,7 @@ public sealed class WindowsToastNotifier : INotifier, IDisposable
                 .AddArgument(NotificationActions.RequestIdKey, id)
                 .AddText(Strings.ToastIncomingRequestTitle)
                 .AddText(string.Format(UiFlow.Culture, Strings.ToastIncomingRequestBodyFormat, guestName, UiFlow.Ltr(deviceName), durationMin))
-                .AddText(Strings.IncomingRequestWarning)
+                .AddText(Strings.MobileConsequence) // the plain consequence, as on the request window (Phase 2)
                 .AddButton(new ToastButton()
                     .SetContent(Strings.Accept)
                     .AddArgument(NotificationActions.ActionKey, NotificationActions.Accept)

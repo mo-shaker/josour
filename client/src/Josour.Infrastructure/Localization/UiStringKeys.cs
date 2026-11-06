@@ -587,4 +587,26 @@ public static class UiStringKeys
     public const string MobileEndAnytimeHint = "MobileEndAnytimeHint";
     public const string MobileRequestExpiredFormat = "MobileRequestExpiredFormat";
     public const string MobileAutoAcceptBodyFormat = "MobileAutoAcceptBodyFormat";
+
+    // ---- desktop redesign (docs/design/desktop-phase2-mockups.html, copy table) ----
+    public const string DesktopTabDevice = "DesktopTabDevice";
+    public const string DesktopMenuMore = "DesktopMenuMore";
+    public const string DesktopStatusOffText = "DesktopStatusOffText";
+    public const string DesktopUnreachableText = "DesktopUnreachableText";
+    public const string DesktopGuestSessionTitleFormat = "DesktopGuestSessionTitleFormat";
+    public const string DesktopDataUsedLabel = "DesktopDataUsedLabel";
+    public const string DesktopHowItWorksText = "DesktopHowItWorksText";
+    public const string DesktopQuitConfirmTitle = "DesktopQuitConfirmTitle";
+    public const string DesktopQuitConfirmText = "DesktopQuitConfirmText";
+    public const string DesktopConfirmEndsSessionFormat = "DesktopConfirmEndsSessionFormat";
+    public const string DesktopQuit = "DesktopQuit";
+    public const string DesktopSignOutConfirmText = "DesktopSignOutConfirmText";
+    public const string DesktopAcceptAndTrust = "DesktopAcceptAndTrust";
+    public const string DesktopEndAnytimeHint = "DesktopEndAnytimeHint";
+    public const string DesktopAdminDisableTitleFormat = "DesktopAdminDisableTitleFormat";
+    public const string DesktopAdminLoading = "DesktopAdminLoading";
+    public const string DesktopHidePassword = "DesktopHidePassword";
+    public const string DesktopQuitApp = "DesktopQuitApp";
+    public const string DesktopHideApp = "DesktopHideApp";
+    public const string DesktopStartupFailedFormat = "DesktopStartupFailedFormat";
 }

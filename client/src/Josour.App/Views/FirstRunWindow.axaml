@@ -1,128 +1,127 @@
 <Window x:Class="Josour.App.Views.FirstRunWindow"
-                 xmlns="https://github.com/avaloniaui"
-                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-                 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-                 xmlns:app="clr-namespace:Josour.App"
-                 xmlns:c="clr-namespace:Josour.App.Controls"
-                 xmlns:vm="clr-namespace:Josour.App.ViewModels"
-                 mc:Ignorable="d"
-                 Title="{x:Static app:Strings.FirstRunWindowTitle}"
-                 FlowDirection="{x:Static app:UiFlow.Direction}"
-                 Icon="/Assets/josour.ico"
-                 Width="460" SizeToContent="Height" MinHeight="480"
-                 CanResize="False"
-                 WindowStartupLocation="CenterScreen">
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:app="clr-namespace:Josour.App"
+        xmlns:c="https://josour.app/controls"
+        mc:Ignorable="d"
+        Title="{x:Static app:Strings.FirstRunWindowTitle}"
+        FlowDirection="{x:Static app:UiFlow.Direction}"
+        Icon="/Assets/josour.ico"
+        Width="480" SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen">
+    <!-- Three steps with a visible progress bar: the server address, signing in, then what this computer looks like as a
+         host (never a gate). Back and Next keep the wizard order on both systems. -->
+    <StackPanel Margin="24,20,24,24" Spacing="12" IsEnabled="{Binding IsIdle}">
+        <c:BrandLockup Width="170" HorizontalAlignment="Center" AutomationProperties.Name="{x:Static app:Strings.AppName}" />
 
-        <StackPanel Grid.Row="1" Margin="24,8,24,24" IsEnabled="{Binding IsIdle}">
-            <TextBlock Classes="title" Text="{x:Static app:Strings.FirstRunWelcomeHeading}"
-                          IsVisible="{Binding IsServerStep}" />
-            <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,4,0,12"
-                          Text="{x:Static app:Strings.FirstRunWelcomeText}"
-                          IsVisible="{Binding IsServerStep}" />
-
-            <TextBlock Classes="caption tertiary" Text="{Binding StepText}" />
-            <TextBlock Classes="subtitle" Margin="0,2,0,0" Text="{Binding StepTitle}" />
-            <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,4,0,16" Text="{Binding StepDescription}" />
-
-            <!-- step 1: the server address -->
-            <StackPanel IsVisible="{Binding IsServerStep}">
-                <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.SettingsServerUrlLabel}" />
-                <!-- A URL is typed left to right whatever the interface language is. -->
-                <TextBox Margin="0,4,0,4"
-                            FlowDirection="{x:Static app:UiFlow.Technical}"
-                            Text="{Binding ServerUrl, Mode=TwoWay}"
-                            Watermark="{x:Static app:Strings.LoginServerUrlPlaceholder}">
-                                <TextBox.InnerLeftContent>
-                                    <c:Icon Symbol="Globe" Margin="8,0,2,0" />
-                                </TextBox.InnerLeftContent>
-                            </TextBox>
-                <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
-                              Text="{x:Static app:Strings.SettingsServerUrlHint}" />
-            </StackPanel>
-
-            <!-- step 2: sign in -->
-            <StackPanel IsVisible="{Binding IsSignInStep}">
-                <StackPanel IsVisible="{Binding IsRegistering}">
-                    <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.RegisterDisplayName}" />
-                    <TextBox Margin="0,4,0,12" MaxLength="100" Text="{Binding DisplayName, Mode=TwoWay}" />
-                </StackPanel>
-                <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.LoginEmailLabel}" />
-                <TextBox Margin="0,4,0,12"
-                            FlowDirection="{x:Static app:UiFlow.Technical}"
-                            Text="{Binding Email, Mode=TwoWay}">
-                                <TextBox.InnerLeftContent>
-                                    <c:Icon Symbol="Mail" Margin="8,0,2,0" />
-                                </TextBox.InnerLeftContent>
-                            </TextBox>
-                <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.LoginPasswordLabel}" />
-                <TextBox PasswordChar="●" Margin="0,4,0,0"
-                                FlowDirection="{x:Static app:UiFlow.Technical}"
-                                Text="{Binding Password, Mode=TwoWay}">
-                                    <TextBox.InnerLeftContent>
-                                        <c:Icon Symbol="Key" Margin="8,0,2,0" />
-                                    </TextBox.InnerLeftContent>
-                                </TextBox>
-            </StackPanel>
-
-            <!-- step 3: what this machine looks like as a host (never a gate) -->
-            <StackPanel IsVisible="{Binding IsReadinessStep}">
-                <c:InfoBar IsClosable="False" IsOpen="True"
-                            Severity="{Binding IsFirewallWarning, Converter={StaticResource WarningSeverity}}"
-                            Message="{Binding FirewallText}" />
-                <c:InfoBar Margin="0,8,0,0" IsClosable="False" IsOpen="True"
-                            Severity="{Binding IsVpnWarning, Converter={StaticResource WarningSeverity}}"
-                            Message="{Binding VpnText}" />
-                <Button Margin="0,12,0,0" HorizontalAlignment="Left"
-                           Content="{x:Static app:Strings.ReadinessRecheck}"
-                           Command="{Binding RecheckReadinessCommand}"
-                           IsEnabled="{Binding !IsReadinessChecking}" />
-            </StackPanel>
-
-            <c:InfoBar Margin="0,12,0,0" IsClosable="False"
-                        IsOpen="{Binding HasMessage, Mode=OneWay}"
-                        Severity="{Binding IsMessageAnError, Converter={StaticResource ErrorSeverity}}"
-                        Message="{Binding Message}" />
-
-            <Grid Margin="0,16,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <ProgressBar IsIndeterminate="True" Grid.Column="0" Width="80" Height="4" HorizontalAlignment="Left" VerticalAlignment="Center"
-                                 IsVisible="{Binding IsBusy}" />
-
-                <Button Grid.Column="1" HorizontalAlignment="Left" Margin="12,0,0,0"
-                           Content="{x:Static app:Strings.FirstRunBack}"
-                           Command="{Binding BackToServerCommand}"
-                           IsVisible="{Binding IsSignInStep}" />
-
-                <Button Grid.Column="2" MinWidth="140" Classes="accent" IsDefault="True"
-                           Content="{x:Static app:Strings.FirstRunNext}"
-                           Command="{Binding ContinueFromServerCommand}"
-                           IsVisible="{Binding IsServerStep}" />
-                <Panel Grid.Column="2" IsVisible="{Binding IsSignInStep}">
-                    <Button MinWidth="140" Classes="accent" IsDefault="True"
-                               Content="{x:Static app:Strings.LoginSignIn}"
-                               Command="{Binding SignInCommand}"
-                               IsVisible="{Binding IsSigningIn}" />
-                    <Button MinWidth="140" Classes="accent"
-                               Content="{x:Static app:Strings.RegisterSubmit}"
-                               Command="{Binding RegisterCommand}"
-                               IsVisible="{Binding IsRegistering}" />
-                </Panel>
-                <Button Grid.Column="2" MinWidth="140" Classes="accent" IsDefault="True"
-                           Content="{x:Static app:Strings.FirstRunFinish}"
-                           Command="{Binding FinishCommand}"
-                           IsVisible="{Binding IsReadinessStep}" />
-            </Grid>
+        <StackPanel Spacing="4" IsVisible="{Binding IsServerStep}">
+            <TextBlock Classes="title" Text="{x:Static app:Strings.FirstRunWelcomeHeading}" />
+            <TextBlock Classes="body secondary" Text="{x:Static app:Strings.FirstRunWelcomeText}" />
         </StackPanel>
-    </Grid>
+
+        <StackPanel Orientation="Horizontal" Spacing="6" AutomationProperties.Name="{Binding StepText}">
+            <Border Width="28" Height="4" CornerRadius="2" Background="{DynamicResource Josour.Brush.Primary}" VerticalAlignment="Center" />
+            <Panel Width="28" Height="4" VerticalAlignment="Center">
+                <Border CornerRadius="2" Background="{DynamicResource Josour.Brush.Border}" />
+                <Border CornerRadius="2" Background="{DynamicResource Josour.Brush.Primary}" IsVisible="{Binding IsStepTwoReached}" />
+            </Panel>
+            <Panel Width="28" Height="4" VerticalAlignment="Center">
+                <Border CornerRadius="2" Background="{DynamicResource Josour.Brush.Border}" />
+                <Border CornerRadius="2" Background="{DynamicResource Josour.Brush.Primary}" IsVisible="{Binding IsStepThreeReached}" />
+            </Panel>
+            <TextBlock Classes="caption secondary" Margin="6,0,0,0" VerticalAlignment="Center" Text="{Binding StepText}" />
+        </StackPanel>
+
+        <StackPanel Spacing="4">
+            <TextBlock Classes="heading" Text="{Binding StepTitle}" />
+            <TextBlock Classes="body secondary" Text="{Binding StepDescription}" />
+        </StackPanel>
+
+        <!-- step 1: the server address -->
+        <StackPanel Spacing="4" IsVisible="{Binding IsServerStep}">
+            <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.SettingsServerUrlLabel}" />
+            <TextBox FlowDirection="{x:Static app:UiFlow.Technical}"
+                     Text="{Binding ServerUrl, Mode=TwoWay}"
+                     Watermark="{x:Static app:Strings.LoginServerUrlPlaceholder}"
+                     AutomationProperties.Name="{x:Static app:Strings.SettingsServerUrlLabel}">
+                <TextBox.InnerLeftContent>
+                    <c:Icon Kind="Server" Classes="sm muted" Margin="10,0,0,0" />
+                </TextBox.InnerLeftContent>
+            </TextBox>
+            <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.MobileServerUrlHelp}" />
+        </StackPanel>
+
+        <!-- step 2: sign in -->
+        <StackPanel Spacing="12" IsVisible="{Binding IsSignInStep}">
+            <StackPanel Spacing="4" IsVisible="{Binding IsRegistering}">
+                <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.RegisterDisplayName}" />
+                <TextBox MaxLength="100" Text="{Binding DisplayName, Mode=TwoWay}" AutomationProperties.Name="{x:Static app:Strings.RegisterDisplayName}" />
+            </StackPanel>
+            <StackPanel Spacing="4">
+                <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.LoginEmailLabel}" />
+                <TextBox FlowDirection="{x:Static app:UiFlow.Technical}" Text="{Binding Email, Mode=TwoWay}"
+                         AutomationProperties.Name="{x:Static app:Strings.LoginEmailLabel}">
+                    <TextBox.InnerLeftContent>
+                        <c:Icon Kind="Mail" Classes="sm muted" Margin="10,0,0,0" />
+                    </TextBox.InnerLeftContent>
+                </TextBox>
+            </StackPanel>
+            <StackPanel Spacing="4">
+                <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.LoginPasswordLabel}" />
+                <TextBox FlowDirection="{x:Static app:UiFlow.Technical}" PasswordChar="{Binding PasswordChar}" Text="{Binding Password, Mode=TwoWay}"
+                         AutomationProperties.Name="{x:Static app:Strings.LoginPasswordLabel}">
+                    <TextBox.InnerLeftContent>
+                        <c:Icon Kind="Key" Classes="sm muted" Margin="10,0,0,0" />
+                    </TextBox.InnerLeftContent>
+                    <TextBox.InnerRightContent>
+                        <Button Classes="icon" MinHeight="24" MinWidth="28" Margin="0,0,2,0" Command="{Binding TogglePasswordCommand}"
+                                ToolTip.Tip="{Binding RevealPasswordName}" AutomationProperties.Name="{Binding RevealPasswordName}">
+                            <c:Icon Kind="Eye" Classes="sm" />
+                        </Button>
+                    </TextBox.InnerRightContent>
+                </TextBox>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- step 3: readiness, never a gate -->
+        <StackPanel Spacing="8" IsVisible="{Binding IsReadinessStep}">
+            <c:InfoBar IsClosable="False" IsOpen="True"
+                       Severity="{Binding IsFirewallWarning, Converter={StaticResource WarningSeverity}}"
+                       Message="{Binding FirewallText}" />
+            <c:InfoBar IsClosable="False" IsOpen="True"
+                       Severity="{Binding IsVpnWarning, Converter={StaticResource WarningSeverity}}"
+                       Message="{Binding VpnText}" />
+            <Button HorizontalAlignment="Left" Command="{Binding RecheckReadinessCommand}" IsEnabled="{Binding !IsReadinessChecking}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <c:Icon Kind="Refresh" Classes="sm" />
+                    <TextBlock Text="{x:Static app:Strings.ReadinessRecheck}" />
+                </StackPanel>
+            </Button>
+        </StackPanel>
+
+        <c:InfoBar IsClosable="False" IsOpen="{Binding HasMessage, Mode=OneWay}"
+                   Severity="{Binding IsMessageAnError, Converter={StaticResource ErrorSeverity}}"
+                   Message="{Binding Message}" AutomationProperties.LiveSetting="Assertive" />
+
+        <ProgressBar IsIndeterminate="True" Height="3" IsVisible="{Binding IsBusy}" />
+
+        <Grid ColumnDefinitions="Auto,*,Auto">
+            <Button Grid.Column="0" Content="{x:Static app:Strings.FirstRunBack}" Command="{Binding BackToServerCommand}" IsVisible="{Binding IsSignInStep}" />
+            <Panel Grid.Column="2">
+                <Button MinWidth="140" Classes="primary" IsDefault="True" Content="{x:Static app:Strings.FirstRunNext}"
+                        Command="{Binding ContinueFromServerCommand}" IsVisible="{Binding IsServerStep}" />
+                <Panel IsVisible="{Binding IsSignInStep}">
+                    <Button MinWidth="140" Classes="primary" IsDefault="True" Content="{x:Static app:Strings.LoginSignIn}"
+                            Command="{Binding SignInCommand}" IsVisible="{Binding IsSigningIn}" />
+                    <Button MinWidth="140" Classes="primary" Content="{x:Static app:Strings.RegisterSubmit}"
+                            Command="{Binding RegisterCommand}" IsVisible="{Binding IsRegistering}" />
+                </Panel>
+                <Button MinWidth="140" Classes="primary" IsDefault="True" Content="{x:Static app:Strings.FirstRunFinish}"
+                        Command="{Binding FinishCommand}" IsVisible="{Binding IsReadinessStep}" />
+            </Panel>
+        </Grid>
+    </StackPanel>
 </Window>

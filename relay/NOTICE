@@ -46,9 +46,10 @@ Readex Pro, version 1.205 (Regular, Medium, SemiBold and Bold)
 
     Four static instances of the variable font, cut with fontTools and
     renamed to the family "Readex Pro" (no glyph changed), are bundled in
-    client/src/Josour.Mobile/Assets/Fonts/ for the Android app; it is also the
-    typeface of the Josour wordmark. The full licence text is beside them in
-    OFL.txt.
+    client/src/Josour.Brand/Assets/Fonts/ and ship in the Android app and in the
+    Windows and macOS apps; it is also the typeface of the Josour wordmark. The
+    full licence text is beside them in OFL.txt, and the desktop app shows it
+    under About, License and notices.
 
 --------------------------------------------------------------------------------
 

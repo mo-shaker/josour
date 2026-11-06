@@ -4,87 +4,63 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:app="clr-namespace:Josour.App"
-                 xmlns:c="clr-namespace:Josour.App.Controls"
-             xmlns:vm="clr-namespace:Josour.App.ViewModels"
+             xmlns:c="https://josour.app/controls"
              mc:Ignorable="d"
-             d:DesignWidth="420" d:DesignHeight="420">
-    <Grid Margin="4,12,4,4">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-
-        <StackPanel Grid.Row="0">
-            <TextBlock Classes="subtitle" Text="{x:Static app:Strings.SessionPanelTitle}" />
-            <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,4,0,16" Text="{Binding RoleText}" />
-        </StackPanel>
-
-        <c:Card Grid.Row="1" Padding="16">
-            <StackPanel>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <c:Icon Grid.Column="0" Symbol="Desktop" FontSize="24" VerticalAlignment="Center" Margin="0,0,12,0" />
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Classes="bodyStrong" TextTrimming="CharacterEllipsis" Text="{Binding PeerText}" />
-                        <TextBlock Classes="secondary" Text="{Binding PhaseText}" />
-                    </StackPanel>
-                    <ProgressBar IsIndeterminate="True" Grid.Column="2" Width="72" Height="4" VerticalAlignment="Center"
-                                     IsVisible="{Binding !IsActive}" />
-                </Grid>
-
-                <TextBlock Classes="title" Margin="0,16,0,0" HorizontalAlignment="Center"
-                              Text="{Binding CountdownText}"
-                              IsVisible="{Binding HasCountdown}" />
-                <TextBlock Classes="caption tertiary" Margin="0,6,0,0" HorizontalAlignment="Center"
-                              Text="{Binding DataUsedText}"
-                              IsVisible="{Binding IsActive}" />
+             d:DesignWidth="420">
+    <!--
+        The status hero while a session runs (DataContext: MainViewModel). Who, time left, data used, and ending it at the
+        top of the window; ending is teal, the safe action (the phone's decision). A guest also gets the proxy note and the
+        check page.
+    -->
+    <StackPanel Spacing="10">
+        <Grid ColumnDefinitions="Auto,*">
+            <c:Motif State="Session" Width="{DynamicResource Josour.Size.MotifEmptyState}" Height="{DynamicResource Josour.Size.MotifEmptyState}" />
+            <StackPanel Grid.Column="1" Margin="14,0,0,0" Spacing="2" VerticalAlignment="Center">
+                <TextBlock Classes="heading" Text="{Binding HeroTitle}" AutomationProperties.LiveSetting="Polite" />
+                <TextBlock Classes="caption secondary" Text="{Binding Session.PeerText}" />
+                <TextBlock Classes="caption secondary" Text="{Binding Session.PhaseText}" />
             </StackPanel>
-        </c:Card>
+        </Grid>
 
-        <StackPanel Grid.Row="2" Margin="0,12,0,0">
-            <c:InfoBar IsOpen="{Binding IsSameNetworkGuest, Mode=OneWay}" IsClosable="False" Severity="Warning"
-                        Message="{x:Static app:Strings.SessionSameNetworkWarning}" />
-            <c:InfoBar IsOpen="{Binding IsGuestActive, Mode=OneWay}" IsClosable="False" Severity="Informational"
-                        Message="{x:Static app:Strings.SessionGuestProxyNote}" />
-            <c:InfoBar IsOpen="{Binding HasNoticeMessage, Mode=OneWay}" IsClosable="False" Severity="Warning"
-                        Message="{Binding NoticeMessage}" />
-
-            <c:Card Padding="16" Margin="0,12,0,0"
-                     IsVisible="{Binding IsEnded}">
-                <StackPanel>
-                    <TextBlock Classes="bodyStrong" Text="{x:Static app:Strings.SessionPhaseEnded}" />
-                    <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,4,0,0" Text="{Binding EndedText}" />
+        <WrapPanel>
+            <StackPanel Margin="0,0,28,4" IsVisible="{Binding Session.HasCountdown}">
+                <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.MobileSessionTimeLeftLabel}" />
+                <TextBlock Classes="display" Text="{Binding Session.TimeLeftText}" />
+            </StackPanel>
+            <StackPanel Margin="0,0,0,4" VerticalAlignment="Bottom">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <c:Icon Kind="Data" Classes="sm muted" />
+                    <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.DesktopDataUsedLabel}" />
                 </StackPanel>
-            </c:Card>
-        </StackPanel>
+                <TextBlock Classes="body" Text="{Binding Session.DataUsedText}" />
+            </StackPanel>
+        </WrapPanel>
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button Margin="0,0,8,0"
-                       Command="{Binding OpenCheckPageCommand}"
-                       IsVisible="{Binding CanOpenCheckPage}">
+        <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding HasAutoNote}">
+            <c:Icon Kind="Info" Classes="sm muted" Margin="0,2,8,0" VerticalAlignment="Top" />
+            <TextBlock Grid.Column="1" Classes="caption secondary" Text="{Binding AutoNoteText}" />
+        </Grid>
+
+        <c:InfoBar IsClosable="False" Severity="Warning" IsOpen="{Binding Session.IsSameNetworkGuest, Mode=OneWay}"
+                   Message="{x:Static app:Strings.SessionSameNetworkWarning}" />
+        <c:InfoBar IsClosable="False" Severity="Informational" IsOpen="{Binding Session.IsGuestActive, Mode=OneWay}"
+                   Message="{x:Static app:Strings.SessionGuestProxyNote}" />
+        <c:InfoBar IsClosable="False" Severity="Warning" IsOpen="{Binding Session.HasNoticeMessage, Mode=OneWay}"
+                   Message="{Binding Session.NoticeMessage}" />
+
+        <WrapPanel HorizontalAlignment="Right">
+            <Button Margin="0,0,8,0" Command="{Binding Session.OpenCheckPageCommand}" IsVisible="{Binding Session.CanOpenCheckPage}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                    <c:Icon Symbol="Globe" />
-                    <TextBlock Text="{x:Static app:Strings.SessionOpenCheckPage}" VerticalAlignment="Center" />
+                    <c:Icon Kind="Link" Classes="sm" />
+                    <TextBlock Text="{x:Static app:Strings.SessionOpenCheckPage}" />
                 </StackPanel>
             </Button>
-            <Button Classes="danger"
-                       Command="{Binding DisconnectCommand}"
-                       IsVisible="{Binding !IsEnded}">
+            <Button Classes="primary" Command="{Binding Session.DisconnectCommand}" IsVisible="{Binding Session.CanDisconnect}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                    <c:Icon Symbol="PlugDisconnected" />
-                    <TextBlock Text="{x:Static app:Strings.SessionDisconnect}" VerticalAlignment="Center" />
+                    <c:Icon Kind="Stop" Classes="sm" />
+                    <TextBlock Text="{x:Static app:Strings.MobileEndSessionNow}" />
                 </StackPanel>
             </Button>
-            <Button Classes="accent"
-                       Content="{x:Static app:Strings.SessionDismiss}"
-                       Command="{Binding DismissCommand}"
-                       IsVisible="{Binding IsEnded}" />
-        </StackPanel>
-    </Grid>
+        </WrapPanel>
+    </StackPanel>
 </UserControl>

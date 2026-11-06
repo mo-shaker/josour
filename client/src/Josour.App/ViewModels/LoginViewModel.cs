@@ -54,6 +54,25 @@ public sealed partial class LoginViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(RegisterCommand))]
     private string _displayName = string.Empty;
 
+    /// <summary>The password is shown in clear while the eye button is pressed on (Phase 2, sign-in).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PasswordChar), nameof(RevealPasswordName))]
+    private bool _isPasswordRevealed;
+
+    /// <summary>The field's mask: none while revealed.</summary>
+    public char PasswordChar => IsPasswordRevealed ? '\0' : '\u25CF';
+
+    /// <summary>The eye button's accessible name, which says what pressing it does.</summary>
+    public string RevealPasswordName => IsPasswordRevealed ? Strings.DesktopHidePassword : Strings.MobileShowPassword;
+
+    [RelayCommand]
+    private void TogglePassword() => IsPasswordRevealed = !IsPasswordRevealed;
+
+    /// <summary>Why the server signed this device out, shown above the fields until the next sign-in; null when nothing to say.</summary>
+    public string? NoticeText { get; }
+
+    public bool HasNotice => !string.IsNullOrEmpty(NoticeText);
+
     /// <summary>Something to say that is not an error ("waiting for approval").</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasInfo))]
@@ -67,6 +86,7 @@ public sealed partial class LoginViewModel : ObservableObject
         _flow = flow;
         _logger = logger;
         _serverUrl = settings.Current.ServerUrl;
+        NoticeText = flow.SignOutNotice;
     }
 
     public bool HasError => !string.IsNullOrEmpty(ErrorText);

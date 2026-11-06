@@ -39,6 +39,10 @@ public sealed partial class SessionPanelViewModel : ObservableObject, IDisposabl
     [ObservableProperty]
     private bool _hasCountdown;
 
+    /// <summary>Only the time ("41:12"), for the hero's large figure under "Time left".</summary>
+    [ObservableProperty]
+    private string _timeLeftText = string.Empty;
+
     [ObservableProperty]
     private string _dataUsedText = string.Empty;
 
@@ -108,6 +112,10 @@ public sealed partial class SessionPanelViewModel : ObservableObject, IDisposabl
                 ? Strings.SessionTimeUp
                 // "29:59" is a colon-separated technical value; without the isolate it reorders in Arabic.
                 : string.Format(UiFlow.Culture, Strings.SessionTimeRemainingFormat, UiFlow.Ltr(FormatDuration(remaining.Value)));
+
+        TimeLeftText = remaining is null
+            ? string.Empty
+            : remaining.Value <= TimeSpan.Zero ? Strings.SessionTimeUp : UiFlow.Ltr(FormatDuration(remaining.Value));
 
         DataUsedText = string.Format(
             UiFlow.Culture,

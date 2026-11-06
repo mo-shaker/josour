@@ -1,77 +1,144 @@
 <Window x:Class="Josour.App.MainWindow"
-                 xmlns="https://github.com/avaloniaui"
-                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-                 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-                 xmlns:app="clr-namespace:Josour.App"
-                 xmlns:c="clr-namespace:Josour.App.Controls"
-                 xmlns:vm="clr-namespace:Josour.App.ViewModels"
-                 xmlns:views="clr-namespace:Josour.App.Views"
-                 mc:Ignorable="d"
-                 Title="{x:Static app:Strings.AppName}"
-                 FlowDirection="{x:Static app:UiFlow.Direction}"
-                 Icon="/Assets/josour.ico"
-                 Width="480" Height="640" MinWidth="420" MinHeight="520"
-                 WindowStartupLocation="CenterScreen">
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:app="clr-namespace:Josour.App"
+        xmlns:c="https://josour.app/controls"
+        xmlns:views="clr-namespace:Josour.App.Views"
+        mc:Ignorable="d"
+        Title="{x:Static app:Strings.AppName}"
+        FlowDirection="{x:Static app:UiFlow.Direction}"
+        Icon="/Assets/josour.ico"
+        Width="460" Height="680" MinWidth="400" MinHeight="560"
+        WindowStartupLocation="CenterScreen">
+    <!--
+        Layout A (docs/design/desktop-phase2-mockups.html): the app bar, the status hero that always answers "can a request
+        reach me?" (or shows the session), then two tabs. Confirmations open over the window.
+    -->
+    <Panel>
+        <DockPanel>
+            <!-- App bar: the lock-up for the interface language at the reading start; the More menu on Windows
+                 (macOS has these in its app menu). -->
+            <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="16,10,12,2">
+                <c:BrandLockup Width="150" VerticalAlignment="Center" AutomationProperties.Name="{x:Static app:Strings.AppName}" />
+                <Button Grid.Column="2" Classes="icon" Name="MoreButton"
+                        IsVisible="{x:Static app:PlatformUi.HasMoreMenu}"
+                        ToolTip.Tip="{x:Static app:Strings.DesktopMenuMore}"
+                        AutomationProperties.Name="{x:Static app:Strings.DesktopMenuMore}">
+                    <c:Icon Kind="More" />
+                    <Button.Flyout>
+                        <MenuFlyout Placement="BottomEdgeAlignedRight">
+                            <MenuItem Header="{x:Static app:Strings.TraySettings}" Command="{Binding ShowSettingsCommand}" InputGesture="{x:Static app:PlatformUi.SettingsGesture}" />
+                            <MenuItem Header="{x:Static app:Strings.TrayAbout}" Command="{Binding ShowAboutCommand}" />
+                            <MenuItem Header="{x:Static app:Strings.TrayAdmin}" Command="{Binding ShowAdminCommand}" IsVisible="{Binding IsAdmin}" />
+                            <Separator />
+                            <MenuItem Header="{x:Static app:Strings.TraySignOut}" Command="{Binding AskSignOutCommand}" />
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
+            </Grid>
 
-        <!--
-            The session takes over the window while it lasts (and until its summary is dismissed); otherwise the contacts
-            (everything between people, ADR-0014) and this device's own "share my connection" switch.
-        -->
-        <Grid Grid.Row="1" Margin="12,4,12,0">
-            <TabControl IsVisible="{Binding !Session.IsVisible}">
-                <TabItem Header="{x:Static app:Strings.GuestTab}">
+            <!-- The status hero. -->
+            <c:Card DockPanel.Dock="Top" Classes="hero" Margin="16,4,16,0">
+                <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding !IsHeroSession}">
+                        <c:Motif Width="{DynamicResource Josour.Size.MotifEmptyState}" Height="{DynamicResource Josour.Size.MotifEmptyState}"
+                                 VerticalAlignment="Top" State="{Binding HeroMotif}" />
+                        <StackPanel Grid.Column="1" Margin="14,0,0,0" Spacing="4" VerticalAlignment="Center">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <c:Icon Kind="Warning" Classes="warning" Margin="0,4,8,0" VerticalAlignment="Top" IsVisible="{Binding IsHeroProblem}" />
+                                <TextBlock Grid.Column="1" Classes="display" Text="{Binding HeroTitle}" AutomationProperties.LiveSetting="Polite" />
+                            </Grid>
+                            <TextBlock Classes="body secondary" Text="{Binding HeroText}" IsVisible="{Binding HeroText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                            <Button Margin="0,4,0,0" HorizontalAlignment="Left" Command="{Binding ReconnectNowCommand}" IsVisible="{Binding CanReconnect}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <c:Icon Kind="Refresh" Classes="sm" />
+                                    <TextBlock Text="{x:Static app:Strings.MobileReconnectNow}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Classes="primary" Margin="0,4,0,0" HorizontalAlignment="Left" Command="{Binding Session.DismissCommand}"
+                                    IsVisible="{Binding IsHeroEnded}" Content="{x:Static app:Strings.SessionDismiss}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <views:SessionPanel IsVisible="{Binding IsHeroSession}" />
+
+                    <Border Classes="divider" IsVisible="{Binding ShowsAvailabilityInHero}" />
+                    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding ShowsAvailabilityInHero}">
+                        <TextBlock Classes="label" VerticalAlignment="Center" Text="{x:Static app:Strings.HostAvailableToggle}" />
+                        <ToggleSwitch Grid.Column="1" OnContent="" OffContent="" Margin="12,0,0,0"
+                                      IsChecked="{Binding Host.IsAvailable, Mode=TwoWay}"
+                                      AutomationProperties.Name="{x:Static app:Strings.HostAvailableToggle}" />
+                    </Grid>
+                </StackPanel>
+            </c:Card>
+
+            <TabControl Margin="16,6,16,0">
+                <TabItem AutomationProperties.Name="{x:Static app:Strings.GuestTab}">
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <c:Icon Kind="People" Classes="sm" />
+                            <TextBlock Text="{x:Static app:Strings.GuestTab}" />
+                        </StackPanel>
+                    </TabItem.Header>
                     <views:ContactsPage DataContext="{Binding Contacts}" />
                 </TabItem>
-                <TabItem Header="{x:Static app:Strings.HostTab}">
-                    <views:HostPage DataContext="{Binding Host}" />
+                <TabItem AutomationProperties.Name="{x:Static app:Strings.DesktopTabDevice}">
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <c:Icon Kind="Laptop" Classes="sm" />
+                            <TextBlock Text="{x:Static app:Strings.DesktopTabDevice}" />
+                        </StackPanel>
+                    </TabItem.Header>
+                    <views:HostPage />
                 </TabItem>
             </TabControl>
+        </DockPanel>
 
-            <views:SessionPanel DataContext="{Binding Session}"
-                                IsVisible="{Binding IsVisible}" />
-        </Grid>
+        <!-- Turning "without asking" on (Phase 1 decision 10). -->
+        <Panel IsVisible="{Binding Contacts.IsConfirmingTrust}">
+            <Border Classes="scrim" />
+            <Border Classes="dialog">
+                <StackPanel Spacing="12">
+                    <TextBlock Classes="heading" Text="{Binding Contacts.TrustConfirmTitle}" AutomationProperties.LiveSetting="Assertive" />
+                    <TextBlock Classes="body" Text="{x:Static app:Strings.MobileTrustConfirmText}" />
+                    <c:PlatformButtonRow>
+                        <Button Classes="primary" Content="{x:Static app:Strings.MobileTrustAllow}" Command="{Binding Contacts.ConfirmTrustCommand}" />
+                        <Button IsCancel="True" Content="{x:Static app:Strings.SettingsCancel}" Command="{Binding Contacts.CancelTrustCommand}" />
+                    </c:PlatformButtonRow>
+                </StackPanel>
+            </Border>
+        </Panel>
 
-        <Grid Grid.Row="2" Margin="16,8,16,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <TextBlock Classes="caption secondary" Grid.Column="0"
-                          Text="{Binding StatusText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        <!-- Sign out, always confirmed. -->
+        <Panel IsVisible="{Binding IsConfirmingSignOut}">
+            <Border Classes="scrim" />
+            <Border Classes="dialog">
+                <StackPanel Spacing="12">
+                    <TextBlock Classes="heading" Text="{x:Static app:Strings.MobileSignOutConfirmTitle}" AutomationProperties.LiveSetting="Assertive" />
+                    <TextBlock Classes="body" Text="{Binding ConfirmText}" />
+                    <c:PlatformButtonRow>
+                        <Button Classes="danger" c:PlatformButtonRow.IsPrimary="True" Content="{x:Static app:Strings.TraySignOut}" Command="{Binding SignOutCommand}" />
+                        <Button IsCancel="True" Content="{x:Static app:Strings.SettingsCancel}" Command="{Binding CancelSignOutCommand}" />
+                    </c:PlatformButtonRow>
+                </StackPanel>
+            </Border>
+        </Panel>
 
-            <!-- The settings and the About/diagnostics surface are reachable from here as well as from the tray. -->
-            <Button Classes="transparent" Grid.Column="1" Padding="6" Margin="8,0,0,0"
-                       ToolTip.Tip="{x:Static app:Strings.MainSettingsTooltip}"
-                       Command="{Binding ShowSettingsCommand}" >
-                <c:Icon Symbol="Settings" />
-            </Button>
-            <Button Classes="transparent" Grid.Column="2" Padding="6" Margin="4,0,0,0"
-                       ToolTip.Tip="{x:Static app:Strings.MainAboutTooltip}"
-                       Command="{Binding ShowAboutCommand}" >
-                <c:Icon Symbol="Info" />
-            </Button>
-
-            <!-- Only an administrator has anything to open here, so nobody else is shown a door they cannot use. -->
-            <Button Classes="transparent" Grid.Column="3" Padding="6" Margin="4,0,0,0"
-                       IsVisible="{Binding IsAdmin}"
-                       ToolTip.Tip="{x:Static app:Strings.MainAdminTooltip}"
-                       Command="{Binding ShowAdminCommand}" >
-                <c:Icon Symbol="Desktop" />
-            </Button>
-
-            <!-- VersionText is bidi-isolated by the ViewModel, so "v0.1.0" reads left to right in either language. -->
-            <TextBlock Classes="caption tertiary" Grid.Column="4"
-                          Text="{Binding VersionText}" VerticalAlignment="Center" Margin="12,0,0,0" />
-        </Grid>
-    </Grid>
+        <!-- Quit while sharing or in a session (Phase 1 decision 11). -->
+        <Panel IsVisible="{Binding IsConfirmingQuit}">
+            <Border Classes="scrim" />
+            <Border Classes="dialog">
+                <StackPanel Spacing="12">
+                    <TextBlock Classes="heading" Text="{x:Static app:Strings.DesktopQuitConfirmTitle}" AutomationProperties.LiveSetting="Assertive" />
+                    <TextBlock Classes="body" Text="{Binding ConfirmText}" />
+                    <c:PlatformButtonRow>
+                        <Button Classes="danger" c:PlatformButtonRow.IsPrimary="True" Content="{x:Static app:Strings.DesktopQuit}" Command="{Binding ExitCommand}" />
+                        <Button IsCancel="True" Content="{x:Static app:Strings.SettingsCancel}" Command="{Binding CancelQuitCommand}" />
+                    </c:PlatformButtonRow>
+                </StackPanel>
+            </Border>
+        </Panel>
+    </Panel>
 </Window>

@@ -111,6 +111,7 @@ public sealed class AuthFlow : IAuthFlow, IDisposable
 
     public async Task CompleteSignInAsync(CancellationToken ct)
     {
+        SignOutNotice = null;
         await ConnectQuietlyAsync(ct);
         _shell.CloseLoginWindow();
         _shell.ShowMainWindow();
@@ -137,9 +138,18 @@ public sealed class AuthFlow : IAuthFlow, IDisposable
 
     private void OnSignedOut(object? sender, SignedOutEventArgs e) => UiThread.Post(() => _ = HandleSignedOutAsync(e.Reason));
 
+    public string? SignOutNotice { get; private set; }
+
     private async Task HandleSignedOutAsync(SignOutReason reason)
     {
         _logger.LogInformation("Signed out ({Reason})", reason);
+        SignOutNotice = reason switch
+        {
+            SignOutReason.SessionExpired => Strings.SignedOutSessionExpired,
+            SignOutReason.DeviceRevoked => Strings.SignedOutDeviceRevoked,
+            SignOutReason.AccountDisabled => Strings.SignedOutAccountDisabled,
+            _ => null,
+        };
         try
         {
             await _connector.DisconnectAsync();
@@ -150,14 +160,7 @@ public sealed class AuthFlow : IAuthFlow, IDisposable
             _shell.ShowLoginWindow();
         }
 
-        var notice = reason switch
-        {
-            SignOutReason.SessionExpired => Strings.SignedOutSessionExpired,
-            SignOutReason.DeviceRevoked => Strings.SignedOutDeviceRevoked,
-            SignOutReason.AccountDisabled => Strings.SignedOutAccountDisabled,
-            _ => null,
-        };
-        if (notice is not null)
+        if (SignOutNotice is { } notice)
         {
             _toasts.ShowInfo(Strings.SignedOutTitle, notice);
         }

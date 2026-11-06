@@ -4,7 +4,7 @@
 -->
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:c="using:Josour.Mobile.Controls">
+                    xmlns:c="https://josour.app/controls">
 
   <SolidColorBrush x:Key="Josour.Brush.Scrim" Color="#80060B0E" />
 

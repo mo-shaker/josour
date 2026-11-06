@@ -2,27 +2,27 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:conv="clr-namespace:Josour.App.Converters"
              x:Class="Josour.App.App"
-             RequestedThemeVariant="Light">
+             RequestedThemeVariant="Default">
     <!-- No MainWindow here: App.Initialize builds the Generic Host and the startup flow decides what to show
-         (or stays in the tray with the minimized switch). -->
+         (or stays in the tray with the minimized switch).
+
+         The look (docs/design/desktop-phase2-mockups.html): the brand tokens shared with the phone, the desktop's density,
+         Fluent's own keys pointed at the tokens, the desktop control themes, then the styles. Light and dark follow the
+         system while the app runs. -->
     <Application.Styles>
         <FluentTheme />
-        <StyleInclude Source="avares://Josour/Controls/Typography.axaml" />
+        <StyleInclude Source="avares://Josour/Theme/Styles.axaml" />
     </Application.Styles>
 
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceInclude Source="avares://Josour/Controls/Icons.axaml" />
-                <ResourceInclude Source="avares://Josour/Controls/Icon.axaml" />
-                <ResourceInclude Source="avares://Josour/Controls/InfoBar.axaml" />
+                <ResourceInclude Source="avares://Josour.Brand/Theme/Tokens.axaml" />
+                <ResourceInclude Source="avares://Josour/Theme/Metrics.axaml" />
+                <ResourceInclude Source="avares://Josour/Theme/FluentOverrides.axaml" />
+                <ResourceInclude Source="avares://Josour/Theme/Controls.axaml" />
             </ResourceDictionary.MergedDictionaries>
 
-            <!--
-                Avalonia binds IsVisible to a bool directly and negates with "{Binding !Foo}", so the two
-                visibility converters WPF needed are gone. What is left is what actually maps a value.
-            -->
-            <conv:ReachabilityToBrushConverter x:Key="ReachabilityBrush" />
             <conv:BooleanToInfoBarSeverityConverter x:Key="ErrorSeverity" />
             <conv:WarningFlagToSeverityConverter x:Key="WarningSeverity" />
         </ResourceDictionary>

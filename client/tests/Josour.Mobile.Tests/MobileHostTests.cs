@@ -225,7 +225,7 @@ public class MobileHostTests
     {
         foreach (var file in new[] { "ReadexPro-Regular.ttf", "ReadexPro-Medium.ttf", "ReadexPro-SemiBold.ttf", "ReadexPro-Bold.ttf", "OFL.txt" })
         {
-            Assert.True(AssetLoader.Exists(new Uri("avares://Josour.Mobile/Assets/Fonts/" + file)), file);
+            Assert.True(AssetLoader.Exists(new Uri("avares://Josour.Brand/Assets/Fonts/" + file)), file);
         }
     }
 }

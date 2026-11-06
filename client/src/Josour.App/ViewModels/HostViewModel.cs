@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Josour.App.Models;
@@ -14,6 +15,44 @@ using Josour.Infrastructure.Session;
 using Josour.App.Services.Notifications;
 
 namespace Josour.App.ViewModels;
+
+/// <summary>
+/// The one answer the status hero gives about sharing (docs/design/desktop-phase2-mockups.html, "Which hero state wins").
+/// Sessions are added on top of it by <see cref="MainViewModel.Hero"/>.
+/// </summary>
+public enum HostStatus
+{
+    /// <summary>"Available" is off.</summary>
+    Off,
+
+    /// <summary>Available, and the connection to the server is being made, confirmed, or was lost less than a moment ago.</summary>
+    Connecting,
+
+    /// <summary>Available, connected and confirmed by the server, with nothing in the way.</summary>
+    Ready,
+
+    /// <summary>Available, but the server has been out of reach for longer than <see cref="HostViewModel.UnreachableGrace"/>.</summary>
+    Unreachable,
+
+    /// <summary>Ready as far as the server knows, but the firewall may stop the other device from connecting (Windows).</summary>
+    NeedsAttention,
+}
+
+/// <summary>What a row on the "This device" tab is about, in rank order (Phase 1, "The four warnings, ranked").</summary>
+public enum HostNoticeKind
+{
+    Firewall,
+    Vpn,
+    SimulatedServer,
+}
+
+/// <summary>One ranked row on the "This device" tab.</summary>
+public sealed record HostNotice(HostNoticeKind Kind, string Title, string Message)
+{
+    public bool IsWarning => Kind is HostNoticeKind.Firewall or HostNoticeKind.Vpn;
+
+    public bool IsInfo => !IsWarning;
+}
 
 /// <summary>
 /// Host page: the "Available for requests" state (single source of truth, mirrored by the tray) published as <c>host.available</c>
@@ -34,6 +73,17 @@ public sealed partial class HostViewModel : ObservableObject
     private readonly ILogger<HostViewModel> _logger;
     private bool _suppressPublish;
     private RequestIncomingMessage? _autoAccepted;
+    private bool _autoAcceptPending;
+    private DateTime? _notConnectedSince;
+
+    /// <summary>The hero's state; recomputed whenever one of the facts it is made of changes.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsStatusOff), nameof(IsStatusReady), nameof(IsStatusUnreachable), nameof(IsStatusNeedsAttention))]
+    private HostStatus _status = HostStatus.Off;
+
+    /// <summary>The session now starting or running was accepted without asking, because the host allows that contact.</summary>
+    [ObservableProperty]
+    private bool _sessionStartedAutomatically;
 
     [ObservableProperty]
     private bool _isAvailable;
@@ -92,16 +142,114 @@ public sealed partial class HostViewModel : ObservableObject
         _sessions.PropertyChanged += OnSessionPropertyChanged;
         IsConnected = _controlChannel.State == ControlChannelState.Connected;
         IsSimulatedServer = controlChannel is MockControlChannel;
+        if (!IsConnected)
+        {
+            _notConnectedSince = DateTime.UtcNow;
+        }
 
         // A probe that already ran (the first run does one) is shown at once rather than repeated.
         if (_readiness.HasProbed)
         {
             ApplyReadiness(_readiness.Last);
         }
+
+        UpdateStatus();
     }
 
     /// <summary>True for the <c>--mock</c> build: the page then says the server is simulated.</summary>
     public bool IsSimulatedServer { get; }
+
+    /// <summary>How long a lost connection reads as "getting ready" before the hero says requests cannot arrive.</summary>
+    public TimeSpan UnreachableGrace { get; set; } = TimeSpan.FromSeconds(5);
+
+    public bool IsStatusOff => Status == HostStatus.Off;
+
+    public bool IsStatusReady => Status == HostStatus.Ready;
+
+    public bool IsStatusUnreachable => Status == HostStatus.Unreachable;
+
+    public bool IsStatusNeedsAttention => Status == HostStatus.NeedsAttention;
+
+    /// <summary>
+    /// The rows of the "This device" tab, in rank order: the firewall (unless it already is the hero's subject), a VPN
+    /// holding the route, a simulated server. Not connected is never a row: it is the hero's.
+    /// </summary>
+    public IReadOnlyList<HostNotice> Notices { get; private set; } = Array.Empty<HostNotice>();
+
+    public bool HasNotices => Notices.Count > 0;
+
+    partial void OnIsConnectedChanged(bool value)
+    {
+        if (value)
+        {
+            _notConnectedSince = null;
+        }
+        else
+        {
+            _notConnectedSince ??= DateTime.UtcNow;
+            if (UnreachableGrace > TimeSpan.Zero)
+            {
+                // Look again when the grace runs out: a reconnect that takes longer than that is a real problem.
+                DispatcherTimer.RunOnce(UpdateStatus, UnreachableGrace + TimeSpan.FromMilliseconds(50));
+            }
+        }
+
+        UpdateStatus();
+    }
+
+    partial void OnIsFirewallRuleMissingChanged(bool value) => UpdateStatus();
+
+    partial void OnIsVpnWarningVisibleChanged(bool value) => UpdateStatus();
+
+    partial void OnVpnWarningMessageChanged(string value) => UpdateStatus();
+
+    /// <summary>The hero's rule, from existing facts only; no networking is involved.</summary>
+    public HostStatus ComputeStatus()
+    {
+        if (!IsAvailable)
+        {
+            return HostStatus.Off;
+        }
+
+        if (!IsConnected)
+        {
+            return _notConnectedSince is { } since && DateTime.UtcNow - since < UnreachableGrace ? HostStatus.Connecting : HostStatus.Unreachable;
+        }
+
+        if (!IsAnnounced)
+        {
+            return HostStatus.Connecting;
+        }
+
+        return IsFirewallRuleMissing ? HostStatus.NeedsAttention : HostStatus.Ready;
+    }
+
+    private void UpdateStatus()
+    {
+        Status = ComputeStatus();
+        var notices = new List<HostNotice>();
+        if (IsFirewallRuleMissing && Status != HostStatus.NeedsAttention)
+        {
+            notices.Add(new HostNotice(HostNoticeKind.Firewall, Strings.HostFirewallWarningTitle, Strings.HostFirewallWarningMessage));
+        }
+
+        if (IsVpnWarningVisible)
+        {
+            notices.Add(new HostNotice(HostNoticeKind.Vpn, Strings.HostVpnWarningTitle, VpnWarningMessage));
+        }
+
+        if (IsSimulatedServer)
+        {
+            notices.Add(new HostNotice(HostNoticeKind.SimulatedServer, Strings.HostSimulatedServerTitle, Strings.HostSimulatedServerHint));
+        }
+
+        if (!notices.SequenceEqual(Notices))
+        {
+            Notices = notices;
+            OnPropertyChanged(nameof(Notices));
+            OnPropertyChanged(nameof(HasNotices));
+        }
+    }
 
     partial void OnIsAvailableChanged(bool value)
     {
@@ -111,6 +259,7 @@ public sealed partial class HostViewModel : ObservableObject
         }
 
         UpdateStatusText();
+        UpdateStatus();
         if (_suppressPublish)
         {
             return;
@@ -172,13 +321,37 @@ public sealed partial class HostViewModel : ObservableObject
     /// <summary>A session is being prepared: ask again, because this is the moment the answer decides something.</summary>
     private void OnSessionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(SessionCoordinator.Phase) && _sessions.Phase == SessionPhase.Preparing)
+        if (e.PropertyName != nameof(SessionCoordinator.Phase))
+        {
+            return;
+        }
+
+        var phase = _sessions.Phase;
+        if (phase == SessionPhase.Preparing)
         {
             _ = CheckReadinessAsync(force: true);
         }
+
+        UiThread.Post(() =>
+        {
+            if (phase == SessionPhase.Preparing)
+            {
+                // Only the session that the automatic acceptance led to; the next one asks again.
+                SessionStartedAutomatically = _autoAcceptPending && _sessions.CurrentSession is { IsHost: true };
+                _autoAcceptPending = false;
+            }
+            else if (phase == SessionPhase.Idle)
+            {
+                SessionStartedAutomatically = false;
+            }
+        });
     }
 
-    partial void OnIsAnnouncedChanged(bool value) => UpdateStatusText();
+    partial void OnIsAnnouncedChanged(bool value)
+    {
+        UpdateStatusText();
+        UpdateStatus();
+    }
 
     /// <summary><c>host.available</c>. Deferred while disconnected; re-sent when the channel (re)connects.</summary>
     private async Task PublishAvailabilityAsync(bool available)
@@ -445,6 +618,8 @@ public sealed partial class HostViewModel : ObservableObject
             _autoAccepted = null;
             return false;
         }
+
+        _autoAcceptPending = true;
 
         // Inform, do not ask. A host who only ever learns about these from a bill or from a slow connection was not
         // told, and being told is the part of consent that an automatic acceptance must not spend.

@@ -3,7 +3,7 @@ using Avalonia.Controls;
 namespace Josour.Mobile;
 
 /// <summary>
-/// The type scale (docs/design/mobile-tokens.json, <c>font</c>) as resources a view reads through <c>DynamicResource</c>:
+/// The type scale (docs/design/brand-tokens.json, <c>mobile.font</c>) as resources a view reads through <c>DynamicResource</c>:
 /// one size per role, the line height for the interface language (Arabic sets taller lines and never letter-spacing), both
 /// multiplied by the phone's own font size setting. A view is built again on a language switch, so it applies them once.
 /// </summary>
@@ -23,7 +23,7 @@ public static class MobileTheme
     };
 
     /// <summary>Android's "remove animations" (animator duration scale 0): the motif stays still.</summary>
-    public static bool ReduceMotion { get; set; }
+    public static bool ReduceMotion { get => Josour.Brand.BrandMotion.ReduceMotion; set => Josour.Brand.BrandMotion.ReduceMotion = value; }
 
     /// <summary>Android's font size setting (1 = default); it scales text (non-linearly, as Android does), never the layout.</summary>
     public static double FontScale { get; private set; } = 1;

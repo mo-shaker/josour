@@ -40,7 +40,12 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
     /// standing consent is not something a host should be able to give by not noticing a pre-ticked box.
     /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AcceptText))]
     private bool _trustThisGuest;
+
+    /// <summary>The request ran out before an answer: the window stays and says so (Phase 2), and nothing is sent.</summary>
+    [ObservableProperty]
+    private bool _isExpired;
 
     /// <param name="serverNow">
     /// The server's clock as the app knows it. Defaults to the local clock only so that the debug
@@ -65,7 +70,10 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
         AllowedSitesSummary = request.Allowlist.Loaded
             ? string.Format(UiFlow.Culture, Strings.AllowedSitesSummaryFormat, request.Allowlist.Sites.Count, request.Allowlist.Version)
             : string.Empty;
-        AllowedSitesMessage = DisclosureText.Message(request.Allowlist);
+        // With no list enforced the scope is said in the phone's plainer words; "could not be loaded" and "allows nothing"
+        // stay the shared sentences, shown as a warning.
+        AllowedSitesMessage = request.Allowlist.Unrestricted ? Strings.MobileScopeUnrestricted : DisclosureText.Message(request.Allowlist);
+        ExpiredText = string.Format(UiFlow.Culture, Strings.MobileRequestExpiredFormat, request.GuestName);
         ScopeLabel = DisclosureText.Label(request.Allowlist);
         ScopeNote = DisclosureText.Note(request.Allowlist);
 
@@ -120,6 +128,24 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
     public bool HasScopeNote => ScopeNote.Length > 0;
 
     public bool HasAllowedSitesMessage => AllowedSitesMessage.Length > 0;
+
+    /// <summary>The scope sentence is a warning (could not be loaded, or allows nothing), not the plain "any site" scope.</summary>
+    public bool IsScopeWarning => HasAllowedSitesMessage && !_request.Allowlist.Unrestricted;
+
+    /// <summary>The "any site" scope, said plainly.</summary>
+    public bool IsScopePlain => HasAllowedSitesMessage && _request.Allowlist.Unrestricted;
+
+    /// <summary>"You did not answer in time, so nothing was shared. Sara can ask again."</summary>
+    public string ExpiredText { get; }
+
+    /// <summary>Accept, or "Accept and always allow" while the standing consent is ticked: the button names what it grants.</summary>
+    public string AcceptText => TrustThisGuest ? Strings.DesktopAcceptAndTrust : Strings.Accept;
+
+    /// <summary>Raised by <see cref="CloseCommand"/>: the window closes (the expired state's only button).</summary>
+    public event EventHandler? CloseRequested;
+
+    [RelayCommand]
+    private void Close() => CloseRequested?.Invoke(this, EventArgs.Empty);
 
     /// <summary>True when the allow-list could not be fetched at all (the window says so, in a warning).</summary>
     public bool IsAllowlistUnavailable => !_request.Allowlist.Loaded;
@@ -182,6 +208,7 @@ public sealed partial class IncomingRequestViewModel : ObservableObject, IDispos
         if (decision == IncomingRequestDecision.TimedOut)
         {
             CountdownText = Strings.RequestExpired;
+            IsExpired = true;
         }
 
         // A rule only ever rides along with an acceptance: "trust from now on" on top of a refusal is not a thing

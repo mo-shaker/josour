@@ -4,174 +4,235 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:app="clr-namespace:Josour.App"
-             xmlns:c="clr-namespace:Josour.App.Controls"
+             xmlns:c="https://josour.app/controls"
              xmlns:vm="clr-namespace:Josour.App.ViewModels"
              mc:Ignorable="d"
-             x:DataType="vm:ContactsViewModel"
-             d:DesignWidth="440" d:DesignHeight="520">
-    <Grid Margin="4,12,4,4" RowDefinitions="Auto,Auto,*,Auto">
-        <!--
-            Where Josour cannot point the operating system's proxy at itself (anything but Windows and macOS), this device
-            cannot use anybody's connection: offering stays possible, using does not.
-        -->
-        <c:InfoBar Grid.Row="1" Margin="0,0,0,10" IsClosable="False" Severity="Warning"
-                   IsOpen="{x:Static vm:ContactsViewModel.IsGuestRoleUnavailable}"
-                   Title="{x:Static app:Strings.GuestRoleUnavailableTitle}"
-                   Message="{x:Static app:Strings.GuestRoleUnavailableMessage}" />
+             d:DesignWidth="420" d:DesignHeight="520">
+    <!-- The Contacts tab (DataContext: ContactsViewModel): everything between people (ADR-0014). -->
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="8" Margin="0,10,0,14">
+            <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.ContactsPageDescription}" />
 
-        <!-- What this tab is for, and the length a request or offer asks for. -->
-        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-            <StackPanel Grid.Column="0">
-                <TextBlock Classes="subtitle" Text="{x:Static app:Strings.ContactsPageTitle}" />
-                <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,4,0,0"
-                           Text="{x:Static app:Strings.ContactsPageDescription}" />
-            </StackPanel>
-            <ComboBox Grid.Column="1" Margin="12,0,0,0" MinWidth="110" VerticalAlignment="Top"
-                      ToolTip.Tip="{x:Static app:Strings.GuestDurationLabel}"
-                      ItemsSource="{Binding DurationOptions}"
-                      SelectedItem="{Binding SelectedDuration, Mode=TwoWay}">
-                <ComboBox.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding StringFormat={x:Static app:Strings.DurationMinutesFormat}}" />
-                    </DataTemplate>
-                </ComboBox.ItemTemplate>
-            </ComboBox>
-        </Grid>
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Classes="label" VerticalAlignment="Center" Text="{x:Static app:Strings.GuestDurationLabel}" />
+                <ComboBox Grid.Column="1" MinWidth="120"
+                          AutomationProperties.Name="{x:Static app:Strings.GuestDurationLabel}"
+                          ItemsSource="{Binding DurationOptions}"
+                          SelectedItem="{Binding SelectedDuration, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding StringFormat={x:Static app:Strings.DurationMinutesFormat}}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </Grid>
 
-        <!-- A contact offers this user their connection: answered here, never automatically (ADR-0014). -->
-        <c:Card Grid.Row="1" Padding="12" Margin="0,0,0,10" IsVisible="{Binding HasPendingOffer}">
-            <StackPanel>
-                <TextBlock Classes="bodyStrong" Text="{x:Static app:Strings.OfferIncomingTitle}" />
-                <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,4,0,8" Text="{Binding PendingOfferText}" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Classes="accent" Command="{Binding AcceptOfferCommand}" Content="{x:Static app:Strings.ContactsAccept}" />
-                    <Button Command="{Binding DeclineOfferCommand}" Content="{x:Static app:Strings.ContactsDecline}" />
+            <!-- Where Josour cannot set the system proxy (not Windows or macOS) this device can offer, not use. -->
+            <c:InfoBar IsClosable="False" Severity="Warning"
+                       IsOpen="{x:Static vm:ContactsViewModel.IsGuestRoleUnavailable}"
+                       Title="{x:Static app:Strings.GuestRoleUnavailableTitle}"
+                       Message="{x:Static app:Strings.GuestRoleUnavailableMessage}" />
+
+            <!-- The result of the last action (an invitation sent, a request refused), next to the list it came from. -->
+            <c:InfoBar IsClosable="False" Severity="Error" IsOpen="{Binding HasErrorMessage, Mode=OneWay}" Message="{Binding StatusMessage}"
+                       AutomationProperties.LiveSetting="Assertive" />
+            <c:InfoBar IsClosable="False" Severity="Informational" IsOpen="{Binding HasInfoMessage, Mode=OneWay}" Message="{Binding StatusMessage}"
+                       AutomationProperties.LiveSetting="Polite" />
+
+            <!-- Waiting for the other side to answer this user's own request or offer. -->
+            <c:Card IsVisible="{Binding IsWaiting}">
+                <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Classes="body" Margin="0,0,12,0" VerticalAlignment="Center" Text="{Binding WaitingText}"
+                                   AutomationProperties.LiveSetting="Polite" />
+                        <Button Grid.Column="1" Command="{Binding CancelWaitingCommand}" Content="{x:Static app:Strings.GuestCancelRequest}" />
+                    </Grid>
+                    <ProgressBar IsIndeterminate="True" Height="3" />
                 </StackPanel>
-            </StackPanel>
-        </c:Card>
+            </c:Card>
 
-        <ScrollViewer Grid.Row="2">
-            <StackPanel Spacing="10">
-                <!-- Invitations to this user. -->
-                <StackPanel IsVisible="{Binding HasIncomingInvites}" Spacing="6">
-                    <TextBlock Classes="bodyStrong" Text="{x:Static app:Strings.ContactsIncomingTitle}" />
-                    <ItemsControl ItemsSource="{Binding IncomingInvites}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="{x:Type vm:IncomingInviteItem}">
-                                <c:Card Padding="10,8" Margin="0,0,0,6">
-                                    <Grid ColumnDefinitions="Auto,*,Auto">
-                                        <c:Icon Grid.Column="0" Symbol="Mail" Margin="0,0,10,0" VerticalAlignment="Center" />
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Classes="bodyStrong" TextWrapping="Wrap" Text="{Binding Text}" />
-                                            <TextBlock Classes="caption secondary" Text="{Binding EmailText}" />
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                            <Button Classes="accent" Command="{Binding AcceptCommand}" Content="{x:Static app:Strings.ContactsAccept}" />
-                                            <Button Command="{Binding DeclineCommand}" Content="{x:Static app:Strings.ContactsDecline}" />
-                                        </StackPanel>
-                                    </Grid>
-                                </c:Card>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+            <!-- A contact offers this user their connection: answered here, never automatically. -->
+            <c:Card IsVisible="{Binding HasPendingOffer}">
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="label" Text="{x:Static app:Strings.OfferIncomingTitle}" />
+                    <TextBlock Classes="body secondary" Text="{Binding PendingOfferText}" />
+                    <c:PlatformButtonRow>
+                        <Button c:PlatformButtonRow.IsPrimary="True" Command="{Binding AcceptOfferCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <c:Icon Kind="Ok" Classes="sm" />
+                                <TextBlock Text="{x:Static app:Strings.ContactsAccept}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding DeclineOfferCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <c:Icon Kind="Close" Classes="sm" />
+                                <TextBlock Text="{x:Static app:Strings.ContactsDecline}" />
+                            </StackPanel>
+                        </Button>
+                    </c:PlatformButtonRow>
                 </StackPanel>
+            </c:Card>
 
-                <!-- The contacts themselves. -->
-                <ItemsControl ItemsSource="{Binding Contacts}" IsVisible="{Binding HasContacts}">
+            <!-- Invitations to this user. -->
+            <StackPanel Spacing="6" IsVisible="{Binding HasIncomingInvites}">
+                <TextBlock Classes="label" Margin="0,4,0,0" Text="{x:Static app:Strings.ContactsIncomingTitle}" />
+                <ItemsControl ItemsSource="{Binding IncomingInvites}">
                     <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="{x:Type vm:ContactItemViewModel}">
-                            <c:Card Padding="12,10" Margin="0,0,0,8">
-                                <StackPanel Spacing="6">
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <StackPanel Grid.Column="0">
-                                            <TextBlock Classes="bodyStrong" Text="{Binding DisplayName}" />
+                        <DataTemplate>
+                            <c:Card Margin="0,0,0,6">
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <Border Classes="avatar" VerticalAlignment="Top">
+                                            <TextBlock Text="{Binding Initial}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                            <TextBlock Classes="label" Text="{Binding Text}" />
                                             <TextBlock Classes="caption secondary" Text="{Binding EmailText}" />
                                         </StackPanel>
-                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
-                                            <Ellipse Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center"
-                                                     Fill="{Binding PresenceDot, Converter={StaticResource ReachabilityBrush}}" />
-                                            <TextBlock Classes="caption tertiary" VerticalAlignment="Center" Text="{Binding PresenceText}" />
-                                        </StackPanel>
                                     </Grid>
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <Button Classes="accent" Command="{Binding UseConnectionCommand}"
-                                                Content="{x:Static app:Strings.ContactUseConnection}" />
-                                        <Button Command="{Binding OfferConnectionCommand}"
-                                                Content="{x:Static app:Strings.ContactOfferConnection}" />
-                                    </StackPanel>
-                                    <c:InfoBar IsClosable="False" Severity="Warning" IsOpen="{Binding IsOnSameNetwork, Mode=OneWay}"
-                                               Message="{x:Static app:Strings.ContactSameNetworkNote}" />
-                                    <CheckBox IsChecked="{Binding AllowWithoutAsking, Mode=TwoWay}"
-                                              Content="{x:Static app:Strings.ContactAllowAlways}" />
-                                    <TextBlock Classes="caption tertiary" IsVisible="{Binding TrustsMe}"
-                                               Text="{x:Static app:Strings.ContactTrustsMe}" />
-                                    <Button Classes="transparent" HorizontalAlignment="Left" Padding="4,2"
-                                            Command="{Binding RemoveCommand}">
-                                        <Panel>
-                                            <TextBlock Classes="caption" IsVisible="{Binding !IsConfirmingRemove}" Text="{x:Static app:Strings.ContactRemove}" />
-                                            <TextBlock Classes="caption" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
-                                                       IsVisible="{Binding IsConfirmingRemove}" Text="{x:Static app:Strings.ContactRemoveConfirm}" />
-                                        </Panel>
-                                    </Button>
+                                    <c:PlatformButtonRow>
+                                        <Button c:PlatformButtonRow.IsPrimary="True" Command="{Binding AcceptCommand}">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <c:Icon Kind="Ok" Classes="sm" />
+                                                <TextBlock Text="{x:Static app:Strings.ContactsAccept}" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Command="{Binding DeclineCommand}">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <c:Icon Kind="Close" Classes="sm" />
+                                                <TextBlock Text="{x:Static app:Strings.ContactsDecline}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </c:PlatformButtonRow>
                                 </StackPanel>
                             </c:Card>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-
-                <StackPanel IsVisible="{Binding !HasContacts}" HorizontalAlignment="Center" Margin="12,16">
-                    <c:Icon Symbol="Mail" FontSize="36" HorizontalAlignment="Center" Opacity="0.6" />
-                    <TextBlock Classes="bodyStrong" HorizontalAlignment="Center" Margin="0,10,0,4"
-                               Text="{x:Static app:Strings.ContactsEmptyTitle}" />
-                    <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="320"
-                               Text="{x:Static app:Strings.ContactsEmptyText}" />
-                </StackPanel>
-
-                <!-- Invitations this user sent: "pending" until accepted or expired (a decline is never shown). -->
-                <StackPanel IsVisible="{Binding HasOutgoingInvites}" Spacing="4">
-                    <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.ContactsOutgoingTitle}" />
-                    <ItemsControl ItemsSource="{Binding OutgoingInvites}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="{x:Type vm:OutgoingInviteItem}">
-                                <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,2">
-                                    <TextBlock Grid.Column="0" Classes="caption" VerticalAlignment="Center" Text="{Binding EmailText}" />
-                                    <TextBlock Grid.Column="1" Classes="caption tertiary" Margin="8,0" VerticalAlignment="Center" Text="{Binding StatusText}" />
-                                    <Button Grid.Column="2" Classes="transparent" Padding="4,2" Command="{Binding WithdrawCommand}">
-                                        <TextBlock Classes="caption" Text="{x:Static app:Strings.ContactsWithdraw}" />
-                                    </Button>
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
             </StackPanel>
-        </ScrollViewer>
 
-        <StackPanel Grid.Row="3" Margin="0,10,0,0" Spacing="8">
-            <!-- Waiting for the other side to answer a request or an offer. -->
-            <c:Card Padding="12" IsVisible="{Binding IsWaiting}">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <ProgressBar IsIndeterminate="True" Grid.Column="0" Width="60" Height="4" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="1" Classes="secondary" Margin="12,0" TextWrapping="Wrap"
-                               VerticalAlignment="Center" Text="{Binding WaitingText}" />
-                    <Button Grid.Column="2" Command="{Binding CancelWaitingCommand}" Content="{x:Static app:Strings.GuestCancelRequest}" />
-                </Grid>
-            </c:Card>
+            <TextBlock Classes="label" Margin="0,4,0,0" Text="{x:Static app:Strings.ContactsPageTitle}" IsVisible="{Binding HasContacts}" />
 
-            <!-- Add someone by email. -->
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBox Grid.Column="0" Watermark="{x:Static app:Strings.ContactsInvitePlaceholder}"
-                         Text="{Binding InviteEmail, Mode=TwoWay}" FlowDirection="LeftToRight" />
-                <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding InviteCommand}">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <c:Icon Symbol="Mail" />
-                        <TextBlock VerticalAlignment="Center" Text="{x:Static app:Strings.ContactsInviteButton}" />
+            <!-- Loading: skeleton rows until the first list arrives, announced once. -->
+            <StackPanel Spacing="8" IsVisible="{Binding IsLoading}">
+                <c:Card>
+                    <StackPanel Spacing="8">
+                        <Border Classes="skeleton" Width="160" HorizontalAlignment="Left" />
+                        <Border Classes="skeleton" Width="110" HorizontalAlignment="Left" />
+                        <Border Classes="skeleton" Width="220" HorizontalAlignment="Left" />
                     </StackPanel>
-                </Button>
-            </Grid>
+                </c:Card>
+                <TextBlock Classes="caption secondary" HorizontalAlignment="Center" Text="{x:Static app:Strings.MobileContactsLoading}"
+                           AutomationProperties.LiveSetting="Polite" />
+            </StackPanel>
 
-            <TextBlock Classes="caption secondary" TextWrapping="Wrap" Text="{Binding StatusMessage}"
-                       IsVisible="{Binding HasStatusMessage}" />
+            <!-- No contacts yet: the motif with both dots open. -->
+            <StackPanel IsVisible="{Binding ShowsEmpty}" HorizontalAlignment="Center" Spacing="6" Margin="12,8">
+                <c:Motif State="Empty" Width="{DynamicResource Josour.Size.MotifEmptyState}" Height="{DynamicResource Josour.Size.MotifEmptyState}"
+                         HorizontalAlignment="Center" />
+                <TextBlock Classes="heading" HorizontalAlignment="Center" TextAlignment="Center" Text="{x:Static app:Strings.ContactsEmptyTitle}" />
+                <TextBlock Classes="body secondary" TextAlignment="Center" MaxWidth="320" Text="{x:Static app:Strings.ContactsEmptyText}" />
+            </StackPanel>
+
+            <ItemsControl ItemsSource="{Binding Contacts}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <c:Card Margin="0,0,0,8">
+                            <StackPanel Spacing="8">
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <Border Classes="avatar" VerticalAlignment="Top">
+                                        <TextBlock Text="{Binding Initial}" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Margin="10,0,8,0">
+                                        <TextBlock Classes="label" Text="{Binding DisplayName}" />
+                                        <TextBlock Classes="caption secondary" Text="{Binding EmailText}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top" Margin="0,4,0,0">
+                                        <Ellipse Classes="presence" Classes.online="{Binding IsOnline}" VerticalAlignment="Center" />
+                                        <TextBlock Classes="caption secondary" VerticalAlignment="Center" Text="{Binding PresenceText}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <c:InfoBar IsClosable="False" Severity="Warning" IsOpen="{Binding IsOnSameNetwork, Mode=OneWay}"
+                                           Message="{x:Static app:Strings.ContactSameNetworkNote}" />
+
+                                <WrapPanel>
+                                    <Button Margin="0,0,8,0" Command="{Binding UseConnectionCommand}" Content="{x:Static app:Strings.ContactUseConnection}" />
+                                    <Button Command="{Binding OfferConnectionCommand}" Content="{x:Static app:Strings.ContactOfferConnection}" />
+                                </WrapPanel>
+
+                                <Border Classes="divider" />
+
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel>
+                                        <TextBlock Classes="label" Text="{x:Static app:Strings.ContactAllowAlways}" />
+                                        <TextBlock Classes="caption secondary" Text="{Binding TrustHelpText}" />
+                                    </StackPanel>
+                                    <ToggleSwitch Grid.Column="1" OnContent="" OffContent="" Margin="12,0,0,0" VerticalAlignment="Center"
+                                                  IsChecked="{Binding AllowWithoutAsking, Mode=TwoWay}"
+                                                  AutomationProperties.Name="{Binding TrustAccessibleName}" />
+                                </Grid>
+
+                                <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding !IsConfirmingRemove}">
+                                    <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding TrustsMe}">
+                                        <c:Icon Kind="Ok" Classes="sm muted" />
+                                        <TextBlock Classes="caption secondary" VerticalAlignment="Center" Text="{x:Static app:Strings.ContactTrustsMe}" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Classes="link" Command="{Binding RemoveCommand}" Content="{x:Static app:Strings.ContactRemove}" />
+                                </Grid>
+                                <Border Classes="confirm" IsVisible="{Binding IsConfirmingRemove}">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Classes="body" Text="{Binding RemoveConfirmText}" AutomationProperties.LiveSetting="Assertive" />
+                                        <c:PlatformButtonRow>
+                                            <Button Classes="danger" c:PlatformButtonRow.IsPrimary="True" Command="{Binding RemoveCommand}"
+                                                    Content="{x:Static app:Strings.ContactRemove}" />
+                                            <Button Command="{Binding CancelRemoveCommand}" Content="{x:Static app:Strings.MobileContactCancel}" />
+                                        </c:PlatformButtonRow>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </c:Card>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Invitations this user sent: waiting until accepted or expired. -->
+            <StackPanel Spacing="2" IsVisible="{Binding HasOutgoingInvites}">
+                <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.ContactsOutgoingTitle}" />
+                <ItemsControl ItemsSource="{Binding OutgoingInvites}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,2">
+                                <TextBlock Classes="body" VerticalAlignment="Center" Text="{Binding EmailText}" />
+                                <TextBlock Grid.Column="1" Classes="caption secondary" Margin="8,0" VerticalAlignment="Center" Text="{Binding StatusText}" />
+                                <Button Grid.Column="2" Classes="link" Command="{Binding WithdrawCommand}" Content="{x:Static app:Strings.ContactsWithdraw}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <!-- Invite someone. -->
+            <c:Card>
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <c:Icon Kind="PersonAdd" Classes="sm" />
+                        <TextBlock Classes="heading" Text="{x:Static app:Strings.MobileInviteHeading}" />
+                    </StackPanel>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBox Name="InviteBox" Watermark="{x:Static app:Strings.ContactsInvitePlaceholder}"
+                                 AutomationProperties.Name="{x:Static app:Strings.ContactsInvitePlaceholder}"
+                                 Text="{Binding InviteEmail, Mode=TwoWay}" FlowDirection="{x:Static app:UiFlow.Technical}" />
+                        <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding InviteCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <c:Icon Kind="Mail" Classes="sm" />
+                                <TextBlock Text="{x:Static app:Strings.ContactsInviteButton}" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                    <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.MobileInviteHelp}" />
+                </StackPanel>
+            </c:Card>
         </StackPanel>
-    </Grid>
+    </ScrollViewer>
 </UserControl>

@@ -95,15 +95,26 @@ public sealed partial class ContactsViewModel : ObservableObject
         _notifier = notifier;
         _logger = logger;
 
-        Contacts.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasContacts));
+        Contacts.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasContacts));
+            OnPropertyChanged(nameof(IsLoading));
+            OnPropertyChanged(nameof(ShowsEmpty));
+        };
         IncomingInvites.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasIncomingInvites));
         OutgoingInvites.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasOutgoingInvites));
 
-        _store.Changed += () => UiThread.Post(Rebuild);
+        _store.Changed += () => UiThread.Post(() =>
+        {
+            IsLoaded = true;
+            Rebuild();
+        });
         _channel.MessageReceived += OnMessage;
         _channel.StateChanged += state => UiThread.Post(() =>
         {
             IsConnected = state == ControlChannelState.Connected;
+            OnPropertyChanged(nameof(IsLoading));
+            OnPropertyChanged(nameof(ShowsEmpty));
             if (IsConnected)
             {
                 ApplyServerSettings(_connector.LastHello);
@@ -119,12 +130,14 @@ public sealed partial class ContactsViewModel : ObservableObject
                 _store.Clear();
                 PendingOffer = null;
                 SetStatus(string.Empty);
+                IsLoaded = false;
             }
         });
 
         IsConnected = _channel.State == ControlChannelState.Connected;
         ApplyServerSettings(_connector.LastHello);
         Rebuild();
+        IsLoaded = HasContacts;
     }
 
     public ObservableCollection<ContactItemViewModel> Contacts { get; } = new();
@@ -137,6 +150,53 @@ public sealed partial class ContactsViewModel : ObservableObject
     public ObservableCollection<int> DurationOptions { get; } = new(OfferedDurations);
 
     public bool HasContacts => Contacts.Count > 0;
+
+    /// <summary>The first contact list has arrived (or there were contacts already): until then the tab shows loading rows.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLoading), nameof(ShowsEmpty))]
+    private bool _isLoaded;
+
+    /// <summary>Loading rows: signed in and connected, and the first list has not arrived. Offline shows what is known.</summary>
+    public bool IsLoading => !IsLoaded && !HasContacts && IsConnected && _auth.IsSignedIn;
+
+    /// <summary>"No contacts yet", only once the list is known to be empty.</summary>
+    public bool ShowsEmpty => !HasContacts && !IsLoading;
+
+    /// <summary>The feedback line is a failure (danger banner) rather than news (info banner).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasErrorMessage), nameof(HasInfoMessage))]
+    private bool _statusIsError;
+
+    public bool HasErrorMessage => HasStatusMessage && StatusIsError;
+
+    public bool HasInfoMessage => HasStatusMessage && !StatusIsError;
+
+    /// <summary>The contact whose "without asking" is waiting for the confirmation dialog; null when none is.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsConfirmingTrust), nameof(TrustConfirmTitle))]
+    private ContactItemViewModel? _trustConfirmation;
+
+    public bool IsConfirmingTrust => TrustConfirmation is not null;
+
+    public string TrustConfirmTitle => TrustConfirmation is { } c
+        ? string.Format(UiFlow.Culture, Strings.MobileTrustConfirmTitleFormat, c.DisplayName)
+        : string.Empty;
+
+    internal void AskTrust(ContactItemViewModel contact) => TrustConfirmation = contact;
+
+    internal void TrustAnswered(ContactItemViewModel contact)
+    {
+        if (ReferenceEquals(TrustConfirmation, contact))
+        {
+            TrustConfirmation = null;
+        }
+    }
+
+    [RelayCommand]
+    private Task ConfirmTrustAsync() => TrustConfirmation?.ConfirmTrustCommand.ExecuteAsync(null) ?? Task.CompletedTask;
+
+    [RelayCommand]
+    private void CancelTrust() => TrustConfirmation?.CancelTrustCommand.Execute(null);
 
     /// <summary>
     /// Whether this machine can use somebody else's connection at all: only where Josour can point the operating system's
@@ -219,7 +279,7 @@ public sealed partial class ContactsViewModel : ObservableObject
         if (error is not null)
         {
             _waiting = WaitingFor.Nothing;
-            SetStatus(DescribeError(error));
+            SetStatus(DescribeError(error), isError: true);
         }
     }
 
@@ -239,7 +299,7 @@ public sealed partial class ContactsViewModel : ObservableObject
         if (error is not null)
         {
             _waiting = WaitingFor.Nothing;
-            SetStatus(DescribeError(error));
+            SetStatus(DescribeError(error), isError: true);
         }
     }
 
@@ -279,7 +339,7 @@ public sealed partial class ContactsViewModel : ObservableObject
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Contacts: could not withdraw");
-            SetStatus(Strings.GuestErrorNotConnected);
+            SetStatus(Strings.GuestErrorNotConnected, isError: true);
         }
     }
 
@@ -304,12 +364,12 @@ public sealed partial class ContactsViewModel : ObservableObject
         {
             // Not sent: this device is not the one the offer is waiting on any more (taken elsewhere, withdrawn, busy here).
             _logger.LogWarning("Contacts: offer.accept for {OfferId} not sent: the offer is no longer pending here", offer.OfferId);
-            SetStatus(Strings.OfferNoLongerAvailable);
+            SetStatus(Strings.OfferNoLongerAvailable, isError: true);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Contacts: offer.accept failed");
-            SetStatus(Strings.GuestErrorNotConnected);
+            SetStatus(Strings.GuestErrorNotConnected, isError: true);
         }
     }
 
@@ -505,13 +565,13 @@ public sealed partial class ContactsViewModel : ObservableObject
         catch (ApiException ex)
         {
             _logger.LogWarning("Contacts: {Code} {Message}", ex.Code, ex.Message);
-            SetStatus(string.Format(UiFlow.Culture, failureFormat ?? Strings.ContactActionFailedFormat, ex.Message));
+            SetStatus(string.Format(UiFlow.Culture, failureFormat ?? Strings.ContactActionFailedFormat, ex.Message), isError: true);
             onFailure?.Invoke();
         }
         catch (ApiUnavailableException ex)
         {
             _logger.LogWarning("Contacts: server unavailable: {Message}", ex.Message);
-            SetStatus(Strings.GuestErrorNotConnected);
+            SetStatus(Strings.GuestErrorNotConnected, isError: true);
             onFailure?.Invoke();
         }
         finally
@@ -520,7 +580,11 @@ public sealed partial class ContactsViewModel : ObservableObject
         }
     }
 
-    private void SetStatus(string message) => StatusMessage = message;
+    private void SetStatus(string message, bool isError = false)
+    {
+        StatusIsError = isError;
+        StatusMessage = message;
+    }
 }
 
 /// <summary>One contact's row on the Contacts tab.</summary>
@@ -534,7 +598,12 @@ public sealed partial class ContactItemViewModel : ObservableObject
     private bool _allowWithoutAsking;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TrustHelpText))]
     private bool _isConfirmingRemove;
+
+    /// <summary>Turning "without asking" on is waiting for the confirmation dialog.</summary>
+    [ObservableProperty]
+    private bool _isConfirmingTrust;
 
     public ContactItemViewModel(ContactsViewModel owner, ContactDto contact, IContactsStore store)
     {
@@ -587,13 +656,66 @@ public sealed partial class ContactItemViewModel : ObservableObject
         OfferConnectionCommand.NotifyCanExecuteChanged();
     }
 
+    /// <summary>"On: accepted without asking…" or "Off: you are asked every time."</summary>
+    public string TrustHelpText => AllowWithoutAsking ? Strings.MobileTrustOnHelp : Strings.MobileTrustOffHelp;
+
+    /// <summary>"Remove Sara? They will no longer be able to ask for your connection."</summary>
+    public string RemoveConfirmText => string.Format(UiFlow.Culture, Strings.MobileRemoveConfirmFormat, DisplayName);
+
+    /// <summary>The avatar's letter: the first whole grapheme of the name (an Arabic letter with its marks).</summary>
+    public string Initial => InitialOf(DisplayName);
+
+    /// <summary>The switch's accessible name: the setting and whose it is.</summary>
+    public string TrustAccessibleName => Strings.ContactAllowAlways + " — " + DisplayName;
+
+    public static string InitialOf(string? name)
+    {
+        var trimmed = (name ?? string.Empty).Trim();
+        return trimmed.Length == 0 ? "?" : System.Globalization.StringInfo.GetNextTextElement(trimmed, 0).ToUpperInvariant();
+    }
+
+    /// <summary>
+    /// Turning it on asks first (Phase 1 decision 10): a standing consent is not given by one possibly accidental click.
+    /// Turning it off takes effect at once, as it always did.
+    /// </summary>
     partial void OnAllowWithoutAskingChanged(bool value)
     {
-        if (!_applying)
+        OnPropertyChanged(nameof(TrustHelpText));
+        if (_applying)
         {
-            _ = _owner.SetTrustAsync(this, value);
+            return;
         }
+
+        if (value)
+        {
+            IsConfirmingTrust = true;
+            _owner.AskTrust(this);
+            return;
+        }
+
+        _ = _owner.SetTrustAsync(this, false);
     }
+
+    [RelayCommand]
+    private Task ConfirmTrustAsync()
+    {
+        IsConfirmingTrust = false;
+        _owner.TrustAnswered(this);
+        return _owner.SetTrustAsync(this, true);
+    }
+
+    [RelayCommand]
+    private void CancelTrust()
+    {
+        IsConfirmingTrust = false;
+        _owner.TrustAnswered(this);
+        _applying = true;
+        AllowWithoutAsking = false;
+        _applying = false;
+    }
+
+    [RelayCommand]
+    private void CancelRemove() => IsConfirmingRemove = false;
 
     [RelayCommand(CanExecute = nameof(CanUseConnection))]
     private Task UseConnectionAsync() => _owner.UseConnectionAsync(this);
@@ -630,6 +752,8 @@ public sealed partial class IncomingInviteItem
     public Guid Id => Invite.Id;
 
     public string Text => string.Format(UiFlow.Culture, Strings.ContactsIncomingFormat, Invite.FromDisplayName);
+
+    public string Initial => ContactItemViewModel.InitialOf(Invite.FromDisplayName);
 
     public string EmailText => UiFlow.Ltr(Invite.FromEmail);
 

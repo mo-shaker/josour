@@ -65,7 +65,13 @@ public partial class App : Application
     /// <summary>The DI container (for the rare code-behind that needs a service).</summary>
     public IServiceProvider Services => _host?.Services ?? throw new InvalidOperationException("The host has not started.");
 
-    public override void Initialize() => AvaloniaXamlLoader.Load(this);
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+
+        // The type scale for whichever language is current now; ApplyLanguage sets it again once the language is final.
+        Theme.DesktopTheme.Apply(Resources, LocalizedStrings.Current.IsRightToLeft);
+    }
 
     public override void OnFrameworkInitializationCompleted()
     {
@@ -169,7 +175,7 @@ public partial class App : Application
             Log.Fatal(ex, "Startup failed");
             FatalErrorWindow.Show(
                 Strings.StartupFailedTitle,
-                string.Format(UiFlow.Culture, Strings.StartupFailedMessageFormat, ex.Message));
+                string.Format(UiFlow.Culture, Strings.DesktopStartupFailedFormat, ex.Message, UiFlow.Ltr(LoggingSetup.DefaultLogDirectory)));
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 desktop.Shutdown(1);
@@ -207,6 +213,8 @@ public partial class App : Application
         CultureInfo.DefaultThreadCurrentUICulture = pack.Culture;
         Thread.CurrentThread.CurrentCulture = pack.Culture;
         Thread.CurrentThread.CurrentUICulture = pack.Culture;
+
+        Theme.DesktopTheme.Apply(Resources, LocalizedStrings.Current.IsRightToLeft);
     }
 
     private static async Task RunStartupFlowAsync(ISystemProxyGuard systemProxy, IAuthFlow flow, ILogger<App> logger)

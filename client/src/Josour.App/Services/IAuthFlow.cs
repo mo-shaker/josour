@@ -11,4 +11,10 @@ public interface IAuthFlow
 
     /// <summary>Tray "Sign out": close the channel, sign out, show the sign-in window.</summary>
     Task SignOutAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Why the server signed this device out (session expired, device removed, account disabled), for the sign-in window
+    /// to show as well as the notification; null after a sign-out the user asked for, and once signed in again.
+    /// </summary>
+    string? SignOutNotice { get; }
 }

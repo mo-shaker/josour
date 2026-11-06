@@ -12,6 +12,7 @@ using Josour.Mobile.Platform;
 using Josour.Mobile.ViewModels;
 using Josour.Mobile.Views;
 using Microsoft.Extensions.Logging.Abstractions;
+using Josour.Brand.Controls;
 
 namespace Josour.Mobile.Tests;
 

@@ -17,6 +17,6 @@ public partial class AdminWindow : Window
 
         // The list is fetched when the window opens rather than when the view model is built, so reopening it
         // shows the accounts as they are now.
-        Opened += (_, _) => viewModel.RefreshCommand.Execute(null);
+        Opened += (_, _) => (DataContext as AdminViewModel)?.RefreshCommand.Execute(null);
     }
 }

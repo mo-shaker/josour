@@ -35,8 +35,3 @@ public enum HostStatus
     SessionEnded,
 }
 
-/// <summary>The drawing the arch motif shows (<c>Controls.Motif</c>).</summary>
-public enum MotifState
-{
-    Off, Connecting, Ready, Unreachable, Attention, Session, Ended, Empty, Offer,
-}

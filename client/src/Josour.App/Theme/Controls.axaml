@@ -1,0 +1,112 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:c="https://josour.app/controls">
+  <!--
+    The desktop's own controls on the tokens: Card (a surface, flat with a border; .hero is the status hero, .sunken a well)
+    and InfoBar (a banner: semantic container, border and icon shape per severity, text in the text colour).
+  -->
+  <ControlTheme x:Key="{x:Type c:Card}" TargetType="c:Card">
+    <Setter Property="Background" Value="{DynamicResource Josour.Brush.Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource Josour.Radius.Card}" />
+    <Setter Property="Padding" Value="14,12" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="PART_Surface"
+                Background="{TemplateBinding Background}"
+                BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}"
+                CornerRadius="{TemplateBinding CornerRadius}"
+                Padding="{TemplateBinding Padding}">
+          <ContentPresenter Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^.hero">
+      <Setter Property="CornerRadius" Value="{DynamicResource Josour.Radius.Hero}" />
+      <Setter Property="Padding" Value="18,16" />
+    </Style>
+    <Style Selector="^.hero /template/ Border#PART_Surface">
+      <Setter Property="BoxShadow" Value="{DynamicResource Josour.Elevation.1}" />
+    </Style>
+    <Style Selector="^.sunken">
+      <Setter Property="Background" Value="{DynamicResource Josour.Brush.SurfaceSunken}" />
+    </Style>
+    <Style Selector="^.rows">
+      <Setter Property="Padding" Value="14,2" />
+    </Style>
+  </ControlTheme>
+
+  <ControlTheme x:Key="{x:Type c:InfoBar}" TargetType="c:InfoBar">
+    <Setter Property="CornerRadius" Value="{DynamicResource Josour.Radius.Card}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="12,10" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.Text}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}"
+                BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}"
+                CornerRadius="{TemplateBinding CornerRadius}"
+                Padding="{TemplateBinding Padding}">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <c:Icon Name="PART_Icon" Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Top" />
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+              <TextBlock Name="PART_Title" Classes="label" Text="{TemplateBinding Title}" IsVisible="False" />
+              <TextBlock Classes="body" Text="{TemplateBinding Message}" />
+            </StackPanel>
+            <Button Name="PART_CloseButton" Grid.Column="2" Classes="icon" Margin="8,0,0,0" VerticalAlignment="Top"
+                    IsVisible="{TemplateBinding IsClosable}">
+              <c:Icon Kind="Close" Classes="sm" />
+            </Button>
+          </Grid>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+
+    <Style Selector="^:has-title /template/ TextBlock#PART_Title">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+
+    <Style Selector="^:informational">
+      <Setter Property="Background" Value="{DynamicResource Josour.Brush.InfoContainer}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.InfoBorder}" />
+    </Style>
+    <Style Selector="^:informational /template/ c|Icon#PART_Icon">
+      <Setter Property="Kind" Value="Info" />
+      <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.InfoFg}" />
+    </Style>
+
+    <Style Selector="^:success">
+      <Setter Property="Background" Value="{DynamicResource Josour.Brush.SuccessContainer}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.SuccessBorder}" />
+    </Style>
+    <Style Selector="^:success /template/ c|Icon#PART_Icon">
+      <Setter Property="Kind" Value="Check" />
+      <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.SuccessFg}" />
+    </Style>
+
+    <Style Selector="^:warning">
+      <Setter Property="Background" Value="{DynamicResource Josour.Brush.WarningContainer}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.WarningBorder}" />
+    </Style>
+    <Style Selector="^:warning /template/ c|Icon#PART_Icon">
+      <Setter Property="Kind" Value="Warning" />
+      <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.WarningFg}" />
+    </Style>
+
+    <Style Selector="^:error">
+      <Setter Property="Background" Value="{DynamicResource Josour.Brush.DangerContainer}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Josour.Brush.DangerBorder}" />
+    </Style>
+    <Style Selector="^:error /template/ c|Icon#PART_Icon">
+      <Setter Property="Kind" Value="Danger" />
+      <Setter Property="Foreground" Value="{DynamicResource Josour.Brush.DangerFg}" />
+    </Style>
+  </ControlTheme>
+</ResourceDictionary>

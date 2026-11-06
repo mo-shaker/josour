@@ -24,6 +24,10 @@ ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 MinVersion=10.0.17763
 WizardStyle=modern
+; The brand art, generated from 1-qantara/ by scripts/brand-theme.py (100, 150 and 200 % for each display scale).
+SetupIconFile=..\src\Josour.App\Assets\josour.ico
+WizardImageFile=art\wizard-100.bmp,art\wizard-150.bmp,art\wizard-200.bmp
+WizardSmallImageFile=art\wizard-small-100.bmp,art\wizard-small-150.bmp,art\wizard-small-200.bmp
 UninstallDisplayIcon={app}\Josour.exe
 CloseApplications=yes
 

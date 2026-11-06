@@ -6,6 +6,30 @@ Every release of Josour: the apps, the server and the relay share one version nu
 
 ## Unreleased
 
+### Windows and macOS
+- **A new look around the qantara mark.** The desktop app is rebuilt on the identity the phone got in 2.6.0
+  ([docs/design/desktop-phase1-foundation.html](docs/design/desktop-phase1-foundation.html), mockups in
+  [desktop-phase2-mockups.html](docs/design/desktop-phase2-mockups.html)): Readex Pro for Arabic and English, the teal
+  and ink colours with light and dark themes that follow the system while the app runs, the lock-up on sign-in, first run
+  and About, and new icons generated from the logo: the app icon (a white symbol on a teal plate, in the `.ico` and in
+  Apple's `.icns` grid), the installer's art, and a tray and menu-bar icon that shows the state in four shapes (available,
+  not available, can't reach the server, in a session). On macOS the menu-bar icon is a template image the system tints.
+- **The main window answers one question first**: can a request reach this computer now, and if not, what to do. A status
+  hero with the Available switch sits above two tabs, Contacts and This device; a short reconnect reads as "getting
+  ready", and the firewall, VPN and simulated-server warnings are ranked instead of stacked. During a session the hero
+  shows who, the time left, the data used and "End the session now". The bottom status strip is gone: Settings, About and
+  User management are in the ⋯ menu on Windows and in the app menu on macOS.
+- **Consent is fairer.** Accept and Reject on a request have the same weight, in each system's order, and come after
+  "What accepting means" in plain words; ticking "always allow" renames Accept to "Accept and always allow"; an expired
+  request says so instead of vanishing; turning on "without asking" for a contact asks first; signing out, quitting
+  while sharing and disabling an account ask first and say what stops.
+- Sign-in shows why the server signed this device out, and the password can be shown. Each system's shortcuts:
+  Ctrl/⌘ , for Settings, Ctrl/⌘ W to close the main window to the tray or menu bar, ⌘Q to quit on macOS, and Esc to
+  cancel a dialog. Every icon button and switch has an accessible name.
+- The theme files and brand images of both apps are generated from one tokens file (`docs/design/brand-tokens.json`) and
+  the logo by `scripts/brand-theme.py`; the publish scripts and CI check that they are current. The identity shared by the
+  phone and the desktop (tokens, font, lock-up, motif, icons) is one project, `Josour.Brand`.
+
 ## 2.6.0 - 2026-11-06
 
 ### Android

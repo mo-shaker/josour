@@ -1,126 +1,117 @@
 <Window x:Class="Josour.App.Views.IncomingRequestWindow"
-                 xmlns="https://github.com/avaloniaui"
-                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-                 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-                 xmlns:app="clr-namespace:Josour.App"
-                 xmlns:c="clr-namespace:Josour.App.Controls"
-                 xmlns:vm="clr-namespace:Josour.App.ViewModels"
-                 mc:Ignorable="d"
-                 Title="{x:Static app:Strings.IncomingRequestWindowTitle}"
-                 Icon="/Assets/josour.ico"
-                 FlowDirection="{x:Static app:UiFlow.Direction}"
-                 Width="480" SizeToContent="Height" MinHeight="420"
-                 CanResize="False"
-                 Topmost="True"
-                 ShowInTaskbar="True"
-                 WindowStartupLocation="CenterScreen">
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:app="clr-namespace:Josour.App"
+        xmlns:c="https://josour.app/controls"
+        mc:Ignorable="d"
+        Title="{x:Static app:Strings.IncomingRequestWindowTitle}"
+        Icon="/Assets/josour.ico"
+        FlowDirection="{x:Static app:UiFlow.Direction}"
+        Width="480" SizeToContent="Height" MaxHeight="720"
+        CanResize="False"
+        Topmost="True"
+        ShowInTaskbar="True"
+        WindowStartupLocation="CenterScreen">
+    <!--
+        The consent (product document section 15, docs/design/desktop-phase2-mockups.html): who, which device, how long, what
+        it reaches, what accepting means in plain words, then the decision. Accept and Reject have equal weight, in each
+        system's order; no button is the default, so Enter never accepts. Esc or closing = decide later (dismissed).
+    -->
+    <Panel>
+        <ScrollViewer IsVisible="{Binding !IsExpired}" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="20" Spacing="12">
+                <Grid ColumnDefinitions="Auto,*">
+                    <c:Motif State="Offer" Width="48" Height="48" VerticalAlignment="Top" />
+                    <TextBlock Name="Heading" Grid.Column="1" Margin="12,0,0,0" Classes="display" Focusable="True"
+                               Text="{Binding Heading}" AutomationProperties.LiveSetting="Assertive" />
+                </Grid>
 
-        <StackPanel Grid.Row="1" Margin="20,8,20,20">
-            <TextBlock Classes="title" TextWrapping="Wrap" Text="{Binding Heading}" />
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto">
+                    <TextBlock Classes="caption secondary" Margin="0,0,16,4" VerticalAlignment="Center" Text="{x:Static app:Strings.IncomingRequestRequesterLabel}" />
+                    <TextBlock Grid.Column="1" Classes="label" Margin="0,0,0,4" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" Text="{Binding GuestName}" />
+                    <TextBlock Grid.Row="1" Classes="caption secondary" Margin="0,0,16,4" VerticalAlignment="Center" Text="{x:Static app:Strings.IncomingRequestDeviceLabel}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Classes="label" Margin="0,0,0,4" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" Text="{Binding GuestDevice}" />
+                    <TextBlock Grid.Row="2" Classes="caption secondary" Margin="0,0,16,0" VerticalAlignment="Center" Text="{x:Static app:Strings.IncomingRequestDurationLabel}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Classes="label" Text="{Binding DurationText}" />
+                </Grid>
 
-            <!-- Product document section 15: who, from which device, for how long. -->
-            <Grid Margin="0,16,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+                <!-- What the request reaches: a list of sites, or (with no list enforced) any site, said plainly. -->
+                <c:Card Classes="sunken">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="label" Text="{Binding ScopeLabel}" />
+                        <TextBlock Classes="caption secondary" Text="{Binding ScopeNote}" IsVisible="{Binding HasScopeNote}" />
+                        <TextBlock Classes="body" Text="{Binding AllowedSitesMessage}" IsVisible="{Binding IsScopePlain}" />
+                        <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                      IsVisible="{Binding HasAllowedSites}">
+                            <ItemsControl ItemsSource="{Binding AllowedSites}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <!-- Each entry is bidi-isolated, so "portal.corp:8443" keeps its order. -->
+                                        <TextBlock Classes="body" Margin="0,1" Text="{Binding}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                        <TextBlock Classes="caption secondary" Text="{Binding AllowedSitesSummary}" IsVisible="{Binding HasAllowedSites}" />
+                        <!-- "Could not be loaded" and "allows nothing" are different sentences, never an empty list. -->
+                        <c:InfoBar IsClosable="False" Severity="Warning" IsOpen="{Binding IsScopeWarning, Mode=OneWay}" Message="{Binding AllowedSitesMessage}" />
+                    </StackPanel>
+                </c:Card>
 
-                <TextBlock Classes="secondary" Grid.Row="0" Grid.Column="0" Margin="0,0,16,6"
-                              Text="{x:Static app:Strings.IncomingRequestRequesterLabel}" />
-                <TextBlock Classes="bodyStrong" Grid.Row="0" Grid.Column="1" Margin="0,0,0,6"
-                              TextTrimming="CharacterEllipsis" Text="{Binding GuestName}" />
+                <!-- What accepting means, directly above the decision. -->
+                <Grid ColumnDefinitions="Auto,*">
+                    <c:Icon Kind="Info" Classes="info" Margin="0,0,10,0" VerticalAlignment="Top" />
+                    <StackPanel Grid.Column="1" Spacing="2">
+                        <TextBlock Classes="label" Text="{x:Static app:Strings.MobileConsequenceTitle}" />
+                        <TextBlock Classes="body" Text="{x:Static app:Strings.MobileConsequence}" />
+                        <TextBlock Classes="caption secondary" Text="{x:Static app:Strings.DesktopEndAnytimeHint}" />
+                    </StackPanel>
+                </Grid>
 
-                <TextBlock Classes="secondary" Grid.Row="1" Grid.Column="0" Margin="0,0,16,6"
-                              Text="{x:Static app:Strings.IncomingRequestDeviceLabel}" />
-                <!-- A device name is a technical identifier: the ViewModel isolates it so it never reorders. -->
-                <TextBlock Classes="bodyStrong" Grid.Row="1" Grid.Column="1" Margin="0,0,0,6"
-                              TextTrimming="CharacterEllipsis" Text="{Binding GuestDevice}" />
+                <!-- ADR-0014: unticked every time; ticking it renames Accept so the button says what it grants. -->
+                <c:Card>
+                    <StackPanel Spacing="4">
+                        <CheckBox IsChecked="{Binding TrustThisGuest, Mode=TwoWay}">
+                            <TextBlock Classes="body" Text="{x:Static app:Strings.IncomingRequestTrustThisGuest}" />
+                        </CheckBox>
+                        <TextBlock Classes="caption secondary" Margin="28,0,0,0" Text="{x:Static app:Strings.IncomingRequestTrustHint}" />
+                    </StackPanel>
+                </c:Card>
 
-                <TextBlock Classes="secondary" Grid.Row="2" Grid.Column="0" Margin="0,0,16,0"
-                              Text="{x:Static app:Strings.IncomingRequestDurationLabel}" />
-                <TextBlock Classes="bodyStrong" Grid.Row="2" Grid.Column="1"
-                              Text="{Binding DurationText}" />
-            </Grid>
-
-            <!-- The allow-list of THIS request's version (GET /domains?version=N), or why it is not there. -->
-            <TextBlock Classes="bodyStrong" Margin="0,16,0,0"
-                          Text="{Binding ScopeLabel}" />
-            <TextBlock Classes="secondary" TextWrapping="Wrap" Margin="0,2,0,0"
-                          Text="{Binding ScopeNote}"
-                          IsVisible="{Binding HasScopeNote}" />
-
-            <c:Card Padding="12" Margin="0,8,0,0"
-                     IsVisible="{Binding HasAllowedSites}">
-                <StackPanel>
-                    <ScrollViewer MaxHeight="132" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <ItemsControl ItemsSource="{Binding AllowedSites}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <!-- Each entry is bidi-isolated: "portal.corp:8443" keeps its order, while the
-                                         list itself still starts at the reading edge of the mirrored card. -->
-                                    <TextBlock Margin="0,1" TextWrapping="Wrap" Text="{Binding}" />
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                    <TextBlock Classes="caption tertiary" Margin="0,8,0,0"
-                                  Text="{Binding AllowedSitesSummary}" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <c:Icon Kind="Clock" Classes="sm muted" />
+                    <TextBlock Classes="caption secondary" VerticalAlignment="Center" Text="{Binding CountdownText}" />
                 </StackPanel>
-            </c:Card>
 
-            <!-- "Could not be loaded" and "this version allows nothing" are different sentences, on purpose. -->
-            <c:InfoBar Margin="0,8,0,0" IsClosable="False" Severity="Warning"
-                        IsOpen="{Binding HasAllowedSitesMessage, Mode=OneWay}"
-                        Message="{Binding AllowedSitesMessage}" />
+                <c:PlatformButtonRow HorizontalAlignment="Stretch">
+                    <Button Classes="large" MinWidth="200" c:PlatformButtonRow.IsPrimary="True" Command="{Binding AcceptCommand}"
+                            AutomationProperties.Name="{Binding AcceptText}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <c:Icon Kind="Ok" Classes="sm" />
+                            <TextBlock Text="{Binding AcceptText}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="large" MinWidth="200" Command="{Binding RejectCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <c:Icon Kind="Close" Classes="sm" />
+                            <TextBlock Text="{x:Static app:Strings.Reject}" />
+                        </StackPanel>
+                    </Button>
+                </c:PlatformButtonRow>
+            </StackPanel>
+        </ScrollViewer>
 
-            <c:InfoBar Margin="0,12,0,0" IsOpen="True" IsClosable="False" Severity="Warning"
-                        Title="{x:Static app:Strings.IncomingRequestWarningTitle}"
-                        Message="{x:Static app:Strings.IncomingRequestWarning}" />
-
-            <TextBlock Classes="secondary" Margin="0,8,0,0" TextWrapping="Wrap"
-                          Text="{x:Static app:Strings.IncomingRequestDisconnectHint}" />
-
-            <!--
-                ADR-0014: a standing consent can be given here, where the host is looking at who is asking, or from the
-                contact's row on the Contacts tab. Unticked every time the window opens, and below the
-                warnings rather than beside the buttons, so it is read as part of the decision and not as part of
-                pressing Accept.
-            -->
-            <c:Card Margin="0,12,0,0">
-                <StackPanel>
-                    <CheckBox Content="{x:Static app:Strings.IncomingRequestTrustThisGuest}"
-                              IsChecked="{Binding TrustThisGuest, Mode=TwoWay}" />
-                    <TextBlock Classes="caption tertiary" Margin="0,8,0,0" TextWrapping="Wrap"
-                                  Text="{x:Static app:Strings.IncomingRequestTrustHint}" />
-                </StackPanel>
-            </c:Card>
-
-            <Grid Margin="0,20,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <c:Icon Symbol="Timer" Margin="0,0,6,0" />
-                    <TextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding CountdownText}" />
-                </StackPanel>
-                <Button Grid.Column="1" MinWidth="110" Margin="8,0,0,0" Classes="accent"
-                           Content="{x:Static app:Strings.Accept}" Command="{Binding AcceptCommand}" />
-                <Button Grid.Column="2" MinWidth="110" Margin="8,0,0,0"
-                           Content="{x:Static app:Strings.Reject}" Command="{Binding RejectCommand}" />
-            </Grid>
+        <!-- Expired: it says why, and stays until closed (or for a few seconds). Nothing was shared. -->
+        <StackPanel Margin="20" Spacing="12" IsVisible="{Binding IsExpired}">
+            <c:Motif State="Ended" Width="{DynamicResource Josour.Size.MotifEmptyState}" Height="{DynamicResource Josour.Size.MotifEmptyState}"
+                     HorizontalAlignment="Left" />
+            <TextBlock Classes="display" Text="{x:Static app:Strings.RequestExpired}" AutomationProperties.LiveSetting="Assertive" />
+            <TextBlock Classes="body" Text="{Binding ExpiredText}" />
+            <c:PlatformButtonRow>
+                <Button Classes="primary" IsCancel="True" Content="{x:Static app:Strings.SessionDismiss}" Command="{Binding CloseCommand}" />
+            </c:PlatformButtonRow>
         </StackPanel>
-    </Grid>
+    </Panel>
 </Window>

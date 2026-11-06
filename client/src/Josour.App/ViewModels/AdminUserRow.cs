@@ -52,6 +52,15 @@ public sealed record AdminUserRow(
     /// </summary>
     public bool CanToggleActive => !IsSelf;
 
+    /// <summary>The state pill: active (success), locked out (warning) or disabled (neutral); the word always says it.</summary>
+    public bool IsStateActive => IsActive && !IsLocked;
+
+    public bool IsStateLocked => IsActive && IsLocked;
+
+    public bool IsStateDisabled => !IsActive;
+
+    public string Initial => ContactItemViewModel.InitialOf(DisplayName);
+
     public bool CanUnlock => IsLocked;
 
     public string ToggleActiveText => IsActive ? Strings.AdminDisable : Strings.AdminEnable;

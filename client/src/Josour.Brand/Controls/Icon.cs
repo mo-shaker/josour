@@ -3,13 +3,14 @@ using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Media;
 
-namespace Josour.Mobile.Controls;
+namespace Josour.Brand.Controls;
 
-/// <summary>The phone's UI icons (docs/design/mobile-phase1-foundation.html, "UI icons").</summary>
+/// <summary>The UI icons of both apps (docs/design/mobile-phase1-foundation.html, "UI icons"; the desktop's additions in desktop-phase2-mockups.html).</summary>
 public enum IconKind
 {
     None, Info, Warning, Danger, Check, Ok, Close, Wifi, Cellular, NoNetwork, NotificationsOff, Battery, Clock, PersonAdd, User,
     Stop, SignOut, Data, Share, People, ChevronDown, Server, Pin, Language, Mail, Link, Laptop,
+    More, Settings, Eye, Copy, Folder, Refresh, Search, Key, Unlock, ChevronEnd,
 }
 
 /// <summary>
@@ -53,6 +54,16 @@ public sealed class Icon : Control
         [IconKind.Language] = (G("M3.5,6H12.5 M8,4V6C8,10 5.8,13.5 3.5,15 M5.5,10.5C6.9,12.5 8.9,13.9 11.5,14.5 M12.5,20L16.5,11L20.5,20 M14,17H19"), null, false),
         [IconKind.Mail] = (G("M5,5.5H19A2,2 0 0,1 21,7.5V16.5A2,2 0 0,1 19,18.5H5A2,2 0 0,1 3,16.5V7.5A2,2 0 0,1 5,5.5Z M3.5,7L12,13L20.5,7"), null, false),
         [IconKind.Link] = (G("M10,14A4,4 0 0,0 15.66,14L18.66,11A4,4 0 0,0 13,5.34L12,6.34 M14,10A4,4 0 0,0 8.34,10L5.34,13A4,4 0 0,0 11,18.66L12,17.66"), null, false),
+        [IconKind.More] = (null, Combine(Combine(Dot(5.5, 12, 1.75), Dot(12, 12, 1.75)), Dot(18.5, 12, 1.75)), false),
+        [IconKind.Settings] = (G("M4,7H12.5 M17.5,7H20 M4,17H6.5 M11.5,17H20 M15,4.5A2.5,2.5 0 1,1 14.99,4.5Z M9,14.5A2.5,2.5 0 1,1 8.99,14.5Z"), null, false),
+        [IconKind.Eye] = (G("M2.5,12C5,7.5 8.5,5.5 12,5.5C15.5,5.5 19,7.5 21.5,12C19,16.5 15.5,18.5 12,18.5C8.5,18.5 5,16.5 2.5,12Z M12,9A3,3 0 1,1 11.99,9Z"), null, false),
+        [IconKind.Copy] = (G("M9,8H18A1.5,1.5 0 0,1 19.5,9.5V19A1.5,1.5 0 0,1 18,20.5H9A1.5,1.5 0 0,1 7.5,19V9.5A1.5,1.5 0 0,1 9,8Z M4.5,15.5V5A1.5,1.5 0 0,1 6,3.5H15"), null, false),
+        [IconKind.Folder] = (G("M5,6H9.5L11.5,8H19A1.5,1.5 0 0,1 20.5,9.5V17.5A1.5,1.5 0 0,1 19,19H5A1.5,1.5 0 0,1 3.5,17.5V7.5A1.5,1.5 0 0,1 5,6Z"), null, false),
+        [IconKind.Refresh] = (G("M19.5,12A7.5,7.5 0 1,1 17.3,6.7 M18,3.5V7H14.5"), null, false),
+        [IconKind.Search] = (G("M10.5,4.5A6,6 0 1,1 10.49,4.5Z M15,15L20,20"), null, false),
+        [IconKind.Key] = (G("M8,9.5A4,4 0 1,1 7.99,9.5Z M11.5,13.5H20.5V16.5 M17.5,13.5V16"), null, false),
+        [IconKind.Unlock] = (G("M7,11V8A5,5 0 0,1 16.6,6 M6,11H18A1.5,1.5 0 0,1 19.5,12.5V19A1.5,1.5 0 0,1 18,20.5H6A1.5,1.5 0 0,1 4.5,19V12.5A1.5,1.5 0 0,1 6,11Z"), null, false),
+        [IconKind.ChevronEnd] = (G("M9.5,6L15.5,12L9.5,18"), null, true),
         [IconKind.Laptop] = (G("M6.5,5H17.5A1.5,1.5 0 0,1 19,6.5V13.5A1.5,1.5 0 0,1 17.5,15H6.5A1.5,1.5 0 0,1 5,13.5V6.5A1.5,1.5 0 0,1 6.5,5Z M2.5,19H21.5"), null, false),
     };
 

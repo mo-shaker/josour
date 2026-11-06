@@ -14,17 +14,17 @@ namespace Josour.App;
 /// which is why <see cref="GlyphMirror"/> exists for the few directional icons.
 /// </para>
 /// <para>
-/// Values are read once, on first use, from <see cref="LocalizedStrings.Current"/> — which <c>App.Initialize</c> fixes
-/// before any window is created. The language does not change while the app runs.
+/// Values are read from <see cref="LocalizedStrings.Current"/>, which <c>App.Start</c> fixes before any window is created; the
+/// language does not change while the app runs. They are read on each use, not cached, so the headless tests can draw every
+/// window in both languages in one process.
 /// </para>
 /// </summary>
 public static class UiFlow
 {
-    private static readonly Lazy<bool> RightToLeftLazy = new(() => LocalizedStrings.Current.IsRightToLeft);
-    private static readonly Lazy<ITransform?> GlyphMirrorLazy = new(CreateGlyphMirror);
+    private static readonly ITransform Mirror = new ScaleTransform(-1, 1);
 
     /// <summary>True while the interface is Arabic.</summary>
-    public static bool IsRightToLeft => RightToLeftLazy.Value;
+    public static bool IsRightToLeft => LocalizedStrings.Current.IsRightToLeft;
 
     /// <summary>The window-level flow direction: right to left in Arabic, left to right in English.</summary>
     public static FlowDirection Direction => IsRightToLeft ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
@@ -36,17 +36,21 @@ public static class UiFlow
     public static FlowDirection Technical => FlowDirection.LeftToRight;
 
     /// <summary>
+    /// Where a left-to-right technical value (<see cref="Technical"/>) lines up: at the reading start, so in an Arabic window
+    /// it sits under the right-aligned labels instead of jumping to the far edge. A path that starts with "~" or "%" needs the
+    /// whole block left to right: an embedding mark alone lets the leading symbol move to the end.
+    /// </summary>
+    public static TextAlignment TechnicalAlignment => IsRightToLeft ? TextAlignment.Right : TextAlignment.Left;
+
+    /// <summary>
     /// Mirrors a directional glyph (a "send" arrow) in a right-to-left interface, and is null otherwise. Use with
     /// <c>RenderTransformOrigin="50%,50%"</c>. One instance is shared by every icon that needs it.
     /// </summary>
-    public static ITransform? GlyphMirror => GlyphMirrorLazy.Value;
+    public static ITransform? GlyphMirror => IsRightToLeft ? Mirror : null;
 
     /// <summary>The culture every <c>string.Format</c> in the UI uses (Arabic text, Western digits).</summary>
     public static CultureInfo Culture => LocalizedStrings.Current.Culture;
 
     /// <summary>Wraps a technical value so bidi keeps it left to right inside Arabic prose; see <see cref="LocalizedStrings.Ltr(string?)"/>.</summary>
     public static string Ltr(string? value) => LocalizedStrings.Current.Ltr(value);
-
-    private static ITransform? CreateGlyphMirror() =>
-        LocalizedStrings.Current.IsRightToLeft ? new ScaleTransform(-1, 1) : null;
 }

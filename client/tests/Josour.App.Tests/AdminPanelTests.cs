@@ -109,6 +109,12 @@ public class AdminPanelTests
 
         await vm.ToggleActiveCommand.ExecuteAsync(vm.Users.Single());
 
+        // Disabling asks first (Phase 2 decision 4): nothing is sent until the confirmation.
+        Assert.Empty(api.Patches);
+        Assert.True(vm.IsConfirmingDisable);
+        await vm.ConfirmDisableCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsConfirmingDisable);
         var (id, patch) = api.Patches[0];
         Assert.Equal(OtherId, id);
         Assert.False(patch.IsActive);
@@ -166,16 +172,27 @@ public class AdminPanelTests
     // ---------------------------------------------------------------- the window
 
     [AvaloniaFact]
-    public void The_window_loads_and_warns_that_disabling_is_immediate()
+    public async Task Disabling_asks_first_and_says_that_it_is_immediate()
     {
-        // "Disabled" that only took effect later is the kind of half-truth an administrator acts on.
-        var vm = Build(new FakeApi());
+        // "Disabled" that only took effect later is the kind of half-truth an administrator acts on: the confirmation says
+        // what happens, at the moment it is about to happen (it used to be a warning that stayed open in the window).
+        var api = new FakeApi();
+        api.Accounts.Add(User(OtherId));
+        var vm = Build(api);
+        await vm.RefreshCommand.ExecuteAsync(null);
 
         using var rendered = new Rendered(new AdminWindow(vm));
+        await vm.ToggleActiveCommand.ExecuteAsync(vm.Users.Single());
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
 
-        var messages = rendered.Window.GetVisualDescendants().OfType<Controls.InfoBar>()
-            .Select(b => b.Message ?? string.Empty).ToList();
-        Assert.Contains(messages, m => m == Strings.AdminDisableWarning);
+        var texts = rendered.Window.GetVisualDescendants().OfType<TextBlock>()
+            .Where(t => t.IsEffectivelyVisible).Select(t => t.Text ?? string.Empty).ToList();
+        Assert.Contains(Strings.AdminDisableWarning, texts);
+        Assert.Empty(api.Patches);
+
+        vm.CancelDisableCommand.Execute(null);
+        Assert.Empty(api.Patches);
+        Assert.False(vm.IsConfirmingDisable);
     }
 
     [AvaloniaFact]

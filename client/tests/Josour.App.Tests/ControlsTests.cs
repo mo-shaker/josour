@@ -1,48 +1,99 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using Josour.App.Controls;
+using Josour.Brand.Controls;
 
 namespace Josour.App.Tests;
 
 /// <summary>
-/// The three controls written by hand to replace WPF-UI: <see cref="Icon"/>, <see cref="Card"/> and
-/// <see cref="InfoBar"/>. They are the pieces with no library behind them, so they are the pieces worth testing.
+/// The desktop's own controls on the tokens: <see cref="Card"/>, <see cref="InfoBar"/> and <see cref="PlatformButtonRow"/>,
+/// and the brand <see cref="Icon"/> they draw with. They are the pieces with no library behind them.
 /// </summary>
 public class ControlsTests
 {
-    /// <summary>Every symbol any view asks for. A name that does not resolve draws nothing at all, silently.</summary>
-    public static TheoryData<string> Symbols => new()
-    {
-        "ArrowSync", "Checkmark", "Desktop", "Dismiss", "ErrorCircle", "Globe",
-        "Info", "Key", "Mail", "PlugDisconnected", "Send", "Settings", "Timer", "Warning",
-    };
-
     private static Rendered Render(Control content) => new(content, width: 200, height: 200);
 
-    [AvaloniaTheory]
-    [MemberData(nameof(Symbols))]
-    public void Every_symbol_the_views_use_resolves_to_a_geometry(string symbol)
+    /// <summary>Every icon kind the desktop's views and banners use draws something; an unknown kind draws nothing.</summary>
+    [AvaloniaFact]
+    public void Every_icon_the_views_use_has_a_shape()
     {
-        var icon = new Icon { Symbol = symbol };
+        var views = Directory.GetFiles(Path.Combine(RepoRoot(), "client/src/Josour.App"), "*.axaml", SearchOption.AllDirectories)
+            .Where(f => !f.Contains("/obj/", StringComparison.Ordinal))
+            .Select(File.ReadAllText)
+            .ToList();
+        var kinds = views.SelectMany(v => System.Text.RegularExpressions.Regex.Matches(v, "Kind=\"(\\w+)\"").Select(m => m.Groups[1].Value))
+            .Concat(new[] { "Info", "Check", "Warning", "Danger" })
+            .Distinct()
+            .ToList();
 
-        using var rendered = Render(icon);
-
-        Assert.NotNull(icon.Data);
-        Assert.NotEqual(default, icon.Data!.Bounds);
+        Assert.NotEmpty(kinds);
+        foreach (var name in kinds)
+        {
+            Assert.True(Enum.TryParse<IconKind>(name, out var kind), name);
+            var icon = new Icon { Kind = kind, Width = 24, Height = 24, Foreground = Brushes.Black, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top };
+            using var rendered = Render(icon);
+            var frame = rendered.Window.CaptureRenderedFrame()!;
+            Assert.True(HasInk(frame), name + " draws nothing");
+        }
     }
 
-    [AvaloniaFact]
-    public void An_unknown_symbol_draws_nothing_rather_than_throwing()
+    private static bool HasInk(Avalonia.Media.Imaging.WriteableBitmap frame)
     {
-        // An icon is decoration; a typo in one must not take a window down.
-        var icon = new Icon { Symbol = "NoSuchSymbol" };
+        using var buffer = frame.Lock();
+        var bytes = new byte[buffer.RowBytes * buffer.Size.Height];
+        System.Runtime.InteropServices.Marshal.Copy(buffer.Address, bytes, 0, bytes.Length);
+        // The window's canvas is near white in the light theme; any dark pixel in the top-left 24x24 is the icon.
+        for (var y = 0; y < 24; y++)
+        {
+            for (var x = 0; x < 24; x++)
+            {
+                var i = y * buffer.RowBytes + x * 4;
+                if (bytes[i] < 128 && bytes[i + 1] < 128 && bytes[i + 2] < 128)
+                {
+                    return true;
+                }
+            }
+        }
 
-        using var rendered = Render(icon);
+        return false;
+    }
 
-        Assert.Null(icon.Data);
+    internal static string RepoRoot()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (dir is not null && !File.Exists(Path.Combine(dir, "client", "Josour.sln")))
+        {
+            dir = Path.GetDirectoryName(dir);
+        }
+
+        return dir ?? throw new InvalidOperationException("Repository root not found");
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Dialog_buttons_follow_each_system_s_order(bool mac)
+    {
+        // Phase 1 decision 9: Windows puts the primary first, macOS last.
+        var before = PlatformButtonRow.UseMacOrder;
+        PlatformButtonRow.UseMacOrder = mac;
+        try
+        {
+            var primary = new Button { Content = "save" };
+            primary.Classes.Add("primary");
+            var row = new PlatformButtonRow { Children = { new Button { Content = "cancel" }, primary } };
+            using var rendered = Render(row);
+
+            Assert.Equal(mac ? 1 : 0, row.Children.IndexOf(primary));
+        }
+        finally
+        {
+            PlatformButtonRow.UseMacOrder = before;
+        }
     }
 
     [AvaloniaFact]
@@ -79,7 +130,7 @@ public class ControlsTests
         {
             var bar = new InfoBar { Severity = severity, Message = "رسالة" };
             using var rendered = Render(bar);
-            symbols.Add(bar.GetVisualDescendants().OfType<Icon>().First().Symbol);
+            symbols.Add(bar.GetVisualDescendants().OfType<Icon>().First().Kind.ToString());
         }
 
         Assert.Equal(symbols.Count, symbols.Distinct().Count());

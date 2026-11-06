@@ -26,6 +26,6 @@ public partial class AboutWindow : Window
         DataContext = viewModel;
 
         // The window can be reopened long after it was built; re-read the connection state each time it is shown.
-        Activated += (_, _) => viewModel.Refresh();
+        Activated += (_, _) => (DataContext as AboutViewModel)?.Refresh();
     }
 }
