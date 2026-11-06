@@ -6,6 +6,8 @@ Every release of Josour: the apps, the server and the relay share one version nu
 
 ## Unreleased
 
+## 2.6.0 - 2026-11-06
+
 ### Android
 - **A new look around the qantara mark.** The phone's interface is rebuilt on the new logo
   ([docs/design/mobile-phase1-foundation.html](docs/design/mobile-phase1-foundation.html), mockups in
