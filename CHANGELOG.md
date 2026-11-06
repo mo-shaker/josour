@@ -6,6 +6,8 @@ Every release of Josour: the apps, the server and the relay share one version nu
 
 ## Unreleased
 
+## 2.7.1 - 2026-11-06
+
 ### Build
 - The Windows build checks the brand assets the way Windows checks the files out (CRLF line endings, a non-UTF-8 default
   encoding), so the release builds there. 2.7.0 was tagged but never published because of this; 2.7.1 is the same app.
