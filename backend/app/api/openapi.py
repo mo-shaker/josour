@@ -52,7 +52,18 @@ TAGS_METADATA: list[dict[str, Any]] = [
     },
     {
         "name": "me",
-        "description": "The calling user and the devices they have registered.",
+        "description": (
+            "The calling user, their workspace, the devices they have registered, and "
+            "invitations to join another workspace."
+        ),
+    },
+    {
+        "name": "workspace",
+        "description": (
+            "The caller's workspace (ADR-0018): a company, family or person, and the boundary "
+            "nothing is shared across - contacts, and so requests and sessions, never cross "
+            "it. Members, roles and invitations. Only in `multi` mode."
+        ),
     },
     {
         "name": "contacts",

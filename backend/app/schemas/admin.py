@@ -35,6 +35,11 @@ class AdminUserCreate(BaseModel):
     password: str = Field(min_length=8, max_length=1024)
     display_name: str = Field(min_length=1, max_length=100)
     role: UserRole = UserRole.USER
+    workspace_id: uuid.UUID | None = Field(
+        default=None,
+        description="Put the account in this workspace as a member (ADR-0018). Omitted: the "
+        "default workspace in `single` mode, a new workspace of its own in `multi` mode.",
+    )
 
     @field_validator("email")
     @classmethod
@@ -95,6 +100,9 @@ class AdminUserOut(UserOut):
                     "approved_at": "2026-08-30T07:02:10.000Z",
                     "deleted_at": None,
                     "last_login_at": "2026-09-05T09:14:22.000Z",
+                    "workspace_id": "5a3b1c2d-0e4f-4a6b-8c7d-9e0f1a2b3c4d",
+                    "workspace_role": "member",
+                    "phone": None,
                 }
             ]
         }
@@ -111,6 +119,11 @@ class AdminUserOut(UserOut):
     approved_at: UtcDatetime | None
     deleted_at: UtcDatetime | None
     last_login_at: UtcDatetime | None
+    workspace_id: uuid.UUID
+    workspace_role: str
+    """``owner``, ``admin`` or ``member`` of ``workspace_id`` (ADR-0018)."""
+    phone: str | None
+    """Proved by SMS at registration (ADR-0019); null for accounts made any other way."""
 
 
 class AdminDeviceOut(ApiModel):

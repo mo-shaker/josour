@@ -16,6 +16,8 @@ from app.models.session import Session
 from app.models.session_domain import SessionDomain
 from app.models.session_key import SessionKey
 from app.models.user import User
+from app.models.verification import PasswordReset, PendingSignup
+from app.models.workspace import Workspace, WorkspaceInvite
 
 __all__ = [
     "AdminWebSession",
@@ -28,6 +30,8 @@ __all__ = [
     "Contact",
     "ContactInvite",
     "Device",
+    "PasswordReset",
+    "PendingSignup",
     "Presence",
     "RefreshToken",
     "SecurityEvent",
@@ -35,4 +39,6 @@ __all__ = [
     "SessionDomain",
     "SessionKey",
     "User",
+    "Workspace",
+    "WorkspaceInvite",
 ]

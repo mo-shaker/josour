@@ -19,3 +19,5 @@
 | [0015](0015-system-proxy-instead-of-work-browser.md) | The guest's system proxy instead of a dedicated work browser | Accepted and implemented 2026-10-21 |
 | [0016](0016-web-admin-dashboard.md) | An administration dashboard on the web, served by the API | Accepted 2026-10-13 |
 | [0017](0017-self-registration-with-approval.md) | Self-registration from the app, with administrator approval by default | Accepted 2026-10-13 |
+| [0018](0018-workspaces.md) | Workspaces: the boundary nothing is shared across | Accepted 2026-11-06 |
+| [0019](0019-verified-registration.md) | Verified registration, password reset, outgoing mail and SMS | Accepted 2026-11-06 (amends 0017) |

@@ -6,6 +6,8 @@
   <dt>{{ t("col.email") }}</dt><dd dir="ltr">{{ user.email }}</dd>
   <dt>{{ t("col.role") }}</dt><dd>{{ t("role." ~ user.role) }}</dd>
   <dt>{{ t("user.registered_via") }}</dt><dd>{{ t("via." ~ user.registered_via) }}</dd>
+  <dt>{{ t("user.workspace") }}</dt><dd>{{ workspace.name }} ({{ t("wsrole." ~ user.workspace_role) }})</dd>
+  {% if user.phone %}<dt>{{ t("user.phone") }}</dt><dd dir="ltr">{{ user.phone }}</dd>{% endif %}
   <dt>{{ t("col.created") }}</dt><dd dir="ltr">{{ user.created_at | dt }}</dd>
   <dt>{{ t("col.last_login") }}</dt><dd dir="ltr">{{ user.last_login_at | dt }}</dd>
   {% if user.locked_until %}<dt>{{ t("user.locked_until") }}</dt><dd dir="ltr">{{ user.locked_until | dt }}</dd>{% endif %}

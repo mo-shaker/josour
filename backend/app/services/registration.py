@@ -8,6 +8,8 @@ has an account; the attempt on a taken address is recorded for the administrator
 ``open`` mode creates an active account at once. It cannot hide a taken address - the person
 would otherwise sign in to somebody else's account or be told nothing - so it says so, and that
 is documented as the price of the mode.
+
+``verify`` mode (ADR-0019) creates no account here at all; see ``app.services.verification``.
 """
 
 import enum
@@ -46,6 +48,8 @@ async def register(
     mode = await current_mode(db)
     if mode == RegistrationMode.CLOSED:
         raise ApiError(403, "registration_closed", "Registration is closed on this server")
+    if mode == RegistrationMode.VERIFY:
+        raise AssertionError("verify mode is app.services.verification's")
 
     existing = await get_user_by_email(db, email)
     if mode == RegistrationMode.APPROVAL:

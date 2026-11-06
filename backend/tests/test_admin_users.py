@@ -30,6 +30,9 @@ USER_KEYS = {
     "approved_at",
     "deleted_at",
     "last_login_at",
+    "workspace_id",
+    "workspace_role",
+    "phone",
 }
 
 

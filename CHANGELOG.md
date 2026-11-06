@@ -6,6 +6,21 @@ Every release of Josour: the apps, the server and the relay share one version nu
 
 ## Unreleased
 
+### Server
+- **Workspaces** ([ADR-0018](docs/decisions/0018-workspaces.md)). Every account belongs to one workspace - a company, a
+  family or a person - and contacts, and so requests, offers and sessions, never cross one. A new `workspace_mode`
+  setting: `single` (the default; everybody in one workspace, as before) or `multi` (every new account gets its own).
+  In `multi` mode the owner and admins invite people by email, remove them, and hand the workspace over, through the new
+  `/workspace` and `/me/workspace-invites` endpoints; the server's administrators list workspaces under
+  `/admin/workspaces`. `GET /me` now carries the workspace.
+- **Verified registration and password reset** ([ADR-0019](docs/decisions/0019-verified-registration.md)). A fourth
+  registration mode, `verify`: the account is created, active, once the person enters a code mailed to them - and one
+  sent by SMS when `require_phone` is on. "Forgot password" by emailed code, in every mode. New `MAIL_*`, `SMTP_*`,
+  `SMS_*` and `TWILIO_*` variables; by default the server sends nothing and nothing changes.
+- Migration 0004 puts every existing account into the default workspace, so an upgraded server behaves as before.
+- The apps do not have the code-entry, phone and workspace screens yet: keep `registration_mode` off `verify` until
+  they do.
+
 ## 2.7.1 - 2026-11-06
 
 ### Build

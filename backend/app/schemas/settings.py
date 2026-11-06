@@ -5,7 +5,7 @@ import re
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.app_setting import DEFAULT_SETTINGS
-from app.models.enums import RegistrationMode
+from app.models.enums import RegistrationMode, WorkspaceMode
 
 MinutesField = Field(ge=1, le=1440)
 SecondsField = Field(ge=10, le=300)
@@ -48,6 +48,8 @@ class AppSettings(BaseModel):
                     "registration_mode": "approval",
                     "min_client_version": "",
                     "invite_ttl_days": 30,
+                    "workspace_mode": "single",
+                    "require_phone": False,
                 }
             ]
         },
@@ -64,6 +66,8 @@ class AppSettings(BaseModel):
     registration_mode: RegistrationMode = RegistrationMode(DEFAULT_SETTINGS["registration_mode"])
     min_client_version: str = Field(DEFAULT_SETTINGS["min_client_version"], max_length=32)
     invite_ttl_days: int = Field(DEFAULT_SETTINGS["invite_ttl_days"], ge=1, le=365)
+    workspace_mode: WorkspaceMode = WorkspaceMode(DEFAULT_SETTINGS["workspace_mode"])
+    require_phone: bool = DEFAULT_SETTINGS["require_phone"]
 
     @field_validator("allowed_ports")
     @classmethod
@@ -93,6 +97,8 @@ class SettingsPatch(BaseModel):
     registration_mode: RegistrationMode | None = None
     min_client_version: str | None = Field(None, max_length=32)
     invite_ttl_days: int | None = Field(None, ge=1, le=365)
+    workspace_mode: WorkspaceMode | None = None
+    require_phone: bool | None = None
 
     @field_validator("allowed_ports")
     @classmethod

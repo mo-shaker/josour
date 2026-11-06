@@ -553,6 +553,19 @@ docker compose exec api python manage.py --help
 **Deleting an account** anonymises it rather than erasing rows: the history of the sessions it shared with other people
 stays theirs. Disabling it (*Users*) signs it out and ends any live session at once, and can be undone.
 
+**Email, verified registration and "forgot password" (optional).** By default the server sends nothing. Set
+`MAIL_BACKEND=smtp` with `MAIL_FROM` and `SMTP_*` in `deploy/.env` (any provider that speaks SMTP) and recreate the API
+(`docker compose up -d`). Then "Forgot password" works in every mode, and *Settings → Registration from the app* offers
+**Open after email verification**: anyone may register, and the account exists only once they enter the code mailed to
+them ([ADR-0019](decisions/0019-verified-registration.md)). To require a phone number too, set `SMS_BACKEND=twilio` and
+`TWILIO_*`, then tick the phone option under the same setting.
+
+**Workspaces.** A self-hosted server keeps everybody in one workspace (*Settings → Workspaces → One workspace for
+everybody*), which is how it always worked. *A workspace per new account* is for a server shared by unrelated groups -
+companies, families - who must not see or reach each other: contacts never cross a workspace, and each workspace's
+owner invites and removes its own members ([ADR-0018](decisions/0018-workspaces.md)). Switching affects accounts
+created afterwards; existing ones stay together in the default workspace.
+
 ### 5.1 The site list — optional, and off by default
 
 Since [ADR-0010](decisions/0010-route-all-through-host.md) **everything** the guest browses goes through the host, and

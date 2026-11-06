@@ -15,6 +15,13 @@ PUBLIC_OPERATIONS = {
     ("/api/v1/auth/logout", "post"),
     ("/api/v1/auth/register", "post"),
     ("/api/v1/auth/registration", "get"),
+    # Verified registration and password reset (ADR-0019): before there is an account.
+    ("/api/v1/auth/register/resend", "post"),
+    ("/api/v1/auth/register/confirm", "post"),
+    ("/api/v1/auth/register/phone", "post"),
+    ("/api/v1/auth/register/phone/confirm", "post"),
+    ("/api/v1/auth/password/forgot", "post"),
+    ("/api/v1/auth/password/reset", "post"),
 }
 
 

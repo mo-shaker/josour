@@ -30,7 +30,7 @@ async def _set_mode(client: AsyncClient, admin_headers: dict, mode: str) -> None
 async def test_registration_mode_is_public_and_defaults_to_approval(client: AsyncClient) -> None:
     response = await client.get("/api/v1/auth/registration")
     assert response.status_code == 200
-    assert response.json() == {"mode": "approval"}
+    assert response.json() == {"mode": "approval", "phone_required": False, "password_reset": False}
 
 
 async def test_an_approval_mode_registration_is_pending_and_cannot_sign_in(
@@ -150,7 +150,7 @@ async def test_closed_mode_refuses_registration(client: AsyncClient, admin_heade
     response = await client.post(REGISTER, json=_body())
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "registration_closed"
-    assert (await client.get("/api/v1/auth/registration")).json() == {"mode": "closed"}
+    assert (await client.get("/api/v1/auth/registration")).json()["mode"] == "closed"
 
 
 async def test_registration_validates_its_input(client: AsyncClient) -> None:

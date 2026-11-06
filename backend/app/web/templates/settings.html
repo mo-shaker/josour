@@ -6,8 +6,15 @@
   {{ csrf_field() }}
   <fieldset>
     <legend>{{ t("settings.registration_mode") }}</legend>
-    {% for mode in ['closed', 'approval', 'open'] %}
+    {% for mode in ['closed', 'approval', 'open', 'verify'] %}
     <label class="choice"><input type="radio" name="registration_mode" value="{{ mode }}" {% if settings.registration_mode == mode %}checked{% endif %}> {{ t("mode." ~ mode) }}</label>
+    {% endfor %}
+    <label class="choice"><input type="checkbox" name="require_phone" {% if settings.require_phone %}checked{% endif %}> {{ t("settings.require_phone") }}</label>
+  </fieldset>
+  <fieldset>
+    <legend>{{ t("settings.workspace_mode") }}</legend>
+    {% for mode in ['single', 'multi'] %}
+    <label class="choice"><input type="radio" name="workspace_mode" value="{{ mode }}" {% if settings.workspace_mode == mode %}checked{% endif %}> {{ t("workspaces." ~ mode) }}</label>
     {% endfor %}
   </fieldset>
   <label>{{ t("settings.max_session_minutes") }} <input type="number" name="max_session_minutes" min="1" max="1440" value="{{ settings.max_session_minutes }}" required></label>

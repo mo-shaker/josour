@@ -26,7 +26,7 @@ from app.core.errors import ApiError, NotFound
 from app.core.rate_limit import opaque_key
 from app.core.security import verify_password_async
 from app.db.session import get_db
-from app.models import Device, Session, User
+from app.models import Device, Session, User, Workspace
 from app.models.enums import (
     NON_ENDED_SESSION_STATUSES,
     InviteStatus,
@@ -538,12 +538,14 @@ async def user_detail(request: Request, user_id: uuid.UUID) -> Response:
         contacts = await contact_service.list_for_admin(db, user.id)
         sessions = await session_service.list_for_user(db, user.id, limit=20)
         events = await session_service.list_security_events(db, user_id=user.id, limit=20)
+        workspace = await db.get(Workspace, user.workspace_id)
         return await _page(
             request,
             db,
             ctx,
             "user_detail.html",
             user=user,
+            workspace=workspace,
             devices=devices,
             online={d.id for d in devices if connection_manager.is_connected(d.id)},
             contacts=contacts,
@@ -948,6 +950,8 @@ async def settings_save(request: Request) -> Response:
             allowed_ports=[int(p) for p in re.split(r"[,\s]+", form.get("allowed_ports", "")) if p],
             min_client_version=form.get("min_client_version", ""),
             invite_ttl_days=int(form["invite_ttl_days"]),
+            require_phone=form.get("require_phone") == "on",
+            workspace_mode=form.get("workspace_mode") or None,
         )
     except (KeyError, ValueError):
         return _back("/admin/settings", error="validation_error")

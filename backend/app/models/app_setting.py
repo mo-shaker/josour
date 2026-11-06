@@ -23,6 +23,11 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # Below this version a client is told to update instead of being served (empty = no floor).
     "min_client_version": "",
     "invite_ttl_days": 30,
+    # ADR-0018: "single" keeps every account in one default workspace (a self-hosted server);
+    # "multi" gives every new account a workspace of its own (the hosted service).
+    "workspace_mode": "single",
+    # ADR-0019: in "verify" registration, must the person also prove a phone number by SMS?
+    "require_phone": False,
 }
 
 

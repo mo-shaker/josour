@@ -33,6 +33,30 @@ class RegistrationMode(enum.StrEnum):
     APPROVAL = "approval"
     """The account exists but cannot sign in until an administrator approves it (the default)."""
     OPEN = "open"
+    VERIFY = "verify"
+    """Anyone may register, and the account is created - active - only once the person has
+    proved the email address with a mailed code, and the phone number too when the server
+    requires one (ADR-0019). Needs ``MAIL_BACKEND`` (and ``SMS_BACKEND`` for phones)."""
+
+
+class WorkspaceMode(enum.StrEnum):
+    """``workspace_mode`` operator setting (ADR-0018)."""
+
+    SINGLE = "single"
+    """Every account belongs to the one default workspace: a self-hosted server is one community,
+    as it always was. The ``/workspace`` endpoints answer ``workspaces_disabled``."""
+    MULTI = "multi"
+    """Every new account gets a workspace of its own and can invite others into it; contacts and
+    sessions never cross a workspace boundary. The hosted service runs in this mode."""
+
+
+class WorkspaceRole(enum.StrEnum):
+    OWNER = "owner"
+    """Exactly one per workspace. Can do everything an admin can, change roles and hand the
+    workspace over; cannot leave it without handing it over first."""
+    ADMIN = "admin"
+    """Invites and removes members and renames the workspace."""
+    MEMBER = "member"
 
 
 class RequestInitiator(enum.StrEnum):
@@ -153,6 +177,21 @@ class SecurityEventType(enum.StrEnum):
     ADMIN_WEB_LOGOUT = "admin_web_logout"
     TOTP_ENABLED = "totp_enabled"
     TOTP_DISABLED = "totp_disabled"
+    WORKSPACE_INVITE_SENT = "workspace_invite_sent"
+    WORKSPACE_JOINED = "workspace_joined"
+    """The account moved into a workspace (accepted an invitation). ``details`` names the
+    workspace it left and the one it joined."""
+    WORKSPACE_LEFT = "workspace_left"
+    WORKSPACE_MEMBER_REMOVED = "workspace_member_removed"
+    """A workspace owner or admin removed the account; it now has a workspace of its own."""
+    WORKSPACE_ROLE_CHANGED = "workspace_role_changed"
+    WORKSPACE_RENAMED = "workspace_renamed"
+    SIGNUP_VERIFIED = "signup_verified"
+    """A ``verify``-mode registration proved its email (and phone) and the account was created.
+    Written against the new account, alongside ``registration_submitted``."""
+    PASSWORD_RESET_REQUESTED = "password_reset_requested"
+    PASSWORD_RESET = "password_reset"
+    """The password was changed with a mailed code: every refresh token was revoked."""
     LISTENER_UNAUTHENTICATED = "listener_unauthenticated"
     """Reported by a host client through ``POST /diagnostics``: connections that reached its
     listening port during a connect window and failed ``AUTH1``. The server cannot observe this

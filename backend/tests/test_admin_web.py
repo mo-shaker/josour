@@ -301,7 +301,7 @@ async def test_settings_change_registration_mode(
         from_page="/admin/settings",
     )
     assert response.status_code == 303 and "done=saved" in response.headers["location"]
-    assert (await client.get("/api/v1/auth/registration")).json() == {"mode": "closed"}
+    assert (await client.get("/api/v1/auth/registration")).json()["mode"] == "closed"
     page = await signed_in.get("/admin/settings")
     assert 'value="80, 443, 8443"' in page.text
 

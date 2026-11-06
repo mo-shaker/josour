@@ -12,11 +12,13 @@ from app.api.routers import (
     me,
     probe,
     sessions,
+    workspace,
 )
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router)
 api_router.include_router(me.router)
+api_router.include_router(workspace.router)
 api_router.include_router(contacts.router)
 api_router.include_router(hosts.router)
 api_router.include_router(sessions.router)

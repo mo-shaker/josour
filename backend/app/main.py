@@ -16,6 +16,7 @@ from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
 from app.db.session import dispose_engine
 from app.services.events import event_bus
+from app.services.outbox import build_senders
 from app.ws.lifecycle import on_shutdown, on_startup
 from app.ws.router import router as ws_router
 from app.ws.subscribers import register_subscribers
@@ -51,6 +52,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.state.rate_limiters = build_rate_limiters(settings)
+    app.state.senders = build_senders(settings)
     register_exception_handlers(app)
     if not settings.is_dev:
         register_guarded_docs(app)

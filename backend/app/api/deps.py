@@ -18,6 +18,7 @@ from app.db.session import get_db
 from app.models import Device, User
 from app.models.enums import DeviceStatus, UserRole
 from app.schemas.common import normalise_email_address
+from app.services.outbox import Senders, build_senders
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 DbDep = Annotated[AsyncSession, Depends(get_db)]
@@ -81,6 +82,17 @@ async def client_version_floor(request: Request, db: DbDep) -> None:
         raise ApiError(426, "upgrade_required", f"This server needs Josour {floor} or later")
 
 
+def get_senders(request: Request) -> Senders:
+    """The mail and SMS senders built at startup (``app.state.senders``, ADR-0019)."""
+    senders = getattr(request.app.state, "senders", None)
+    if isinstance(senders, Senders):
+        return senders
+    return build_senders(getattr(request.app.state, "settings", None) or get_settings())
+
+
+SendersDep = Annotated[Senders, Depends(get_senders)]
+
+
 def client_ip(request: Request) -> str | None:
     """Peer address as seen by uvicorn (X-Forwarded-For is applied by uvicorn's proxy-headers
     middleware when the proxy is trusted; see the Dockerfile CMD)."""
@@ -103,6 +115,7 @@ def build_rate_limiters(settings: Settings) -> RateLimiters | None:
         invite_user=TokenBucketLimiter(settings.invite_rate_limit_per_day, 86400.0),
         admin_login_ip=TokenBucketLimiter(settings.admin_login_rate_limit_per_minute, 60.0),
         diagnostics_user=TokenBucketLimiter(settings.diagnostics_rate_limit_per_hour, 3600.0),
+        verify_ip=TokenBucketLimiter(settings.verify_rate_limit_per_hour, 3600.0),
     )
 
 
@@ -185,6 +198,14 @@ async def register_rate_limit(request: Request) -> None:
     if limiters is None:
         return
     _spend(limiters.register_ip, client_ip(request) or "unknown")
+
+
+async def verify_rate_limit(request: Request) -> None:
+    """Entering or sending a verification or reset code: per client IP (ADR-0019)."""
+    limiters = get_rate_limiters(request)
+    if limiters is None:
+        return
+    _spend(limiters.verify_ip, client_ip(request) or "unknown")
 
 
 async def invite_rate_limit(request: Request, auth: AuthDep) -> None:

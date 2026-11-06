@@ -131,6 +131,10 @@ class RateLimiters:
     """``POST /admin/login`` (the web dashboard) per client IP (ADR-0016)."""
     diagnostics_user: TokenBucketLimiter
     """``POST /diagnostics`` per authenticated user."""
+    verify_ip: TokenBucketLimiter
+    """The code-checking and code-sending steps of verified registration and password reset,
+    per client IP (ADR-0019): every code also dies after five wrong tries, so this bounds how
+    many codes one address can try in all."""
 
     def reset(self) -> None:
         for limiter in (
@@ -142,5 +146,6 @@ class RateLimiters:
             self.invite_user,
             self.admin_login_ip,
             self.diagnostics_user,
+            self.verify_ip,
         ):
             limiter.reset()

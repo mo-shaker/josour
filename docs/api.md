@@ -82,10 +82,33 @@ reuse. A client must therefore never refresh in parallel.
     `429 registration_unavailable`.
   - `open`: `201 { "status": "active" }`; a taken address is `409 conflict` — that mode cannot hide it.
   - `closed`: `403 registration_closed`.
+  - `verify` (added 2026-11-06, [ADR-0019](decisions/0019-verified-registration.md)): `202 { "status": "verify" }`
+    whether or not the address had an account. **No account exists yet**: a six-digit code is mailed to the address
+    (the owner of a taken address gets a notice instead). `503 mail_unavailable` / `sms_unavailable` when the server
+    cannot send what the mode needs.
+
+### Verified registration and password reset (added on 2026-11-06, [ADR-0019](decisions/0019-verified-registration.md))
+
+`GET /auth/registration` also returns `phone_required` (in `verify` mode the phone steps below are needed) and
+`password_reset` (the server sends mail). Every endpoint here is unauthenticated and shares a per-IP budget
+(`VERIFY_RATE_LIMIT_PER_HOUR`, 30). Codes are six digits, valid 15 minutes, dead after five wrong tries.
+
+- `POST /auth/register/resend` `{ email }` → always `202`; a new code at most once a minute, five per registration.
+- `POST /auth/register/confirm` `{ email, code }` → `201 { "status": "active" }` (the account exists; sign in), or
+  `200 { "status": "phone_required", "signup_token" }` when the server requires a phone. `400 invalid_code`.
+- `POST /auth/register/phone` `{ signup_token, phone }` → `202`, an SMS code to the number (E.164; `+20 100…` and
+  `0020…` are normalised). `400 signup_expired`, `409 phone_in_use`, `429 rate_limited` (one a minute) /
+  `too_many_codes`.
+- `POST /auth/register/phone/confirm` `{ signup_token, code }` → `201 { "status": "active" }`.
+- `POST /auth/password/forgot` `{ email }` → always `202`; a code is mailed only to an account that may sign in.
+- `POST /auth/password/reset` `{ email, code, password }` → `204`: every refresh token and dashboard session is
+  revoked and a lockout is lifted. `400 invalid_code`.
 
 ## Contacts (added on 2026-10-13, [ADR-0014](decisions/0014-contacts-and-server-held-trust.md))
 
-Only contacts can see each other's hosts and ask for or offer a connection.
+Only contacts can see each other's hosts and ask for or offer a connection. Since 2026-11-06 contacts never cross a
+workspace ([ADR-0018](decisions/0018-workspaces.md)): an invitation to an account in another workspace is answered
+like any other and never arrives.
 
 - `GET /contacts` → `[{ user_id, display_name, email, online, i_trust, trusts_me, since }]`. `i_trust`: I let this
   contact use **my** connection without asking me; `trusts_me`: they let me use theirs.
@@ -102,9 +125,32 @@ Only contacts can see each other's hosts and ask for or offer a connection.
 - `POST /contacts/invites/{id}/accept` → `{ contact }`; `POST /contacts/invites/{id}/decline` → `204`;
   `DELETE /contacts/invites/{id}` (the inviter withdrawing) → `204`.
 
+## Workspaces (added on 2026-11-06, [ADR-0018](decisions/0018-workspaces.md))
+
+Every account belongs to exactly one workspace. In `single` mode (the default) that is the one default workspace and
+every route below answers `403 workspaces_disabled`; in `multi` mode every new account gets its own.
+
+- `GET /workspace` → `{ id, name, role, member_count }`; `PATCH /workspace` `{ name }` (owner or admin).
+- `GET /workspace/members` → `[{ user_id, display_name, email, role, state, online, joined_at }]`.
+- `PATCH /workspace/members/{user_id}` `{ role }` → `204`, owner only; `role: "owner"` hands the workspace over and
+  makes the caller an admin.
+- `DELETE /workspace/members/{user_id}` → `204`. The person keeps the account, in a workspace of their own; their
+  contacts here are removed and a live session ends `contact_removed`. The owner removes anyone but themselves; an
+  admin removes members only.
+- `POST /workspace/leave` → `204`; `409 owner_must_transfer` for the owner.
+- `GET /workspace/invites` → `[{ id, email, role, status: "pending"|"expired", created_at, expires_at }]` (owner or
+  admin; a decline still shows as pending). `POST /workspace/invites` `{ email, role: "member"|"admin" }` → always
+  `202` (only the owner invites an admin; shares the contact-invitation budget). `DELETE /workspace/invites/{id}` →
+  `204`.
+- `GET /me/workspace-invites` → `[{ id, workspace_id, workspace_name, role, from_display_name, created_at,
+  expires_at }]` (always `[]` in `single` mode). `POST /me/workspace-invites/{id}/accept` → `204`: the caller moves
+  into that workspace, losing every contact they had (`409 owner_must_transfer` if they own a workspace with other
+  members). `POST /me/workspace-invites/{id}/decline` → `204`, silent.
+
 ## The current user
 
-- `GET /me` → `{ id, email, display_name, role }`
+- `GET /me` → `{ id, email, display_name, role, workspace: { id, name, role, member_count }, workspace_mode, phone }`
+  (`workspace`, `workspace_mode` and `phone` added 2026-11-06)
 - `GET /me/devices` → `[{ id, name, os_version, status, last_seen_at, created_at }]`
 - `DELETE /me/devices/{id}` → `204` (deregistration; revokes the device's refresh tokens)
 - `GET /hosts` → `[{ device_id, user_id, user_display_name, device_name, reachable, same_public_ip }]` — the same shape as
@@ -158,7 +204,8 @@ Only contacts can see each other's hosts and ask for or offer a connection.
 
 ## Administration (role = admin)
 
-- `POST /admin/users` `{ email, password, display_name, role }` → `201` the user (approved and active). A
+- `POST /admin/users` `{ email, password, display_name, role, workspace_id? }` → `201` the user (approved and active;
+  `workspace_id`, added 2026-11-06, places the account in that workspace as a member). A
   `user_created` security event names the role and the administrator (added 2026-10-28; `manage.py create-user`
   writes it with `via: "cli"`).
 - `GET /admin/users?q=&state=&role=&limit=&offset=` → a list; `state` is `active`, `disabled`, `pending`, `rejected`
@@ -187,6 +234,8 @@ Only contacts can see each other's hosts and ask for or offer a connection.
   trusted_by_contact, created_at }]`; `DELETE /admin/contacts/{user_id}/{contact_user_id}` → `204`;
   `POST /admin/contacts/{user_id}/{contact_user_id}/revoke-trust` → `204` — an administrator can withdraw a trust
   grant, never give one. `GET /admin/invites?status=&limit=` → the invitations (added 2026-10-13).
+- `GET /admin/workspaces?q=&limit=&offset=` → `[{ id, name, is_default, member_count, owner_user_id, owner_email,
+  created_at }]` (added 2026-11-06). Every user row carries `workspace_id`, `workspace_role` and `phone`.
 - `GET /admin/devices?user_id=`, `POST /admin/devices/{id}/revoke` → `204`.
 - `GET /admin/domains` → `{ version, entries, updated_at }`.
 - `PUT /admin/domains` `{ "entries": [...] }` → a new version; validates every entry; broadcasts `allowlist.updated`.
@@ -194,7 +243,7 @@ Only contacts can see each other's hosts and ask for or offer a connection.
 - `GET /admin/security-events?limit=`, `GET /admin/diagnostics` → a summary: the number of sessions, the
   `connect_result=ok` rate (with `timeout` counted as a failure), the distribution of `winner_type`, of `tls_version`,
   and of `end_reason` (added in week 4).
-- `GET /admin/settings`, `PATCH /admin/settings` `{ max_session_minutes?, request_timeout_seconds?, connect_timeout_seconds?, log_domains?, enforce_allowlist?, allowed_ports?, registration_mode?, min_client_version?, invite_ttl_days? }`.
+- `GET /admin/settings`, `PATCH /admin/settings` `{ max_session_minutes?, request_timeout_seconds?, connect_timeout_seconds?, log_domains?, enforce_allowlist?, allowed_ports?, registration_mode?, min_client_version?, invite_ttl_days?, workspace_mode?, require_phone? }`.
   Every change is written as a `settings_changed` security event.
 - **The web dashboard** (`/admin`, [ADR-0016](decisions/0016-web-admin-dashboard.md)) calls the same services, so it
   writes the same security events; each one it writes for an administrative action also carries `details.via: "web"`
@@ -214,6 +263,8 @@ Only contacts can see each other's hosts and ask for or offer a connection.
 | `log_domains` | false |
 | `enforce_allowlist` | false — **[ADR-0010](decisions/0010-route-all-through-host.md)**: everything the guest's browsers ask for goes through the host. The list restricts only when an administrator turns this key on |
 | `allowed_ports` | `[80, 443]` |
-| `registration_mode` | `approval` — [ADR-0017](decisions/0017-self-registration-with-approval.md) |
+| `registration_mode` | `approval` — [ADR-0017](decisions/0017-self-registration-with-approval.md); `verify` since 2026-11-06 ([ADR-0019](decisions/0019-verified-registration.md)) |
 | `min_client_version` | `""` (no floor) |
 | `invite_ttl_days` | 30 |
+| `workspace_mode` | `single` — [ADR-0018](decisions/0018-workspaces.md); the hosted service uses `multi` |
+| `require_phone` | false — in `verify` mode, also prove a phone number by SMS ([ADR-0019](decisions/0019-verified-registration.md)) |

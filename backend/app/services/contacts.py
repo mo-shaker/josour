@@ -8,6 +8,10 @@ Who can share a connection with whom is decided here and nowhere else:
 * each side owns one switch about its *own* connection - "this contact may use it without asking
   me" - which is the ``auto_accept`` column of the user's own row.
 
+Contacts never cross a workspace (ADR-0018): an invitation is only ever delivered to an account
+in the inviter's own workspace, so two accounts in different workspaces cannot become contacts -
+and with no contact there is no host list entry, request, offer or session between them.
+
 Invitations never reveal whether an address has an account. Inviting an unknown address and a
 known one return the same answer and leave the same thing in the inviter's outgoing list; a
 decline is silent, so it is indistinguishable from an address nobody uses.
@@ -158,12 +162,15 @@ def _live(invite: ContactInvite) -> bool:
     )
 
 
-async def _invitable_user(db: AsyncSession, email: str) -> User | None:
+async def _invitable_user(db: AsyncSession, email: str, workspace_id: uuid.UUID) -> User | None:
     """The account an invitation to ``email`` is delivered to, if there is one that may receive
-    it: approved and not deleted. A pending account gets it on approval."""
+    it: approved, not deleted, and in the inviter's workspace. A pending account gets it on
+    approval; an account elsewhere never does (the invitation simply never arrives, exactly as
+    for an address nobody uses)."""
     return await db.scalar(
         select(User).where(
             User.email == email,
+            User.workspace_id == workspace_id,
             User.approval_status == ApprovalStatus.APPROVED,
             User.deleted_at.is_(None),
         )
@@ -188,7 +195,7 @@ async def invite(
         raise ValidationFailed("you cannot invite yourself")
     effects = Effects(contacts_changed={inviter.id})
     now = utcnow()
-    target = await _invitable_user(db, email)
+    target = await _invitable_user(db, email, inviter.workspace_id)
     if target is not None:
         if await are_contacts(db, inviter.id, target.id):
             return effects
@@ -247,6 +254,9 @@ async def invite(
 async def _accept(
     db: AsyncSession, invite_row: ContactInvite, *, invitee: User, ip: str | None
 ) -> None:
+    inviter = await db.get(User, invite_row.inviter_user_id)
+    if inviter is None or inviter.workspace_id != invitee.workspace_id:
+        raise NotFound("Invitation not found")
     now = utcnow()
     await _connect(db, invite_row.inviter_user_id, invitee.id)
     invite_row.status = InviteStatus.ACCEPTED
@@ -327,6 +337,7 @@ async def list_invites(db: AsyncSession, user: User) -> InvitesOut:
             ContactInvite.status == InviteStatus.PENDING,
             ContactInvite.expires_at > now,
             User.deleted_at.is_(None),
+            User.workspace_id == user.workspace_id,
         )
         .order_by(ContactInvite.created_at.desc())
     )
@@ -407,10 +418,13 @@ async def attach_pending_invites(db: AsyncSession, user: User) -> int:
     Called on approval, on an open registration and when an administrator changes an email."""
     rows = list(
         await db.scalars(
-            select(ContactInvite).where(
+            select(ContactInvite)
+            .join(User, User.id == ContactInvite.inviter_user_id)
+            .where(
                 ContactInvite.invitee_email == user.email,
                 ContactInvite.status == InviteStatus.PENDING,
                 ContactInvite.invitee_user_id.is_(None),
+                User.workspace_id == user.workspace_id,
             )
         )
     )
@@ -581,17 +595,26 @@ async def remove_all_for_user(db: AsyncSession, user_id: uuid.UUID) -> Effects:
 
 
 async def seed_all_active(db: AsyncSession) -> int:
-    """``manage.py seed-contacts --all-active``: make every pair of active accounts contacts.
+    """``manage.py seed-contacts --all-active``: make every pair of active accounts *in the same
+    workspace* contacts.
 
     The one-off bridge for a deployment upgrading from the global host list: everybody who
     could see everybody before still can, and each person prunes from there."""
-    ids = list(
-        await db.scalars(select(User.id).where(User.is_active.is_(True), User.deleted_at.is_(None)))
+    rows = list(
+        await db.execute(
+            select(User.id, User.workspace_id).where(
+                User.is_active.is_(True), User.deleted_at.is_(None)
+            )
+        )
     )
+    by_workspace: dict[uuid.UUID, list[uuid.UUID]] = {}
+    for user_id, workspace_id in rows:
+        by_workspace.setdefault(workspace_id, []).append(user_id)
     created = 0
-    for i, a in enumerate(ids):
-        for b in ids[i + 1 :]:
-            if await get_link(db, a, b) is None or await get_link(db, b, a) is None:
-                await _connect(db, a, b)
-                created += 1
+    for ids in by_workspace.values():
+        for i, a in enumerate(ids):
+            for b in ids[i + 1 :]:
+                if await get_link(db, a, b) is None or await get_link(db, b, a) is None:
+                    await _connect(db, a, b)
+                    created += 1
     return created

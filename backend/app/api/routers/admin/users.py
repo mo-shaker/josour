@@ -53,6 +53,7 @@ async def create_user(
         password=payload.password,
         display_name=payload.display_name,
         role=payload.role,
+        workspace_id=payload.workspace_id,
     )
     user_service.record_created(db, user, actor_user_id=auth.user.id, ip=client_ip(request))
     await db.commit()

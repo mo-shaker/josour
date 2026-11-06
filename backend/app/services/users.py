@@ -3,6 +3,7 @@
 import enum
 import secrets
 import uuid
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func, or_, select, update
@@ -11,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.clock import utcnow
 from app.core.errors import Conflict, ValidationFailed
 from app.core.security import hash_password_async
-from app.models import Device, Presence, User
+from app.models import Device, Presence, User, Workspace
 from app.models.enums import (
     ApprovalStatus,
     DeviceStatus,
@@ -19,9 +20,11 @@ from app.models.enums import (
     SecurityEventType,
     SessionEndReason,
     UserRole,
+    WorkspaceRole,
 )
 from app.schemas.admin import AdminUserPatch
 from app.services import admin_web_sessions
+from app.services import workspaces as workspace_service
 from app.services.effects import Effects
 from app.services.security_events import record_event
 from app.services.tokens import revoke_user_tokens
@@ -335,26 +338,51 @@ async def create_user(
     role: UserRole = UserRole.USER,
     approval_status: ApprovalStatus = ApprovalStatus.APPROVED,
     registered_via: RegisteredVia = RegisteredVia.ADMIN,
+    workspace_id: uuid.UUID | None = None,
+    password_hash: str | None = None,
+    email_verified_at: datetime | None = None,
+    phone: str | None = None,
+    phone_verified_at: datetime | None = None,
 ) -> User:
-    """Approved accounts start active; pending and rejected ones never do (the CHECK)."""
+    """Approved accounts start active; pending and rejected ones never do (the CHECK).
+
+    The account goes into ``workspace_id`` as a member when one is named (an operator placing
+    it), otherwise where :func:`app.services.workspaces.placement_for_new_account` says: a
+    workspace of its own in ``multi`` mode, the default one in ``single`` mode (ADR-0018).
+    ``password_hash`` is for a verified registration, whose password was hashed when it began."""
     email = normalise_email(email)
     if "@" not in email:
         raise ValidationFailed("email must be a valid email address")
-    validate_password(password)
+    if password_hash is None:
+        validate_password(password)
     if not display_name.strip():
         raise ValidationFailed("display_name must not be empty")
     if await get_user_by_email(db, email) is not None:
         raise Conflict("a user with this email already exists")
+    if workspace_id is not None:
+        if await db.get(Workspace, workspace_id) is None:
+            raise ValidationFailed("no such workspace")
+        workspace_role = WorkspaceRole.MEMBER
+    else:
+        workspace, workspace_role = await workspace_service.placement_for_new_account(
+            db, display_name
+        )
+        workspace_id = workspace.id
     approved = approval_status == ApprovalStatus.APPROVED
     user = User(
         email=email,
-        password_hash=await hash_password_async(password),
+        password_hash=password_hash or await hash_password_async(password),
         display_name=display_name.strip(),
         role=UserRole(role),
         approval_status=approval_status,
         registered_via=registered_via,
         is_active=approved,
         approved_at=utcnow() if approved else None,
+        workspace_id=workspace_id,
+        workspace_role=workspace_role,
+        email_verified_at=email_verified_at,
+        phone=phone,
+        phone_verified_at=phone_verified_at,
     )
     db.add(user)
     await db.flush()

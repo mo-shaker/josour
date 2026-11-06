@@ -58,6 +58,20 @@ services:
       REGISTER_RATE_LIMIT_PER_HOUR: ${REGISTER_RATE_LIMIT_PER_HOUR:-5}
       INVITE_RATE_LIMIT_PER_DAY: ${INVITE_RATE_LIMIT_PER_DAY:-20}
       MAX_PENDING_REGISTRATIONS: ${MAX_PENDING_REGISTRATIONS:-200}
+      # Outgoing email and SMS for verified registration and password reset (ADR-0019).
+      # MAIL_BACKEND=none sends nothing: "verify" registration and "forgot password" are then off.
+      MAIL_BACKEND: ${MAIL_BACKEND:-none}
+      MAIL_FROM: ${MAIL_FROM:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+      SMS_BACKEND: ${SMS_BACKEND:-none}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM: ${TWILIO_FROM:-}
+      VERIFY_RATE_LIMIT_PER_HOUR: ${VERIFY_RATE_LIMIT_PER_HOUR:-30}
       # Web dashboard at https://${DOMAIN}/admin (ADR-0016).
       ADMIN_WEB_ENABLED: ${ADMIN_WEB_ENABLED:-true}
       ADMIN_WEB_ALLOWED_CIDRS: ${ADMIN_WEB_ALLOWED_CIDRS:-}

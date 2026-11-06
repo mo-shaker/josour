@@ -20,6 +20,8 @@ DEFAULTS = {
     "registration_mode": "approval",
     "min_client_version": "",
     "invite_ttl_days": 30,
+    "workspace_mode": "single",
+    "require_phone": False,
 }
 
 

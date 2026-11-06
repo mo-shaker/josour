@@ -13,8 +13,19 @@ from app.api.routers.admin import (
     sessions,
     settings,
     users,
+    workspaces,
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
-for module in (users, contacts, devices, domains, sessions, security_events, diagnostics, settings):
+for module in (
+    users,
+    workspaces,
+    contacts,
+    devices,
+    domains,
+    sessions,
+    security_events,
+    diagnostics,
+    settings,
+):
     router.include_router(module.router)

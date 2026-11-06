@@ -16,7 +16,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.clock import utcnow
 from app.db.base import Base
 from app.db.types import UtcDateTime
-from app.models.enums import ApprovalStatus, RegisteredVia, UserRole
+from app.models.enums import ApprovalStatus, RegisteredVia, UserRole, WorkspaceRole
+
+_HAS_PHONE = text("phone IS NOT NULL")
 
 
 class User(Base):
@@ -55,6 +57,23 @@ class User(Base):
     but its email, name and password are replaced and it can never sign in again."""
     last_login_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
 
+    # --- Workspace (ADR-0018). Exactly one per account.
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("workspaces.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    workspace_role: Mapped[str] = mapped_column(
+        String(8),
+        nullable=False,
+        default=WorkspaceRole.MEMBER,
+        server_default=WorkspaceRole.MEMBER.value,
+    )
+
+    # --- Verified registration (ADR-0019). Null for accounts made any other way.
+    email_verified_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    """E.164 (``+201001234567``), proved with an SMS code. One account per number."""
+    phone_verified_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+
     # --- Second factor for the web dashboard (ADR-0016); unused by the desktop sign-in.
     totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
     totp_enabled_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
@@ -68,6 +87,13 @@ class User(Base):
             text("approval_status = 'approved' OR is_active = false"), name="pending_inactive"
         ),
         Index("ix_users_approval_status_created_at", "approval_status", "created_at"),
+        Index(
+            "uq_users_phone",
+            "phone",
+            unique=True,
+            postgresql_where=_HAS_PHONE,
+            sqlite_where=_HAS_PHONE,
+        ),
     )
 
     @property

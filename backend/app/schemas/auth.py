@@ -173,12 +173,105 @@ class RegisterRequest(BaseModel):
 class RegisterOut(BaseModel):
     model_config = ConfigDict(json_schema_extra={"examples": [{"status": "pending"}]})
 
-    status: Literal["pending", "active"]
+    status: Literal["pending", "active", "verify"]
     """``pending``: an administrator must approve the account before it can sign in.
-    ``active``: sign in now."""
+    ``active``: sign in now. ``verify``: enter the code mailed to the address
+    (``POST /auth/register/confirm``)."""
 
 
 class RegistrationInfo(BaseModel):
-    model_config = ConfigDict(json_schema_extra={"examples": [{"mode": "approval"}]})
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"mode": "approval", "phone_required": False, "password_reset": False},
+                {"mode": "verify", "phone_required": True, "password_reset": True},
+            ]
+        }
+    )
 
     mode: RegistrationMode
+    phone_required: bool = Field(
+        description="In `verify` mode, registration also needs a phone number proved by SMS."
+    )
+    password_reset: bool = Field(
+        description="`POST /auth/password/forgot` works: the server sends email."
+    )
+
+
+class _EmailIn(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+
+    @field_validator("email")
+    @classmethod
+    def _normalise_email(cls, value: str) -> str:
+        return normalise_email_address(value)
+
+
+_CODE = Field(min_length=4, max_length=12, description="The six digits that were sent")
+
+
+class EmailIn(_EmailIn):
+    model_config = ConfigDict(json_schema_extra={"examples": [{"email": "bob@example.com"}]})
+
+
+class ConfirmEmailIn(_EmailIn):
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"email": "bob@example.com", "code": "042317"}]}
+    )
+
+    code: str = _CODE
+
+
+class SignupStepOut(BaseModel):
+    """What ``POST /auth/register/confirm`` (and the phone steps) leave to do."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"status": "active", "signup_token": None},
+                {"status": "phone_required", "signup_token": "<opaque token>"},
+            ]
+        }
+    )
+
+    status: Literal["active", "phone_required"]
+    """``active``: the account exists; sign in with ``POST /auth/login``. ``phone_required``:
+    send a number to ``POST /auth/register/phone`` with ``signup_token``."""
+    signup_token: str | None = Field(
+        default=None,
+        description="Only with `phone_required`: proves the email step for the phone steps. "
+        "Valid until the registration expires (one hour after it began).",
+    )
+
+
+class SignupPhoneIn(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [{"signup_token": "<opaque token>", "phone": "+201001234567"}]
+        }
+    )
+
+    signup_token: str = Field(min_length=1, max_length=128)
+    phone: str = Field(min_length=8, max_length=32, description="International (E.164) format")
+
+
+class SignupPhoneConfirmIn(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"signup_token": "<opaque token>", "code": "042317"}]}
+    )
+
+    signup_token: str = Field(min_length=1, max_length=128)
+    code: str = _CODE
+
+
+class PasswordResetIn(_EmailIn):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"email": "bob@example.com", "code": "042317", "password": "a-new-passphrase"}
+            ]
+        }
+    )
+
+    code: str = _CODE
+    password: str = Field(min_length=8, max_length=1024)

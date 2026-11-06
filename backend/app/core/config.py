@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     event, so an account must not be able to fill the database with them. A client reports one
     failed connect per session; the NAT prototype tool sends ten pairs per run."""
 
+    verify_rate_limit_per_hour: int = Field(default=30, ge=1)
+    """Code entry and code sending for verified registration and password reset, per client IP
+    (ADR-0019). Each code also dies after five wrong tries."""
+
     admin_login_rate_limit_per_minute: int = Field(default=10, ge=1)
     """``POST /admin/login`` (the web dashboard) per client IP. The per-email bucket and the
     account lockout are shared with the app's sign-in."""
@@ -68,6 +72,26 @@ class Settings(BaseSettings):
     max_pending_registrations: int = Field(default=200, ge=1)
     """Above this many accounts waiting for approval, new registrations are refused until an
     administrator works through the queue - a bound on what a registration flood can leave."""
+
+    # --- Outgoing email and SMS (ADR-0019): verification codes, password resets, invitations.
+    mail_backend: Literal["none", "console", "smtp"] = "none"
+    """``none`` sends nothing (``verify`` registration and password reset are then unavailable);
+    ``console`` writes each message to the log - for development only, refused in ``prod``;
+    ``smtp`` sends through ``SMTP_*`` (Postmark, SES, Resend and friends all speak it)."""
+    mail_from: str = ""
+    """``Josour <no-reply@example.com>``. Required with ``smtp``."""
+    smtp_host: str = ""
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_security: Literal["starttls", "tls", "none"] = "starttls"
+    sms_backend: Literal["none", "console", "twilio"] = "none"
+    """``none`` sends nothing (``require_phone`` is then refused at registration); ``console`` as
+    for mail; ``twilio`` sends through the Messages API with ``TWILIO_*``."""
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_from: str = ""
+    """A sender number (``+15005550006``) or a Messaging Service SID (``MG...``)."""
 
     # --- Relay (ADR-0009). The relay is the guaranteed transport; direct is the optimisation.
     relay_host: str = ""
@@ -122,6 +146,16 @@ class Settings(BaseSettings):
             raise ValueError("RELAY_SECRET is set but RELAY_HOST is not")
         if self.relay_secret and len(self.relay_secret) < 32:
             raise ValueError("RELAY_SECRET must be at least 32 characters")
+        if self.env == "prod" and "console" in (self.mail_backend, self.sms_backend):
+            raise ValueError(
+                "MAIL_BACKEND/SMS_BACKEND=console writes codes to the log; not in prod"
+            )
+        if self.mail_backend == "smtp" and not (self.smtp_host and self.mail_from):
+            raise ValueError("MAIL_BACKEND=smtp needs SMTP_HOST and MAIL_FROM")
+        if self.sms_backend == "twilio" and not (
+            self.twilio_account_sid and self.twilio_auth_token and self.twilio_from
+        ):
+            raise ValueError("SMS_BACKEND=twilio needs TWILIO_ACCOUNT_SID, _AUTH_TOKEN and _FROM")
         try:
             self.admin_web_networks  # noqa: B018 - validated at boot, not at first request
         except ValueError as exc:

@@ -10,7 +10,13 @@ ME = "/api/v1/me"
 async def test_get_me(client: AsyncClient, logged_in: dict[str, Any], auth_headers: dict) -> None:
     response = await client.get(ME, headers=auth_headers)
     assert response.status_code == 200
-    assert response.json() == logged_in["user"]
+    body = response.json()
+    # GET /me is the sign-in's user object plus where the account belongs (ADR-0018).
+    assert {key: body[key] for key in logged_in["user"]} == logged_in["user"]
+    assert body["workspace_mode"] == "single"
+    assert body["workspace"]["role"] == "owner"  # the first account in the default workspace
+    assert body["workspace"]["member_count"] == 1
+    assert body["phone"] is None
 
 
 async def test_me_requires_bearer(client: AsyncClient) -> None:
